@@ -141,7 +141,7 @@ def generate(
             blk_driver.add_map(nvme_prp_list_map)
 
             nvme_identify_mr = SystemDescription.MemoryRegion(
-                sdf, "nvme_identify", 0x1000, paddr=0x5FDF4000
+                sdf, "nvme_identify", 0x2000, paddr=0x5FDF4000
             )
             sdf.add_mr(nvme_identify_mr)
             nvme_identify_map = SystemDescription.Map(

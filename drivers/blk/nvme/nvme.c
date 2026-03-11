@@ -41,6 +41,7 @@ uintptr_t nvme_io_sq_region_paddr;
 uintptr_t nvme_io_cq_region_paddr;
 
 nvme_identify_ctrl_t *nvme_identify_ctrl;
+nvme_identify_ns_t *nvme_identify_ns;
 
 /* Timed polling used while waiting for controller reset/enable transitions. */
 #define NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS 10
@@ -64,13 +65,14 @@ static blk_storage_info_t *storage_info;
 
 /*
  * State machine flow:
- *   WAIT_NOT_READY -> WAIT_READY -> WAIT_IDENTIFY (timer-driven, see nvme_poll_controller_status)
- *   WAIT_IDENTIFY -> WAIT_CREATE_IO_CQ -> WAIT_CREATE_IO_SQ -> READY (IRQ-driven, see handle_admin_completions)
+ *   WAIT_NOT_READY -> WAIT_READY -> WAIT_IDENTIFY_CTRL (timer-driven, see nvme_poll_controller_status)
+ *   WAIT_IDENTIFY_CTRL -> WAIT_IDENTIFY_NS -> WAIT_CREATE_IO_CQ -> WAIT_CREATE_IO_SQ -> READY (IRQ-driven, see handle_admin_completions)
  */
 typedef enum {
     NVME_STATE_WAIT_NOT_READY,    // Waiting for CSTS.RDY=0
     NVME_STATE_WAIT_READY,        // Waiting for CSTS.RDY=1
-    NVME_STATE_WAIT_IDENTIFY,     // Waiting for Identify Controller completion
+    NVME_STATE_WAIT_IDENTIFY_CTRL,// Waiting for Identify Controller completion
+    NVME_STATE_WAIT_IDENTIFY_NS,  // Waiting for Identify Namespace completion
     NVME_STATE_WAIT_CREATE_IO_CQ, // Waiting for Create I/O CQ completion
     NVME_STATE_WAIT_CREATE_IO_SQ, // Waiting for Create I/O SQ completion
     NVME_STATE_READY,             // Operational
@@ -78,9 +80,10 @@ typedef enum {
 
 typedef struct {
     nvme_state_t state;
-    uint32_t timeout_ms;   // CAP.TO derived timeout
-    uint32_t waited_ms;    // Time waited in current state
-    uint32_t io_queue_depth; // Configured I/O queue depth based on CAP.MQES
+    uint32_t timeout_ms;        // CAP.TO derived timeout
+    uint32_t waited_ms;         // Time waited in current state
+    uint32_t io_queue_depth;    // Configured I/O queue depth based on CAP.MQES
+    uint32_t sectors_per_block; // Derived from Identify Namespace data
 } nvme_state_ctx_t;
 
 static nvme_state_ctx_t state_ctx;
@@ -195,6 +198,31 @@ static void validate_identify_entry_size_limits(void)
     }
 }
 
+/* Resolve namespace logical-sector size from active FLBAS/LBAF selection. */
+static uint32_t nvme_namespace_sector_size(const nvme_identify_ns_t *identify_ns)
+{
+    uint8_t format_index = nvme_identify_flbas_format_index(identify_ns->flbas);
+    uint8_t lbads = identify_ns->lbaf[format_index].lbads;
+
+    /* Logical block data size (sector size) = 2^LBADS bytes. */
+    assert(lbads >= 9);
+    return 1 << lbads;
+}
+
+/* Copy fixed-width ASCII fields and trim trailing space padding in place. */
+static void copy_trim_ascii(char *dst, size_t dst_size, const char *src, size_t src_size)
+{
+    assert(dst_size >= (src_size + 1));
+
+    memcpy(dst, src, src_size);
+    dst[src_size] = '\0';
+
+    while (src_size > 0 && dst[src_size - 1] == ' ') {
+        dst[src_size - 1] = '\0';
+        src_size--;
+    }
+}
+
 /* Build PRP pointers for a request using a single non-chained PRP list model. */
 static int build_prp_dptr(uint32_t cid, uintptr_t data_paddr, uint16_t count, uint64_t *dptr1, uint64_t *dptr2)
 {
@@ -290,9 +318,9 @@ static void handle_request(void)
             continue;
         }
 
-        /* Translate sDDF 4096B blocks to NVMe 512B sectors. */
-        uint64_t lba = block_number * 8;
-        uint32_t nlb = (count * 8) - 1;
+        /* Translate sDDF 4096B blocks to NVMe device sectors. */
+        uint64_t lba = block_number * state_ctx.sectors_per_block;
+        uint32_t nlb = (count * state_ctx.sectors_per_block) - 1;
 
         /* Allocate a CID */
         uint32_t cid;
@@ -355,7 +383,7 @@ static void handle_admin_completions(void)
     LOG_NVME("Admin completion in state %d\n", state_ctx.state);
 
     switch (state_ctx.state) {
-    case NVME_STATE_WAIT_IDENTIFY: {
+    case NVME_STATE_WAIT_IDENTIFY_CTRL: {
         LOG_NVME("Identify Controller completed\n");
         LOG_NVME("  VID: 0x%04x  SSVID: 0x%04x\n", nvme_identify_ctrl->vid, nvme_identify_ctrl->ssvid);
         LOG_NVME("  SN:  %.20s\n", nvme_identify_ctrl->sn);
@@ -370,6 +398,52 @@ static void handle_admin_completions(void)
         //    After determining the number of I/O Queues, the NVMe Transport specific interrupt registers
         //    (e.g., MSI and/or MSI-X registers) should be configured
         validate_identify_entry_size_limits();
+
+        uint32_t admin_cid;
+        err = ialloc_alloc(&cid_ialloc, &admin_cid);
+        assert(err == 0);
+        assert(admin_cid <= UINT16_MAX);
+
+        /*
+         * Identify Namespace for the NVM Command Set (CNS=00h).
+         * [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114]
+         * [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114]
+         */
+        nvme_queue_submit(&admin_queue,
+                          &(nvme_submission_queue_entry_t) {
+                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_IDENTIFY, NVME_CDW0_PSDT_PRP),
+                              .nsid = NVME_DEFAULT_NSID,
+                              .cdw10 = NVME_IDENTIFY_CNS_NAMESPACE,
+                              .prp1 = NVME_IDENTIFY_NS_PADDR,
+                          });
+
+        state_ctx.state = NVME_STATE_WAIT_IDENTIFY_NS;
+        LOG_NVME("Submitted Identify Namespace, waiting...\n");
+        break;
+    }
+
+    case NVME_STATE_WAIT_IDENTIFY_NS: {
+        LOG_NVME("Identify Namespace completed\n");
+
+        /*
+         * FLBAS selects the active LBAF entry; LBADS gives sector size as 2^LBADS.
+         * [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114, Fig. 116]
+         */
+        uint8_t format_index = nvme_identify_flbas_format_index(nvme_identify_ns->flbas);
+        uint8_t lbads UNUSED = nvme_identify_ns->lbaf[format_index].lbads;
+        uint32_t sector_size = nvme_namespace_sector_size(nvme_identify_ns);
+
+        /* Uses Logical Block Data Size only (2^LBADS); metadata size (MS) is excluded. [NVM-CommandSet-1.1 §1.4.2.5] */
+        /* Extended LBA transfers (2^LBADS + MS) are currently not supported. [NVM-CommandSet-1.1 §1.4.3.1] */
+        assert(BLK_TRANSFER_SIZE >= sector_size);
+        assert(BLK_TRANSFER_SIZE % sector_size == 0);
+
+        state_ctx.sectors_per_block = BLK_TRANSFER_SIZE / sector_size;
+        uint64_t total_blocks UNUSED = (nvme_identify_ns->nsze * sector_size) / BLK_TRANSFER_SIZE;
+
+        LOG_NVME("NS: NSZE=%lu, LBADS=%u, sector=%uB, capacity=%lu blocks\n", nvme_identify_ns->nsze, lbads,
+                 sector_size, total_blocks);
+
         uint16_t io_queue_id = NVME_DEFAULT_IO_Q_ID;
         assert(nvme_io_sq_region != 0x0);
         assert(nvme_io_cq_region != 0x0);
@@ -449,8 +523,17 @@ static void handle_admin_completions(void)
         storage_info = blk_config.virt.storage_info.vaddr;
 
         /* Set storage info */
-        storage_info->capacity = 0x4000; /* 64MB / 4KB = 16384 blocks */
-        storage_info->block_size = 4096;
+        storage_info->read_only = false;
+        storage_info->sector_size = nvme_namespace_sector_size(nvme_identify_ns);
+        storage_info->block_size = 1;
+        storage_info->queue_depth = state_ctx.io_queue_depth;
+        storage_info->cylinders = 0;
+        storage_info->heads = 0;
+        storage_info->blocks = 0;
+        storage_info->capacity = (nvme_identify_ns->nsze * storage_info->sector_size) / BLK_TRANSFER_SIZE;
+
+        copy_trim_ascii(storage_info->serial_number, sizeof(storage_info->serial_number),
+                        (const char *)nvme_identify_ctrl->sn, sizeof(nvme_identify_ctrl->sn));
 
         LOG_NVME("Setting storage info ready at %p...\n", storage_info);
         blk_storage_set_ready(storage_info, true);
@@ -600,7 +683,7 @@ static void nvme_poll_controller_status(void)
                               .prp1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
                           });
 
-        state_ctx.state = NVME_STATE_WAIT_IDENTIFY;
+        state_ctx.state = NVME_STATE_WAIT_IDENTIFY_CTRL;
         LOG_NVME("Submitted Identify Controller, waiting for completion\n");
 
         // Acknowledge any pending IRQ from controller ready
@@ -706,6 +789,7 @@ void init(void)
     nvme_io_cq_region_paddr = NVME_IO_CQ_PADDR;
 
     nvme_identify_ctrl = (void *)NVME_IDENTIFY_CTRL_VADDR;
+    nvme_identify_ns = (void *)NVME_IDENTIFY_NS_VADDR;
 
     /* Initialise CID allocator */
     ialloc_init(&cid_ialloc, cid_ialloc_idxlist, MAX_PENDING_REQS);
