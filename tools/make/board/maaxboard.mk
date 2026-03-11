@@ -16,5 +16,6 @@ UART_DRIV_DIR := ${PLATFORM}
 CLK_DRIV_DIR := ${PLATFORM}
 PWM_DRIV_DIR := imx
 PINCTRL_DRIV_DIR := imx
+TMU_DRIV_DIR := imx8mq
 
 CPU := cortex-a53
