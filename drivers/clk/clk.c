@@ -180,7 +180,7 @@ int clk_disable(struct clk *clk)
     return CLK_INVALID_OP;
 }
 
-int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
+int clk_set_rate(const struct clk *clk, uint64_t req_rate, uint64_t *rate)
 {
     if (!clk)
         return CLK_UNKNOWN_TARGET;

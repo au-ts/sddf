@@ -157,13 +157,13 @@ struct clk_hw {
  */
 struct clk_ops {
     int (*get_parent)(const struct clk *clk, uint8_t *index);
-    int (*set_parent)(struct clk *clk, uint8_t index);
+    int (*set_parent)(const struct clk *clk, uint8_t index);
     uint64_t (*recalc_rate)(const struct clk *clk, uint64_t parent_rate);
     int (*set_rate)(const struct clk *clk, uint64_t rate, uint64_t parent_rate);
-    void (*init)(struct clk *clk);
-    int (*enable)(struct clk *clk);
-    int (*disable)(struct clk *clk);
-    int (*is_enabled)(struct clk *clk);
+    void (*init)(const struct clk *clk);
+    int (*enable)(const struct clk *clk);
+    int (*disable)(const struct clk *clk);
+    int (*is_enabled)(const struct clk *clk);
 };
 
 struct clk {
@@ -403,4 +403,4 @@ int clk_disable(struct clk *clk);
  * @req_rate:    request rate
  * @rate:   pointer to result variable
  */
-int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);
+int clk_set_rate(const struct clk *clk, uint64_t req_rate, uint64_t *rate);

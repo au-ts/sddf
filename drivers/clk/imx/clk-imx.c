@@ -39,21 +39,21 @@
 
 #define PLL_FRAC_DENOM 0x1000000
 
-static int clk_gate2_enable(struct clk *clk)
+static int clk_gate2_enable(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     return regmap_update_bits(clk->base, data->offset, data->bit_idx, MASK(2), 0x3);
 }
 
-static int clk_gate2_disable(struct clk *clk)
+static int clk_gate2_disable(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     return regmap_update_bits(clk->base, data->offset, data->bit_idx, MASK(2), 0);
 }
 
-static int clk_gate2_is_enabled(struct clk *clk)
+static int clk_gate2_is_enabled(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
@@ -217,7 +217,7 @@ static int clk_sscg_pll_get_parent(const struct clk *clk, uint8_t *index)
     return 0;
 }
 
-static int clk_sscg_pll_set_parent(struct clk *clk, uint8_t index)
+static int clk_sscg_pll_set_parent(const struct clk *clk, uint8_t index)
 {
     /* struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data); */
 
@@ -291,7 +291,7 @@ static int imx8m_clk_core_slice_get_parent(const struct clk *clk, uint8_t *index
     return 0;
 }
 
-static int imx8m_clk_core_slice_set_parent(struct clk *clk, uint8_t index)
+static int imx8m_clk_core_slice_set_parent(const struct clk *clk, uint8_t index)
 {
     struct clk_core_slice_data *data = (struct clk_core_slice_data *)(clk->data);
 
@@ -358,7 +358,7 @@ static int imx8m_clk_common_slice_get_parent(const struct clk *clk, uint8_t *ind
     return 0;
 }
 
-static int imx8m_clk_common_slice_set_parent(struct clk *clk, uint8_t index)
+static int imx8m_clk_common_slice_set_parent(const struct clk *clk, uint8_t index)
 {
     struct clk_common_slice_data *data = (struct clk_common_slice_data *)(clk->data);
 
@@ -425,7 +425,7 @@ static int imx8m_clk_bus_slice_get_parent(const struct clk *clk, uint8_t *index)
     return 0;
 }
 
-static int imx8m_clk_bus_slice_set_parent(struct clk *clk, uint8_t index)
+static int imx8m_clk_bus_slice_set_parent(const struct clk *clk, uint8_t index)
 {
     struct clk_bus_slice_data *data = (struct clk_bus_slice_data *)(clk->data);
 
@@ -489,7 +489,6 @@ static int imx8m_cpu_set_rate(const struct clk *clk, uint64_t rate, uint64_t par
     }
 
     return 0;
-
 }
 
 static uint64_t imx8m_cpu_recalc_rate(const struct clk *clk, uint64_t prate)
