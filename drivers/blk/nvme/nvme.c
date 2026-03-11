@@ -17,7 +17,7 @@
 #include "nvme.h"
 #include "nvme_queue.h"
 
-#define DEBUG_DRIVER
+//#define DEBUG_DRIVER
 #ifdef DEBUG_DRIVER
 #include "nvme_debug.h"
 #define UNUSED
@@ -80,12 +80,14 @@ typedef enum {
 
 typedef struct {
     nvme_state_t state;
-    uint32_t timeout_ms;        // CAP.TO derived timeout
-    uint32_t waited_ms;         // Time waited in current state
-    uint32_t io_queue_depth;    // Configured I/O queue depth based on CAP.MQES
-    uint32_t sectors_per_block; // Derived from Identify Namespace data
-    uint8_t cap_mpsmin;         // CAP.MPSMIN used for MDTS calculation
-    uint32_t max_io_pages;      // Maximum number of I/O pages per transfer based on MDTS/CAP.MPSMIN
+    uint32_t timeout_ms;            // CAP.TO derived timeout
+    uint32_t waited_ms;             // Time waited in current state
+    uint32_t io_queue_depth;        // Configured I/O queue depth based on CAP.MQES
+    uint32_t sectors_per_block;     // Derived from Identify Namespace data
+    uint8_t cap_mpsmin;             // CAP.MPSMIN used for MDTS calculation
+    uint32_t max_io_pages;          // Maximum number of I/O pages per transfer based on MDTS/CAP.MPSMIN
+    bool use_sgl;                   // Whether to use SGLs for I/O commands (controller supports SGL transport)
+    bool sgl_requires_dword_align;  // Whether SGL transport support requires dword-aligned addresses and lengths
 } nvme_state_ctx_t;
 
 static nvme_state_ctx_t state_ctx;
@@ -118,6 +120,9 @@ _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=6553
 
 _Static_assert(PRP_LIST_REGION_SIZE <= NVME_PRP_LIST_REGION_SIZE,
                "PRP list region exceeds configured nvme_prp_list region size");
+
+/* SGL Data Block (SQE-inlined) needs no per-request memory; max is the blk_req_t count field width. */
+#define NVME_SGL_MAX_INLINE_PAGES ((typeof(((blk_req_t *)0)->count))-1)
 
 static ialloc_t cid_ialloc;
 static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
@@ -226,6 +231,23 @@ static void copy_trim_ascii(char *dst, size_t dst_size, const char *src, size_t 
         dst[src_size - 1] = '\0';
         src_size--;
     }
+}
+
+/* Build a single inline SGL Data Block descriptor for a contiguous buffer. */
+static int build_sgl_dptr(uintptr_t data_paddr, uint32_t byte_count, uint64_t *dptr1, uint64_t *dptr2)
+{
+    /* Enforce SGL dword alignment only when required by controller. */
+    if (state_ctx.sgl_requires_dword_align
+        && ((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) != 0) {
+        sddf_dprintf("NVMe: SGL alignment violation: addr=0x%lx len=%u\n", data_paddr, byte_count);
+        return -1;
+    }
+
+    uint8_t id = NVME_SGL_ID(NVME_SGL_TYPE_DATA_BLOCK, NVME_SGL_SUBTYPE_ADDRESS);
+
+    *dptr1 = data_paddr;
+    *dptr2 = (uint64_t)byte_count | ((uint64_t)id << NVME_SGL_DPTR2_ID_SHIFT);
+    return 0;
 }
 
 /* Build PRP pointers for a request using a single non-chained PRP list model. */
@@ -351,7 +373,16 @@ static void handle_request(void)
 
         uint64_t dptr1 = 0;
         uint64_t dptr2 = 0;
-        err = build_prp_dptr(cid, req_paddr, count, &dptr1, &dptr2);
+        uint32_t cdw0;
+
+        if (state_ctx.use_sgl) {
+            cdw0 = nvme_build_cdw0((uint16_t)cid, opcode, NVME_CDW0_PSDT_SGL_MPTR_CONTIG);
+            err = build_sgl_dptr(req_paddr, (uint32_t)count * BLK_TRANSFER_SIZE, &dptr1, &dptr2);
+        } else {
+            cdw0 = nvme_build_cdw0((uint16_t)cid, opcode, NVME_CDW0_PSDT_PRP);
+            err = build_prp_dptr(cid, req_paddr, count, &dptr1, &dptr2);
+        }
+
         if (err != 0) {
             err = ialloc_free(&cid_ialloc, cid);
             assert(!err);
@@ -362,13 +393,13 @@ static void handle_request(void)
         }
 
         nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t) {
-                                         .cdw0 = nvme_build_cdw0((uint16_t)cid, opcode, NVME_CDW0_PSDT_PRP),
+                                         .cdw0 = cdw0,
                                          .nsid = NVME_DEFAULT_NSID,
                                          .cdw10 = (uint32_t)lba,
                                          .cdw11 = (uint32_t)(lba >> 32),
                                          .cdw12 = nvme_build_rw_cdw12((uint16_t)nlb, true),
-                                         .prp1 = dptr1,
-                                         .prp2 = dptr2,
+                                         .dptr1 = dptr1,
+                                         .dptr2 = dptr2,
                                      });
     }
 
@@ -406,9 +437,25 @@ static void handle_admin_completions(void)
     case NVME_STATE_WAIT_IDENTIFY_CTRL: {
         LOG_NVME("Identify Controller completed\n");
         LOG_NVME("  VID: 0x%04x  SSVID: 0x%04x\n", nvme_identify_ctrl->vid, nvme_identify_ctrl->ssvid);
-        LOG_NVME("  SN:  %.20s\n", nvme_identify_ctrl->sn);
-        LOG_NVME("  MN:  %.40s\n", nvme_identify_ctrl->mn);
-        LOG_NVME("  FR:  %.8s\n", nvme_identify_ctrl->fr);
+        LOG_NVME("  SN:  %.20s\n", (const char *)nvme_identify_ctrl->sn);
+        LOG_NVME("  MN:  %.40s\n", (const char *)nvme_identify_ctrl->mn);
+        LOG_NVME("  FR:  %.8s\n", (const char *)nvme_identify_ctrl->fr);
+        LOG_NVME("  SGLS: 0x%08x\n", nvme_identify_ctrl->sgls);
+
+        /*
+         * SGL mode selection currently uses SGLS[1:0] (support + alignment class).
+         * [NVMe-2.1 §5.1.13.2.1, Fig. 312]
+         */
+        uint32_t sgl_support = nvme_identify_ctrl->sgls & NVME_IDENTIFY_SGLS_TRANSPORT_MASK;
+        state_ctx.use_sgl = (sgl_support & NVME_IDENTIFY_SGLS_TRANSPORT_BYTE_ALIGNED)
+                            || (sgl_support & NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED);
+        state_ctx.sgl_requires_dword_align = (sgl_support == NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED);
+
+        if (state_ctx.use_sgl) {
+            LOG_NVME("I/O DPTR mode: SGL (%s alignment)\n", state_ctx.sgl_requires_dword_align ? "dword" : "byte");
+        } else {
+            LOG_NVME("I/O DPTR mode: PRP fallback (controller does not report SGL support)\n");
+        }
 
         /*
          * MDTS scaling:
@@ -417,7 +464,7 @@ static void handle_admin_completions(void)
          */
         uint8_t mdts = nvme_identify_ctrl->mdts;
 
-        uint32_t static_max_pages = NVME_PRP_ENTRIES_PER_PAGE;
+        uint32_t static_max_pages = state_ctx.use_sgl ? NVME_SGL_MAX_INLINE_PAGES : NVME_PRP_ENTRIES_PER_PAGE;
 
         if (mdts == 0) {
             state_ctx.max_io_pages = static_max_pages;
@@ -437,7 +484,8 @@ static void handle_admin_completions(void)
                      pages * 4);
 
             if (pages > static_max_pages) {
-                LOG_NVME("MDTS: %u pages exceeds PRP slot capacity (%u), clamping\n", pages, static_max_pages);
+                LOG_NVME("MDTS: %u pages exceeds %s capacity (%u), clamping\n", pages,
+                         state_ctx.use_sgl ? "SGL inline" : "PRP slot", static_max_pages);
                 pages = static_max_pages;
             }
 
@@ -468,7 +516,7 @@ static void handle_admin_completions(void)
                               .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_IDENTIFY, NVME_CDW0_PSDT_PRP),
                               .nsid = NVME_DEFAULT_NSID,
                               .cdw10 = NVME_IDENTIFY_CNS_NAMESPACE,
-                              .prp1 = NVME_IDENTIFY_NS_PADDR,
+                              .dptr1 = NVME_IDENTIFY_NS_PADDR,
                           });
 
         state_ctx.state = NVME_STATE_WAIT_IDENTIFY_NS;
@@ -527,8 +575,8 @@ static void handle_admin_completions(void)
                               .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_CQ, NVME_CDW0_PSDT_PRP),
                               .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
                               .cdw11 = nvme_build_create_io_cq_cdw11(NVME_CREATE_IO_Q_INTERRUPT_VECTOR, true, true),
-                              .prp2 = 0,
-                              .prp1 = nvme_io_cq_region_paddr,
+                              .dptr2 = 0,
+                              .dptr1 = nvme_io_cq_region_paddr,
                           });
 
         state_ctx.state = NVME_STATE_WAIT_CREATE_IO_CQ;
@@ -553,8 +601,8 @@ static void handle_admin_completions(void)
                               .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
                               .cdw11 = nvme_build_create_io_sq_cdw11(NVME_DEFAULT_IO_Q_ID, NVME_CREATE_IO_SQ_QPRIO_URGENT, true),
                               .cdw12 = 0,
-                              .prp2 = 0,
-                              .prp1 = nvme_io_sq_region_paddr,
+                              .dptr2 = 0,
+                              .dptr1 = nvme_io_sq_region_paddr,
                           });
 
         state_ctx.state = NVME_STATE_WAIT_CREATE_IO_SQ;
@@ -734,8 +782,8 @@ static void nvme_poll_controller_status(void)
                           &(nvme_submission_queue_entry_t) {
                               .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_IDENTIFY, NVME_CDW0_PSDT_PRP),
                               .cdw10 = NVME_IDENTIFY_CNS_CONTROLLER,
-                              .prp2 = 0,
-                              .prp1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
+                              .dptr2 = 0,
+                              .dptr1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
                           });
 
         state_ctx.state = NVME_STATE_WAIT_IDENTIFY_CTRL;
