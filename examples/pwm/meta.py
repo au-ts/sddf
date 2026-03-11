@@ -12,7 +12,7 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -29,6 +29,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
     clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=150, passive=True)
+    # Ensure the priority is exclusively the highest as the pinctrl driver must run first!
+    # This is enforced by sdfgen at the render() step.
+    pinctrl_driver = ProtectionDomain(
+        "pinctrl_driver", "pinctrl_driver.elf", priority=253
+    )
+    pinctrl_node = dtb.node(board.pinctrl)
+    assert pinctrl_node is not None
+    pinctrl_system = Sddf.Pinctrl(sdf, pinctrl_node, pinctrl_driver)
 
     pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=100)
 
@@ -84,6 +92,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pds = [
         serial_driver,
         serial_virt_tx,
+        pinctrl_driver,
         clk_driver,
         pwm_driver,
         client,
@@ -93,6 +102,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
+
+    assert pinctrl_system.connect()
+    assert pinctrl_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

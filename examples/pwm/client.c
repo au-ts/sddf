@@ -28,8 +28,18 @@ void init(void)
 
     LOG_CLIENT("starting\n");
 
-    bool success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 500, /* pulse width ns */ 200, 0);
-    assert(success);
+    while (1) {
+        for (volatile int i = 0; i < 100000000; i++) {}
+
+        bool success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 500, /* pulse width ns */ 200, 0);
+        assert(success);
+
+        for (volatile int i = 0; i < 100000000; i++) {}
+
+            // disable
+        success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 0, /* pulse width ns */ 0, 0);
+        assert(success);
+    }
 
     LOG_CLIENT("done\n");
 }
