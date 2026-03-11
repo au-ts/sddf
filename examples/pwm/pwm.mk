@@ -35,7 +35,7 @@ SDDF_CUSTOM_LIBC := 1
 include ${SDDF}/tools/make/board/common.mk
 
 
-IMAGES := pwm_driver.elf client.elf serial_virt_tx.elf serial_driver.elf
+IMAGES := pwm_driver.elf client.elf serial_virt_tx.elf serial_driver.elf clk_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
@@ -47,12 +47,14 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 METAPROGRAM := $(TOP)/meta.py
 
 PWM_DRIVER := $(SDDF)/drivers/pwm/${PWM_DRIV_DIR}
+CLK_DRIVER := $(SDDF)/drivers/clk/${CLK_DRIV_DIR}
 SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 
 all: $(IMAGE_FILE)
 
-include ${SDDF}/drivers/pwm/${PWM_DRIV_DIR}/pwm_driver.mk
-include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
+include ${CLK_DRIVER}/clk_driver.mk
+include ${PWM_DRIVER}/pwm_driver.mk
+include ${SERIAL_DRIVER}/serial_driver.mk
 
 include ${SDDF}/util/util.mk
 # include ${SDDF}/pwm/components/pwm_components.mk

@@ -28,8 +28,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
+    clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=150, passive=True)
 
-    pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=150)
+    pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=100)
 
     client = ProtectionDomain("client", "client.elf", priority=0)
 
@@ -52,12 +53,38 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert chan.pd_a_id == 1, chan.pd_a_id
     assert chan.pd_b_id == 0, chan.pd_b_id
 
+    # HACK for sdfgen
+
+    # HACK: sdfgen doesn't support multiple regions for a device resource yet
+    #       or the clk class. This will be removed in the pending sdfgen refactor.
+    #       We can add direct support for the Maaxboard via boards.py, but
+    #       the odroid clk driver depends on numerous maps that aren't in the DTS
+    #       at all, meaning this switch is the best we can do for now.
+    if board.name == "maaxboard":
+        clk_ccm_mr = MemoryRegion(sdf, "clk_ccm", 0xd000, paddr=0x30380000)
+        clk_ccm_analog_mr = MemoryRegion(sdf, "clk_ccm_analog", 0x1000, paddr=0x30360000)
+        sdf.add_mr(clk_ccm_mr)
+        sdf.add_mr(clk_ccm_analog_mr)
+
+        clk_ccm_map = Map(clk_ccm_mr, 0x3200000, "rw", cached=False)
+        clk_ccm_analog_map = Map(clk_ccm_analog_mr, 0x3300000, "rw", cached=False)
+        clk_driver.add_map(clk_ccm_map)
+        clk_driver.add_map(clk_ccm_analog_map)
+    else:
+        print("Unsupported board!")
+        exit(-1)
+
+
+    clk_channel = Channel(clk_driver, client, pp_b=True)
+    sdf.add_channel(clk_channel)
+
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx)
     serial_system.add_client(client)
 
     pds = [
         serial_driver,
         serial_virt_tx,
+        clk_driver,
         pwm_driver,
         client,
     ]

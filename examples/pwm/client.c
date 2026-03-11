@@ -24,6 +24,8 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
+    for (volatile int i = 0; i < 1000000; i++) {}
+
     LOG_CLIENT("starting\n");
 
     bool success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 500, /* pulse width ns */ 200, 0);
