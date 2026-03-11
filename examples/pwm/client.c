@@ -46,14 +46,14 @@ void init(void)
 
         for (volatile int i = 0; i < 100000000; i++) {}
 
-        // success = sddf_pwm_set_freq_duty(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* freq */ 1000, /* duty (/1000) */ 500, /* flags */ 0);
-        // assert(success);
+        success = sddf_pwm_set_freq_duty(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* freq */ 1000, /* duty (/1000) */ 500, /* flags */ 0);
+        assert(success);
 
-        // for (volatile int i = 0; i < 100000000; i++) {}
+        for (volatile int i = 0; i < 100000000; i++) {}
 
-        // // disable
-        // success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* period ns */ 0, /* pulse width ns */ 0, 0);
-        // assert(success);
+        // disable
+        success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* period ns */ 0, /* pulse width ns */ 0, 0);
+        assert(success);
     }
 
     LOG_CLIENT("done\n");
