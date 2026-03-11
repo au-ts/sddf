@@ -513,21 +513,21 @@ void init(void)
     assert(timer_config_check_magic(&timer_config));
 
     /* Check device presence first */
-    uint32_t vid_did UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x00);
+    uint32_t vid_did UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_ID);
     LOG_NVME("VendorID:DeviceID = %08x\n", vid_did);
 
-    uint32_t bar0 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x10);
+    uint32_t bar0 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR0);
     LOG_NVME("NVMe PCI BAR0 readback: %08x\n", bar0);
 
     /* Enable Bus Master and Memory Space */
-    uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x04);
-    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x04, cmd | 0x6);
-    LOG_NVME("PCI Command Register: %08x\n", pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x04));
+    uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);
+    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND, cmd | 0x6);
+    LOG_NVME("PCI Command Register: %08x\n", pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND));
 
     /* Check Interrupt Configuration */
-    uint32_t intr_info = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x3C);
-    uint8_t intr_line UNUSED = intr_info & 0xFF;
-    uint8_t intr_pin UNUSED = (intr_info >> 8) & 0xFF;
+    uint32_t intr_info = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_INTR_INFO);
+    uint8_t intr_line UNUSED = intr_info & NVME_PCIE_INTR_LINE_MASK;
+    uint8_t intr_pin UNUSED = (intr_info & NVME_PCIE_INTR_PIN_MASK) >> NVME_PCIE_INTR_PIN_SHIFT;
     LOG_NVME("PCI Interrupt Line: %d, Pin: %d\n", intr_line, intr_pin);
 
     /* Map Controller and Metadata - x86 uses hardcoded addresses */
