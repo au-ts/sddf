@@ -233,22 +233,38 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
 #define NVME_PCI_FUNC 0
 
 /* Memory Region Virtual Addresses */
-#define NVME_CONTROLLER_VADDR (0x20000000)
-#define NVME_METADATA_VADDR (0x20100000)
-#define NVME_ASQ_VADDR (NVME_METADATA_VADDR + 0x0000)
-#define NVME_ACQ_VADDR (NVME_METADATA_VADDR + 0x1000)
-#define NVME_IO_SQ_VADDR (NVME_METADATA_VADDR + 0x2000)
-#define NVME_IO_CQ_VADDR (NVME_METADATA_VADDR + 0x3000)
-#define NVME_PRP_LIST_VADDR (NVME_METADATA_VADDR + 0x4000)
-#define NVME_DATA_REGION_VADDR (0x20200000)
+#define NVME_CONTROLLER_VADDR 0x20000000
+#define NVME_ASQ_VADDR        0x20100000
+#define NVME_ACQ_VADDR        0x20101000
+#define NVME_IO_SQ_VADDR      0x20102000
+#define NVME_IO_CQ_VADDR      0x20103000
+#define NVME_IDENTIFY_VADDR   0x20104000
+#define NVME_PRP_LIST_VADDR   0x20200000
 
 /* Memory Region Physical Addresses */
-#define NVME_METADATA_PADDR (0x5FFF0000)
-#define NVME_ASQ_PADDR (NVME_METADATA_PADDR + 0x0000)
-#define NVME_ACQ_PADDR (NVME_METADATA_PADDR + 0x1000)
-#define NVME_IO_SQ_PADDR (NVME_METADATA_PADDR + 0x2000)
-#define NVME_IO_CQ_PADDR (NVME_METADATA_PADDR + 0x3000)
-#define NVME_PRP_LIST_PADDR (NVME_METADATA_PADDR + 0x4000)
-#define NVME_DATA_REGION_PADDR (0x5FDF0000)
+#define NVME_ASQ_PADDR        0x5FDF0000
+#define NVME_ACQ_PADDR        0x5FDF1000
+#define NVME_IO_SQ_PADDR      0x5FDF2000
+#define NVME_IO_CQ_PADDR      0x5FDF3000
+#define NVME_IDENTIFY_PADDR   0x5FDF4000
+#define NVME_PRP_LIST_PADDR   0x5FE00000
+
+/* Memory Region Sizes. */
+#define NVME_ASQ_REGION_SIZE        0x1000
+#define NVME_ACQ_REGION_SIZE        0x1000
+#define NVME_IO_SQ_REGION_SIZE      0x1000
+#define NVME_IO_CQ_REGION_SIZE      0x1000
+#define NVME_IDENTIFY_REGION_SIZE   0x1000
+#define NVME_PRP_LIST_REGION_SIZE   0x80000
+
+/* Identify response buffers (one page each). */
+#define NVME_IDENTIFY_CTRL_VADDR   (NVME_IDENTIFY_VADDR)
+#define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
 
 #define NVME_IRQ 17
+
+/* Queue structures must fit their dedicated queue regions. */
+_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ASQ_REGION_SIZE, "ASQ allocation exceeds nvme_admin_sq region size");
+_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ACQ_REGION_SIZE, "ACQ allocation exceeds nvme_admin_cq region size");
+_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_SQ_REGION_SIZE, "IO SQ allocation exceeds nvme_io_sq region size");
+_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_CQ_REGION_SIZE, "IO CQ allocation exceeds nvme_io_cq region size");

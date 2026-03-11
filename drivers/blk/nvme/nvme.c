@@ -74,13 +74,13 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
-#define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
-#define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
+/* Admin queue max 4096 entries, I/O queue max 65536 entries. [NVMe-2.1 §3.3.3.1] */
+#define NVME_ASQ_CAPACITY (NVME_ASQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t))
+#define NVME_ACQ_CAPACITY (NVME_ACQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t))
 _Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
 _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (entries)");
-#define NVME_IO_SQ_CAPACITY (NVME_IO_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
-#define NVME_IO_CQ_CAPACITY (NVME_IO_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
-// §3.3.3.1
+#define NVME_IO_SQ_CAPACITY (NVME_IO_SQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t))
+#define NVME_IO_CQ_CAPACITY (NVME_IO_CQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t))
 _Static_assert(NVME_IO_SQ_CAPACITY <= 0x10000, "capacity of IO SQ must be <=65536 (entries)");
 _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=65536 (entries)");
 
@@ -92,9 +92,8 @@ _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=6553
 #define PRP_LIST_SLOT_SIZE 256
 #define PRP_LIST_REGION_SIZE (MAX_PENDING_REQS * PRP_LIST_SLOT_SIZE)
 
-/* Ensure PRP list region doesn't overflow into the data region */
-_Static_assert(PRP_LIST_REGION_SIZE <= NVME_DATA_REGION_VADDR - NVME_PRP_LIST_VADDR,
-               "PRP list region exceeds metadata space");
+_Static_assert(PRP_LIST_REGION_SIZE <= NVME_PRP_LIST_REGION_SIZE,
+               "PRP list region exceeds configured nvme_prp_list region size");
 
 static ialloc_t cid_ialloc;
 static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
@@ -447,7 +446,7 @@ static void nvme_poll_controller_status(void)
                               .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
                               .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
                               .prp2 = 0,
-                              .prp1 = NVME_DATA_REGION_PADDR, /* Data region for identify - hardcoded for x86 */
+                              .prp1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
                           });
 
         state_ctx.state = NVME_STATE_WAIT_IDENTIFY;
