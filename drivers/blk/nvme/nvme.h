@@ -213,8 +213,8 @@ typedef struct nvme_submission_queue_entry {
     uint32_t cdw2;  /* Command Dword 2 (command-specific) */
     uint32_t cdw3;  /* Command Dword 3 (command-specific) */
     uint64_t mptr;  /* Metadata Pointer */
-    uint64_t prp1;  /* Data Pointer - PRP Entry 1 */
-    uint64_t prp2;  /* Data Pointer - PRP Entry 2 */
+    uint64_t dptr1;  /* Data Pointer - PRP Entry 1 */
+    uint64_t dptr2;  /* Data Pointer - PRP Entry 2 */
     uint32_t cdw10; /* Command Dword 10 (command-specific) */
     uint32_t cdw11; /* Command Dword 11 (command-specific) */
     uint32_t cdw12; /* Command Dword 12 (command-specific) */
@@ -268,6 +268,23 @@ typedef struct nvme_completion_queue_entry {
 } nvme_completion_queue_entry_t;
 _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
                "The Common Completion Queue Entry Layout is 16 bytes in size");
+
+/* Generic SGL descriptor format. [NVMe-2.1 §4.3.2, Fig. 114] */
+#define NVME_SGL_ID_TYPE_SHIFT     4
+#define NVME_SGL_ID_SUBTYPE_SHIFT  0
+#define NVME_SGL_ID_TYPE_MASK      NVME_BITS_MASK(4, 7)
+#define NVME_SGL_ID_SUBTYPE_MASK   NVME_BITS_MASK(0, 3)
+#define NVME_SGL_ID(type, subtype) ((((type) & 0xFU) << NVME_SGL_ID_TYPE_SHIFT) | (((subtype) & 0xFU) << NVME_SGL_ID_SUBTYPE_SHIFT))
+#define NVME_SGL_DPTR2_ID_SHIFT    56 /* ID occupies dptr2[63:56] */
+
+/* SGL Descriptor Type - currently only Data Block is supported. [NVMe-2.1 Fig. 115] */
+#define NVME_SGL_TYPE_DATA_BLOCK 0x0
+
+/* SGL Descriptor Sub Type - currently only Address is supported. [NVMe-2.1 Fig. 116] */
+#define NVME_SGL_SUBTYPE_ADDRESS 0x0
+
+/* Dword alignment mask: (x & mask) != 0 indicates misalignment. [NVMe-2.1 §4.3.2] */
+#define NVME_SGL_DWORD_ALIGN_MASK 0x3U
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  Identify Structures
@@ -354,6 +371,11 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
     uint8_t idx_high = (uint8_t)(((flbas & NVME_IDENTIFY_FLBAS_FIDXU_MASK) >> NVME_IDENTIFY_FLBAS_FIDXU_SHIFT) << 4);
     return (uint8_t)(idx_low | idx_high);
 }
+
+/* SGLS bits 1:0 transport encoding. [NVMe-2.1 Fig. 312] */
+#define NVME_IDENTIFY_SGLS_TRANSPORT_MASK          NVME_BITS_MASK(0, 1)
+#define NVME_IDENTIFY_SGLS_TRANSPORT_BYTE_ALIGNED  BIT(0)
+#define NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED BIT(1)
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  PCIe Transport
