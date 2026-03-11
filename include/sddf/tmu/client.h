@@ -11,28 +11,12 @@
 #include <sddf/tmu/protocol.h>
 
 /**
- * Enable or disable the TMU via PPC to the passive TMU driver.
- * @param channel of TMU driver.
- * @param enable true to enable, false to disable.
- * @return 0 on success, 1 on failure.
- */
-static inline int sddf_tmu_set_enabled(microkit_channel channel, bool enable)
-{
-    microkit_msginfo msginfo = microkit_msginfo_new(SDDF_TMU_SET_ENABLED, 1);
-    microkit_mr_set(SDDF_TMU_SET_ENABLED_ENABLE, enable ? 1 : 0);
-
-    msginfo = microkit_ppcall(channel, msginfo);
-
-    return (int)microkit_msginfo_get_label(msginfo);
-}
-
-/**
  * Set the IRQ forwarding mode via PPC to the passive TMU driver.
  * @param channel of TMU driver.
  * @param mode IRQ mode (disabled, instantaneous, or average).
  * @return 0 on success, 1 on failure.
  */
-static inline int sddf_tmu_set_irq_mode(microkit_channel channel, sddf_tmu_irq_modes mode)
+static inline int sddf_tmu_set_irq_mode(microkit_channel channel, sddf_tmu_irq_modes_t mode)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_TMU_SET_IRQ_MODE, 1);
     microkit_mr_set(SDDF_TMU_SET_IRQ_MODE_MODE, mode);
@@ -51,7 +35,7 @@ static inline int sddf_tmu_set_irq_mode(microkit_channel channel, sddf_tmu_irq_m
 static inline int sddf_tmu_set_irq_threshold(microkit_channel channel, int64_t threshold)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_TMU_SET_IRQ_THRESHOLD, 1);
-    microkit_mr_set(SDDF_TMU_SET_IRQ_THRESHOLD_THRESHOLD, threshold);
+    microkit_mr_set(0, threshold);
 
     msginfo = microkit_ppcall(channel, msginfo);
 
@@ -71,8 +55,10 @@ static inline int sddf_tmu_get_temp(microkit_channel channel, sddf_tmu_temp_info
     msginfo = microkit_ppcall(channel, msginfo);
 
     int ret = (int)microkit_msginfo_get_label(msginfo);
-    if (ret == SDDF_TMU_GET_TEMP_SUCCESS) {
-        info->valid = microkit_mr_get(SDDF_TMU_GET_TEMP_VALIDITY);
+    if (ret == SDDF_TMU_ERR_OK) {
+        uint64_t valid = microkit_mr_get(SDDF_TMU_GET_TEMP_VALIDITY);
+        info->valid_inst = valid & 0b1;
+        info->valid_inst = (valid & 0b10) >> 1;
         info->temp_inst = microkit_mr_get(SDDF_TMU_GET_TEMP_INST);
         info->temp_avg = microkit_mr_get(SDDF_TMU_GET_TEMP_AVG);
     }

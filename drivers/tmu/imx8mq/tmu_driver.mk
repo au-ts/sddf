@@ -8,6 +8,7 @@
 #
 # NOTES
 #  Generates tmu_driver.elf
+#  Requires floating point support
 #  Requires libsddf_util_debug.a in ${LIBS}
 
 TMU_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))

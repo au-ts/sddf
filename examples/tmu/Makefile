@@ -25,7 +25,7 @@ all: ${IMAGE_FILE}
 ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
 	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK}  $(notdir $@)
 
-${BUILD_DIR}/Makefile: pmic.mk
+${BUILD_DIR}/Makefile: tmu.mk
 	mkdir -p ${BUILD_DIR}
-	cp pmic.mk $@
+	cp tmu.mk $@
 FORCE:
