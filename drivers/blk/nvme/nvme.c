@@ -39,8 +39,6 @@ nvme_submission_queue_entry_t *nvme_io_sq_region;
 nvme_completion_queue_entry_t *nvme_io_cq_region;
 uintptr_t nvme_io_sq_region_paddr;
 uintptr_t nvme_io_cq_region_paddr;
-#define NVME_ADMIN_QUEUE_SIZE 0x1000
-#define NVME_IO_QUEUE_SIZE    0x1000
 
 static nvme_queue_info_t admin_queue;
 static nvme_queue_info_t io_queue;
@@ -76,36 +74,6 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
-/*
- * PCI Configuration (hardcoded for x86_64)
- * FUTURE: Get these from PCIe enumeration
- */
-
-#define NVME_PCI_BUS 0
-#define NVME_PCI_DEV 4
-#define NVME_PCI_FUNC 0
-
-/* Memory Region Virtual Addresses */
-#define NVME_CONTROLLER_VADDR (0x20000000)
-#define NVME_METADATA_VADDR (0x20100000)
-#define NVME_ASQ_VADDR (NVME_METADATA_VADDR + 0x0000)
-#define NVME_ACQ_VADDR (NVME_METADATA_VADDR + 0x1000)
-#define NVME_IO_SQ_VADDR (NVME_METADATA_VADDR + 0x2000)
-#define NVME_IO_CQ_VADDR (NVME_METADATA_VADDR + 0x3000)
-#define NVME_PRP_LIST_VADDR (NVME_METADATA_VADDR + 0x4000)
-#define NVME_DATA_REGION_VADDR (0x20200000)
-
-/* Memory Region Physical Addresses */
-#define NVME_METADATA_PADDR (0x5FFF0000)
-#define NVME_ASQ_PADDR (NVME_METADATA_PADDR + 0x0000)
-#define NVME_ACQ_PADDR (NVME_METADATA_PADDR + 0x1000)
-#define NVME_IO_SQ_PADDR (NVME_METADATA_PADDR + 0x2000)
-#define NVME_IO_CQ_PADDR (NVME_METADATA_PADDR + 0x3000)
-#define NVME_PRP_LIST_PADDR (NVME_METADATA_PADDR + 0x4000)
-#define NVME_DATA_REGION_PADDR (0x5FDF0000)
-
-#define NVME_IRQ 17
-
 #define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
 #define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
 _Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
@@ -132,28 +100,6 @@ static ialloc_t cid_ialloc;
 static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
 static uint32_t cid_to_id[MAX_PENDING_REQS];
 static uint16_t cid_to_count[MAX_PENDING_REQS];
-
-/* I/O Port Configuration */
-#define PCI_CONFIG_ADDR_IOPORT_ID 1
-#define PCI_CONFIG_DATA_IOPORT_ID 2
-#define PCI_CONFIG_ADDR_PORT 0xCF8
-#define PCI_CONFIG_DATA_PORT 0xCFC
-
-static uint32_t pci_config_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
-{
-    uint32_t address = (uint32_t)((uint32_t)bus << 16) | ((uint32_t)dev << 11) | ((uint32_t)func << 8) | (offset & 0xfc)
-                     | ((uint32_t)0x80000000);
-    microkit_x86_ioport_write_32(PCI_CONFIG_ADDR_IOPORT_ID, PCI_CONFIG_ADDR_PORT, address);
-    return microkit_x86_ioport_read_32(PCI_CONFIG_DATA_IOPORT_ID, PCI_CONFIG_DATA_PORT);
-}
-
-static void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, uint32_t value)
-{
-    uint32_t address = (uint32_t)((uint32_t)bus << 16) | ((uint32_t)dev << 11) | ((uint32_t)func << 8) | (offset & 0xfc)
-                     | ((uint32_t)0x80000000);
-    microkit_x86_ioport_write_32(PCI_CONFIG_ADDR_IOPORT_ID, PCI_CONFIG_ADDR_PORT, address);
-    microkit_x86_ioport_write_32(PCI_CONFIG_DATA_IOPORT_ID, PCI_CONFIG_DATA_PORT, value);
-}
 
 void nvme_irq_mask(void)
 {
