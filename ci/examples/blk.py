@@ -11,19 +11,14 @@ import tempfile
 import types
 
 from ts_ci import (
-    TestConfig,
-    run_test,
-    matrix_product,
     HardwareBackend,
     QemuBackend,
-    TestMetadata,
     wait_for_output,
 )
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
-
-TEST_MATRIX = matrix.generate_example_test_matrix("blk", matrix.EXAMPLES["blk"])
+from ci.common import TestConfig, run_tests
 
 SDDF = Path(__file__).parents[2]
 mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
@@ -36,7 +31,7 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
         tmpdir = tempfile.TemporaryDirectory(suffix="sddf_blk_disks")
         backend._sddf_tmpdir = tmpdir
 
-        (fd, disk_path) = tempfile.mkstemp(dir=tmpdir.name)
+        fd, disk_path = tempfile.mkstemp(dir=tmpdir.name)
         os.close(fd)
 
         subprocess.run(
@@ -83,13 +78,14 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 # export
-TEST_METADATA = TestMetadata(
+TEST_CASES = matrix.generate_example_test_cases(
+    "blk",
+    matrix.EXAMPLES["blk"],
     test_fn=test,
     backend_fn=backend_fn,
-    loader_img_fn=common.loader_img_path,
     no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
 )
 
 
 if __name__ == "__main__":
-    run_test(TEST_METADATA, TEST_MATRIX)
+    run_tests(TEST_CASES)

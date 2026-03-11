@@ -7,27 +7,21 @@ from pathlib import Path
 import sys
 
 from ts_ci import (
-    matrix_product,
-    HardwareBackend,
-    TestConfig,
-    wait_for_output,
     log,
+    wait_for_output,
     TestFailureException,
-    TestMetadata,
-    run_test,
+    HardwareBackend,
 )
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
-
-TEST_MATRIX = matrix.generate_example_test_matrix("timer", matrix.EXAMPLES["timer"])
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
 TIME_MEASURE_COUNT = 5
 TIME_LENGTH = 1000**3  # 1 second in nanoseconds
 
 
-async def test(backend: HardwareBackend, test_config: TestConfig):
+async def test(backend: HardwareBackend, test_config: common.TestConfig):
     await wait_for_output(backend, b"CLIENT|INFO: starting\r\n")
 
     async with asyncio.timeout(5 + TIME_MEASURE_COUNT):
@@ -58,12 +52,14 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 # export
-TEST_METADATA = TestMetadata(
+TEST_CASES = matrix.generate_example_test_cases(
+    "timer",
+    matrix.EXAMPLES["timer"],
     test_fn=test,
     backend_fn=common.backend_fn,
-    loader_img_fn=common.loader_img_path,
     no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
 )
 
+
 if __name__ == "__main__":
-    run_test(TEST_METADATA, TEST_MATRIX)
+    common.run_tests(TEST_CASES)
