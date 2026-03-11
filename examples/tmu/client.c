@@ -11,15 +11,7 @@
 #include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
-#include <sddf/pmic/client.h>
-#ifdef CONFIG_PLAT_MAAXBOARD
-#include <sddf/pmic/bd71837amwv-bindings.h>
-#define TARGET_REGULATOR (BD718XX_BUCK2)    // VDD_ARM
-#define VOLTAGE_A   (900000)    // 0.9V
-#define VOLTAGE_B   (1000000)   // 1V
-#else
-#error "Unsupported board!"
-#endif
+#include <sddf/tmu/client.h>
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
@@ -29,8 +21,8 @@ cothread_t t_main;
 
 static serial_queue_handle_t serial_tx_queue_handle;
 
-// TODO: sdfgen for pmic client channel
-#define PMIC_CHANNEL (0)
+// TODO: sdfgen for tmu client channel
+#define TMU_CHANNEL (0)
 
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
@@ -38,11 +30,11 @@ static char t_client_main_stack[STACK_SIZE];
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("SCAN|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_dprintf("TMU_CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("SCAN|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("TMU_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 static inline bool delay_ms(size_t milliseconds)
 {
@@ -68,23 +60,51 @@ void notified(sddf_channel ch)
         co_switch(t_main);
     } else if (ch == serial_config.tx.id) {
         // nothing to do
+    } else if (ch == TMU_CHANNEL) {
+        LOG_CLIENT_ERR("Warning: IRQ forwarded!\n");
     } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }
 
+static uint64_t busywork_magic = 0;
+
 void client_main(void) {
     LOG_CLIENT("Entered main loop.\n");
-    for (uint32_t i = 0;; i++) {
-        // Alternate between setting voltage rail to 0.9 or 1V
-        if (i % 2) {
-            sddf_pmic_set_vout(PMIC_CHANNEL, TARGET_REGULATOR, VOLTAGE_A);
-            LOG_CLIENT("Set voltage of regulator %d to %zu\n", TARGET_REGULATOR, VOLTAGE_A);
+    int ret;
+    #ifdef SDDF_PMU_ENABLE_IRQ
+    // Set an average temperature IRQ forward @ 45 deg C
+    int ret = sddf_tmu_set_irq_mode(TMU_CHANNEL, SDDF_TMU_IRQ_MODE_AVG);
+    assert(!ret);
+    ret = sddf_tmu_set_irq_threshold(TMU_CHANNEL, 45.0);
+    assert(!ret);
+    #endif
+
+    sddf_tmu_temp_info_t temp_info;
+    for (;;) {
+        // Get temperature and print
+        ret = sddf_tmu_get_temp(TMU_CHANNEL, &temp_info);
+        if (ret) {
+            LOG_CLIENT_ERR("Failed to get temperature!\n");
         } else {
-            sddf_pmic_set_vout(PMIC_CHANNEL, TARGET_REGULATOR, VOLTAGE_B);
-            LOG_CLIENT("Set voltage of regulator %d to %zu\n", TARGET_REGULATOR, VOLTAGE_B);
+            LOG_CLIENT("\n\nRead successfully!\n");
+            LOG_CLIENT("\tAvg. valid: %d\n", temp_info.valid_avg);
+            LOG_CLIENT("\tAvg. temp: %f\n", temp_info.temp_avg);
+            LOG_CLIENT("\tInst. valid: %d\n", temp_info.valid_inst);
+            LOG_CLIENT("\tInst. temp: %f\n", temp_info.temp_inst);
         }
-        delay_ms(5000);
+        // delay_ms(2000);
+        // Busy wait to make heat
+        for (uint64_t i = 0; i < 100000000; i++) {
+            busywork_magic++;
+            busywork_magic = ((busywork_magic / 2) << 3) - 5;
+            busywork_magic = (busywork_magic * busywork_magic) + 300;
+            if (busywork_magic < 500) {
+                busywork_magic = busywork_magic * 718;
+            } else {
+                busywork_magic = busywork_magic - (300*busywork_magic);
+            }
+        }
     }
 }
 

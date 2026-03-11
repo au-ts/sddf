@@ -23,7 +23,8 @@ typedef enum {
 typedef enum {
     SDDF_TMU_IRQ_MODE_DISABLED,
     SDDF_TMU_IRQ_MODE_INSTANTANEOUS,    // IRQ on instant of threshold exceeding
-    SDDF_TMU_IRQ_MODE_AVG   // IRQ when low-passed average exceeds theshold
+    SDDF_TMU_IRQ_MODE_AVG,   // IRQ when low-passed average exceeds theshold
+    SDDF_TMU_IRQ_MODES_NUM
 } sddf_tmu_irq_modes_t;
 
 typedef enum {
@@ -31,56 +32,39 @@ typedef enum {
     SDDF_TMU_ERR_UNPERMITTED,
     SDDF_TMU_ERR_FAILED,
     SDDF_TMU_ERR_EINVAL,
+    SDDF_TMU_ERR_BAD_PPC_CALL,
     SDDF_TMU_NUM_ERRORS
 } sddf_tmu_err_t;
 
 typedef struct tmu_temp_info {
     sddf_temp_celsius_t temp_inst;
     sddf_temp_celsius_t temp_avg;
-    bool valid; // Temp was outside of safe boundaries
+    bool valid_inst; // Temp was outside of safe boundaries
+    bool valid_avg;
 } sddf_tmu_temp_info_t;
-
-// SDDF_TMU_SET_ENABLED
-// Enable or disable the TMU.
-// Args:
-// MR0: 0 to disable, 1 to enable
-// Returns:
-// MR0: 0 on success, 1 on failure.
-#define SDDF_TMU_SET_ENABLED_ENABLE (0)
-#define SDDF_TMU_SET_ENABLED_SUCCESS (0)
-#define SDDF_TMU_SET_ENABLED_FAIL (1)
 
 // SDDF_TMU_SET_IRQ_MODE
 // Set the IRQ forwarding to disabled or active with a direct or low-pass average theshold. Forwarded interrupts are sent to
 // Args:
 // MR0: mode. 0 = disabled, 1 = instantaneous, 2 = average
 // Returns:
-// MR0: 0 on success, 1 on failure.
 #define SDDF_TMU_SET_IRQ_MODE_MODE (0)
-#define SDDF_TMU_SET_IRQ_MODE_SUCCESS (0)
-#define SDDF_TMU_SET_IRQ_MODE_FAIL (1)
 
 // SDDF_TMU_SET_IRQ_THESHOLD
 // Set the bounds for IRQ delivery
 // Args:
 // MR0: high theshold in degrees celsius
 // Returns:
-// MR0: 0 on success, 1 on failure.
-#define SDDF_TMU_SET_IRQ_THRESHOLD_THRESHOLD (0)
-#define SDDF_TMU_SET_IRQ_THRESHOLD_SUCCESS (0)
-#define SDDF_TMU_SET_IRQ_THRESHOLD_FAIL (1)
+#define SDDF_TMU_SET_IRQ_THESHOLD_THESH (0)
 
 // SDDF_TMU_GET_TEMP
 // Return temperature reading.
 // Args: (none)
 // Returns:
-// MR0: 0 on success, 1 on failure.
-// MR1: reading value. 0 if invalid, 1 if valid
-// MR2: instantaneous temperature in celsius
-// MR3: average temperature in celsius
-#define SDDF_TMU_GET_TEMP_SUCCESS (0)
-#define SDDF_TMU_GET_TEMP_FAIL (1)
-#define SDDF_TMU_GET_TEMP_VALIDITY (1)
-#define SDDF_TMU_GET_TEMP_INST (2)
-#define SDDF_TMU_GET_TEMP_AVG (3)
+// MR0: validity mask. bit 0 = inst valid, bit 1 = avg valid
+// MR1: instantaneous temperature in celsius
+// MR2: average temperature in celsius
+#define SDDF_TMU_GET_TEMP_VALIDITY (0)
+#define SDDF_TMU_GET_TEMP_INST (1)
+#define SDDF_TMU_GET_TEMP_AVG (2)
 

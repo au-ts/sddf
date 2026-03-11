@@ -3,6 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
+#pragma once
+#include <sddf/util/util.h>
 
 typedef struct imx8mq_tmu_regs {
     uint32_t tmr;               /* 0x00 - TMU mode register */
@@ -41,6 +43,7 @@ typedef struct imx8mq_tmu_regs {
 
 #define SENSOR_MAX_TEMP ((sddf_temp_celsius_t) 85)
 #define SENSOR_MIN_TEMP ((sddf_temp_celsius_t) 0)
+#define SENSOR_QUANTISATION (8)
 
 /*
  * Register fields.
@@ -51,72 +54,49 @@ typedef struct imx8mq_tmu_regs {
  */
 
 // TMR - TMU Mode Register
-// Bit 31: ME, Bits 15-8: MSITE
-#define TMU_TMR_ME_MASK             (0x80000000)
-#define TMU_TMR_ME_OFFSET           (31)
-#define TMU_TMR_ME_BIT              (0x80000000)
-#define TMU_TMR_MSITE_MASK          (0x0000FF00)
-#define TMU_TMR_MSITE_OFFSET        (8)
+#define TMU_TMR_ME_BIT              (BIT(31))
+#define TMU_TMR_MSITE_MASK          (0x7)
+#define TMU_TMR_MSITE_OFFSET        (13)
+#define TMU_TMR_MSITE_ARM_BIT       (BIT(13))
+#define TMU_TMR_MSITE_GPU_BIT       (BIT(14))
+#define TMU_TMR_MSITE_VPU_BIT       (BIT(15))
+#define TMU_TMR_ALPF_MASK           (0x3)
+#define TMU_TMR_ALPF_OFFSET         (26)
 
 // TSR - TMU Status Register
-// Bit 31: MIE, Bit 1: ORL, Bit 0: ORH
-#define TMU_TSR_MIE_MASK            (0x80000000)
-#define TMU_TSR_MIE_OFFSET          (31)
-#define TMU_TSR_MIE_BIT             (0x80000000)
-#define TMU_TSR_ORL_MASK            (0x00000002)
-#define TMU_TSR_ORL_OFFSET          (1)
-#define TMU_TSR_ORL_BIT             (0x00000002)
-#define TMU_TSR_ORH_MASK            (0x00000001)
-#define TMU_TSR_ORH_OFFSET          (0)
-#define TMU_TSR_ORH_BIT             (0x00000001)
+#define TMU_TSR_MIE_BIT             (BIT(30))
+#define TMU_TSR_ORL_BIT             (BIT(29))
+#define TMU_TSR_ORH_BIT             (BIT(28))
 
 // TMTMIR - TMU Monitor Temperature Measurement Interval Register
-// Bits 15-0: TMI
-#define TMU_TMTMIR_TMI_MASK         (0x0000FFFF)
-#define TMU_TMTMIR_TMI_OFFSET       (0)
+#define TMU_TMTMIR_TMI_MASK         (0xFFFF)
 
 // TIER - TMU Interrupt Enable Register
-// Bit 2: ITTEIE, Bit 1: ATTEIE, Bit 0: ATCTEIE
-#define TMU_TIER_ITTEIE_MASK        (0x00000004)
-#define TMU_TIER_ITTEIE_OFFSET      (2)
-#define TMU_TIER_ITTEIE_BIT         (0x00000004)
-#define TMU_TIER_ATTEIE_MASK        (0x00000002)
-#define TMU_TIER_ATTEIE_OFFSET      (1)
-#define TMU_TIER_ATTEIE_BIT         (0x00000002)
-#define TMU_TIER_ATCTEIE_MASK       (0x00000001)
-#define TMU_TIER_ATCTEIE_OFFSET     (0)
-#define TMU_TIER_ATCTEIE_BIT        (0x00000001)
+#define TMU_TIER_ITTEIE_BIT         (BIT(31))
+#define TMU_TIER_ATTEIE_BIT         (BIT(30))
+#define TMU_TIER_ATCTEIE_BIT        (BIT(29))
 
 // TIDR - TMU Interrupt Detect Register
-// Bit 2: ITTE, Bit 1: ATTE, Bit 0: ATCTE (W1C)
-#define TMU_TIDR_ITTE_MASK          (0x00000004)
-#define TMU_TIDR_ITTE_OFFSET        (2)
-#define TMU_TIDR_ITTE_BIT           (0x00000004)
-#define TMU_TIDR_ATTE_MASK          (0x00000002)
-#define TMU_TIDR_ATTE_OFFSET        (1)
-#define TMU_TIDR_ATTE_BIT           (0x00000002)
-#define TMU_TIDR_ATCTE_MASK         (0x00000001)
-#define TMU_TIDR_ATCTE_OFFSET       (0)
-#define TMU_TIDR_ATCTE_BIT          (0x00000001)
+#define TMU_TIDR_ITTE_BIT           (BIT(31))
+#define TMU_TIDR_ATTE_BIT           (BIT(30))
+#define TMU_TIDR_ATCTE_BIT          (BIT(29))
 
 // TISCR - TMU Interrupt Site Capture Register
-// Bits 10-8: ISITE, Bits 2-0: ASITE
-#define TMU_TISCR_ISITE_MASK        (0x00000700)
-#define TMU_TISCR_ISITE_OFFSET      (8)
-#define TMU_TISCR_ASITE_MASK        (0x00000007)
-#define TMU_TISCR_ASITE_OFFSET      (0)
+#define TMU_TISCR_ISITE_MASK        (0x7)
+#define TMU_TISCR_ISITE_OFFSET      (29)
+#define TMU_TISCR_ASITE_MASK        (0x7)
+#define TMU_TISCR_ASITE_OFFSET      (13)
 
 // TICSCR - TMU Interrupt Critical Site Capture Register
-// Bits 2-0: CASITE
-#define TMU_TICSCR_CASITE_MASK      (0x00000007)
-#define TMU_TICSCR_CASITE_OFFSET    (0)
+#define TMU_TICSCR_CASITE_MASK      (0x7)
+#define TMU_TICSCR_CASITE_OFFSET    (13)
 
 // TMHTCR - TMU Monitor High Temperature Capture Register
 // Bit 31: V, Bits 11-0: TEMP
 #define TMU_TMHTCR_V_MASK           (0x80000000)
 #define TMU_TMHTCR_V_OFFSET         (31)
 #define TMU_TMHTCR_V_BIT            (0x80000000)
-#define TMU_TMHTCR_TEMP_MASK        (0x00000FFF)
+#define TMU_TMHTCR_TEMP_MASK        (0x0FFF)
 #define TMU_TMHTCR_TEMP_OFFSET      (0)
 
 // TMLTCR - TMU Monitor Low Temperature Capture Register
@@ -124,63 +104,25 @@ typedef struct imx8mq_tmu_regs {
 #define TMU_TMLTCR_V_MASK           (0x80000000)
 #define TMU_TMLTCR_V_OFFSET         (31)
 #define TMU_TMLTCR_V_BIT            (0x80000000)
-#define TMU_TMLTCR_TEMP_MASK        (0x00000FFF)
-#define TMU_TMLTCR_TEMP_OFFSET      (0)
+#define TMU_TMLTCR_TEMP_MASK        (0x0FFF)
 
 // TMHTITR - TMU Monitor High Temperature Immediate Threshold Register
-// Bit 31: EN, Bits 11-0: TEMP
-#define TMU_TMHTITR_EN_MASK         (0x80000000)
-#define TMU_TMHTITR_EN_OFFSET       (31)
-#define TMU_TMHTITR_EN_BIT          (0x80000000)
-#define TMU_TMHTITR_TEMP_MASK       (0x00000FFF)
-#define TMU_TMHTITR_TEMP_OFFSET     (0)
+#define TMU_TMHTITR_EN_BIT          (BIT(31))
+#define TMU_TMHTITR_TEMP_MASK       (0xff)
 
 // TMHTATR - TMU Monitor High Temperature Average Threshold Register
-// Bit 31: EN, Bits 11-0: TEMP
-#define TMU_TMHTATR_EN_MASK         (0x80000000)
-#define TMU_TMHTATR_EN_OFFSET       (31)
-#define TMU_TMHTATR_EN_BIT          (0x80000000)
-#define TMU_TMHTATR_TEMP_MASK       (0x00000FFF)
-#define TMU_TMHTATR_TEMP_OFFSET     (0)
+#define TMU_TMHTATR_EN_BIT          (BIT(31))
+#define TMU_TMHTATR_TEMP_MASK       (0xFF)
 
 // TMHTACTR - TMU Monitor High Temperature Average Critical Threshold Register
-// Bit 31: EN, Bits 11-0: TEMP
-#define TMU_TMHTACTR_EN_MASK        (0x80000000)
-#define TMU_TMHTACTR_EN_OFFSET      (31)
-#define TMU_TMHTACTR_EN_BIT         (0x80000000)
-#define TMU_TMHTACTR_TEMP_MASK      (0x00000FFF)
-#define TMU_TMHTACTR_TEMP_OFFSET    (0)
-
-// TTCFGR - TMU Temperature Configuration Register
-// Bits 31-0: DATA
-#define TMU_TTCFGR_DATA_MASK        (0xFFFFFFFF)
-#define TMU_TTCFGR_DATA_OFFSET      (0)
-
-// TSCFGR - TMU Sensor Configuration Register
-// Bits 31-0: DATA
-#define TMU_TSCFGR_DATA_MASK        (0xFFFFFFFF)
-#define TMU_TSCFGR_DATA_OFFSET      (0)
+#define TMU_TMHTACTR_EN_BIT         (BIT(31))
+#define TMU_TMHTACTR_TEMP_MASK      (0xFF)
 
 // TRITSRn - TMU Report Immediate Temperature Site Registers
-// Bit 31: V, Bits 11-0: TEMP
-#define TMU_TRITSR_V_MASK           (0x80000000)
-#define TMU_TRITSR_V_OFFSET         (31)
-#define TMU_TRITSR_V_BIT            (0x80000000)
-#define TMU_TRITSR_TEMP_MASK        (0x00000FFF)
-#define TMU_TRITSR_TEMP_OFFSET      (0)
+#define TMU_TRITSR_V_BIT            (BIT(31))
+#define TMU_TRITSR_TEMP_MASK        (0xff)
 
 // TRATSRn - TMU Report Average Temperature Site Registers
-// Bit 31: V, Bits 11-0: TEMP
-#define TMU_TRATSR_V_MASK           (0x80000000)
-#define TMU_TRATSR_V_OFFSET         (31)
-#define TMU_TRATSR_V_BIT            (0x80000000)
-#define TMU_TRATSR_TEMP_MASK        (0x00000FFF)
-#define TMU_TRATSR_TEMP_OFFSET      (0)
-
-// TTRnCR - TMU Temperature Range Control Registers
-// Bits 23-16: CAL_PTR, Bits 11-0: TEMP
-#define TMU_TTRCR_CAL_PTR_MASK      (0x00FF0000)
-#define TMU_TTRCR_CAL_PTR_OFFSET    (16)
-#define TMU_TTRCR_TEMP_MASK         (0x00000FFF)
-#define TMU_TTRCR_TEMP_OFFSET       (0)
+#define TMU_TRATSR_V_BIT            (BIT(31))
+#define TMU_TRATSR_TEMP_MASK        (0xFF)
 

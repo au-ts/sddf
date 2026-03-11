@@ -18,6 +18,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
+IrqConventional = SystemDescription.IrqConventional
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
@@ -43,6 +44,20 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
     )
     serial_system.add_client(client)
+
+
+    # TODO: replace with sdfgen
+    if board.name == "maaxboard":
+        tmu_mr = MemoryRegion(sdf, "tmu_mr", 0x1000, paddr=0x30260000)
+        sdf.add_mr(tmu_mr)
+
+        tmu_mr_map = Map(tmu_mr, 0x30260000, "rw", cached=False)
+        tmu_driver.add_map(tmu_mr_map)
+        tmu_driver.add_irq(IrqConventional(49 + 32, IrqConventional.Trigger.EDGE))
+
+    else:
+        print("Unsupported board!")
+        exit(-1)
 
     # Connect TMU client
     # TODO: sdfgen for this

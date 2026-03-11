@@ -5,7 +5,9 @@
  */
 
 #pragma once
-#include <sddf/pmu/protocol.h>
+#include <sddf/tmu/protocol.h>
+#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 
 #define DEBUG_TMU_DRIVER
 #ifdef DEBUG_TMU_DRIVER
@@ -50,7 +52,7 @@ sddf_tmu_err_t degrees_to_quantised(sddf_temp_celsius_t val_degrees, sddf_temp_c
                                     sddf_temp_celsius_t max_temp, uint32_t quantisation,
                                     uint64_t *quantised_val) {
     // Sanity: reject values that are invalid
-    if (val_degrees < min_temp || val_degrees >= max_temp) {
+    if (val_degrees < min_temp || val_degrees > max_temp) {
         return SDDF_TMU_ERR_EINVAL;
     }
 
@@ -78,7 +80,7 @@ sddf_tmu_err_t degrees_to_quantised(sddf_temp_celsius_t val_degrees, sddf_temp_c
  *  Returns:
  *  sddf_tmu_err_t OK if fine, otherwise positive error value.
  */
-sddf_tmu_err_t degrees_to_quantised(uint64_t val_quantised, sddf_temp_celsius_t min_temp,
+sddf_tmu_err_t quantised_to_degrees(uint64_t val_quantised, sddf_temp_celsius_t min_temp,
                                     sddf_temp_celsius_t max_temp, uint32_t quantisation,
                                     sddf_temp_celsius_t *degrees_celsius) {
 
@@ -88,9 +90,9 @@ sddf_tmu_err_t degrees_to_quantised(uint64_t val_quantised, sddf_temp_celsius_t 
     sddf_temp_celsius_t temp = ((sddf_temp_celsius_t)val_quantised * unit);
 
     // Sanity: if this temperature is outside of the valid temp range we have failed horribly.
-    assert(temp > min_temp && val_degrees <= max_temp);
+    assert(temp > min_temp && temp <= max_temp);
 
     // Finally: return.
-    *quantised_val = val_in_units;
+    *degrees_celsius = temp;
     return SDDF_TMU_ERR_OK;
 }
