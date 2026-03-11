@@ -12,11 +12,11 @@
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/pwm/client.h>
+#include <sddf/clk/imx8mq-bindings.h>
+#include <sddf/clk/client.h>
 
 // TODO: Clock tree
-// TODO: Pinmux
-// TODO: support for more than one PWM output per client
-// TODO: errata ERR051198
+// TODO: errata ERR051198?
 
 #define DEBUG_DRIVER
 
@@ -28,14 +28,25 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PWM DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-
-#define CH_PWM_IRQ 0
+#define CH_CLOCK_PPC 0
 #define CH_CONTROL_PPC 1
 
-// FIXME: hardcoded in meta.py
-static volatile imx_pwm_regs_t *pwm_regs = (volatile void *)0x30000000;
+#define NUM_PWM_CHANNELS 4
 
-static inline uint32_t pwm_mk_control(uint16_t prescalar, uint8_t poutc)
+// FIXME: hardcoded in meta.py. clk_rate unknown til runtime
+static struct pwm_channel_state {
+    volatile imx_pwm_regs_t *regs;
+    uint64_t clk_rate;
+    uint32_t clk_id;
+    uint32_t gate_clk_id;
+} pwm_channel_states[NUM_PWM_CHANNELS] = {
+    [0] = { .regs = (volatile void *)0x30000000, .clk_id = IMX8MQ_CLK_PWM1, .gate_clk_id = IMX8MQ_CLK_PWM1_ROOT },
+    [1] = { .regs = (volatile void *)0x30010000, .clk_id = IMX8MQ_CLK_PWM2, .gate_clk_id = IMX8MQ_CLK_PWM2_ROOT },
+    [2] = { .regs = (volatile void *)0x30020000, .clk_id = IMX8MQ_CLK_PWM3, .gate_clk_id = IMX8MQ_CLK_PWM3_ROOT },
+    [3] = { .regs = (volatile void *)0x30030000, .clk_id = IMX8MQ_CLK_PWM4, .gate_clk_id = IMX8MQ_CLK_PWM4_ROOT },
+};
+
+static inline const uint32_t pwm_mk_control(uint16_t prescalar, uint8_t poutc)
 {
     assert(prescalar < BIT(PWMx_PWMCR__PRESCALAR_LEN));
     assert(poutc < BIT(PWMx_PWMCR__POUTC_LEN));
@@ -66,7 +77,7 @@ static inline uint32_t pwm_mk_control(uint16_t prescalar, uint8_t poutc)
     );
 }
 
-static void pwm_sw_reset(void)
+static void pwm_sw_reset(volatile imx_pwm_regs_t *pwm_regs)
 {
     /* disable the PWM by reset. Necessary to clear the 'sample' FIFO. */
     pwm_regs->control = BIT(PWMx_PWMCR__SWR);
@@ -81,22 +92,25 @@ static void pwm_sw_reset(void)
 }
 
 /* [IMX8MDQLQRM] Section 12.2.6 Disable Sequence for the PWM */
-static void pwm_disable(void)
+static void pwm_disable(volatile imx_pwm_regs_t *pwm_regs)
 {
     /* Can be disabled at any time. Any data in FIFO will remain unless
        cleared by a software reset */
     pwm_regs->control &= BIT(PWMx_PWMCR__EN);
 }
 
-static void pwm_enable(void)
+static void pwm_enable(volatile imx_pwm_regs_t *pwm_regs)
 {
     pwm_regs->control |= BIT(PWMx_PWMCR__EN);
 }
 
 /* [IMX8MDQLQRM] Section 12.2.4.1 Operation */
-static bool pwm_configure(uint64_t period_ns, uint64_t pulse_width_ns, int flags)
+static bool pwm_configure(int channel, uint64_t period_ns, uint64_t pulse_width_ns, int flags)
 {
-    pwm_disable();
+    volatile imx_pwm_regs_t *pwm_regs = pwm_channel_states[channel].regs;
+    uint64_t clk_rate = pwm_channel_states[channel].clk_rate;
+
+    pwm_disable(pwm_regs);
 
     /*
         The PWM hardware has a 16-bit up-counter that counts from 0 to the period register,
@@ -112,28 +126,94 @@ static bool pwm_configure(uint64_t period_ns, uint64_t pulse_width_ns, int flags
         poutc = PWMx_PWMCR__POUTC_NORMAL;
     }
 
-#if 0
-    /* The peripheral clock ticks up at a certain rate */
-    // FIXME hacks?
-    uint64_t clk_rate = 83333333;
+    uint64_t clk_period_ns = (1 * 1000UL * 1000UL * 1000UL) / clk_rate;
 
-    uint64_t min_ns = clk_rate / /* prescale */ 4096 *  1 /* count */;
-    uint64_t max_ns = clk_rate / /* prescale */ 1 *  0xFFFE /* count */;
-#endif
+    // -1 for value to put in prescale
+    const uint64_t max_prescale_v = 4096;
+    const uint64_t min_prescale_v = 1;
 
-    uint16_t prescalar = 0;
-    uint16_t period = 0x4000;
-    uint16_t sample = 0x1000;
+    // -2 for value to put in the period
+    const uint64_t max_period_register_v = 0x10000;
+    const uint64_t min_period_register_v = 0x2;
 
-    // Writing 0xFFFF to this register will achieve the same result as writing 0xFFFE.
-    if (period == 0xFFFF) {
-        LOG_DRIVER_ERR("period would be out of range\n");
+    const uint64_t min_period = clk_period_ns * min_prescale_v * min_period_register_v;
+    const uint64_t max_period = clk_period_ns * max_prescale_v * max_period_register_v;
+
+    LOG_DRIVER("clock period %ld\n", clk_period_ns);
+    LOG_DRIVER("min clock period %ld\n", min_period);
+    LOG_DRIVER("max clock period %ld\n", max_period);
+
+    // We're also be lazy here
+    if (period_ns < min_period) {
+        LOG_DRIVER("requested period too small\n");
+        return false;
+    } else if (period_ns > max_period) {
+        // FIXME: we could update root clock scales in this case
+        //        we could potentially do it for min if we can increase the clk freq
+        LOG_DRIVER("requested period too large\n");
         return false;
     }
 
-    // Note: PWMO (Hz) = PCLK(Hz) / (period +2).
+    // _v suffix means the interpretation of the value (for math) not the value you put somewhere.
 
-    // TODO: Settings PWM_PWMPR to 0xFFFF when PWMx_PWMCR REPEAT bits are set to non-zero values is not allowed.
+    // Want: maximise the period register for precision
+    // Want: minimise the prescale for precision
+
+    // TODO: should be possible to do this just based on the slope or whatever but I seem to be incapable of doing that
+    //       in my head.
+
+
+    // XXXX: this is just really wrong for the higher prescales...
+    // kinda assumes == 0.
+
+    // Find the range that covers `low_period` <... `period_ns` ...= `high_period`
+    // that has the largest values. Note we do equality on high and inequality on low.
+    uint64_t period_reg_v = max_period_register_v;
+    uint64_t high_period_ns = max_period;
+    uint64_t prescale_v = max_prescale_v;
+    while (prescale_v > min_prescale_v) {
+        // lower is considered the "next"
+        uint64_t low_period_ns = clk_period_ns * (prescale_v - 1) * period_reg_v;
+
+        // LOG_DRIVER("Considering prescale %ld covering range %ld... %ld.... %ld\n", prescale_v, low_period_ns, period_ns, high_period_ns);
+
+        if (low_period_ns < period_ns && period_ns <= high_period_ns) {
+            // LOG_DRIVER("... it fits\n");
+            break;
+        }
+
+        high_period_ns = low_period_ns;
+        prescale_v--;
+    }
+
+    if (prescale_v == min_prescale_v) {
+        while (period_reg_v > min_period_register_v) {
+            uint64_t low_period_ns = clk_period_ns * prescale_v * (period_reg_v - 1);
+
+            // LOG_DRIVER("Considering period reg %ld covering range %ld... %ld.... %ld\n", period_reg_v, low_period_ns, period_ns, high_period_ns);
+
+            if (low_period_ns < period_ns && period_ns <= high_period_ns) {
+                // LOG_DRIVER("... it fits\n");
+                break;
+            }
+
+            high_period_ns = low_period_ns;
+            period_reg_v--;
+        }
+    }
+
+    // Done by the error checks earlier this cannot happen.
+    assert(period_reg_v != min_period_register_v);
+
+    uint16_t prescalar = prescale_v - 1;
+    uint16_t period = period_reg_v - 2;
+
+    // The sample (duty cycle) uses the same scale as the period.
+    uint64_t sample_v = ((clk_period_ns * prescale_v * period_reg_v) / period_ns) * pulse_width_ns;
+    // TODO: offset does this make sense?
+    uint16_t sample = sample_v - 1;
+
+    LOG_DRIVER("prescalar in registers: %d, period: %d, sample: %d\n", prescalar, period, sample);
 
     pwm_regs->control = pwm_mk_control(prescalar, poutc);
     pwm_regs->sample = sample;
@@ -141,11 +221,12 @@ static bool pwm_configure(uint64_t period_ns, uint64_t pulse_width_ns, int flags
 
     /* 4. Check/Clear status bits (w1c) to ensure they are all zero */
     if (pwm_regs->status & PWMx_PWMSR__InterruptStatus_MASK) {
-        LOG_DRIVER_ERR("PWM status (error) bits are 1: 0x%x\n", pwm_regs->status);
+        pwm_regs->status = PWMx_PWMSR__InterruptStatus_MASK;
+        // This seems to always happen. We don't care about this, though.
+        // LOG_DRIVER("PWM status (error) bits are 1: 0x%x\n", pwm_regs->status);
     }
-    pwm_regs->status = PWMx_PWMSR__InterruptStatus_MASK;
 
-    pwm_enable();
+    pwm_enable(pwm_regs);
 
     return true;
 }
@@ -155,7 +236,21 @@ void init(void)
 {
     LOG_DRIVER("PWM starting\n");
 
-    pwm_sw_reset();
+    for (int i = 0; i < NUM_PWM_CHANNELS; i++) {
+        int ret;
+
+        ret = sddf_clk_get_rate(CH_CLOCK_PPC, pwm_channel_states[i].clk_id, &pwm_channel_states[i].clk_rate);
+        assert(ret == 0);
+
+        LOG_DRIVER("PWM%d clk rate is %ld Hz\n", i, pwm_channel_states[i].clk_rate);
+
+        ret = sddf_clk_enable(CH_CLOCK_PPC, pwm_channel_states[i].gate_clk_id);
+        assert(ret == 0);
+
+        pwm_sw_reset(pwm_channel_states[i].regs);
+
+        LOG_DRIVER("PWM%d reset complete\n", i);
+    }
 }
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -164,28 +259,42 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 
     switch (microkit_msginfo_get_label(msginfo)) {
     case SDDF_PWM_PPC_ID_SET_NS: {
-        LOG_DRIVER("PPC set NS request\n");
+        LOG_DRIVER("set period/pulse width ns request\n");
+
+        // TODO: check msginfo length
 
         seL4_Word channel = sddf_get_mr(SDDF_PWM_PPC_SLOT_CHANNEL);
-        // TODO: channel unsupported.
-        assert(channel == 0);
-
         seL4_Word period_ns = sddf_get_mr(SDDF_PWM_PPC_SLOT_PERIOD);
         seL4_Word pulse_width_ns = sddf_get_mr(SDDF_PWM_PPC_SLOT_PULSE_WIDTH);
         seL4_Word flags = sddf_get_mr(SDDF_PWM_PPC_SLOT_FLAGS);
 
+        LOG_DRIVER("... for pwm channel %ld\n", channel);
+        LOG_DRIVER("... with period ns %ld\n", period_ns);
+        LOG_DRIVER("... with pulse width ns %ld\n", pulse_width_ns);
+        LOG_DRIVER("... with flags 0x%lx\n", flags);
+
+        if (channel >= NUM_PWM_CHANNELS) {
+            // Invalid channel.
+            return microkit_msginfo_new(SDDF_PWM_FAILURE, 0);
+        }
+
         if (period_ns == 0 && pulse_width_ns == 0) {
-            pwm_disable();
+            pwm_disable(pwm_channel_states[channel].regs);
             return microkit_msginfo_new(SDDF_PWM_SUCCESS, 0);
+        } else if (period_ns == 0) {
+            // Cannot have 0 period.
+            return microkit_msginfo_new(SDDF_PWM_FAILURE, 0);
+        } else if (pulse_width_ns >= period_ns) {
+            // Cannot have pulse width >= period as this would be duty > 100%
+            return microkit_msginfo_new(SDDF_PWM_FAILURE, 0);
         } else {
-            bool success = pwm_configure(period_ns, pulse_width_ns, flags);
+            bool success = pwm_configure(channel, period_ns, pulse_width_ns, flags);
             return microkit_msginfo_new(success ? SDDF_PWM_SUCCESS : SDDF_PWM_FAILURE, 0);
         }
     }
     default:
         LOG_DRIVER("Unknown request %lu from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-        // XXXX.
-        return microkit_msginfo_new(0, 0);
+        return microkit_msginfo_new(SDDF_PWM_FAILURE, 0);
     }
 }
 

@@ -17,6 +17,9 @@ __attribute__((__section__(".serial_client_config"))) serial_client_config_t ser
 
 #define CH_PWM_CONTROL_PPC 0
 
+/* We use PWM2 (channel 1) which is connected to IO_GPIO13 by our pinctrl driver */
+#define PWM_CHANNEL 1
+
 void init(void)
 {
     assert(serial_config_check_magic(&serial_config));
@@ -28,17 +31,29 @@ void init(void)
 
     LOG_CLIENT("starting\n");
 
+    bool success;
     while (1) {
         for (volatile int i = 0; i < 100000000; i++) {}
 
-        bool success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 500, /* pulse width ns */ 200, 0);
+        success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* period ns */ 500 * 1000, /* pulse width ns */ 200 * 1000, /* flags */ 0);
         assert(success);
 
         for (volatile int i = 0; i < 100000000; i++) {}
 
-            // disable
-        success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 0, /* pulse width ns */ 0, 0);
+        // disable
+        success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* period ns */ 0, /* pulse width ns */ 0, 0);
         assert(success);
+
+        for (volatile int i = 0; i < 100000000; i++) {}
+
+        // success = sddf_pwm_set_freq_duty(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* freq */ 1000, /* duty (/1000) */ 500, /* flags */ 0);
+        // assert(success);
+
+        // for (volatile int i = 0; i < 100000000; i++) {}
+
+        // // disable
+        // success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, PWM_CHANNEL, /* period ns */ 0, /* pulse width ns */ 0, 0);
+        // assert(success);
     }
 
     LOG_CLIENT("done\n");

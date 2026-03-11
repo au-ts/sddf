@@ -51,15 +51,23 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         assert False
 
     # HACK for sdfgen.             "soc@0/bus@30400000/pwm@30670000",
-    pwm2_mr = MemoryRegion(sdf, "pwm2", 0x10000, paddr=0x30670000)
+    pwm1_mr = MemoryRegion(sdf, "pwm1", 0x10_000, paddr=0x30660000)
+    pwm2_mr = MemoryRegion(sdf, "pwm2", 0x10_000, paddr=0x30670000)
+    pwm3_mr = MemoryRegion(sdf, "pwm3", 0x10_000, paddr=0x30680000)
+    pwm4_mr = MemoryRegion(sdf, "pwm4", 0x10_000, paddr=0x30690000)
+    sdf.add_mr(pwm1_mr)
     sdf.add_mr(pwm2_mr)
-    pwm_driver.add_map(Map(pwm2_mr, 0x30_000_000, "rw", cached=False))
-    pwm_driver.add_irq(IrqConventional(82 + 32, IrqConventional.Trigger.EDGE))
-
-    chan = Channel(pwm_driver, client, pp_b=True, notify_a=False, notify_b=False)
-    sdf.add_channel(chan)
-    assert chan.pd_a_id == 1, chan.pd_a_id
-    assert chan.pd_b_id == 0, chan.pd_b_id
+    sdf.add_mr(pwm3_mr)
+    sdf.add_mr(pwm4_mr)
+    pwm_driver.add_map(Map(pwm1_mr, 0x30_000_000, "rw", cached=False))
+    pwm_driver.add_map(Map(pwm2_mr, 0x30_010_000, "rw", cached=False))
+    pwm_driver.add_map(Map(pwm3_mr, 0x30_020_000, "rw", cached=False))
+    pwm_driver.add_map(Map(pwm4_mr, 0x30_030_000, "rw", cached=False))
+    # Despite having IRQs, we never need them.
+    # pwm_driver.add_irq(IrqConventional(0x52 + 32, IrqConventional.Trigger.LEVEL))
+    # pwm_driver.add_irq(IrqConventional(0x53 + 32, IrqConventional.Trigger.LEVEL))
+    # pwm_driver.add_irq(IrqConventional(0x54 + 32, IrqConventional.Trigger.LEVEL))
+    # pwm_driver.add_irq(IrqConventional(0x55 + 32, IrqConventional.Trigger.LEVEL))
 
     # HACK for sdfgen
 
@@ -83,8 +91,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         exit(-1)
 
 
-    clk_channel = Channel(clk_driver, client, pp_b=True)
+    clk_channel = Channel(clk_driver, pwm_driver, pp_b=True)
     sdf.add_channel(clk_channel)
+    assert clk_channel.pd_b_id == 0, clk_channel.pd_b_id
+
+    # clients
+    chan = Channel(pwm_driver, client, pp_b=True, notify_a=False, notify_b=False)
+    sdf.add_channel(chan)
+    assert chan.pd_a_id == 1, chan.pd_a_id
+    assert chan.pd_b_id == 0, chan.pd_b_id
+
 
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx)
     serial_system.add_client(client)
