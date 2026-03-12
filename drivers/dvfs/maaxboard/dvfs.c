@@ -7,8 +7,10 @@
 // Note: the DVFS driver only implements the operating point table and a protocol
 //       for shifting between points. Thermal control is implemented by a client.
 //
-//       This platform has a global clock and regulator, so the CPU field has no
+//       This platform has a global clock and regulator, so the CPU/reg field has no
 //       impact on settings and the returned operating point is shared for all CPUs.
+//       We may want to encode the notion of dependent operating points in the protocol
+//       in the future as this disambiguates things.
 
 #include <stdbool.h>
 #include <os/sddf.h>
@@ -17,12 +19,16 @@
 #include <sddf/util/util.h>
 #include <sddf/clk/client.h>
 #include <sddf/clk/imx8mq-bindings.h>
+#include <sddf/pmic/bd71837amwv-bindings.h>
+#include <sddf/pmic/client.h>
+#include <sddf/pmic/protocol.h>
 #include <sddf/dvfs/protocol.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 // TODO: replace with sdfgen resources
 #define CLK_DRIVER_CHANNEL ((uint64_t) 0)
+#define PMIC_DRIVER_CHANNEL (1)
 
 // TODO: support passing in operating point table from sdfgen
 #define OP_TABLE_SZ 4
@@ -35,10 +41,14 @@ const dvfs_op_point_t imx_op_point_table[OP_TABLE_SZ] = {
 
 #define IMX_NUM_CORES 4
 const dvfs_core_info_t core_list[IMX_NUM_CORES] = {
-    { .core_id = 0, .clk_src_id = IMX8MQ_CLK_ARM, .op_point_tbl = imx_op_point_table },
-    { .core_id = 1, .clk_src_id = IMX8MQ_CLK_ARM, .op_point_tbl = imx_op_point_table },
-    { .core_id = 2, .clk_src_id = IMX8MQ_CLK_ARM, .op_point_tbl = imx_op_point_table },
-    { .core_id = 3, .clk_src_id = IMX8MQ_CLK_ARM, .op_point_tbl = imx_op_point_table }
+    { .core_id = 0, .clk_src_id = IMX8MQ_CLK_ARM, .regulator_id = BD718XX_BUCK2,
+        .op_point_tbl = imx_op_point_table },
+    { .core_id = 1, .clk_src_id = IMX8MQ_CLK_ARM, .regulator_id = BD718XX_BUCK2,
+        .op_point_tbl = imx_op_point_table },
+    { .core_id = 2, .clk_src_id = IMX8MQ_CLK_ARM, .regulator_id = BD718XX_BUCK2,
+        .op_point_tbl = imx_op_point_table },
+    { .core_id = 3, .clk_src_id = IMX8MQ_CLK_ARM, .regulator_id = BD718XX_BUCK2,
+        .op_point_tbl = imx_op_point_table }
 };
 
 // Cluster shares a single clock and power source, just one index.
@@ -69,7 +79,7 @@ static inline int do_set_frequency(op_point_idx_t op_point_idx) {
         LOG_DVFS_DRIVER_ERR("Failed to set clock rate!\n");
         return ret;
     }
-    assert(target_freq == set_ret_rate);
+    // assert(target_freq == set_ret_rate);
 
     uint64_t returned_freq = 0;
     ret = sddf_clk_get_rate(CLK_DRIVER_CHANNEL, core_list[0].clk_src_id,
@@ -82,12 +92,26 @@ static inline int do_set_frequency(op_point_idx_t op_point_idx) {
         LOG_DVFS_DRIVER_ERR("Target freq %zu != actual freq %zu!\n",
                             target_freq, returned_freq);
         return 1;
+    } else {
+        LOG_DVFS_DRIVER("Successfully set freq to %zu (target=%zu)!\n",
+                            returned_freq, target_freq);
     }
     return 0;
 }
 
 static inline int do_set_voltage(op_point_idx_t op_point_idx) {
-    // TODO
+    uint64_t target_voltage = imx_op_point_table[op_point_idx].voltage_uv;
+
+    int ret = sddf_pmic_set_vout(PMIC_DRIVER_CHANNEL, core_list[0].regulator_id,
+                                 target_voltage);
+    if (ret  != SDDF_PMIC_ERR_OK) {
+        LOG_DVFS_DRIVER_ERR("Failed to set voltage for operating point %zu @ %zu uV!\n",
+                            op_point_idx, target_voltage);
+        return -1;
+    } else {
+        LOG_DVFS_DRIVER("Set voltage for operating point %zu @ %zu uV!\n",
+                            op_point_idx, target_voltage);
+    }
     return 0;
 }
 
@@ -114,10 +138,8 @@ void init(void) {
 void notified(microkit_channel ch) {}
 
 microkit_msginfo protected(sddf_channel ch, microkit_msginfo msginfo) {
-    LOG_DVFS_DRIVER("PROTECTED\n");
     uint64_t core_identifier = 0;
     op_point_idx_t new_point = 0;
-    LOG_DVFS_DRIVER_ERR("Label value = %zu\n", microkit_msginfo_get_label(msginfo));
     switch (microkit_msginfo_get_label(msginfo)) {
         case SDDF_DVFS_GET_POINT:
             LOG_DVFS_DRIVER("GET_POINT\n");

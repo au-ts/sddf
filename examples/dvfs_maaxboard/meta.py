@@ -27,19 +27,24 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
 
-    client = ProtectionDomain("client", "client.elf", priority=1)
-    dvfs_driver = ProtectionDomain("dvfs_driver", "dvfs_driver.elf", priority=99, passive=True)
-    clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=100, passive=True)
-    # i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=101)
-    # i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=102)
+    # timer driver should be highest prio for sanity
+    # i2c must be higher priority than pmic
+    # pmic must be higher priority than dvfs
+    # clk must be higher prio than dvfs
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=200)
+    clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=110, passive=True)
+    i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=102)
+    i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=101)
+    pmic_driver = ProtectionDomain("pmic_driver", "pmic_driver.elf", priority=100)
+    dvfs_driver = ProtectionDomain("dvfs_driver", "dvfs_driver.elf", priority=99, passive=True)
+    client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
-    # i2c_node = dtb.node(board.i2c)
-    # assert i2c_node is not None
+    i2c_node = dtb.node(board.i2c)
+    assert i2c_node is not None
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
@@ -48,8 +53,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     )
     serial_system.add_client(client)
 
-    # i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    # i2c_system.add_client(dvfs_driver)
+    i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
+    i2c_system.add_client(pmic_driver)
 
     # HACK: sdfgen doesn't support multiple regions for a device resource yet
     #       or the clk class. This will be removed in the pending sdfgen refactor.
@@ -72,8 +77,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         exit(-1)
 
 
+    # add channels
+    # TODO: replace with sdfgen invocations
     clk_channel = Channel(clk_driver, dvfs_driver, pp_b=True)
     sdf.add_channel(clk_channel)
+
+    pmic_channel = Channel(pmic_driver, dvfs_driver, pp_b=True)
+    sdf.add_channel(pmic_channel)
 
     dvfs_channel = Channel(dvfs_driver, client, pp_b=True)
     sdf.add_channel(dvfs_channel)
@@ -84,15 +94,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         serial_driver,
         serial_virt_tx,
         timer_driver,
-        # i2c_driver,
-        # i2c_virt,
+        pmic_driver,
+        i2c_driver,
+        i2c_virt,
         client,
     ]
     for pd in pds:
         sdf.add_pd(pd)
 
-    # assert i2c_system.connect()
-    # assert i2c_system.serialise_config(output_dir)
+    assert i2c_system.connect()
+    assert i2c_system.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert timer_system.connect()

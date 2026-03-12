@@ -16,7 +16,7 @@
 #include <sddf/i2c/queue.h>
 
 
-#define DEBUG_PMIC_DRIVER
+// #define DEBUG_PMIC_DRIVER
 #ifdef DEBUG_PMIC_DRIVER
 #define LOG_PMIC_DRIVER(...) do{ sddf_dprintf("PMIC DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
