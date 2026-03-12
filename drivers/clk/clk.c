@@ -205,8 +205,12 @@ int clk_set_rate(const struct clk *clk, uint64_t req_rate, uint64_t *rate)
     }
 
     if (clk->hw.init->ops->set_rate) {
-        *rate = clk->hw.init->ops->set_rate(clk, req_rate, prate);
-        return 0;
+        err = clk->hw.init->ops->set_rate(clk, req_rate, prate);
+        if (!err) {
+            clk_get_rate(clk, rate);
+            return err;
+        }
+        return err;
     }
 
     return clk_set_rate(pclk, req_rate, rate);

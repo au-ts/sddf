@@ -150,8 +150,8 @@ static int clk_pll_set_rate(const struct clk *clk, uint64_t rate, uint64_t paren
         }
     }
 
-    if (!timeout)
-        return CLK_FAILED_OP;
+    /* if (!timeout) */
+        /* return CLK_FAILED_OP; */
 
     ret = regmap_update_bits(clk->base, data->offset, 14, MASK(1), 0);
     if (ret)
