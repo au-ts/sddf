@@ -30,6 +30,7 @@ typedef struct op_point {
 typedef struct dvfs_core_info {
     uint64_t core_id;
     uint64_t clk_src_id;    // Reference to clock binding for platform.
+    uint64_t regulator_id;  // Reference to regulator for core voltage adjustment
     const dvfs_op_point_t *op_point_tbl;  // point to constant array
 } dvfs_core_info_t;
 // NOTE: op point table should always be the same on a clustser UNLESS hetereogeneous cores.
