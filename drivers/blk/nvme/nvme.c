@@ -40,6 +40,8 @@ nvme_completion_queue_entry_t *nvme_io_cq_region;
 uintptr_t nvme_io_sq_region_paddr;
 uintptr_t nvme_io_cq_region_paddr;
 
+nvme_identify_ctrl_t *nvme_identify_ctrl;
+
 /* Timed polling used while waiting for controller reset/enable transitions. */
 #define NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS 10
 #define NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS (NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS * NS_IN_MS)
@@ -260,6 +262,10 @@ static void handle_admin_completions(void)
     switch (state_ctx.state) {
     case NVME_STATE_WAIT_IDENTIFY: {
         LOG_NVME("Identify Controller completed\n");
+        LOG_NVME("  VID: 0x%04x  SSVID: 0x%04x\n", nvme_identify_ctrl->vid, nvme_identify_ctrl->ssvid);
+        LOG_NVME("  SN:  %.20s\n", nvme_identify_ctrl->sn);
+        LOG_NVME("  MN:  %.40s\n", nvme_identify_ctrl->mn);
+        LOG_NVME("  FR:  %.8s\n", nvme_identify_ctrl->fr);
 
         // 8. The host determines any I/O Command Set specific configuration information
         //    For now, we assume that the controller supports only the NVM Command Set.
@@ -586,6 +592,8 @@ void init(void)
 
     nvme_io_cq_region = (void *)NVME_IO_CQ_VADDR;
     nvme_io_cq_region_paddr = NVME_IO_CQ_PADDR;
+
+    nvme_identify_ctrl = (void *)NVME_IDENTIFY_CTRL_VADDR;
 
     /* Initialise CID allocator */
     ialloc_init(&cid_ialloc, cid_ialloc_idxlist, MAX_PENDING_REQS);
