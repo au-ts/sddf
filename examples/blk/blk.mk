@@ -36,7 +36,8 @@ endif
 
 IMAGE_FILE := loader.img
 REPORT_FILE  := report.txt
-SYSTEM_FILE := ../blk_iommu.system
+SYSTEM_FILE := blk.system
+SYSTEM_FILE_IOMMU := ../blk_iommu.system
 
 SUPPORTED_BOARDS := qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \
@@ -114,8 +115,8 @@ endif
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
 	touch $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE_IOMMU) $(SYSTEM_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE_IOMMU) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:
 	$(SDDF)/tools/mkvirtdisk disk 1 512 16777216 GPT
