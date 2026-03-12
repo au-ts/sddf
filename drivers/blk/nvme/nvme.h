@@ -276,6 +276,40 @@ _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
 /* Identify CNS value for controller. [NVMe-2.1 §5.1.13, Fig. 310] */
 #define NVME_IDENTIFY_CNS_CONTROLLER 0x01U
 
+/*
+ * Identify Controller (I/O Command Set Independent) response for CNS=01h.
+ * Currently unused fields are modeled as reserved spans while preserving spec-defined offsets.
+ * [NVMe-2.1 §5.1.13.2.1, Fig. 312]
+ */
+typedef struct nvme_identify_ctrl {
+    uint16_t vid;    /* PCI Vendor ID */
+    uint16_t ssvid;  /* PCI Subsystem Vendor ID */
+    char sn[20];     /* Serial Number (ASCII, space-padded) */
+    char mn[40];     /* Model Number (ASCII, space-padded) */
+    char fr[8];      /* Firmware Revision (ASCII) */
+    uint8_t _reserved0[77 - 72];
+    uint8_t mdts;    /* Max transfer size exponent (0h means no limit; units based on CAP.MPSMIN) */
+    uint8_t _reserved1[96 - 78];
+    uint32_t ctratt; /* Controller Attributes (MEM bit 16 affects MDTS metadata accounting) */
+    uint8_t _reserved2[512 - 100];
+    uint8_t sqes;    /* MINSQES[3:0], MAXSQES[7:4] (required value is 6 => 64-byte SQE) */
+    uint8_t cqes;    /* MINCQES[3:0], MAXCQES[7:4] (required value is 4 => 16-byte CQE) */
+    uint8_t _reserved3[536 - 514];
+    uint32_t sgls;   /* SGL Support */
+    uint8_t _reserved4[4096 - 540];
+} nvme_identify_ctrl_t;
+_Static_assert(sizeof(nvme_identify_ctrl_t) == 4096, "Identify Controller data structure must be 4096 bytes");
+_Static_assert(offsetof(nvme_identify_ctrl_t, vid) == 0, "VID must be at byte offset 0");
+_Static_assert(offsetof(nvme_identify_ctrl_t, ssvid) == 2, "SSVID must be at byte offset 2");
+_Static_assert(offsetof(nvme_identify_ctrl_t, sn) == 4, "SN must be at byte offset 4");
+_Static_assert(offsetof(nvme_identify_ctrl_t, mn) == 24, "MN must be at byte offset 24");
+_Static_assert(offsetof(nvme_identify_ctrl_t, fr) == 64, "FR must be at byte offset 64");
+_Static_assert(offsetof(nvme_identify_ctrl_t, mdts) == 77, "MDTS must be at byte offset 77");
+_Static_assert(offsetof(nvme_identify_ctrl_t, ctratt) == 96, "CTRATT must be at byte offset 96");
+_Static_assert(offsetof(nvme_identify_ctrl_t, sqes) == 512, "SQES must be at byte offset 512");
+_Static_assert(offsetof(nvme_identify_ctrl_t, cqes) == 513, "CQES must be at byte offset 513");
+_Static_assert(offsetof(nvme_identify_ctrl_t, sgls) == 536, "SGLS must be at byte offset 536");
+
 /* ═══════════════════════════════════════════════════════════════════════
  *  PCIe Transport
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -368,6 +402,7 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
 #define NVME_PRP_LIST_REGION_SIZE   0x80000
 
 /* Identify response buffers (one page each). */
+#define NVME_IDENTIFY_BUFFER_BYTES 0x1000
 #define NVME_IDENTIFY_CTRL_VADDR   (NVME_IDENTIFY_VADDR)
 #define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
 
@@ -381,3 +416,7 @@ _Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ASQ_REGION_SIZE, "ASQ allocation ex
 _Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ACQ_REGION_SIZE, "ACQ allocation exceeds nvme_admin_cq region size");
 _Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_SQ_REGION_SIZE, "IO SQ allocation exceeds nvme_io_sq region size");
 _Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_CQ_REGION_SIZE, "IO CQ allocation exceeds nvme_io_cq region size");
+
+/* Identify buffers must fit in their shared region and not overlap. */
+_Static_assert(sizeof(nvme_identify_ctrl_t) <= NVME_IDENTIFY_BUFFER_BYTES,
+               "Identify Controller structure must fit within one Identify buffer");
