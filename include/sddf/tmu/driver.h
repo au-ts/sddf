@@ -9,7 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define DEBUG_TMU_DRIVER
+// #define DEBUG_TMU_DRIVER
 #ifdef DEBUG_TMU_DRIVER
 #define LOG_TMU_DRIVER(...) do{ sddf_dprintf("TMU DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else

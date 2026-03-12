@@ -10,7 +10,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/dvfs/protocol.h>
 
-#define DEBUG_DVFS_DRIVER
+// #define DEBUG_DVFS_DRIVER
 #ifdef DEBUG_DVFS_DRIVER
 #define LOG_DVFS_DRIVER(...) do{ sddf_dprintf("DVFS DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
