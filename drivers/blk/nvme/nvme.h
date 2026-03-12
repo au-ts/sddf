@@ -74,49 +74,49 @@ typedef struct nvme_controller {
 _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller_t must match spec layout");
 
 /* Controller Capabilities. [NVMe-2.1 §3.1.4.1, Fig. 36] */
-#define NVME_CAP_MQES_MASK      NVME_BITS_MASK(0, 15)   /* Maximum Queue Entries Supported (0-based) */
-#define NVME_CAP_NOIOCSS        BIT(37 + 7)             /* No I/O Command Set Support */
-#define NVME_CAP_IOCSS          BIT(37 + 6)             /* I/O Command Set Support    */
-#define NVME_CAP_NCSS           BIT(37 + 0)             /* NVM Command Set Support    */
-#define NVME_CAP_TO_SHIFT       24                      /* Controller Ready Timeout (500 ms units) */
+#define NVME_CAP_MQES_MASK      NVME_BITS_MASK(0, 15) /* Maximum Queue Entries Supported (0-based) */
+#define NVME_CAP_NOIOCSS        BIT(37 + 7) /* No I/O Command Set Support */
+#define NVME_CAP_IOCSS          BIT(37 + 6) /* I/O Command Set Support    */
+#define NVME_CAP_NCSS           BIT(37 + 0) /* NVM Command Set Support    */
+#define NVME_CAP_TO_SHIFT       24 /* Controller Ready Timeout (500 ms units) */
 #define NVME_CAP_TO_MASK        NVME_BITS_MASK(24, 31)
-#define NVME_CAP_MPSMIN_SHIFT   48                      /* Memory Page Size Minimum   */
+#define NVME_CAP_MPSMIN_SHIFT   48 /* Memory Page Size Minimum   */
 #define NVME_CAP_MPSMIN_MASK    NVME_BITS_MASK(48, 51)
-#define NVME_CAP_MPSMAX_SHIFT   52                      /* Memory Page Size Maximum   */
+#define NVME_CAP_MPSMAX_SHIFT   52 /* Memory Page Size Maximum   */
 #define NVME_CAP_MPSMAX_MASK    NVME_BITS_MASK(52, 55)
-#define NVME_CAP_DSTRD_SHIFT    32                      /* Doorbell Stride (2 ^ (2 + DSTRD)) */
+#define NVME_CAP_DSTRD_SHIFT    32 /* Doorbell Stride (2 ^ (2 + DSTRD)) */
 #define NVME_CAP_DSTRD_MASK     NVME_BITS_MASK(32, 35)
 
 /* Version. [NVMe-2.1 §3.1.4.2, Fig. 37] */
 #define NVME_VS_TER_SHIFT       0
-#define NVME_VS_TER             NVME_BITS_MASK(0, 7)    /* Tertiary Version */
+#define NVME_VS_TER             NVME_BITS_MASK(0, 7) /* Tertiary Version */
 #define NVME_VS_MNR_SHIFT       8
-#define NVME_VS_MNR             NVME_BITS_MASK(8, 15)   /* Minor Version */
+#define NVME_VS_MNR             NVME_BITS_MASK(8, 15) /* Minor Version */
 #define NVME_VS_MJR_SHIFT       16
-#define NVME_VS_MJR             NVME_BITS_MASK(16, 31)  /* Major Version */
+#define NVME_VS_MJR             NVME_BITS_MASK(16, 31) /* Major Version */
 
 /* Controller Configuration. [NVMe-2.1 §3.1.4.5, Fig. 41] */
-#define NVME_CC_IOCQES_SHIFT    20                      /* I/O CQ Entry Size (2^IOCQES bytes) */
+#define NVME_CC_IOCQES_SHIFT    20 /* I/O CQ Entry Size (2^IOCQES bytes) */
 #define NVME_CC_IOCQES_MASK     NVME_BITS_MASK(20, 23)
-#define NVME_CC_IOSQES_SHIFT    16                      /* I/O SQ Entry Size (2^IOSQES bytes) */
+#define NVME_CC_IOSQES_SHIFT    16 /* I/O SQ Entry Size (2^IOSQES bytes) */
 #define NVME_CC_IOSQES_MASK     NVME_BITS_MASK(16, 19)
-#define NVME_CC_MPS_SHIFT       7                       /* Host Memory Page Size (2^(12+MPS) bytes) */
+#define NVME_CC_MPS_SHIFT       7 /* Host Memory Page Size (2^(12+MPS) bytes) */
 #define NVME_CC_MPS_MASK        NVME_BITS_MASK(7, 10)
-#define NVME_CC_CSS_SHIFT       4                       /* I/O Command Set Selected */
+#define NVME_CC_CSS_SHIFT       4 /* I/O Command Set Selected */
 #define NVME_CC_CSS_MASK        NVME_BITS_MASK(4, 6)
-#define NVME_CC_CSS_NVM         0x0U                    /* NVM Command Set */
-#define NVME_CC_EN              BIT(0)                  /* Controller Enable */
+#define NVME_CC_CSS_NVM         0x0U /* NVM Command Set */
+#define NVME_CC_EN              BIT(0) /* Controller Enable */
 
 /* Controller Status. [NVMe-2.1 §3.1.4.6, Fig. 42] */
-#define NVME_CSTS_RDY           BIT(0)                  /* Controller Ready */
+#define NVME_CSTS_RDY           BIT(0) /* Controller Ready */
 
 /* NVM Subsystem Reset. [NVMe-2.1 §3.1.4.7, Fig. 43] */
-#define NVME_NSSRC_VALUE        (0x4E564D65)            /* NVM Subsystem Reset Control - Reset value */
+#define NVME_NSSRC_VALUE        (0x4E564D65) /* NVM Subsystem Reset Control - Reset value */
 
 /* Admin Queue Attributes. [NVMe-2.1 §3.1.4.8, Fig. 44] */
-#define NVME_AQA_ACQS_SHIFT     16                      /* Admin Completion Queue Size (#entries) */
+#define NVME_AQA_ACQS_SHIFT     16 /* Admin Completion Queue Size (#entries) */
 #define NVME_AQA_ACQS_MASK      NVME_BITS_MASK(16, 27)
-#define NVME_AQA_ASQS_SHIFT     0                       /* Admin Submission Queue Size (#entries) */
+#define NVME_AQA_ASQS_SHIFT     0 /* Admin Submission Queue Size (#entries) */
 #define NVME_AQA_ASQS_MASK      NVME_BITS_MASK(0, 11)
 
 /* Doorbell stride in bytes = 2^(2 + DSTRD). [NVMe-2.1 §3.1.4.1, Fig. 36] */
@@ -213,8 +213,8 @@ typedef struct nvme_submission_queue_entry {
     uint32_t cdw2;  /* Command Dword 2 (command-specific) */
     uint32_t cdw3;  /* Command Dword 3 (command-specific) */
     uint64_t mptr;  /* Metadata Pointer */
-    uint64_t dptr1;  /* Data Pointer - PRP Entry 1 */
-    uint64_t dptr2;  /* Data Pointer - PRP Entry 2 */
+    uint64_t dptr1; /* Data Pointer - PRP Entry 1 */
+    uint64_t dptr2; /* Data Pointer - PRP Entry 2 */
     uint32_t cdw10; /* Command Dword 10 (command-specific) */
     uint32_t cdw11; /* Command Dword 11 (command-specific) */
     uint32_t cdw12; /* Command Dword 12 (command-specific) */
@@ -300,20 +300,20 @@ _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
  * [NVMe-2.1 §5.1.13.2.1, Fig. 312]
  */
 typedef struct nvme_identify_ctrl {
-    uint16_t vid;    /* PCI Vendor ID */
-    uint16_t ssvid;  /* PCI Subsystem Vendor ID */
-    char sn[20];     /* Serial Number (ASCII, space-padded) */
-    char mn[40];     /* Model Number (ASCII, space-padded) */
-    char fr[8];      /* Firmware Revision (ASCII) */
+    uint16_t vid; /* PCI Vendor ID */
+    uint16_t ssvid; /* PCI Subsystem Vendor ID */
+    char sn[20]; /* Serial Number (ASCII, space-padded) */
+    char mn[40]; /* Model Number (ASCII, space-padded) */
+    char fr[8]; /* Firmware Revision (ASCII) */
     uint8_t _reserved0[77 - 72];
-    uint8_t mdts;    /* Max transfer size exponent (0h means no limit; units based on CAP.MPSMIN) */
+    uint8_t mdts; /* Max transfer size exponent (0h means no limit; units based on CAP.MPSMIN) */
     uint8_t _reserved1[96 - 78];
     uint32_t ctratt; /* Controller Attributes (MEM bit 16 affects MDTS metadata accounting) */
     uint8_t _reserved2[512 - 100];
-    uint8_t sqes;    /* MINSQES[3:0], MAXSQES[7:4] (required value is 6 => 64-byte SQE) */
-    uint8_t cqes;    /* MINCQES[3:0], MAXCQES[7:4] (required value is 4 => 16-byte CQE) */
+    uint8_t sqes; /* MINSQES[3:0], MAXSQES[7:4] (required value is 6 => 64-byte SQE) */
+    uint8_t cqes; /* MINCQES[3:0], MAXCQES[7:4] (required value is 4 => 16-byte CQE) */
     uint8_t _reserved3[536 - 514];
-    uint32_t sgls;   /* SGL Support */
+    uint32_t sgls; /* SGL Support */
     uint8_t _reserved4[4096 - 540];
 } nvme_identify_ctrl_t;
 _Static_assert(sizeof(nvme_identify_ctrl_t) == 4096, "Identify Controller data structure must be 4096 bytes");
@@ -338,7 +338,7 @@ _Static_assert(offsetof(nvme_identify_ctrl_t, sgls) == 536, "SGLS must be at byt
 typedef struct nvme_lba_format {
     uint16_t ms;
     uint8_t lbads; /* 2^LBADS bytes; values < 9 are invalid. */
-    uint8_t rp;    /* Bits 1:0 are RP; upper bits are reserved. */
+    uint8_t rp; /* Bits 1:0 are RP; upper bits are reserved. */
 } nvme_lba_format_t;
 _Static_assert(sizeof(nvme_lba_format_t) == 4, "Each LBAF entry is 4 bytes");
 

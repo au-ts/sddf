@@ -94,14 +94,15 @@ static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_q
     LOG_NVME("!!! LOG PAGE !!!\n");
     nvme_completion_queue_entry_t entry;
     entry = nvme_queue_submit_and_consume_poll(
-        admin_queue, &(nvme_submission_queue_entry_t) {
-                         .cdw0 = nvme_build_cdw0(0b1001, NVME_ADMIN_OP_GET_LOG_PAGE, NVME_CDW0_PSDT_PRP),
-                         .dptr2 = 0,
-                         .dptr1 = data_paddr,
-                         .cdw10 = nvme_build_get_log_page_cdw10(NVME_DEBUG_ERROR_LOG_NUMDL, NVME_LOG_PAGE_LID_ERROR_INFO),
-                         .cdw11 = 0x0,
-                         .cdw12 = 0x0,
-                     });
+        admin_queue,
+        &(nvme_submission_queue_entry_t) {
+            .cdw0 = nvme_build_cdw0(0b1001, NVME_ADMIN_OP_GET_LOG_PAGE, NVME_CDW0_PSDT_PRP),
+            .dptr2 = 0,
+            .dptr1 = data_paddr,
+            .cdw10 = nvme_build_get_log_page_cdw10(NVME_DEBUG_ERROR_LOG_NUMDL, NVME_LOG_PAGE_LID_ERROR_INFO),
+            .cdw11 = 0x0,
+            .cdw12 = 0x0,
+        });
 
     assert((entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT == 0); // §4.2.3 Status Field
 

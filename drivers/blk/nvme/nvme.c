@@ -237,8 +237,7 @@ static void copy_trim_ascii(char *dst, size_t dst_size, const char *src, size_t 
 static int build_sgl_dptr(uintptr_t data_paddr, uint32_t byte_count, uint64_t *dptr1, uint64_t *dptr2)
 {
     /* Enforce SGL dword alignment only when required by controller. */
-    if (state_ctx.sgl_requires_dword_align
-        && ((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) != 0) {
+    if (state_ctx.sgl_requires_dword_align && ((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) != 0) {
         sddf_dprintf("NVMe: SGL alignment violation: addr=0x%lx len=%u\n", data_paddr, byte_count);
         return -1;
     }
@@ -323,11 +322,10 @@ static void handle_request(void)
             cid_to_id[cid] = id;
             cid_to_count[cid] = 0;
 
-            nvme_queue_submit(&io_queue,
-                              &(nvme_submission_queue_entry_t) {
-                                  .cdw0 = nvme_build_cdw0((uint16_t)cid, NVME_OP_FLUSH, NVME_CDW0_PSDT_PRP),
-                                  .nsid = NVME_DEFAULT_NSID,
-                              });
+            nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t) {
+                                             .cdw0 = nvme_build_cdw0((uint16_t)cid, NVME_OP_FLUSH, NVME_CDW0_PSDT_PRP),
+                                             .nsid = NVME_DEFAULT_NSID,
+                                         });
 
             LOG_NVME("Submitted FLUSH: cid=%u req_id=%u\n", cid, id);
             continue;
@@ -448,7 +446,7 @@ static void handle_admin_completions(void)
          */
         uint32_t sgl_support = nvme_identify_ctrl->sgls & NVME_IDENTIFY_SGLS_TRANSPORT_MASK;
         state_ctx.use_sgl = (sgl_support & NVME_IDENTIFY_SGLS_TRANSPORT_BYTE_ALIGNED)
-                            || (sgl_support & NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED);
+                         || (sgl_support & NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED);
         state_ctx.sgl_requires_dword_align = (sgl_support == NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED);
 
         if (state_ctx.use_sgl) {
@@ -570,14 +568,15 @@ static void handle_admin_completions(void)
         assert(err == 0);
         assert(admin_cid <= UINT16_MAX);
 
-        nvme_queue_submit(&admin_queue,
-                          &(nvme_submission_queue_entry_t) {
-                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_CQ, NVME_CDW0_PSDT_PRP),
-                              .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
-                              .cdw11 = nvme_build_create_io_cq_cdw11(NVME_CREATE_IO_Q_INTERRUPT_VECTOR, true, true),
-                              .dptr2 = 0,
-                              .dptr1 = nvme_io_cq_region_paddr,
-                          });
+        nvme_queue_submit(
+            &admin_queue,
+            &(nvme_submission_queue_entry_t) {
+                .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_CQ, NVME_CDW0_PSDT_PRP),
+                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
+                .cdw11 = nvme_build_create_io_cq_cdw11(NVME_CREATE_IO_Q_INTERRUPT_VECTOR, true, true),
+                .dptr2 = 0,
+                .dptr1 = nvme_io_cq_region_paddr,
+            });
 
         state_ctx.state = NVME_STATE_WAIT_CREATE_IO_CQ;
         LOG_NVME("Submitted Create I/O CQ, waiting for completion\n");
@@ -595,15 +594,16 @@ static void handle_admin_completions(void)
         assert(err == 0);
         assert(admin_cid <= UINT16_MAX);
 
-        nvme_queue_submit(&admin_queue,
-                          &(nvme_submission_queue_entry_t) {
-                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_SQ, NVME_CDW0_PSDT_PRP),
-                              .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
-                              .cdw11 = nvme_build_create_io_sq_cdw11(NVME_DEFAULT_IO_Q_ID, NVME_CREATE_IO_SQ_QPRIO_URGENT, true),
-                              .cdw12 = 0,
-                              .dptr2 = 0,
-                              .dptr1 = nvme_io_sq_region_paddr,
-                          });
+        nvme_queue_submit(
+            &admin_queue,
+            &(nvme_submission_queue_entry_t) {
+                .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_SQ, NVME_CDW0_PSDT_PRP),
+                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
+                .cdw11 = nvme_build_create_io_sq_cdw11(NVME_DEFAULT_IO_Q_ID, NVME_CREATE_IO_SQ_QPRIO_URGENT, true),
+                .cdw12 = 0,
+                .dptr2 = 0,
+                .dptr1 = nvme_io_sq_region_paddr,
+            });
 
         state_ctx.state = NVME_STATE_WAIT_CREATE_IO_SQ;
         LOG_NVME("Submitted Create I/O SQ, waiting for completion\n");
@@ -868,7 +868,8 @@ void init(void)
     /* Enable Bus Master and Memory Space */
     uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);
     pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND, cmd | 0x6);
-    LOG_NVME("PCI Command Register: %08x\n", pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND));
+    LOG_NVME("PCI Command Register: %08x\n",
+             pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND));
 
     /* Check Interrupt Configuration */
     uint32_t intr_info = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_INTR_INFO);
