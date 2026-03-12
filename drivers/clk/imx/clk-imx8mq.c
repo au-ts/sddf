@@ -2654,7 +2654,7 @@ static IMX_CLK_GATE4(sdma2_clk, { &ipg_audio_root }, CCM_BASE, 0x43b0, 0);
 static IMX_CLK_FIXED_FACTOR(gpt_3m, { &osc_25m }, 1, 8);
 static IMX_CLK_FIXED_FACTOR(dram_alt_root, { &dram_alt }, 1, 4);
 
-static IMX_CLK_CPU(arm_clk, { &arm_a53_div }, &arm_a53_core, &arm_a53_div, &arm_pll_out, &arm_a53_core);
+static IMX_CLK_CPU(arm_clk, { &arm_a53_core }, &arm_a53_core, &arm_a53_div, &arm_pll_out, &arm_a53_core);
 
 static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
     [IMX8MQ_CLK_DUMMY] = &dummy,
