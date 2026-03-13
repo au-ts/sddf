@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Download Microkit SDK
         run: |
           wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.5
+        uses: mlugg/setup-zig@v2.2.1
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
         with:
@@ -73,7 +73,7 @@ jobs:
       - name: Build examples
         run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
       - name: Archive image artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: loader-images
           path: |
@@ -86,7 +86,7 @@ jobs:
     runs-on: [self-hosted, macos, ARM64]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
         with:
@@ -101,7 +101,7 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Download Microkit SDK
         run: |
           wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64.tar.gz
@@ -111,7 +111,7 @@ jobs:
           brew install llvm lld make imagemagick dtc
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.5
+        uses: mlugg/setup-zig@v2.2.1
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
@@ -132,7 +132,7 @@ jobs:
     needs: build_linux_x86_64_nix
     steps:
       - name: Checkout sDDF repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies (via apt)
         run: |
           sudo apt update
@@ -140,7 +140,7 @@ jobs:
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
       - name: Download images
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: loader-images
           path: ci_build
@@ -150,7 +150,7 @@ jobs:
           exec ./ci/run.py --only-qemu
       - name: Archive logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-logs-qemu
           path: ci_logs
@@ -176,14 +176,14 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Get machine queue
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: seL4/machine_queue
           path: machine_queue
       - name: Download images
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: loader-images
           path: ci_build
@@ -201,7 +201,7 @@ jobs:
           exec ./ci/run.py --no-only-qemu
       - name: Archive logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-logs-hardware
           path: ci_logs
