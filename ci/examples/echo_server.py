@@ -8,27 +8,20 @@ from pathlib import Path
 import sys
 
 from ts_ci import (
+    log,
     matrix_product,
-    run_test,
-    TestConfig,
-    TestMetadata,
+    reset_terminal,
+    wait_for_output,
     HardwareBackend,
     QemuBackend,
     TestFailureException,
-    log,
-    reset_terminal,
-    wait_for_output,
 )
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix.generate_example_test_matrix(
-    "echo_server", matrix.EXAMPLES["echo_server"]
-)
 
-
-def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
+def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
@@ -49,7 +42,7 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     return backend
 
 
-async def test(backend: HardwareBackend, test_config: TestConfig):
+async def test(backend: HardwareBackend, test_config: common.TestConfig):
     async with asyncio.timeout(20):
         await wait_for_output(backend, b"DHCP request finished")
         dhcp_client1 = await wait_for_output(backend, b"\r\n")
@@ -77,12 +70,14 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 # export
-TEST_METADATA = TestMetadata(
+TEST_CASES = matrix.generate_example_test_cases(
+    "echo_server",
+    matrix.EXAMPLES["echo_server"],
     test_fn=test,
     backend_fn=backend_fn,
-    loader_img_fn=common.loader_img_path,
     no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
 )
 
+
 if __name__ == "__main__":
-    run_test(TEST_METADATA, TEST_MATRIX)
+    common.run_tests(TEST_CASES)

@@ -6,13 +6,19 @@ from __future__ import annotations
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, TypedDict
 
-from ts_ci import MACHINE_QUEUE_BOARDS, matrix_product, TestConfig
+from ts_ci import MACHINE_QUEUE_BOARDS, matrix_product
+from . import common
+from .common import TestConfig, TestFunction, BackendFunction
 
 NO_OUTPUT_DEFAULT_TIMEOUT_S: int = 60
 
 
-def generate_example_test_matrix(
-    example: str, example_matrix: _ExampleMatrixType
+def generate_example_test_cases(
+    example: str,
+    example_matrix: _ExampleMatrixType,
+    test_fn: TestFunction,
+    backend_fn: BackendFunction,
+    no_output_timeout_s: int,
 ) -> list[TestConfig]:
     def listify(s: str | Sequence[str]) -> Sequence[str]:
         if isinstance(s, str):
@@ -22,22 +28,30 @@ def generate_example_test_matrix(
 
     matrix = set(
         matrix_product(
+            TestConfig,
             example=[example],
             board=example_matrix["boards"],
             config=example_matrix["configs"],
             build_system=example_matrix["build_systems"],
+            test_fn=[test_fn],
+            backend_fn=[backend_fn],
+            no_output_timeout_s=[no_output_timeout_s],
         )
     )
 
     for exclude in example_matrix["tests_exclude"]:
         to_exclude = set(
             matrix_product(
+                TestConfig,
                 example=[example],
                 board=listify(exclude.get("board", example_matrix["boards"])),
                 config=listify(exclude.get("config", example_matrix["configs"])),
                 build_system=listify(
                     exclude.get("build_system", example_matrix["build_systems"])
                 ),
+                test_fn=[test_fn],
+                backend_fn=[backend_fn],
+                no_output_timeout_s=[no_output_timeout_s],
             )
         )
         matrix -= to_exclude
@@ -155,12 +169,11 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
 ## Type Hinting + Sanity Checks ##
 _BoardNames = Literal[
     "cheshire",
-    "odroidc4",
+    "hifive_p550",
     "imx8mm_evk",
     "imx8mp_evk",
     "imx8mq_evk",
     "imx8mp_iotgate",
-    "hifive_p550",
     "kria_k26",
     "maaxboard",
     "odroidc2",

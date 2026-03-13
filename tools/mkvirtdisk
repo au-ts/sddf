@@ -4,27 +4,24 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 
-# This bash script creates a virtual disk image with an msdos partition table.
+# This bash script creates a virtual disk image with an msdos/GPT partition table.
 # It aligns the partitions to both the sDDF transfer size and the device's logical size.
-# It creates a FAT 12 filesystem on each partition.
+# It creates a filesystem on each partition (FAT12 by default, or ext4).
 
 set -e
 
 function cleanup {
-    rm -f $BUILD_DIR/fat.img
+    if [ -n "$FS_IMAGE" ]; then
+        rm -f "$FS_IMAGE"
+    fi
 }
 
 trap cleanup EXIT
 
 # Usage instructions
-if [ $# -ne 5 ]; then
-    echo "Usage: $0 <virtual_disk_name> <num_partitions> <logical_size> <memsize> <partition_schema>"
-    exit 1
-fi
-
-if ! command -v mkfs.fat &> /dev/null
-then
-    echo "mkfs.fat could not be found, please install dosfstools"
+if [ $# -lt 5 ] || [ $# -gt 6 ]; then
+    echo "Usage: $0 <virtual_disk_name> <num_partitions> <logical_size> <memsize> <partition_schema> [filesystem]"
+    echo "filesystem: fat (default), ext4"
     exit 1
 fi
 
@@ -38,6 +35,22 @@ NUM_PARTITIONS=$2
 LSIZE=$3
 MEMSIZE=$4
 PARTITION_SCHEMA=$5
+FS_TYPE=${6:-fat}
+
+if [[ "$FS_TYPE" == "fat" ]]; then
+    if ! command -v mkfs.fat &> /dev/null; then
+        echo "mkfs.fat could not be found"
+        exit 1
+    fi
+elif [[ "$FS_TYPE" == "ext4" ]]; then
+    if ! command -v mkfs.ext4 &> /dev/null; then
+        echo "mkfs.ext4 could not be found"
+        exit 1
+    fi
+else
+    echo "Filesystem type '$FS_TYPE' is not supported (supported: fat, ext4)"
+    exit 1
+fi
 
 SDDF_TRANSFER_SIZE=4096
 FDISK_LSIZE=512
@@ -164,14 +177,22 @@ else
     exit 1
 fi
 
-# Create the FAT filesystem
-rm -f $BUILD_DIR/fat.img
-mkfs.fat -C $BUILD_DIR/fat.img $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 12 -S $LSIZE
+FS_IMAGE="$BUILD_DIR/$FS_TYPE.img"
+rm -f "$FS_IMAGE"
 
-# Copy the FAT filesystem to the virtual disk
+if [[ "$FS_TYPE" == "fat" ]]; then
+    # Create the FAT filesystem
+    mkfs.fat -C "$FS_IMAGE" $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 12 -S $LSIZE
+else
+    # Create the EXT4 filesystem
+    # The fs_size argument is in units of the filesystem block size (SDDF_TRANSFER_SIZE).
+    mkfs.ext4 -q -F -b "$SDDF_TRANSFER_SIZE" -O ^metadata_csum_seed "$FS_IMAGE" $(( FS_COUNT * FDISK_LSIZE / SDDF_TRANSFER_SIZE ))
+fi
+
+# Copy the filesystem to the virtual disk
 for i in $(seq 0 $(( NUM_PARTITIONS - 1 )))
 do
-    echo "Copying FAT filesystem to partition $i, seek=$((POFFSET + i * FS_COUNT)), count=$FS_COUNT, bs=$FDISK_LSIZE"
+    echo "Copying $FS_TYPE filesystem to partition $i, seek=$((POFFSET + i * FS_COUNT)), count=$FS_COUNT, bs=$FDISK_LSIZE"
     # `conv=notrnc` to disable truncating the disk to the size of data written, or it will destroy backup partition table
-    dd if=$BUILD_DIR/fat.img of=$DISK_IMAGE bs=$FDISK_LSIZE seek="$((POFFSET + i * FS_COUNT))" count=$FS_COUNT conv=notrunc 2> /dev/null
+    dd if="$FS_IMAGE" of=$DISK_IMAGE bs=$FDISK_LSIZE seek="$((POFFSET + i * FS_COUNT))" count=$FS_COUNT conv=notrunc 2> /dev/null
 done

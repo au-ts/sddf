@@ -7,20 +7,14 @@ from pathlib import Path
 import sys
 
 from ts_ci import (
-    matrix_product,
-    HardwareBackend,
-    TestConfig,
-    wait_for_output,
-    send_input,
     expect_output,
-    TestMetadata,
-    run_test,
+    send_input,
+    wait_for_output,
+    HardwareBackend,
 )
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
-
-TEST_MATRIX = matrix.generate_example_test_matrix("serial", matrix.EXAMPLES["serial"])
 
 ANSI_RED = b"\x1b[31m"
 ANSI_GREEN = b"\x1b[32m"
@@ -34,7 +28,7 @@ def colour_number(num: bytes, colour: bytes) -> bytes:
     return out
 
 
-async def test(backend: HardwareBackend, test_config: TestConfig):
+async def test(backend: HardwareBackend, test_config: common.TestConfig):
     # TODO: We really need some kind of colour (de)multiplexer....
 
     async with asyncio.timeout(10):
@@ -64,12 +58,14 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 # export
-TEST_METADATA = TestMetadata(
+TEST_CASES = matrix.generate_example_test_cases(
+    "serial",
+    matrix.EXAMPLES["serial"],
     test_fn=test,
     backend_fn=common.backend_fn,
-    loader_img_fn=common.loader_img_path,
     no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
 )
 
+
 if __name__ == "__main__":
-    run_test(TEST_METADATA, TEST_MATRIX)
+    common.run_tests(TEST_CASES)
