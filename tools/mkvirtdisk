@@ -177,15 +177,14 @@ else
     exit 1
 fi
 
+FS_IMAGE="$BUILD_DIR/$FS_TYPE.img"
+rm -f "$FS_IMAGE"
+
 if [[ "$FS_TYPE" == "fat" ]]; then
-    FS_IMAGE="$BUILD_DIR/fat.img"
     # Create the FAT filesystem
-    rm -f "$FS_IMAGE"
     mkfs.fat -C "$FS_IMAGE" $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 12 -S $LSIZE
 else
-    FS_IMAGE="$BUILD_DIR/ext4.img"
     # Create the EXT4 filesystem
-    rm -f "$FS_IMAGE"
     # The fs_size argument is in units of the filesystem block size (SDDF_TRANSFER_SIZE).
     mkfs.ext4 -q -F -b "$SDDF_TRANSFER_SIZE" -O ^metadata_csum_seed "$FS_IMAGE" $(( FS_COUNT * FDISK_LSIZE / SDDF_TRANSFER_SIZE ))
 fi
