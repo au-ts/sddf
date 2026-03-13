@@ -45,12 +45,13 @@ IMAGES := timer_driver.elf \
 		  pmic_driver.elf \
 		  i2c_driver.elf \
 		  i2c_virt.elf \
-		  client.elf \
+		  thermal_control.elf \
 		  serial_driver.elf \
 		  serial_virt_tx.elf \
 		  pwm_driver.elf \
 		  pinctrl_driver.elf \
-		  tmu_driver.elf
+		  tmu_driver.elf \
+		  worker.elf
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -58,7 +59,7 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 SYSTEM_FILE = thermal_control.system
-CLIENT_OBJS := client.o
+THERMAL_CONTROL_OBJS := thermal_control.o
 
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
@@ -77,16 +78,23 @@ all: $(IMAGE_FILE)
 
 ${IMAGES}: libsddf_util_debug.a
 
-client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DTEST_BOARD_${MICROKIT_BOARD} $< -o client.o
+thermal_control.o: ${TOP}/thermal_control.c
+	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DTEST_BOARD_${MICROKIT_BOARD} $< -o thermal_control.o
 
-client.elf: client.o libco.a libsddf_util.a
+thermal_control.elf: thermal_control.o libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+worker.o: ${TOP}/worker.c
+	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DTEST_BOARD_${MICROKIT_BOARD} $< -o worker.o
+
+worker.elf: worker.o libco.a libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_thermal_control.data thermal_control.elf
 	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_pmic_driver.data pmic_driver.elf
 	$(OBJCOPY) --update-section .device_resources=i2c_driver_device_resources.data i2c_driver.elf
 	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver.data i2c_driver.elf
@@ -94,7 +102,8 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_thermal_control.data thermal_control.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_worker.data worker.elf
 	$(OBJCOPY) --update-section .device_resources=pinctrl_driver_device_resources.data pinctrl_driver.elf
 	touch $@
 

@@ -79,7 +79,7 @@ static inline int do_set_frequency(op_point_idx_t op_point_idx) {
         LOG_DVFS_DRIVER_ERR("Failed to set clock rate!\n");
         return ret;
     }
-    // assert(target_freq == set_ret_rate);
+    assert(target_freq == set_ret_rate);
 
     uint64_t returned_freq = 0;
     ret = sddf_clk_get_rate(CLK_DRIVER_CHANNEL, core_list[0].clk_src_id,
