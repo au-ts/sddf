@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+
+    SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <memory_region name="clk_ccm" size="0xd000" phys_addr="0x30380000"/>
+    <memory_region name="clk_ccm_analog" size="0x1000" phys_addr="0x30360000"/>
+    <!-- <memory_region name="timer_registers" size="0x1000" phys_addr="0xFFD0F000" /> -->
+
+    <protection_domain name="clk_driver" priority="254" pp="true" passive="true" stack_size="0x5000">
+        <program_image path="clk_driver.elf"/>
+
+        <map mr="clk_ccm" vaddr="0x3_200_000" perms="rw" setvar_vaddr="ccm_base" cached="false" />
+        <map mr="clk_ccm_analog" vaddr="0x3_300_000" perms="rw" setvar_vaddr="ccm_analog_base" cached="false" />
+    </protection_domain>
+
+    <!-- <protection_domain name="timer" priority="254" pp="true" passive="true"> -->
+    <!--     <program_image path="timer_driver.elf" /> -->
+    <!--     <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" /> -->
+    <!--     <irq irq="42" id="0" trigger="edge" /> <!-\- timer interrupt for timer A -\-> -->
+    <!-- </protection_domain> -->
+
+    <protection_domain name="client" priority="100">
+        <program_image path="client.elf" />
+    </protection_domain>
+
+    <!-- <channel> -->
+    <!--     <end pd="timer" id="1" /> -->
+    <!--     <end pd="clk_driver" id="1" /> -->
+    <!-- </channel> -->
+
+    <channel>
+        <end pd="clk_driver" id="0" />
+        <end pd="client" id="0" />
+    </channel>
+
+</system>
