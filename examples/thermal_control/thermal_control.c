@@ -47,6 +47,8 @@ sddf_channel timer_channel;
 // TODO: abstract for other boards
 // invariant: sorted in order of temp bound
 #define NUM_TRIP_POINTS (7)
+#define POLL_DELAY (1000) // ms
+
 trip_point_t tp_table[NUM_TRIP_POINTS] = {
     {
         .temp_lower_bound = 20.0,
@@ -103,10 +105,11 @@ static inline bool delay_ms(size_t milliseconds)
 }
 
 static inline trip_point_t *get_trip_point(sddf_temp_celsius_t temp) {
-    trip_point_t *ret;
-    for (int i = 0; i < NUM_TRIP_POINTS; i++) {
-        ret = &tp_table[i];
-        if (ret->temp_lower_bound >= temp) {
+    trip_point_t *ret = &tp_table[0];
+    for (int i = 1; i < NUM_TRIP_POINTS; i++) {
+        if (tp_table[i].temp_lower_bound <= temp) {
+            ret = &tp_table[i];
+        } else {
             break;
         }
     }
@@ -127,6 +130,7 @@ void client_main(void) {
 
     sddf_tmu_temp_info_t temp_info;
     trip_point_t *prev_tp = &tp_table[0];
+    bool init = false;
     for(uint64_t i;;i++) {
         LOG_CLIENT("\n\nPolling...\n");
         // get temp
@@ -141,27 +145,30 @@ void client_main(void) {
         }
 
         trip_point_t *tp = get_trip_point(temp_info.temp_inst);
-        if (tp != prev_tp) {
+        if (tp != prev_tp || !init) {
             LOG_CLIENT("\tNew trip point:\n");
             LOG_CLIENT("\t\tLower temp. bound: %f\n", tp->temp_lower_bound);
             LOG_CLIENT("\t\tOperating point idx: %zu\n", tp->dvfs_opp);
             LOG_CLIENT("\t\tFan power: %zu\n", tp->fan_pwm_duty);
+            // set dvfs operating point
+            int ret1 = sddf_dvfs_set_point(DVFS_CHANNEL, 0, tp->dvfs_opp);
+            if (ret1 != SDDF_DVFS_SUCCESS) {
+                LOG_CLIENT_ERR("Fail to get OPP, Error: %d\n", ret1);
+                assert(false);
+            }
+
+            // set fan speed
+            bool success = sddf_pwm_set_freq_duty(PWM_CONTROL_CHANNEL, PWM_FAN_CHANNEL_ID , FAN_FREQ, tp->fan_pwm_duty, 0);
+            if (!success) {
+                LOG_CLIENT_ERR("Failed to set fan PWM speed!");
+                assert(false);
+            }
+            init = true;
+
         }
         prev_tp = tp;
 
-        // set dvfs operating point
-        int ret1 = sddf_dvfs_set_point(DVFS_CHANNEL, 0, tp->dvfs_opp);
-        if (ret1 != SDDF_DVFS_SUCCESS) {
-            LOG_CLIENT_ERR("Fail to get OPP, Error: %d\n", ret1);
-            assert(false);
-        }
 
-        // set fan speed
-        bool success = sddf_pwm_set_freq_duty(PWM_CONTROL_CHANNEL, PWM_FAN_CHANNEL_ID , FAN_FREQ, tp->fan_pwm_duty, 0);
-        if (!success) {
-            LOG_CLIENT_ERR("Failed to set fan PWM speed!");
-            assert(false);
-        }
         LOG_CLIENT("Sleeping until next poll...\n");
         if (i % 2) {
             LOG_CLIENT("tick\n");
@@ -169,7 +176,7 @@ void client_main(void) {
             LOG_CLIENT("tock\n");
         }
         // finally, sleep
-        delay_ms(2000);
+        delay_ms(POLL_DELAY);
     }
 }
 

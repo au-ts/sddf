@@ -45,8 +45,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pmic_driver = ProtectionDomain("pmic_driver", "pmic_driver.elf", priority=100)
     dvfs_driver = ProtectionDomain("dvfs_driver", "dvfs_driver.elf", priority=99, passive=True)
     pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=98)
-    tmu_driver = ProtectionDomain("tmu_driver", "tmu_driver.elf", priority=97)
-    client = ProtectionDomain("client", "client.elf", priority=1)
+    tmu_driver = ProtectionDomain("tmu_driver", "tmu_driver.elf", priority=97, passive=True)
+    thermal_control = ProtectionDomain("thermal_control", "thermal_control.elf", priority=2)
+    worker = ProtectionDomain("worker", "worker.elf", priority=1)
 
 
     timer_node = dtb.node(board.timer)
@@ -59,11 +60,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert pinctrl_node is not None
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client)
+    timer_system.add_client(thermal_control)
     serial_system = Sddf.Serial(
         sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
     )
-    serial_system.add_client(client)
+    serial_system.add_client(thermal_control)
+    serial_system.add_client(worker)
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
     i2c_system.add_client(pmic_driver)
@@ -129,13 +131,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pmic_channel = Channel(pmic_driver, dvfs_driver, pp_b=True)
     sdf.add_channel(pmic_channel)
 
-    dvfs_channel = Channel(dvfs_driver, client, pp_b=True)
+    dvfs_channel = Channel(dvfs_driver, thermal_control, pp_b=True)
     sdf.add_channel(dvfs_channel)
 
-    pwm_channel = Channel(pwm_driver, client, pp_b=True, notify_a=False, notify_b=False)
+    pwm_channel = Channel(pwm_driver, thermal_control, pp_b=True, notify_a=False, notify_b=False)
     sdf.add_channel(pwm_channel)
 
-    tmu_channel = Channel(tmu_driver, client, pp_b=True)
+    tmu_channel = Channel(tmu_driver, thermal_control, pp_b=True)
     sdf.add_channel(tmu_channel)
 
     pds = [
@@ -150,7 +152,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         pmic_driver,
         i2c_driver,
         i2c_virt,
-        client,
+        thermal_control,
+        worker
     ]
     for pd in pds:
         sdf.add_pd(pd)
