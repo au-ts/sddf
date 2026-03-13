@@ -13,5 +13,6 @@ NET_DRIV_DIR := ${PLATFORM}
 ETH_DRIV := eth_driver_${PLATFORM}.elf
 TIMER_DRIV_DIR := ${PLATFORM}
 UART_DRIV_DIR := ${PLATFORM}
+TMU_DRIV_DIR := imx8mq
 
 CPU := cortex-a53
