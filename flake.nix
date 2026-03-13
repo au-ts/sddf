@@ -9,7 +9,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     zig-overlay.url = "github:mitchellh/zig-overlay";
     zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.28.1";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.29.0";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;

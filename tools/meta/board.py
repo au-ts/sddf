@@ -4,6 +4,31 @@ from dataclasses import dataclass
 from typing import List, Optional
 from sdfgen import SystemDescription
 
+ProtectionDomain = SystemDescription.ProtectionDomain
+
+
+def add_x86_hpet(sdf: SystemDescription, timer_driver: ProtectionDomain):
+    # Timer IRQ must be the highest priority (highest vector) to ensure they are delivered
+    # as close as possible to the timer expiry. The highest vector is defined by (irq_user_max - irq_user_min) in seL4 source
+    # Since our HPET driver uses legacy IRQ routing, comparator 0's IRQ will always arrives at
+    # I/O APIC 0's pin 2.
+    hpet_irq = SystemDescription.IrqIoapic(
+        ioapic_id=0,
+        pin=2,
+        vector=107,
+        id=0,
+        trigger=SystemDescription.IrqIoapic.Trigger.EDGE,
+    )
+    timer_driver.add_irq(hpet_irq)
+
+    # paddr=0xFED00000 is a x86 convention for HPET, though it may be different on some machines depending on their BIOS.
+    hpet_regs = SystemDescription.MemoryRegion(
+        sdf, "hpet_regs", 0x1000, paddr=0xFED00000
+    )
+    hpet_regs_map = SystemDescription.Map(hpet_regs, 0x5000_0000, "rw", cached=False)
+    timer_driver.add_map(hpet_regs_map)
+    sdf.add_mr(hpet_regs)
+
 
 @dataclass
 class Board:
@@ -156,6 +181,13 @@ BOARDS: List[Board] = [
     ),
     Board(
         name="x86_64_generic",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x7FFDF000,
+        timer=None,
+        serial=None,
+    ),
+    Board(
+        name="x86_64_generic_vtx",
         arch=SystemDescription.Arch.X86_64,
         paddr_top=0x7FFDF000,
         timer=None,
