@@ -1,0 +1,18 @@
+{
+    "compatible": [
+        "fsl,imx8mm-iomuxc",
+        "fsl,imx8mp-iomuxc",
+        "fsl,imx8mq-iomuxc"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 65536,
+                "dt_index": 0
+            }
+        ],
+        "irqs": []
+    }
+}

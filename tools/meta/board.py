@@ -16,6 +16,7 @@ class Board:
     i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
+    pinctrl: str = None
     baud_rate: Optional[int] = None
 
 
@@ -71,10 +72,12 @@ BOARDS: List[Board] = [
         name="maaxboard",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
+        i2c="soc@0/bus@30800000/i2c@30a20000",
         serial="soc@0/bus@30800000/serial@30860000",
         timer="soc@0/bus@30000000/timer@302d0000",
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
         blk="soc@0/bus@30800000/mmc@30b40000",
+        pinctrl="soc@0/bus@30000000/iomuxc@30330000",
         partition=2,
     ),
     Board(
