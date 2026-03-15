@@ -16,6 +16,10 @@
 #define BIT(nr) (1UL << (nr))
 #endif
 
+#ifndef BIT_MASK
+#define BIT_MASK(start, end) ((BIT(((end) - (start)) + 1U) - 1U) << (start))
+#endif
+
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)

@@ -54,9 +54,9 @@ static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_que
 
 /* Get Log Page CDW10 fields (LID, NUMDL). [NVMe-2.1 §5.1.12, Fig. 197] */
 #define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_SHIFT   0
-#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK    NVME_BITS_MASK(0, 7)
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK    BIT_MASK(0, 7)
 #define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_SHIFT 16
-#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK  NVME_BITS_MASK(16, 31)
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK  BIT_MASK(16, 31)
 
 /* Build Get Log Page CDW10. [NVMe-2.1 §5.1.12, Fig. 197] */
 static inline uint32_t nvme_build_get_log_page_cdw10(uint16_t numdl, uint8_t lid)
