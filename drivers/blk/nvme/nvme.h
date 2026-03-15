@@ -26,6 +26,10 @@
         https://lekensteyn.nl/files/docs/PCI_SPEV_V3_0.pdf
 */
 
+// clang-format off
+#define LOG_NVME_ERR(...) do{ sddf_dprintf("NVME|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
+// clang-format on
+
 /* ═══════════════════════════════════════════════════════════════════════
  *  Controller Registers
  * ═══════════════════════════════════════════════════════════════════════ */
