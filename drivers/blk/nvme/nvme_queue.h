@@ -16,7 +16,7 @@
  */
 #define NVME_CQE_PHASE_MASK BIT(0)
 #define NVME_CQE_STATUS_SHIFT 1
-#define NVME_CQE_STATUS_MASK  NVME_BITS_MASK(1, 15)
+#define NVME_CQE_STATUS_MASK  BIT_MASK(1, 15)
 
 typedef struct nvme_queue_info {
     struct {

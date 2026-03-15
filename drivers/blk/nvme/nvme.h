@@ -27,13 +27,6 @@
 */
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  Bitfield Helpers
- * ═══════════════════════════════════════════════════════════════════════ */
-
-/* Inclusive bitfield mask helper. */
-#define NVME_BITS_MASK(start, end) ((BIT(((end) - (start)) + 1U) - 1U) << (start))
-
-/* ═══════════════════════════════════════════════════════════════════════
  *  Controller Registers
  * ═══════════════════════════════════════════════════════════════════════ */
 
@@ -74,36 +67,36 @@ typedef struct nvme_controller {
 _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller_t must match spec layout");
 
 /* Controller Capabilities. [NVMe-2.1 §3.1.4.1, Fig. 36] */
-#define NVME_CAP_MQES_MASK      NVME_BITS_MASK(0, 15) /* Maximum Queue Entries Supported (0-based) */
+#define NVME_CAP_MQES_MASK      BIT_MASK(0, 15) /* Maximum Queue Entries Supported (0-based) */
 #define NVME_CAP_NOIOCSS        BIT(37 + 7) /* No I/O Command Set Support */
 #define NVME_CAP_IOCSS          BIT(37 + 6) /* I/O Command Set Support    */
 #define NVME_CAP_NCSS           BIT(37 + 0) /* NVM Command Set Support    */
 #define NVME_CAP_TO_SHIFT       24 /* Controller Ready Timeout (500 ms units) */
-#define NVME_CAP_TO_MASK        NVME_BITS_MASK(24, 31)
+#define NVME_CAP_TO_MASK        BIT_MASK(24, 31)
 #define NVME_CAP_MPSMIN_SHIFT   48 /* Memory Page Size Minimum   */
-#define NVME_CAP_MPSMIN_MASK    NVME_BITS_MASK(48, 51)
+#define NVME_CAP_MPSMIN_MASK    BIT_MASK(48, 51)
 #define NVME_CAP_MPSMAX_SHIFT   52 /* Memory Page Size Maximum   */
-#define NVME_CAP_MPSMAX_MASK    NVME_BITS_MASK(52, 55)
+#define NVME_CAP_MPSMAX_MASK    BIT_MASK(52, 55)
 #define NVME_CAP_DSTRD_SHIFT    32 /* Doorbell Stride (2 ^ (2 + DSTRD)) */
-#define NVME_CAP_DSTRD_MASK     NVME_BITS_MASK(32, 35)
+#define NVME_CAP_DSTRD_MASK     BIT_MASK(32, 35)
 
 /* Version. [NVMe-2.1 §3.1.4.2, Fig. 37] */
 #define NVME_VS_TER_SHIFT       0
-#define NVME_VS_TER             NVME_BITS_MASK(0, 7) /* Tertiary Version */
+#define NVME_VS_TER             BIT_MASK(0, 7) /* Tertiary Version */
 #define NVME_VS_MNR_SHIFT       8
-#define NVME_VS_MNR             NVME_BITS_MASK(8, 15) /* Minor Version */
+#define NVME_VS_MNR             BIT_MASK(8, 15) /* Minor Version */
 #define NVME_VS_MJR_SHIFT       16
-#define NVME_VS_MJR             NVME_BITS_MASK(16, 31) /* Major Version */
+#define NVME_VS_MJR             BIT_MASK(16, 31) /* Major Version */
 
 /* Controller Configuration. [NVMe-2.1 §3.1.4.5, Fig. 41] */
 #define NVME_CC_IOCQES_SHIFT    20 /* I/O CQ Entry Size (2^IOCQES bytes) */
-#define NVME_CC_IOCQES_MASK     NVME_BITS_MASK(20, 23)
+#define NVME_CC_IOCQES_MASK     BIT_MASK(20, 23)
 #define NVME_CC_IOSQES_SHIFT    16 /* I/O SQ Entry Size (2^IOSQES bytes) */
-#define NVME_CC_IOSQES_MASK     NVME_BITS_MASK(16, 19)
+#define NVME_CC_IOSQES_MASK     BIT_MASK(16, 19)
 #define NVME_CC_MPS_SHIFT       7 /* Host Memory Page Size (2^(12+MPS) bytes) */
-#define NVME_CC_MPS_MASK        NVME_BITS_MASK(7, 10)
+#define NVME_CC_MPS_MASK        BIT_MASK(7, 10)
 #define NVME_CC_CSS_SHIFT       4 /* I/O Command Set Selected */
-#define NVME_CC_CSS_MASK        NVME_BITS_MASK(4, 6)
+#define NVME_CC_CSS_MASK        BIT_MASK(4, 6)
 #define NVME_CC_CSS_NVM         0x0U /* NVM Command Set */
 #define NVME_CC_EN              BIT(0) /* Controller Enable */
 
@@ -115,9 +108,9 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 
 /* Admin Queue Attributes. [NVMe-2.1 §3.1.4.8, Fig. 44] */
 #define NVME_AQA_ACQS_SHIFT     16 /* Admin Completion Queue Size (#entries) */
-#define NVME_AQA_ACQS_MASK      NVME_BITS_MASK(16, 27)
+#define NVME_AQA_ACQS_MASK      BIT_MASK(16, 27)
 #define NVME_AQA_ASQS_SHIFT     0 /* Admin Submission Queue Size (#entries) */
-#define NVME_AQA_ASQS_MASK      NVME_BITS_MASK(0, 11)
+#define NVME_AQA_ASQS_MASK      BIT_MASK(0, 11)
 
 /* Doorbell stride in bytes = 2^(2 + DSTRD). [NVMe-2.1 §3.1.4.1, Fig. 36] */
 #define NVME_DOORBELL_STRIDE_BYTES(DSTRD) (4U << (DSTRD))
@@ -155,9 +148,9 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
  * QSIZE is 0-based (actual depth = QSIZE + 1).
  */
 #define NVME_CREATE_IO_Q_CDW10_QID_SHIFT   0
-#define NVME_CREATE_IO_Q_CDW10_QID_MASK    NVME_BITS_MASK(0, 15)
+#define NVME_CREATE_IO_Q_CDW10_QID_MASK    BIT_MASK(0, 15)
 #define NVME_CREATE_IO_Q_CDW10_QSIZE_SHIFT 16
-#define NVME_CREATE_IO_Q_CDW10_QSIZE_MASK  NVME_BITS_MASK(16, 31)
+#define NVME_CREATE_IO_Q_CDW10_QSIZE_MASK  BIT_MASK(16, 31)
 
 static inline uint32_t nvme_build_create_io_q_cdw10(uint16_t qid, uint16_t qsize)
 {
@@ -169,7 +162,7 @@ static inline uint32_t nvme_build_create_io_q_cdw10(uint16_t qid, uint16_t qsize
 #define NVME_CREATE_IO_CQ_CDW11_PC       BIT(0)
 #define NVME_CREATE_IO_CQ_CDW11_IEN      BIT(1)
 #define NVME_CREATE_IO_CQ_CDW11_IV_SHIFT 16
-#define NVME_CREATE_IO_CQ_CDW11_IV_MASK  NVME_BITS_MASK(16, 31)
+#define NVME_CREATE_IO_CQ_CDW11_IV_MASK  BIT_MASK(16, 31)
 
 static inline uint32_t nvme_build_create_io_cq_cdw11(uint16_t iv, bool ien, bool pc)
 {
@@ -180,9 +173,9 @@ static inline uint32_t nvme_build_create_io_cq_cdw11(uint16_t iv, bool ien, bool
 /* Create I/O SQ CDW11 fields. [NVMe-2.1 §5.2.2, Fig. 479] */
 #define NVME_CREATE_IO_SQ_CDW11_PC          BIT(0)
 #define NVME_CREATE_IO_SQ_CDW11_QPRIO_SHIFT 1
-#define NVME_CREATE_IO_SQ_CDW11_QPRIO_MASK  NVME_BITS_MASK(1, 2)
+#define NVME_CREATE_IO_SQ_CDW11_QPRIO_MASK  BIT_MASK(1, 2)
 #define NVME_CREATE_IO_SQ_CDW11_CQID_SHIFT  16
-#define NVME_CREATE_IO_SQ_CDW11_CQID_MASK   NVME_BITS_MASK(16, 31)
+#define NVME_CREATE_IO_SQ_CDW11_CQID_MASK   BIT_MASK(16, 31)
 
 /* Create I/O SQ QPRIO values. [NVMe-2.1 §5.2.2, Fig. 479] */
 #define NVME_CREATE_IO_SQ_QPRIO_URGENT    0x0
@@ -198,7 +191,7 @@ static inline uint32_t nvme_build_create_io_sq_cdw11(uint16_t cqid, uint8_t qpri
 }
 
 /* NVM Read/Write CDW12 fields. [NVM-CommandSet-1.1 §3.3.4, Fig. 53; §3.3.6, Fig. 70] */
-#define NVME_RW_CDW12_NLB_MASK NVME_BITS_MASK(0, 15)
+#define NVME_RW_CDW12_NLB_MASK BIT_MASK(0, 15)
 #define NVME_RW_CDW12_LR       BIT(31)
 
 static inline uint32_t nvme_build_rw_cdw12(uint16_t nlb, bool lr)
@@ -228,18 +221,18 @@ _Static_assert(sizeof(nvme_submission_queue_entry_t) == 64, "Each Common Command
  * CDW0 fields used by this driver: Opcode, PSDT, and CID.
  * FUSE (bits 9:8) is currently not used. [NVMe-2.1 §4.1.1, Fig. 91]
  */
-#define NVME_CDW0_OPCODE_MASK NVME_BITS_MASK(0, 7)
+#define NVME_CDW0_OPCODE_MASK BIT_MASK(0, 7)
 
 /*
  * CID occupies bits 31:16 and must be unique among outstanding queue commands.
  * CID 0xFFFF is reserved for non-command-specific Error Information entries. [NVMe-2.1 Fig. 91]
  */
 #define NVME_CDW0_CID_SHIFT 16
-#define NVME_CDW0_CID_MASK  NVME_BITS_MASK(16, 31)
+#define NVME_CDW0_CID_MASK  BIT_MASK(16, 31)
 
 /* PSDT (bits 15:14) selects PRP vs SGL data pointers. [NVMe-2.1 Fig. 91] */
 #define NVME_CDW0_PSDT_SHIFT 14
-#define NVME_CDW0_PSDT_MASK  NVME_BITS_MASK(14, 15)
+#define NVME_CDW0_PSDT_MASK  BIT_MASK(14, 15)
 /* 00b: use PRPs. */
 #define NVME_CDW0_PSDT_PRP             0x0U
 /* 01b: use SGLs, MPTR points to one contiguous physical metadata buffer. */
@@ -272,8 +265,8 @@ _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
 /* Generic SGL descriptor format. [NVMe-2.1 §4.3.2, Fig. 114] */
 #define NVME_SGL_ID_TYPE_SHIFT     4
 #define NVME_SGL_ID_SUBTYPE_SHIFT  0
-#define NVME_SGL_ID_TYPE_MASK      NVME_BITS_MASK(4, 7)
-#define NVME_SGL_ID_SUBTYPE_MASK   NVME_BITS_MASK(0, 3)
+#define NVME_SGL_ID_TYPE_MASK      BIT_MASK(4, 7)
+#define NVME_SGL_ID_SUBTYPE_MASK   BIT_MASK(0, 3)
 #define NVME_SGL_ID(type, subtype) ((((type) & 0xFU) << NVME_SGL_ID_TYPE_SHIFT) | (((subtype) & 0xFU) << NVME_SGL_ID_SUBTYPE_SHIFT))
 #define NVME_SGL_DPTR2_ID_SHIFT    56 /* ID occupies dptr2[63:56] */
 
@@ -330,9 +323,9 @@ _Static_assert(offsetof(nvme_identify_ctrl_t, sgls) == 536, "SGLS must be at byt
 
 /* Min/max SQES/CQES (min in bits 3:0, max in bits 7:4). [NVMe-2.1 Fig. 312] */
 #define NVME_IDENTIFY_ENTRY_SIZE_MIN_SHIFT 0
-#define NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK  NVME_BITS_MASK(0, 3)
+#define NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK  BIT_MASK(0, 3)
 #define NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT 4
-#define NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK  NVME_BITS_MASK(4, 7)
+#define NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK  BIT_MASK(4, 7)
 
 /* LBA Format entry layout. [NVM-CommandSet-1.1 Fig. 116] */
 typedef struct nvme_lba_format {
@@ -361,9 +354,9 @@ _Static_assert(offsetof(nvme_identify_ns_t, flbas) == 26, "FLBAS must be at byte
 _Static_assert(offsetof(nvme_identify_ns_t, lbaf) == 128, "LBAF array must start at byte offset 128");
 
 /* FLBAS field layout. [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114] */
-#define NVME_IDENTIFY_FLBAS_FIDXL_MASK  NVME_BITS_MASK(0, 3)
+#define NVME_IDENTIFY_FLBAS_FIDXL_MASK  BIT_MASK(0, 3)
 #define NVME_IDENTIFY_FLBAS_FIDXU_SHIFT 5
-#define NVME_IDENTIFY_FLBAS_FIDXU_MASK  NVME_BITS_MASK(5, 6)
+#define NVME_IDENTIFY_FLBAS_FIDXU_MASK  BIT_MASK(5, 6)
 
 static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 {
@@ -373,7 +366,7 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 }
 
 /* SGLS bits 1:0 transport encoding. [NVMe-2.1 Fig. 312] */
-#define NVME_IDENTIFY_SGLS_TRANSPORT_MASK          NVME_BITS_MASK(0, 1)
+#define NVME_IDENTIFY_SGLS_TRANSPORT_MASK          BIT_MASK(0, 1)
 #define NVME_IDENTIFY_SGLS_TRANSPORT_BYTE_ALIGNED  BIT(0)
 #define NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED BIT(1)
 
@@ -402,9 +395,9 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
 
 /* Interrupt information field layout. [PCIe2-0.9 §7.5.1.20] */
-#define NVME_PCIE_INTR_LINE_MASK  NVME_BITS_MASK(0, 7)
+#define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
 #define NVME_PCIE_INTR_PIN_SHIFT  8U
-#define NVME_PCIE_INTR_PIN_MASK   NVME_BITS_MASK(8, 15)
+#define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
 
 static inline uint32_t nvme_pcie_cfg_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
 {
