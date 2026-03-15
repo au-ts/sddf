@@ -12,7 +12,11 @@
 #include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 
-__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+// TODO: the retain and used attributes are necessary as nothing uses/refers to this section
+// in release mode in this driver.
+// The solution is to fix our tooling to generate device resources for this driver as well
+// and then remove 'retain,used'.
+__attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 // @billn Need a way to express io port in sdfgen config structure

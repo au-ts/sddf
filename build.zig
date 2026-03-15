@@ -26,6 +26,7 @@ const DriverClass = struct {
         jh7110,
         goldfish,
         bcm2835,
+        rk3568,
     };
 
     const Gpio = enum {
@@ -36,8 +37,16 @@ const DriverClass = struct {
     const Network = enum {
         imx,
         meson,
-        virtio,
         @"dwmac-5.10a",
+        const Virtio = enum {
+            pci,
+            mmio,
+        };
+    };
+
+    const Clock = enum {
+        meson,
+        imx,
     };
 
     const I2cHost = enum {
@@ -49,6 +58,9 @@ const DriverClass = struct {
         const Virtio = enum {
             pci,
             mmio,
+        };
+        const Nvme = enum {
+            pci,
         };
     };
 
@@ -337,6 +349,85 @@ fn addVirtioBlockDriver(
     return driver;
 }
 
+fn addNvmeBlockDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Block.Nvme,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_nvme_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/blk/nvme/nvme.c"),
+    });
+    driver.addIncludePath(b.path("drivers/blk/nvme"));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addClockDriver(
+    b: *std.Build,
+    clk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Clock,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_clk_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+
+    switch (class) {
+        .meson => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/meson/clk-meson.c",
+                "drivers/clk/meson/clk-measure.c",
+                "drivers/clk/meson/sm1-clk.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+        .imx => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/imx/clk-imx.c",
+                "drivers/clk/imx/clk-imx8mq.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+    }
+
+    const common_src_files = .{
+        "clk-operations.c",
+        "clk.c",
+    };
+
+    inline for (common_src_files) |f| {
+        driver.addCSourceFile(.{ .file = b.path(b.fmt("drivers/clk/{s}", .{f})) });
+    }
+
+    driver.defineCMacro(b.fmt("BOARD_CLASS_{s}", .{@tagName(class)}), "1");
+    driver.addIncludePath(clk_config_include);
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("drivers/clk"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addMmcDriver(
     b: *std.Build,
     util: *std.Build.Step.Compile,
@@ -383,6 +474,37 @@ fn addNetworkDriver(
     const source = b.fmt("drivers/network/{s}/ethernet.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addVirtioNetworkDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Network.Virtio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_net_virtio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/network/virtio/common/ethernet.c"),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
     });
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
@@ -571,6 +693,11 @@ pub fn build(b: *std.Build) !void {
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
+        inline for (std.meta.fields(DriverClass.Block.Nvme)) |class| {
+            const driver = addNvmeBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
 
         // Serial components
         const serial_virt_rx = addPd(b, .{
@@ -714,6 +841,11 @@ pub fn build(b: *std.Build) !void {
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
+        inline for (std.meta.fields(DriverClass.Network.Virtio)) |class| {
+            const driver = addVirtioNetworkDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
 
         // Network components
         const net_virt_rx = addPd(b, .{
@@ -769,5 +901,21 @@ pub fn build(b: *std.Build) !void {
         net_copy.linkLibrary(util);
         net_copy.linkLibrary(util_putchar_debug);
         b.installArtifact(net_copy);
+    }
+
+    // Clock drivers
+    inline for (std.meta.fields(DriverClass.Clock)) |class| {
+        const driver = addClockDriver(b, clk_client_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+
+        const clk_config = b.addSystemCommand(&.{
+            "python",
+            "drivers/clk/create_clk_config.py",
+            dtb_path,
+        }); // Creates a system command which runs the python interpreter
+        const clk_config_include = clk_config.addOutputDirectoryArg("test");
+        driver.addIncludePath(clk_config_include);
+
+        b.installArtifact(driver);
     }
 }

@@ -39,7 +39,7 @@ def run_benchmark(args, throughput: int, packet_size: int):
     # test mode
     argv += [
         "--test",
-        "latency",
+        "latency-check",
         "--test-args",
         make_arg_list(
             socktype=args.protocol,

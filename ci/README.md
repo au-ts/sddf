@@ -15,6 +15,9 @@ On each commit and pull request, the build and simulation tests are checked. The
 hardware tests do not happen unless an explicit 'hardware test' label is added
 to a pull request. This is done to not overwhelm our supply of hardware.
 
+The scripts to test sDDF live in the `ci/` directory, however the general
+infrastrucutre lives in a [separate repository](https://github.com/au-ts/systems-ci).
+
 ### Accessing Log Artifacts
 
 As GitHub's log viewer performs terribly when the log files are large enough, we
@@ -22,6 +25,14 @@ publish archived copies on the [trustworthy.systems
 website](https://trustworthy.systems/github/ci-artifacts/). Both the raw log
 files, built images, and pre-rendered HTML logs are available. The archive is
 updated on an hourly basis.
+
+### Setup
+
+Install the `ts_ci` library from `systems-ci`.
+
+```sh
+$ pip install git+https://github.com/au-ts/systems-ci#subdirectory=ts_ci
+```
 
 ### Builds
 
@@ -111,12 +122,6 @@ QEMU:
 ```sh
 ./ci/run.py --only-qemu
 ```
-
-### Internals
-
-TODO:
-* talk about matrix.py
-* talk about adding your own example.py script
 
 ## Style
 

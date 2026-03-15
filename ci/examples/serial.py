@@ -6,17 +6,21 @@ import asyncio
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ts_ci import (
+    matrix_product,
+    HardwareBackend,
+    TestConfig,
+    wait_for_output,
+    send_input,
+    expect_output,
+    TestMetadata,
+    run_test,
+)
 
-from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    board=matrix.EXAMPLES["serial"]["boards_test"],
-    config=matrix.EXAMPLES["serial"]["configs"],
-    build_system=matrix.EXAMPLES["serial"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("serial", matrix.EXAMPLES["serial"])
 
 ANSI_RED = b"\x1b[31m"
 ANSI_GREEN = b"\x1b[32m"
@@ -59,5 +63,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         )
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=common.backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    cli("serial", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)
+    run_test(TEST_METADATA, TEST_MATRIX)

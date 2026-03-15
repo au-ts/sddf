@@ -4,22 +4,27 @@
 
 from pathlib import Path
 import sys
+from dataclasses import dataclass
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
-from ci.lib.runner import TestConfig
-from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
-
+from ts_ci import (
+    HardwareBackend,
+    QemuBackend,
+    MachineQueueBackend,
+    MACHINE_QUEUE_BOARDS,
+    MACHINE_QUEUE_BOARD_OPTIONS,
+    TestConfig,
+)
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
 
 
-def example_build_path(example_name: str, test_config: TestConfig):
+def example_build_path(test_config: TestConfig):
     return (
         CI_BUILD_DIR
         / "examples"
-        / example_name
+        / test_config.example
         / test_config.build_system
         / test_config.board
         / test_config.config
@@ -27,11 +32,10 @@ def example_build_path(example_name: str, test_config: TestConfig):
 
 
 def loader_img_path(
-    example_name: str,
     test_config: TestConfig,
 ):
     return (
-        example_build_path(example_name, test_config)
+        example_build_path(test_config)
         / ("bin" if test_config.build_system == "zig" else "")
         / "loader.img"
     )

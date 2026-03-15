@@ -12,8 +12,7 @@ import contextlib
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.runner import ArgparseActionList, TestConfig, matrix_product
-from ci.lib import log
+from ts_ci import log, ArgparseActionList, TestConfig, matrix_product
 from ci import common, matrix
 
 
@@ -22,9 +21,9 @@ def get_example_dir(example_name: str):
     return SDDF / "examples" / example_name
 
 
-def build_make(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    build_dir = common.example_build_path(example_name, test_config)
-    example_dir = get_example_dir(example_name)
+def build_make(args: argparse.Namespace, test_config: TestConfig):
+    build_dir = common.example_build_path(test_config)
+    example_dir = get_example_dir(test_config.example)
 
     subprocess.run(
         [
@@ -40,13 +39,25 @@ def build_make(args: argparse.Namespace, example_name: str, test_config: TestCon
     )
 
 
-def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    build_dir = common.example_build_path(example_name, test_config)
-    example_dir = get_example_dir(example_name)
+def build_zig(args: argparse.Namespace, test_config: TestConfig):
+    build_dir = common.example_build_path(test_config)
+    example_dir = get_example_dir(test_config.example)
 
     zig_env = os.environ.copy()
     zig_env["ZIG_GLOBAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
     zig_env["ZIG_LOCAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
+
+    # Explicitly handle each config in case of unexpected future Microkit
+    # configurations
+    zig_optimize_table = {
+        "debug": "Debug",
+        "debug-smp": "Debug",
+        "release": "ReleaseSafe",
+        "release-smp": "ReleaseSafe",
+        "benchmark": "ReleaseSafe",
+        "benchmark-smp": "ReleaseSafe",
+    }
+    zig_optimize = zig_optimize_table[test_config.config]
 
     with contextlib.chdir(example_dir):
         subprocess.run(
@@ -56,6 +67,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
                 f"-Dsdk={args.microkit_sdk}",
                 f"-Dboard={test_config.board}",
                 f"-Dconfig={test_config.config}",
+                f"-Doptimize={zig_optimize}",
                 "-p",
                 build_dir,
                 f"-j{args.num_jobs}",
@@ -65,11 +77,11 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
         )
 
 
-def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
+def build(args: argparse.Namespace, test_config: TestConfig):
     log.group_start(
         "building example '%s' for '%s' with microkit config '%s' and '%s'"
         % (
-            example_name,
+            test_config.example,
             test_config.board,
             test_config.config,
             test_config.build_system,
@@ -77,9 +89,9 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
     )
 
     if test_config.build_system == "make":
-        build_make(args, example_name, test_config)
+        build_make(args, test_config)
     elif test_config.build_system == "zig":
-        build_zig(args, example_name, test_config)
+        build_zig(args, test_config)
     else:
         raise NotImplementedError(f"unknown build system '{test_config.build_system}'")
 
@@ -115,9 +127,10 @@ if __name__ == "__main__":
             continue
 
         example_matrix = matrix_product(
-            board=options["boards_build"],
+            example=[example_name],
+            board=options["boards"],
             config=options["configs"],
             build_system=options["build_systems"],
         )
         for test_config in example_matrix:
-            build(args, example_name, test_config)
+            build(args, test_config)

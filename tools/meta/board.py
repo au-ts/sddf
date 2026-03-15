@@ -1,7 +1,7 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from sdfgen import SystemDescription
 
 
@@ -16,6 +16,8 @@ class Board:
     i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
+    pinctrl: str = None
+    baud_rate: Optional[int] = None
 
 
 # Keep this list in alphabetical order by board name
@@ -74,6 +76,7 @@ BOARDS: List[Board] = [
         timer="soc@0/bus@30000000/timer@302d0000",
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
         blk="soc@0/bus@30800000/mmc@30b40000",
+        pinctrl="soc@0/bus@30000000/iomuxc@30330000",
         partition=2,
     ),
     Board(
@@ -99,8 +102,8 @@ BOARDS: List[Board] = [
         paddr_top=0x6_0000_000,
         serial="pl011@9000000",
         timer="timer",
-        blk="virtio_mmio@a003e00",
-        ethernet="virtio_mmio@a003e00",
+        blk="virtio_mmio@a000200",
+        ethernet="virtio_mmio@a000000",
         i2c=None,
     ),
     Board(
@@ -109,10 +112,19 @@ BOARDS: List[Board] = [
         paddr_top=0xA_0000_000,
         serial="soc/serial@10000000",
         timer="soc/rtc@101000",
-        ethernet="soc/virtio_mmio@10008000",
-        blk="soc/virtio_mmio@10008000",
+        ethernet="soc/virtio_mmio@10001000",
+        blk="soc/virtio_mmio@10002000",
         partition=0,
         i2c=None,
+    ),
+    Board(
+        name="rock3b",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xEC000000,
+        serial="serial@fe660000",
+        timer="rktimer@fe5f0000",
+        ethernet="ethernet@fe2a0000",
+        baud_rate=1500000,
     ),
     Board(
         name="rpi4b_1gb",

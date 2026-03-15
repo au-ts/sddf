@@ -7,17 +7,24 @@ import re
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ts_ci import (
+    matrix_product,
+    run_test,
+    TestConfig,
+    TestMetadata,
+    HardwareBackend,
+    QemuBackend,
+    TestFailureException,
+    log,
+    reset_terminal,
+    wait_for_output,
+)
 
-from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
-from ci.lib import log
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    board=matrix.EXAMPLES["echo_server"]["boards_test"],
-    config=matrix.EXAMPLES["echo_server"]["configs"],
-    build_system=matrix.EXAMPLES["echo_server"]["build_systems"],
+TEST_MATRIX = matrix.generate_example_test_matrix(
+    "echo_server", matrix.EXAMPLES["echo_server"]
 )
 
 
@@ -25,10 +32,14 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
+        if test_config.board == "x86_64_generic":
+            virtio_device = "virtio-net-pci,netdev=netdev0,addr=0x2.0"
+        else:
+            virtio_device = "virtio-net-device,netdev=netdev0,bus=virtio-mmio-bus.0"
         # fmt: off
         backend.invocation_args.extend([
 			"-global", "virtio-mmio.force-legacy=false",
-			"-device", "virtio-net-pci,netdev=netdev0" if test_config.board == "x86_64_generic" else "virtio-net-device,netdev=netdev0",
+			"-device",  virtio_device,
 			"-netdev", "user,id=netdev0," +
                        "hostfwd=udp::1235-10.0.2.15:1235,hostfwd=tcp::1236-10.0.2.15:1236,hostfwd=tcp::1237-10.0.2.15:1237," +
                        "hostfwd=udp::1238-10.0.2.16:1235,hostfwd=tcp::1239-10.0.2.16:1236,hostfwd=tcp::1240-10.0.2.16:1237",
@@ -65,5 +76,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    cli("echo_server", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(TEST_METADATA, TEST_MATRIX)

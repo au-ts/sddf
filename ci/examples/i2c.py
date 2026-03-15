@@ -6,17 +6,20 @@ import asyncio
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ts_ci import (
+    TestConfig,
+    HardwareBackend,
+    matrix_product,
+    MachineQueueBackend,
+    wait_for_output,
+    TestMetadata,
+    run_test,
+)
 
-from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    board=matrix.EXAMPLES["i2c"]["boards_test"],
-    config=matrix.EXAMPLES["i2c"]["configs"],
-    build_system=matrix.EXAMPLES["i2c"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("i2c", matrix.EXAMPLES["i2c"])
 
 
 def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
@@ -39,5 +42,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         await wait_for_output(backend, b"Date and Time: 01-06-25 00:00:00 (Monday)\r\n")
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    cli("i2c", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(TEST_METADATA, TEST_MATRIX)

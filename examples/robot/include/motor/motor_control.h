@@ -34,7 +34,7 @@
 // Time Spent (microseconds) on HIGH/LOW for Motor Control PWM Signals
 // Control, Time HIGH, Time LOW
 static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPING_ROWS] = {
-    {CONTROL_FORWARD, 2000, 18000},
+    {CONTROL_FORWARD, 1700, 18300},
     {CONTROL_REVERSE,  1000, 19000},
     {CONTROL_NEUTRAL, 1500, 18500},
 };

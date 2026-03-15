@@ -3,66 +3,78 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from __future__ import annotations
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, TypedDict
 
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from ts_ci import MACHINE_QUEUE_BOARDS, matrix_product, TestConfig
 
-# The ordering in these lists defines an implicit ordering of which boards
-# to use for CI preferentially, though all will eventually be tried.
-MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
-    "hifive_p550": ["p550a"],
-    "serengeti": ["serengeti1", "serengeti2"],
-    "imx8mm_evk": ["imx8mm"],
-    "imx8mp_iotgate": ["iotgate1"],
-    "imx8mq_evk": ["imx8mq", "imx8mq2"],
-    "maaxboard": ["maaxboard1", "maaxboard2"],
-    "odroidc2": ["odroidc2"],
-    "odroidc4": ["odroidc4_1", "odroidc4_2"],
-    "star64": ["star64"],
-    "zcu102": ["zcu102", "zcu102_2"],
-    "rpi4b_1gb": ["pi4B"],
-}
+NO_OUTPUT_DEFAULT_TIMEOUT_S: int = 60
 
-MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
-    "serengeti": dict(uboot_image_started=b"Starting kernel ..."),
-    "star64": dict(uboot_image_started=b"Starting kernel ..."),
-    "hifive_p550": dict(uboot_image_started=b"Starting kernel ..."),
-}
+
+def generate_example_test_matrix(
+    example: str, example_matrix: _ExampleMatrixType
+) -> list[TestConfig]:
+    def listify(s: str | Sequence[str]) -> Sequence[str]:
+        if isinstance(s, str):
+            return [s]
+        else:
+            return s
+
+    matrix = set(
+        matrix_product(
+            example=[example],
+            board=example_matrix["boards"],
+            config=example_matrix["configs"],
+            build_system=example_matrix["build_systems"],
+        )
+    )
+
+    for exclude in example_matrix["tests_exclude"]:
+        to_exclude = set(
+            matrix_product(
+                example=[example],
+                board=listify(exclude.get("board", example_matrix["boards"])),
+                config=listify(exclude.get("config", example_matrix["configs"])),
+                build_system=listify(
+                    exclude.get("build_system", example_matrix["build_systems"])
+                ),
+            )
+        )
+        matrix -= to_exclude
+
+    return list(matrix)
+
 
 EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": [
+        "boards": [
             "maaxboard",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "x86_64_generic",
         ],
-        "boards_test": [
-            "maaxboard",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "x86_64_generic",
-        ],
+        "tests_exclude": [],
     },
     "i2c": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["odroidc4"],
-        "boards_test": ["odroidc4"],
+        "boards": ["odroidc4"],
+        "tests_exclude": [],
     },
     # Use i2c bus scan for all devices that don't have an I2C test board
     # attached.
     "i2c_bus_scan": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["serengeti"],
-        "boards_test": ["serengeti"],
+        "boards": ["serengeti"],
+        "tests_exclude": [],
     },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],
-        "boards_build": [
+        "boards": [
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
@@ -72,19 +84,14 @@ EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "star64",
             "x86_64_generic",
         ],
-        "boards_test": [
-            "imx8mm_evk",
-            "imx8mq_evk",
-            "imx8mp_iotgate",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "star64",
+        "tests_exclude": [
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
         ],
     },
     "gpio": {
@@ -98,7 +105,7 @@ EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
     "serial": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": [
+        "boards": [
             "cheshire",
             "hifive_p550",
             "imx8mm_evk",
@@ -109,39 +116,24 @@ EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "serengeti",
             "star64",
             "x86_64_generic",
             "zcu102",
         ],
-        "boards_test": [
-            "hifive_p550",
-            "imx8mm_evk",
-            "imx8mq_evk",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            # Disabled because https://github.com/seL4/microkit/issues/401
-            # "rpi4b_1gb",
-            "serengeti",
-            "star64",
-            "x86_64_generic",
-            "zcu102",
+        "tests_exclude": [
+            # not in machine queue
+            {"board": "cheshire"},
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
         ],
     },
     "timer": {
-        # Only works in debug mode so as to not depend on serial
-        "configs": ["debug"],
+        "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        # TODO:
-        # "tests_exclude": [
-        #     { "config": "release "},
-        #     { "config", "debug", "build": "zig", board: "odroid"}
-        # ],
-        "boards_build": [
+        "boards": [
             "imx8mq_evk",
             "imx8mp_evk",
             "maaxboard",
@@ -149,51 +141,85 @@ EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "star64",
             "serengeti",
             "x86_64_generic",
             "zcu102",
         ],
-        "boards_test": [
+        "tests_exclude": [
+            # does not print anything in release mode, so we don't depend on serial
+            {"config": "release"},
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
+        ],
+    },
+    "pinctrl": {
+        # Only works in debug mode so as to not depend on serial
+        "configs": ["debug", "release"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "imx8mm_evk",
             "imx8mq_evk",
+            "imx8mp_evk",
             "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            # Disabled for https://github.com/seL4/microkit/issues/401
-            # "rpi4b_1gb",
-            "serengeti",
-            "star64",
-            "x86_64_generic",
-            "zcu102",
+        ],
+        "boards_test": [
+            "imx8mm_evk",
+            "imx8mq_evk",
+            "imx8mp_evk",
+            "maaxboard",
         ],
     },
 }
 
-if TYPE_CHECKING:
-    _BoardNames = Literal[
-        "odroidc4",
-        "imx8mm_evk",
-        "imx8mp_evk",
-        "imx8mq_evk",
-        "maaxboard",
-        "odroidc2",
-        "serengeti",
-        "star64",
-        "qemu_virt_aarch64",
-        "qemu_virt_riscv64",
-        "x86_64_generic",
-    ]
-    assert set(MACHINE_QUEUE_BOARDS.keys()) == set(_BoardNames.__args__) | {
-        "qemu_virt_aarch64",
-        "qemu_virt_riscv64",
-        "x86_64_generic",
-    }
+## Type Hinting + Sanity Checks ##
+_BoardNames = Literal[
+    "cheshire",
+    "odroidc4",
+    "imx8mm_evk",
+    "imx8mp_evk",
+    "imx8mq_evk",
+    "imx8mp_iotgate",
+    "hifive_p550",
+    "maaxboard",
+    "odroidc2",
+    "odroidc4",
+    "rpi4b_1gb",
+    "rock3b",
+    "serengeti",
+    "star64",
+    "qemu_virt_aarch64",
+    "qemu_virt_riscv64",
+    "x86_64_generic",
+    "zcu102",
+]
 
-    class _ExampleMatrixType(TypedDict):
-        configs: list[Literal["debug", "release", "benchmark"]]
-        build_systems: list[Literal["make", "zig"]]
-        boards_build: list[_BoardNames]
-        boards_test: list[_BoardNames]
+known_board_names = set(MACHINE_QUEUE_BOARDS.keys()) | {
+    # simulation boards
+    "qemu_virt_aarch64",
+    "qemu_virt_riscv64",
+    "x86_64_generic",
+    # build only
+    "imx8mp_evk",
+    "rock3b",
+    "cheshire",
+}
+assert (
+    set(_BoardNames.__args__) <= known_board_names  # type: ignore
+), f"_BoardNames contains a board that is not valid {known_board_names ^ set(_BoardNames.__args__)}"  # type: ignore
+
+for ex in EXAMPLES.values():
+    for board in chain(
+        ex["boards"], (excl["board"] for excl in ex["tests_exclude"] if "board" in excl)
+    ):
+        assert board in known_board_names, f"{board} not a valid board"
+
+
+class _ExampleMatrixType(TypedDict):
+    configs: list[Literal["debug", "release", "benchmark"]]
+    build_systems: list[Literal["make", "zig"]]
+    boards: list[_BoardNames]
+    tests_exclude: list[dict[str, str]]

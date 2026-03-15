@@ -128,8 +128,9 @@ static bool gpt_validate_partitions()
 {
     int err = 0;
     if (blk_queue_empty_resp(&drv_h)) {
-        LOG_BLK_VIRT("Notified by driver but queue is empty, expecting a response to a BLK_REQ_READ request for GPT "
-                     "partition entries\n");
+        LOG_BLK_VIRT_ERR(
+            "Notified by driver but queue is empty, expecting a response to a BLK_REQ_READ request for GPT "
+            "partition entries\n");
         return false;
     }
 
@@ -310,7 +311,7 @@ static bool mbr_handle_response()
 
     int err = 0;
     if (blk_queue_empty_resp(&drv_h)) {
-        LOG_BLK_VIRT(
+        LOG_BLK_VIRT_ERR(
             "Notified by driver but queue is empty, expecting a response to a BLK_REQ_READ request into sector 0\n");
         return false;
     }

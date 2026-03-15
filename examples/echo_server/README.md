@@ -43,6 +43,10 @@ clients for logging DHCP messages, and by the benchmarking component to print
 results. The timer subsystem is used by the echo server clients to create the
 regular timeouts that the IP stack requires to function.
 
+In addition to an ethernet driver, we also make use of a serial driver and timer driver.
+The serial driver is used for logging DHCP messages, benchmarking results, etc.
+The timer driver is used as the IP stack needs to be able to set regular timeouts to function.
+
 To learn more about the benchmarking architecture and setup, see the
 [benchmarking section below](#benchmarking).
 
@@ -59,7 +63,9 @@ The following platforms are supported:
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* rock3b
 * star64
+* x86_64_generic (only QEMU right now)
 
 To compile the system image, run:
 
@@ -163,16 +169,17 @@ comprised of three types of actors:
 - The ipbench *clients* which are the load generators that receive instructions
   from the controller and send and receive traffic to and from the target. In
   our benchmarks the clients run the
-  [latency](https://github.com/au-ts/ipbench/tree/main/ipbench2/doc) test.
+  [latency check](https://github.com/au-ts/ipbench/tree/main/ipbench2/doc) test.
 - The *target* system which is being measured. The target echoes back traffic
   received from the clients, and in the
   [cpu_target_lukem](https://github.com/au-ts/ipbench/tree/main/ipbench2/doc)
   test that we use it also coordinates with the controller to measure the
   utilisation of the system.
 
-The client latency and target utilisation tests we use allow us to calculate:
+The client `latency-check` and target utilisation tests we use allow us to
+calculate:
 - The proportion of traffic sent by the clients that is successfully echoed back
-  by the target (i.e. achieved throughput in bits/s).
+  by the target without packet corruption (i.e. achieved throughput in bits/s).
 - The time taken for each response to be received (i.e. latency as minimum,
   median, mean and maximum round trip times).
 - The CPU utilisation of the target system during each benchmark (i.e. the total
@@ -192,13 +199,13 @@ For a selected throughput, a benchmark run involves three phases, throughout all
 of which traffic is sent by the clients to the target at the selected
 throughput:
 1. A warm-up phase for a fixed number of seconds.
-2. The client latency testing phase where the clients begin taking statistics on
-   packets received (RTT for responses and dropped packet counts). This phase
-   will continue until the configured number of sample packets have been
-   received by the clients, thus can vary in time significantly depending on the
-   achieved throughput of the target. Note that if the target becomes
-   unresponsive during this phase, or there is a large amount of packet loss
-   ipbench will hang here.
+2. The client `latency-check` testing phase where the clients begin checking
+   packets received and taking statistics (RTT for responses and dropped packet
+   counts). This phase will continue until the configured number of sample
+   packets have been received by the clients, thus can vary in time
+   significantly depending on the achieved throughput of the target. Note that
+   if the target becomes unresponsive during this phase, or there is a large
+   amount of packet loss ipbench will hang here.
 3. A cool-down phase for a fixed number of seconds.
 
 The latency and throughput measurements taken by the clients are based only on
@@ -353,7 +360,7 @@ data](#difference-between-echo-server-clients).
 
 You can see all the possible arguments with
 ```sh
-python3 script/benchmark.py -h
+python3 scripts/benchmark.py -h
 ```
 
 Note that for gathering benchmark results you should not change the default

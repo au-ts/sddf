@@ -3,35 +3,41 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import asyncio
-import functools
-import subprocess
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
+import types
+
+from ts_ci import (
+    TestConfig,
+    run_test,
+    matrix_product,
+    HardwareBackend,
+    QemuBackend,
+    TestMetadata,
+    wait_for_output,
+)
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
-
-from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    board=matrix.EXAMPLES["blk"]["boards_test"],
-    config=matrix.EXAMPLES["blk"]["configs"],
-    build_system=matrix.EXAMPLES["blk"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("blk", matrix.EXAMPLES["blk"])
 
 SDDF = Path(__file__).parents[2]
 mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
 
 
-def backend_fn(
-    disks_dir: str, test_config: TestConfig, loader_img: Path
-) -> HardwareBackend:
+def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
-        (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
+        tmpdir = tempfile.TemporaryDirectory(suffix="sddf_blk_disks")
+        backend._sddf_tmpdir = tmpdir
+
+        (fd, disk_path) = tempfile.mkstemp(dir=tmpdir.name)
+        os.close(fd)
 
         subprocess.run(
             [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
@@ -39,13 +45,28 @@ def backend_fn(
             capture_output=True,
         )
 
+        if test_config.board == "x86_64_generic":
+            virtio_device = "virtio-blk-pci,drive=hd,addr=0x3.0"
+        else:
+            virtio_device = "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1"
+
         # fmt: off
         backend.invocation_args.extend([
             "-global", "virtio-mmio.force-legacy=false",
             "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-            "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
+            "-device", virtio_device,
         ])
         # fmt: on
+
+        orig_stop = backend.stop
+
+        async def stop_with_cleanup(self):
+            try:
+                await orig_stop()
+            finally:
+                tmpdir.cleanup()
+
+        backend.stop = types.MethodType(stop_with_cleanup, backend)
 
     return backend
 
@@ -61,12 +82,14 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         )
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
+
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
-        cli(
-            "blk",
-            test,
-            TEST_MATRIX,
-            functools.partial(backend_fn, qemu_disks_dir),
-            common.loader_img_path,
-        )
+    run_test(TEST_METADATA, TEST_MATRIX)

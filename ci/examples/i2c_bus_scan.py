@@ -6,22 +6,21 @@ import asyncio
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
-
-from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
-from ci import common, matrix
-
-TEST_MATRIX = matrix_product(
-    board=matrix.EXAMPLES["i2c_bus_scan"]["boards_test"],
-    config=matrix.EXAMPLES["i2c_bus_scan"]["configs"],
-    build_system=matrix.EXAMPLES["i2c_bus_scan"]["build_systems"],
+from ts_ci import (
+    matrix_product,
+    HardwareBackend,
+    TestConfig,
+    wait_for_output,
+    TestMetadata,
+    run_test,
 )
 
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ci import common, matrix
 
-def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
-    backend = common.backend_fn(test_config, loader_img)
-    return backend
+TEST_MATRIX = matrix.generate_example_test_matrix(
+    "i2c_bus_scan", matrix.EXAMPLES["i2c_bus_scan"]
+)
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
@@ -29,5 +28,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         await wait_for_output(backend, b"           	 ... is present!\r\n")
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=common.backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    cli("i2c_bus_scan", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(TEST_METADATA, TEST_MATRIX)
