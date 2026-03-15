@@ -216,7 +216,7 @@ static uint32_t nvme_namespace_sector_size(const nvme_identify_ns_t *identify_ns
 
     /* Logical block data size (sector size) = 2^LBADS bytes. */
     assert(lbads >= 9);
-    return 1 << lbads;
+    return BIT(lbads);
 }
 
 /* Copy fixed-width ASCII fields and trim trailing space padding in place. */
