@@ -82,7 +82,7 @@ typedef struct {
     nvme_state_t state;
     uint32_t timeout_ms;            // CAP.TO derived timeout
     uint32_t waited_ms;             // Time waited in current state
-    uint32_t io_queue_depth;        // Configured I/O queue depth based on CAP.MQES
+    uint16_t io_queue_depth;        // 0-based I/O queue depth (n means n+1 entries)
     uint32_t sectors_per_block;     // Derived from Identify Namespace data
     uint8_t cap_mpsmin;             // CAP.MPSMIN used for MDTS calculation
     uint32_t max_io_pages;          // Maximum number of I/O pages per transfer based on MDTS/CAP.MPSMIN
@@ -99,14 +99,15 @@ __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_confi
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 /* Admin queue max 4096 entries, I/O queue max 65536 entries. [NVMe-2.1 §3.3.3.1] */
-#define NVME_ASQ_CAPACITY (NVME_ASQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t))
-#define NVME_ACQ_CAPACITY (NVME_ACQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t))
-_Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
-_Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (entries)");
-#define NVME_IO_SQ_CAPACITY (NVME_IO_SQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t))
-#define NVME_IO_CQ_CAPACITY (NVME_IO_CQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t))
-_Static_assert(NVME_IO_SQ_CAPACITY <= 0x10000, "capacity of IO SQ must be <=65536 (entries)");
-_Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=65536 (entries)");
+/* zero-based length */
+#define NVME_ASQ_CAPACITY ((NVME_ASQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t)) - 1U)
+#define NVME_ACQ_CAPACITY ((NVME_ACQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t)) - 1U)
+_Static_assert(NVME_ASQ_CAPACITY < 0x1000, "capacity of ASQ must be <=4096 (entries)");
+_Static_assert(NVME_ACQ_CAPACITY < 0x1000, "capacity of ACQ must be <=4096 (entries)");
+#define NVME_IO_SQ_CAPACITY ((NVME_IO_SQ_REGION_SIZE / sizeof(nvme_submission_queue_entry_t)) - 1U)
+#define NVME_IO_CQ_CAPACITY ((NVME_IO_CQ_REGION_SIZE / sizeof(nvme_completion_queue_entry_t)) - 1U)
+_Static_assert(NVME_IO_SQ_CAPACITY < 0x10000, "capacity of IO SQ must be <=65536 (entries)");
+_Static_assert(NVME_IO_CQ_CAPACITY < 0x10000, "capacity of IO CQ must be <=65536 (entries)");
 
 /* Map sDDF IDs to NVMe CIDs - align with I/O queue depth */
 #define MAX_PENDING_REQS NVME_IO_SQ_CAPACITY
@@ -114,7 +115,7 @@ _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=6553
 /* PRP List Configuration */
 #define MAX_TRANSFER_PAGES 32   /* 128KB max transfer (32 * 4KB pages) */
 #define PRP_LIST_SLOT_SIZE 256
-#define PRP_LIST_REGION_SIZE (MAX_PENDING_REQS * PRP_LIST_SLOT_SIZE)
+#define PRP_LIST_REGION_SIZE ((MAX_PENDING_REQS + 1U) * PRP_LIST_SLOT_SIZE)
 #define NVME_PRP_ENTRIES_PER_PAGE       ((uint32_t)(PRP_LIST_SLOT_SIZE / sizeof(uint64_t)))
 #define NVME_PRP_NON_CHAINED_MAX_PAGES  (1 + NVME_PRP_ENTRIES_PER_PAGE) // PRP1 + List slot
 
@@ -125,9 +126,9 @@ _Static_assert(PRP_LIST_REGION_SIZE <= NVME_PRP_LIST_REGION_SIZE,
 #define NVME_SGL_MAX_INLINE_PAGES ((typeof(((blk_req_t *)0)->count))-1)
 
 static ialloc_t cid_ialloc;
-static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
-static uint32_t cid_to_id[MAX_PENDING_REQS];
-static uint16_t cid_to_count[MAX_PENDING_REQS];
+static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS + 1U];
+static uint32_t cid_to_id[MAX_PENDING_REQS + 1U];
+static uint16_t cid_to_count[MAX_PENDING_REQS + 1U];
 
 /*
  * Host queue entry-size exponents for CC.IOSQES/CC.IOCQES.
@@ -415,10 +416,8 @@ static void handle_admin_completions(void)
         return;
     }
 
-    if (entry.cid >= state_ctx.io_queue_depth || !ialloc_in_use(&cid_ialloc, entry.cid)) {
-        LOG_NVME_ERR("admin completion with invalid CID=%u dropped\n", entry.cid);
-        return;
-    }
+    assert(entry.cid <= state_ctx.io_queue_depth);
+    assert(ialloc_in_use(&cid_ialloc, entry.cid));
 
     int err = ialloc_free(&cid_ialloc, entry.cid);
     assert(err == 0);
@@ -549,7 +548,6 @@ static void handle_admin_completions(void)
         assert(nvme_io_cq_region != 0x0);
         assert(nvme_io_sq_region_paddr != 0x0);
         assert(nvme_io_cq_region_paddr != 0x0);
-        assert(state_ctx.io_queue_depth > 0);
         nvme_queues_init(&io_queue, io_queue_id, nvme_controller, nvme_io_sq_region, state_ctx.io_queue_depth,
                          nvme_io_cq_region, state_ctx.io_queue_depth);
 
@@ -572,7 +570,7 @@ static void handle_admin_completions(void)
             &admin_queue,
             &(nvme_submission_queue_entry_t) {
                 .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_CQ, NVME_CDW0_PSDT_PRP),
-                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
+                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth),
                 .cdw11 = nvme_build_create_io_cq_cdw11(NVME_CREATE_IO_Q_INTERRUPT_VECTOR, true, true),
                 .dptr2 = 0,
                 .dptr1 = nvme_io_cq_region_paddr,
@@ -598,7 +596,7 @@ static void handle_admin_completions(void)
             &admin_queue,
             &(nvme_submission_queue_entry_t) {
                 .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_SQ, NVME_CDW0_PSDT_PRP),
-                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth - 1U),
+                .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, state_ctx.io_queue_depth),
                 .cdw11 = nvme_build_create_io_sq_cdw11(NVME_DEFAULT_IO_Q_ID, NVME_CREATE_IO_SQ_QPRIO_URGENT, true),
                 .cdw12 = 0,
                 .dptr2 = 0,
@@ -658,10 +656,8 @@ static void handle_io_completions(void)
 
     while (nvme_queue_consume(&io_queue, &cq_entry) == 0) {
         uint16_t cid = cq_entry.cid;
-        if (cid >= state_ctx.io_queue_depth || !ialloc_in_use(&cid_ialloc, cid)) {
-            LOG_NVME_ERR("completion with invalid CID=%u dropped\n", cid);
-            continue;
-        }
+        assert(cid <= state_ctx.io_queue_depth);
+        assert(ialloc_in_use(&cid_ialloc, cid));
 
         uint32_t id = cid_to_id[cid];
         uint16_t count = cid_to_count[cid];
@@ -721,8 +717,7 @@ static void nvme_poll_controller_status(void)
         nvme_controller->asq = nvme_asq_region_paddr;
         nvme_controller->acq = nvme_acq_region_paddr;
         nvme_controller->aqa &= ~(NVME_AQA_ACQS_MASK | NVME_AQA_ASQS_MASK);
-        nvme_controller->aqa |= ((NVME_ASQ_CAPACITY - 1) << NVME_AQA_ASQS_SHIFT)
-                              | ((NVME_ACQ_CAPACITY - 1) << NVME_AQA_ACQS_SHIFT);
+        nvme_controller->aqa |= (NVME_ASQ_CAPACITY << NVME_AQA_ASQS_SHIFT) | (NVME_ACQ_CAPACITY << NVME_AQA_ACQS_SHIFT);
 
         // 3. Initialise Command Support Sets.
         // QEMU NVMe workaround: Always use NVM Command Set (CSS=0b000)
@@ -830,10 +825,7 @@ void nvme_controller_init()
     uint8_t cap_to = (uint8_t)((nvme_controller->cap & NVME_CAP_TO_MASK) >> NVME_CAP_TO_SHIFT);
 
     // Maximum Queue Entries Supported
-    uint16_t mqes_raw = (uint16_t)(nvme_controller->cap & NVME_CAP_MQES_MASK);
-
-    // Use uint32_t to avoid overflow if mqes_raw == 0xFFFF (0-based value means 65536 entries)
-    uint32_t mqes_max = (uint32_t)mqes_raw + 1;
+    uint16_t mqes = (uint16_t)(nvme_controller->cap & NVME_CAP_MQES_MASK);
     uint32_t desired = NVME_IO_SQ_CAPACITY < NVME_IO_CQ_CAPACITY ? NVME_IO_SQ_CAPACITY : NVME_IO_CQ_CAPACITY;
 
     // Initialize state machine context
@@ -841,10 +833,11 @@ void nvme_controller_init()
         .state = NVME_STATE_WAIT_NOT_READY,
         .timeout_ms = (cap_to + 1) * 500,
         .waited_ms = 0,
-        .io_queue_depth = (mqes_max < desired) ? mqes_max : desired,
+        .io_queue_depth = (mqes < desired) ? mqes : desired,
     };
 
-    LOG_NVME("MQES: raw=0x%x -> max %u entries, using %u\n", mqes_raw, mqes_max, state_ctx.io_queue_depth);
+    LOG_NVME("MQES: raw=0x%x -> max %u entries, using %u entries\n", mqes, (uint32_t)mqes + 1U,
+             (uint32_t)state_ctx.io_queue_depth + 1U);
 
     nvme_poll_controller_status();
 }
@@ -896,7 +889,7 @@ void init(void)
     nvme_identify_ns = (void *)NVME_IDENTIFY_NS_VADDR;
 
     /* Initialise CID allocator */
-    ialloc_init(&cid_ialloc, cid_ialloc_idxlist, MAX_PENDING_REQS);
+    ialloc_init(&cid_ialloc, cid_ialloc_idxlist, MAX_PENDING_REQS + 1U);
 
     /* NVMe Controller Init */
     nvme_controller_init();
