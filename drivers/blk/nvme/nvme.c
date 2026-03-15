@@ -183,23 +183,23 @@ static void validate_identify_entry_size_limits(void)
                    >> NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT;
 
     if (minsqes > maxsqes) {
-        sddf_dprintf("NVMe SQES invalid: min %u > max %u\n", minsqes, maxsqes);
+        LOG_NVME_ERR("SQES invalid: min %u > max %u\n", minsqes, maxsqes);
         assert(false);
     }
 
     if (mincqes > maxcqes) {
-        sddf_dprintf("NVMe CQES invalid: min %u > max %u\n", mincqes, maxcqes);
+        LOG_NVME_ERR("CQES invalid: min %u > max %u\n", mincqes, maxcqes);
         assert(false);
     }
 
     if (NVME_HOST_IOSQES_EXP < minsqes || NVME_HOST_IOSQES_EXP > maxsqes) {
-        sddf_dprintf("NVMe SQES mismatch: controller range [%u, %u], host IOSQES=%u\n", minsqes, maxsqes,
+        LOG_NVME_ERR("SQES mismatch: controller range [%u, %u], host IOSQES=%u\n", minsqes, maxsqes,
                      NVME_HOST_IOSQES_EXP);
         assert(false);
     }
 
     if (NVME_HOST_IOCQES_EXP < mincqes || NVME_HOST_IOCQES_EXP > maxcqes) {
-        sddf_dprintf("NVMe CQES mismatch: controller range [%u, %u], host IOCQES=%u\n", mincqes, maxcqes,
+        LOG_NVME_ERR("CQES mismatch: controller range [%u, %u], host IOCQES=%u\n", mincqes, maxcqes,
                      NVME_HOST_IOCQES_EXP);
         assert(false);
     }
@@ -238,7 +238,7 @@ static int build_sgl_dptr(uintptr_t data_paddr, uint32_t byte_count, uint64_t *d
 {
     /* Enforce SGL dword alignment only when required by controller. */
     if (state_ctx.sgl_requires_dword_align && ((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) != 0) {
-        sddf_dprintf("NVMe: SGL alignment violation: addr=0x%lx len=%u\n", data_paddr, byte_count);
+        LOG_NVME_ERR("SGL alignment violation: addr=0x%lx len=%u\n", data_paddr, byte_count);
         return -1;
     }
 
@@ -254,7 +254,7 @@ static int build_prp_dptr(uint32_t cid, uintptr_t data_paddr, uint16_t count, ui
 {
     /* Driver currently supports a single PRP-list page only (no chained PRP-list traversal). */
     if (count > NVME_PRP_NON_CHAINED_MAX_PAGES) {
-        sddf_dprintf("NVMe: PRP transfer too large for non-chained list (%u pages, max %u)\n", count,
+        LOG_NVME_ERR("PRP transfer too large for non-chained list (%u pages, max %u)\n", count,
                      NVME_PRP_NON_CHAINED_MAX_PAGES);
         return -1;
     }
@@ -342,7 +342,7 @@ static void handle_request(void)
         }
 
         if (count == 0) {
-            sddf_dprintf("NVMe: rejecting zero-length request\n");
+            LOG_NVME_ERR("rejecting zero-length request\n");
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_INVALID_PARAM, 0, id);
             assert(!err);
             notify_virt = true;
@@ -351,7 +351,7 @@ static void handle_request(void)
 
         /* Reject oversized transfers */
         if (count > state_ctx.max_io_pages) {
-            sddf_dprintf("NVMe: request too large (%u pages, max %u)\n", count, state_ctx.max_io_pages);
+            LOG_NVME_ERR("request too large (%u pages, max %u)\n", count, state_ctx.max_io_pages);
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_UNSPEC, 0, id);
             assert(!err);
             notify_virt = true;
@@ -416,7 +416,7 @@ static void handle_admin_completions(void)
     }
 
     if (entry.cid >= state_ctx.io_queue_depth || !ialloc_in_use(&cid_ialloc, entry.cid)) {
-        sddf_dprintf("NVMe: admin completion with invalid CID=%u dropped\n", entry.cid);
+        LOG_NVME_ERR("admin completion with invalid CID=%u dropped\n", entry.cid);
         return;
     }
 
@@ -425,7 +425,7 @@ static void handle_admin_completions(void)
 
     uint16_t status = (entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT;
     if (status != 0) {
-        sddf_dprintf("NVMe admin command failed with status 0x%x in state %d\n", status, state_ctx.state);
+        LOG_NVME_ERR("admin command failed with status 0x%x in state %d\n", status, state_ctx.state);
         return;
     }
 
@@ -646,7 +646,7 @@ static void handle_admin_completions(void)
     }
 
     default:
-        sddf_dprintf("Unexpected admin completion in state %d\n", state_ctx.state);
+        LOG_NVME_ERR("Unexpected admin completion in state %d\n", state_ctx.state);
         break;
     }
 }
@@ -659,7 +659,7 @@ static void handle_io_completions(void)
     while (nvme_queue_consume(&io_queue, &cq_entry) == 0) {
         uint16_t cid = cq_entry.cid;
         if (cid >= state_ctx.io_queue_depth || !ialloc_in_use(&cid_ialloc, cid)) {
-            sddf_dprintf("NVMe: completion with invalid CID=%u dropped\n", cid);
+            LOG_NVME_ERR("completion with invalid CID=%u dropped\n", cid);
             continue;
         }
 
@@ -707,7 +707,7 @@ static void nvme_poll_controller_status(void)
                 state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
             }
-            sddf_dprintf("NVMe reset timeout after %u ms\n", state_ctx.waited_ms);
+            LOG_NVME_ERR("Reset: timeout after %u ms\n", state_ctx.waited_ms);
             return;
         }
         LOG_NVME("controller reset complete\n");
@@ -764,7 +764,7 @@ static void nvme_poll_controller_status(void)
                 state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
             }
-            sddf_dprintf("NVMe enable timeout after %u ms\n", state_ctx.waited_ms);
+            LOG_NVME_ERR("Enable: timeout after %u ms\n", state_ctx.waited_ms);
             return;
         }
         LOG_NVME("controller ready\n");
