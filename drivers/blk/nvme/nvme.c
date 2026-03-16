@@ -237,11 +237,9 @@ static void copy_trim_ascii(char *dst, size_t dst_size, const char *src, size_t 
 /* Build a single inline SGL Data Block descriptor for a contiguous buffer. */
 static int build_sgl_dptr(uintptr_t data_paddr, uint32_t byte_count, uint64_t *dptr1, uint64_t *dptr2)
 {
-    /* Enforce SGL dword alignment only when required by controller. */
-    if (state_ctx.sgl_requires_dword_align && ((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) != 0) {
-        LOG_NVME_ERR("SGL alignment violation: addr=0x%lx len=%u\n", data_paddr, byte_count);
-        return -1;
-    }
+    /* SGL dword alignment is guaranteed by the blk virt (page-aligned buffers, page-sized transfers). */
+    assert(!state_ctx.sgl_requires_dword_align
+           || (((data_paddr | (uint64_t)byte_count) & NVME_SGL_DWORD_ALIGN_MASK) == 0));
 
     uint8_t id = NVME_SGL_ID(NVME_SGL_TYPE_DATA_BLOCK, NVME_SGL_SUBTYPE_ADDRESS);
 
