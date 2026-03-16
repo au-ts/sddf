@@ -117,18 +117,17 @@
         "zig-overlay": "zig-overlay"
       },
       "locked": {
-        "lastModified": 1773188563,
-        "narHash": "sha256-rIoi/joPD6Jpm84AnpHESjTvAMQUGamZP2ej5pFr15M=",
-        "ref": "refs/heads/sddf_pinctrl",
-        "rev": "1977e83776aae65e558505c9e95168aebe990b95",
-        "revCount": 779,
-        "type": "git",
-        "url": "file:///home/julia/ts/microkit_sdf_gen_pwm"
+        "lastModified": 1770792752,
+        "narHash": "sha256-7FwM1WXyXR9WJJOdUa68zL+VKRMkf1ok24bOZsTDgHg=",
+        "owner": "au-ts",
+        "repo": "microkit_sdf_gen",
+        "rev": "4508df1ff7b797eae363108655d9fe0673c7c79a",
+        "type": "github"
       },
       "original": {
         "owner": "au-ts",
-        "ref": "0.28.1",
         "repo": "microkit_sdf_gen",
+        "rev": "4508df1ff7b797eae363108655d9fe0673c7c79a",
         "type": "github"
       }
     },

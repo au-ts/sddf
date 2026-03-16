@@ -22,6 +22,8 @@
 
 __attribute__((__section__(".gpio_client_config"))) gpio_client_config_t gpio_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+
 
 static char t_client_main_stack[STACK_SIZE];
 

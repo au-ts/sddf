@@ -18,6 +18,7 @@ class Board:
     blk: Optional[str] = None
     pinctrl: str = None
     baud_rate: Optional[int] = None
+    gpio: Optional[str] = None
 
 
 # Keep this list in alphabetical order by board name
@@ -77,6 +78,7 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
         blk="soc@0/bus@30800000/mmc@30b40000",
         pinctrl="soc@0/bus@30000000/iomuxc@30330000",
+        gpio="soc@0/bus@30000000/gpio@30200000",
         partition=2,
     ),
     Board(

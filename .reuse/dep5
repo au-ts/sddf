@@ -45,6 +45,7 @@ Files:
     drivers/gpio/imx/config.json
     drivers/timer/rk3568/config.json
     drivers/pinctrl/imx/config.json
+    drivers/gpio/imx/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 

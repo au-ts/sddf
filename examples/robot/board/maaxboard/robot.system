@@ -1,55 +1,115 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="gpio@30220000/drivers/gpio/imx/regs" size="0x10000" phys_addr="0x30220000" />
+    <memory_region name="pwm1" size="0x10000" phys_addr="0x30660000" />
+    <memory_region name="pwm2" size="0x10000" phys_addr="0x30670000" />
+    <memory_region name="pwm3" size="0x10000" phys_addr="0x30680000" />
+    <memory_region name="pwm4" size="0x10000" phys_addr="0x30690000" />
+    <memory_region name="clk_ccm" size="0xd000" phys_addr="0x30380000" />
+    <memory_region name="clk_ccm_analog" size="0x1000" phys_addr="0x30360000" />
+    <memory_region name="serial@30860000/drivers/serial/imx/regs" size="0x1000" phys_addr="0x30860000" />
+    <memory_region name="serial@30860000/serial/queue/serial_driver/serial_virt_tx" size="0x1000" />
+    <memory_region name="serial@30860000/serial/data/serial_driver/serial_virt_tx" size="0x20000" />
+    <memory_region name="serial@30860000/serial/queue/serial_virt_tx/client" size="0x1000" />
+    <memory_region name="serial@30860000/serial/data/serial_virt_tx/client" size="0x10000" />
+    <memory_region name="iomuxc@30330000/drivers/pinctrl/imx/regs" size="0x10000" phys_addr="0x30330000" />
+    <memory_region name="gpio@30200000/drivers/gpio/imx/regs" size="0x10000" phys_addr="0x30200000" />
     <memory_region name="timer@302d0000/drivers/timer/imx/regs" size="0x10000" phys_addr="0x302d0000" />
-    <protection_domain name="timer" priority="254" passive="true">
+    <protection_domain name="timer" priority="253" passive="true">
         <program_image path="timer_driver.elf" />
         <map mr="timer@302d0000/drivers/timer/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
         <irq irq="87" id="0" trigger="level" />
     </protection_domain>
     <protection_domain name="client" priority="2">
         <program_image path="client.elf" />
+        <map mr="serial@30860000/serial/queue/serial_virt_tx/client" vaddr="0x20000000" perms="rw" />
+        <map mr="serial@30860000/serial/data/serial_virt_tx/client" vaddr="0x20001000" perms="rw" />
     </protection_domain>
-    <protection_domain name="gpio_driver" priority="254" passive="true">
+    <protection_domain name="gpio_driver" priority="253" passive="true">
         <program_image path="gpio_driver.elf" />
-        <map mr="gpio@30220000/drivers/gpio/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
-        <irq irq="100" id="60" trigger="level" />
-        <irq irq="101" id="61" trigger="level" />
+        <map mr="gpio@30200000/drivers/gpio/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
+        <irq irq="96" id="60" trigger="level" />
+        <irq irq="97" id="61" trigger="level" />
+    </protection_domain>
+    <protection_domain name="serial_driver" priority="200">
+        <program_image path="serial_driver.elf" />
+        <map mr="serial@30860000/drivers/serial/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
+        <map mr="serial@30860000/serial/queue/serial_driver/serial_virt_tx" vaddr="0x20001000" perms="rw" />
+        <map mr="serial@30860000/serial/data/serial_driver/serial_virt_tx" vaddr="0x20002000" perms="rw" />
+        <irq irq="58" id="0" trigger="level" />
+    </protection_domain>
+    <protection_domain name="serial_virt_tx" priority="199" stack_size="0x2000">
+        <program_image path="serial_virt_tx.elf" />
+        <map mr="serial@30860000/serial/queue/serial_driver/serial_virt_tx" vaddr="0x20000000" perms="rw" />
+        <map mr="serial@30860000/serial/data/serial_driver/serial_virt_tx" vaddr="0x20001000" perms="rw" />
+        <map mr="serial@30860000/serial/queue/serial_virt_tx/client" vaddr="0x20021000" perms="rw" />
+        <map mr="serial@30860000/serial/data/serial_virt_tx/client" vaddr="0x20022000" perms="rw" />
+    </protection_domain>
+    <protection_domain name="pinctrl_driver" priority="254" passive="true">
+        <program_image path="pinctrl_driver.elf" />
+        <map mr="iomuxc@30330000/drivers/pinctrl/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
+    </protection_domain>
+    <protection_domain name="clk_driver" priority="150" passive="true">
+        <program_image path="clk_driver.elf" />
+        <map mr="clk_ccm" vaddr="0x3200000" perms="rw" cached="false" />
+        <map mr="clk_ccm_analog" vaddr="0x3300000" perms="rw" cached="false" />
+    </protection_domain>
+    <protection_domain name="pwm_driver" priority="100">
+        <program_image path="pwm_driver.elf" />
+        <map mr="pwm1" vaddr="0x30000000" perms="rw" cached="false" />
+        <map mr="pwm2" vaddr="0x30010000" perms="rw" cached="false" />
+        <map mr="pwm3" vaddr="0x30020000" perms="rw" cached="false" />
+        <map mr="pwm4" vaddr="0x30030000" perms="rw" cached="false" />
     </protection_domain>
     <channel>
-        <end pd="gpio_driver" id="0" />
+        <end pd="clk_driver" id="0" />
+        <end pd="pwm_driver" id="0" pp="true" />
+    </channel>
+    <channel>
+        <end pd="pwm_driver" id="1" notify="false" />
         <end pd="client" id="0" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="1" />
-        <end pd="client" id="1" notify="false" pp="true" />
+        <end pd="serial_driver" id="1" />
+        <end pd="serial_virt_tx" id="0" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="2" />
+        <end pd="serial_virt_tx" id="1" />
+        <end pd="client" id="1" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="0" />
         <end pd="client" id="2" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="3" />
+        <end pd="gpio_driver" id="1" />
         <end pd="client" id="3" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="4" />
+        <end pd="gpio_driver" id="2" />
         <end pd="client" id="4" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="5" />
+        <end pd="gpio_driver" id="3" />
         <end pd="client" id="5" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="6" />
+        <end pd="gpio_driver" id="4" />
         <end pd="client" id="6" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="7" />
+        <end pd="gpio_driver" id="5" />
         <end pd="client" id="7" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="timer" id="1" />
+        <end pd="gpio_driver" id="6" />
         <end pd="client" id="8" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="7" />
+        <end pd="client" id="9" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="10" notify="false" pp="true" />
     </channel>
 </system>

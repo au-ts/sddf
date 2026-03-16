@@ -42,6 +42,11 @@ from board import BOARDS
 assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+IrqConventional = SystemDescription.IrqConventional
+Channel = SystemDescription.Channel
+Map = SystemDescription.Map
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = None
@@ -58,7 +63,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Ensure the priority is exclusively the highest as the pinctrl driver must run first!
     # This is enforced by sdfgen at the render() step.
     pinctrl_driver = ProtectionDomain(
-        "pinctrl_driver", "pinctrl_driver.elf", priority=253
+        "pinctrl_driver", "pinctrl_driver.elf", priority=254
     )
     pinctrl_node = dtb.node(board.pinctrl)
     assert pinctrl_node is not None
@@ -66,8 +71,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=100)
 
-    timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254, passive=True)
-    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254, passive=True)
+    timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=253, passive=True)
+    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=253, passive=True)
     # telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
     # client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
     client = ProtectionDomain("client", "client.elf", priority=2)

@@ -16,7 +16,7 @@
 #include <sddf/gpio/client.h>
 #include <sddf/gpio/config.h>
 #include <sddf/gpio/protocol.h>
-
+#include <sddf/serial/config.h>
 
 #include "include/gpio_common/gpio_common.h"
 #include "include/motor/motor_control.h"

@@ -48,9 +48,6 @@ typedef enum {
 #define GPIO_VALUE_SHIFT 10
 #define GPIO_VALUE_WIDTH 10
 
-#define GPIO_ENCODE_VALUE(val) (((val) & BIT_MASK(GPIO_VALUE_WIDTH)) << GPIO_VALUE_SHIFT)
-#define GPIO_DECODE_VALUE(label) (((label) >> GPIO_VALUE_SHIFT) & BIT_MASK(GPIO_VALUE_WIDTH))
-
 /**
  * Encode a raw 10-bit value into bits [19:10] of a label.
  */

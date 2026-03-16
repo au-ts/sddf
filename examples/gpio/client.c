@@ -32,7 +32,7 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-int gpio_irqs_recieved = 0;
+int gpio_irqs_received = 0;
 
 void client_main(void)
 {
@@ -46,171 +46,171 @@ void client_main(void)
         assert(false);
     }
 
-    // LOG_CLIENT("Setting direction of GPIO2 to input!\n");
-    // ret = sddf_gpio_direction_input(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set direction to input. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting direction of GPIO2 to input!\n");
+    ret = sddf_gpio_direction_input(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set direction to input. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Checking (GPIO1's output == GPIO2's input)!\n");
-    // ret = sddf_gpio_get(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", ret);
-    //     assert(false);
-    // } else if (ret == 1) {
-    //     LOG_CLIENT_ERR("Failed because GPIO2's input is reading value 1!\n");
-    //     assert(false);
-    // }
+    LOG_CLIENT("Checking (GPIO1's output == GPIO2's input)!\n");
+    ret = sddf_gpio_get(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", ret);
+        assert(false);
+    } else if (ret == 1) {
+        LOG_CLIENT_ERR("Failed because GPIO2's input is reading value 1!\n");
+        assert(false);
+    }
 
     LOG_CLIENT("Setting value of GPIO1 to 1!\n");
+    ret = sddf_gpio_set(gpio_channel_1_output, 1);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
+        assert(false);
+    }
+
+    LOG_CLIENT("Checking (GPIO1's output == GPIO2's input)!\n");
+    ret = sddf_gpio_get(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", ret);
+        assert(false);
+    } else if (ret == 0) {
+        LOG_CLIENT_ERR("Failed because GPIO2's input is reading value 0!\n");
+        assert(false);
+    }
+
+    LOG_CLIENT("Now we will test IRQ functionality!\n");
+
+    LOG_CLIENT("Setting type of IRQ of GPIO2 to falling edge!\n");
+    ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_EDGE_FALLING);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
+        assert(false);
+    }
+
+    LOG_CLIENT("Enabling IRQ functionality for GPIO2!\n");
+    ret = sddf_gpio_irq_enable(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
+        assert(false);
+    }
+
+    // To actually test an IRQ was received from a GPIO we set a timeout so that we can check if we got an IRQ
+    // from the GPIO driver within a reasonable amount of time.
+    LOG_CLIENT("Setting a timeout for 1 second!\n");
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
+
+    LOG_CLIENT("Setting value of GPIO1 to 0!\n");
     ret = sddf_gpio_set(gpio_channel_1_output, 0);
     if (ret < 0) {
         LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
         assert(false);
     }
 
-    // LOG_CLIENT("Checking (GPIO1's output == GPIO2's input)!\n");
-    // ret = sddf_gpio_get(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", ret);
-    //     assert(false);
-    // } else if (ret == 0) {
-    //     LOG_CLIENT_ERR("Failed because GPIO2's input is reading value 0!\n");
-    //     assert(false);
-    // }
+    LOG_CLIENT("Main coroutine paused!\n");
+    co_switch(t_event);
+    LOG_CLIENT("Main coroutine resumed!\n");
 
-    // LOG_CLIENT("Now we will test IRQ functionality!\n");
+    LOG_CLIENT("Checking we received irq from GPIO2!\n");
+    if (gpio_irqs_received != 1) {
+        LOG_CLIENT_ERR("We received wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_received);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Setting type of IRQ of GPIO2 to falling edge!\n");
-    // ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_EDGE_FALLING);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting type of IRQ of GPIO2 to rising edge!\n");
+    ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_EDGE_RISING);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Enabling IRQ functionality for GPIO2!\n");
-    // ret = sddf_gpio_irq_enable(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Re-enabling IRQ functionality for GPIO2!\n");
+    ret = sddf_gpio_irq_enable(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // // To actually test an IRQ was recieved from a GPIO we set a timeout so that we can check if we got an IRQ
-    // // from the GPIO driver within a reasonable amount of time.
-    // LOG_CLIENT("Setting a timeout for 1 second!\n");
-    // sddf_timer_set_timeout(timer_channel, NS_IN_S);
+    LOG_CLIENT("Setting a timeout for 1 second!\n");
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
 
-    // LOG_CLIENT("Setting value of GPIO1 to 0!\n");
-    // ret = sddf_gpio_set(gpio_channel_1_output, 0);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting value of GPIO1 to 1!\n");
+    ret = sddf_gpio_set(gpio_channel_1_output, 1);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Main coroutine paused!\n");
-    // co_switch(t_event);
-    // LOG_CLIENT("Main coroutine resumed!\n");
+    LOG_CLIENT("Main coroutine paused!\n");
+    co_switch(t_event);
+    LOG_CLIENT("Main coroutine resumed!\n");
 
-    // LOG_CLIENT("Checking we recieved irq from GPIO2!\n");
-    // if (gpio_irqs_recieved != 1) {
-    //     LOG_CLIENT_ERR("We recieved wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_recieved);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Checking we received irq from GPIO2!\n");
+    if (gpio_irqs_received != 2) {
+        LOG_CLIENT_ERR("We received wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_received);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Setting type of IRQ of GPIO2 to rising edge!\n");
-    // ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_EDGE_RISING);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Re-enabling IRQ functionality for GPIO2!\n");
+    ret = sddf_gpio_irq_enable(gpio_channel_2_input);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Re-enabling IRQ functionality for GPIO2!\n");
-    // ret = sddf_gpio_irq_enable(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting a timeout for 1 second!\n");
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
 
-    // LOG_CLIENT("Setting a timeout for 1 second!\n");
-    // sddf_timer_set_timeout(timer_channel, NS_IN_S);
+    LOG_CLIENT("Setting value of GPIO1 to 0!\n");
+    ret = sddf_gpio_set(gpio_channel_1_output, 0);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Setting value of GPIO1 to 1!\n");
-    // ret = sddf_gpio_set(gpio_channel_1_output, 1);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Main coroutine paused!\n");
+    co_switch(t_event);
+    LOG_CLIENT("Main coroutine resumed!\n");
 
-    // LOG_CLIENT("Main coroutine paused!\n");
-    // co_switch(t_event);
-    // LOG_CLIENT("Main coroutine resumed!\n");
+    LOG_CLIENT("Checking we DIDN'T recieve irq from GPIO2!\n");
+    if (gpio_irqs_received != 2) {
+        LOG_CLIENT_ERR("We received wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_received);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Checking we recieved irq from GPIO2!\n");
-    // if (gpio_irqs_recieved != 2) {
-    //     LOG_CLIENT_ERR("We recieved wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_recieved);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting type of IRQ of GPIO2 to high level!\n");
+    ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_LEVEL_HIGH);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Re-enabling IRQ functionality for GPIO2!\n");
-    // ret = sddf_gpio_irq_enable(gpio_channel_2_input);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting a timeout for 1 second!\n");
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
 
-    // LOG_CLIENT("Setting a timeout for 1 second!\n");
-    // sddf_timer_set_timeout(timer_channel, NS_IN_S);
+    LOG_CLIENT("Checking we havent received any irq's from GPIO2!\n");
+    if (gpio_irqs_received != 2) {
+        LOG_CLIENT_ERR("We received wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_received);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Setting value of GPIO1 to 0!\n");
-    // ret = sddf_gpio_set(gpio_channel_1_output, 0);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Setting value of GPIO1 to 1!\n");
+    ret = sddf_gpio_set(gpio_channel_1_output, 1);
+    if (ret < 0) {
+        LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
+        assert(false);
+    }
 
-    // LOG_CLIENT("Main coroutine paused!\n");
-    // co_switch(t_event);
-    // LOG_CLIENT("Main coroutine resumed!\n");
+    LOG_CLIENT("Main coroutine paused!\n");
+    co_switch(t_event);
+    LOG_CLIENT("Main coroutine resumed!\n");
 
-    // LOG_CLIENT("Checking we DIDN'T recieve irq from GPIO2!\n");
-    // if (gpio_irqs_recieved != 2) {
-    //     LOG_CLIENT_ERR("We recieved wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_recieved);
-    //     assert(false);
-    // }
-
-    // LOG_CLIENT("Setting type of IRQ of GPIO2 to high level!\n");
-    // ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_LEVEL_HIGH);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
-
-    // LOG_CLIENT("Setting a timeout for 1 second!\n");
-    // sddf_timer_set_timeout(timer_channel, NS_IN_S);
-
-    // LOG_CLIENT("Checking we havent recieved any irq's from GPIO2!\n");
-    // if (gpio_irqs_recieved != 2) {
-    //     LOG_CLIENT_ERR("We recieved wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_recieved);
-    //     assert(false);
-    // }
-
-    // LOG_CLIENT("Setting value of GPIO1 to 1!\n");
-    // ret = sddf_gpio_set(gpio_channel_1_output, 1);
-    // if (ret < 0) {
-    //     LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
-    //     assert(false);
-    // }
-
-    // LOG_CLIENT("Main coroutine paused!\n");
-    // co_switch(t_event);
-    // LOG_CLIENT("Main coroutine resumed!\n");
-
-    // LOG_CLIENT("Checking we recieved irq from GPIO2!\n\n");
-    // if (gpio_irqs_recieved != 3) {
-    //     LOG_CLIENT_ERR("We recieved wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_recieved);
-    //     assert(false);
-    // }
+    LOG_CLIENT("Checking we received irq from GPIO2!\n\n");
+    if (gpio_irqs_received != 3) {
+        LOG_CLIENT_ERR("We received wrong amount of IRQs from GPIO2. Amount : %d!\n", gpio_irqs_received);
+        assert(false);
+    }
 
     LOG_CLIENT("IF YOU GOT THIS FAR EVERYTHING WENT SMOOTHLY!!!\n");
 
@@ -241,11 +241,11 @@ void init(void)
 void notified(microkit_channel ch)
 {
     if (ch == gpio_channel_1_output) {
-        LOG_CLIENT_ERR("We should not of received IRQ from this gpio channel! (channel : %d)\n", ch);
+        LOG_CLIENT_ERR("We should not have received IRQ from this gpio channel! (channel : %d)\n", ch);
         assert(false);
     } else if (ch == gpio_channel_2_input) {
         LOG_CLIENT("Got an interrupt from GPIO driver!\n");
-        gpio_irqs_recieved++;
+        gpio_irqs_received++;
     } else if (ch == timer_channel) {
         LOG_CLIENT("Got an interrupt from timer driver!\n");
         co_switch(t_main);
