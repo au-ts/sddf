@@ -58,7 +58,7 @@ jobs:
 
   build_linux_x86_64_nix:
     name: Build (Linux x86-64 Nix)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
