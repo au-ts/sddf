@@ -96,17 +96,6 @@ uint64_t get_time_now() {
     return sddf_timer_time_now(timer_channel);
 }
 
-// send motor control request for micro_s micorseconds
-void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
-    LOG_CLIENT("Sending motor request\n");
-
-    microkit_msginfo new_msg = microkit_msginfo_new(0, 2);
-    microkit_mr_set(0, command);
-    microkit_mr_set(1, micro_s);
-
-    microkit_ppcall(motor_ch, new_msg);
-}
-
 // returns distance in cm
 
 void client_main(void) {
@@ -116,48 +105,51 @@ void client_main(void) {
     // time_start = sddf_timer_time_now(timer_channel);
     // digital_write(gpio_channel_echo_a, GPIO_LOW);
 
+    control_forward();
+
     while(true)
     {
-        delay_miliseconds(10, CLIENT_TIMEOUT_ID);
-        control_stop();
-        // control_forward(1000);
 
-        // LOG_CLIENT("Client main\n");
+        // delay_miliseconds(10, CLIENT_TIMEOUT_ID);
+        // control_stop();
+        // // control_forward(1000);
 
-        uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
-        // uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
-        // uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
+        // // LOG_CLIENT("Client main\n");
 
+        // uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
+        // // uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
+        // // uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
+
+        // // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
         // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
-        LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
-        // LOG_CLIENT("dist sensor c: %d", dist_sensor_c);
+        // // LOG_CLIENT("dist sensor c: %d", dist_sensor_c);
         
-        if (dist_sensor_a > 15) {
-            LOG_CLIENT("attempting drive\n");
-            control_forward(1000);
-            LOG_CLIENT("returned from drive\n");
-        }
-
-        // NOTE: a is front, b is right, c is left
-        // if (dist_sensor_a < 5) {
-        //     control_stop();
-        //     // move left/right depending on where bot is located
-        //     if (dist_sensor_b > dist_sensor_a) {
-        //         control_right(1000);
-        //     }
-        //     else {
-        //         control_left(1000);
-        //     }
-        // }
-        // else if (dist_sensor_b < 5) {
-        //     control_left(1000);
-        // }
-        // else if (dist_sensor_c < 5) {
-        //     control_right(1000);
-        // }
-        // else {
+        // if (dist_sensor_a > 15) {
+        //     LOG_CLIENT("attempting drive\n");
         //     control_forward(1000);
+        //     LOG_CLIENT("returned from drive\n");
         // }
+
+        // // NOTE: a is front, b is right, c is left
+        // // if (dist_sensor_a < 5) {
+        // //     control_stop();
+        // //     // move left/right depending on where bot is located
+        // //     if (dist_sensor_b > dist_sensor_a) {
+        // //         control_right(1000);
+        // //     }
+        // //     else {
+        // //         control_left(1000);
+        // //     }
+        // // }
+        // // else if (dist_sensor_b < 5) {
+        // //     control_left(1000);
+        // // }
+        // // else if (dist_sensor_c < 5) {
+        // //     control_right(1000);
+        // // }
+        // // else {
+        // //     control_forward(1000);
+        // // }
     }
 }
 
@@ -179,29 +171,6 @@ void notified(sddf_channel ch) {
             // LOG_CLIENT("client timeout\n");
             co_switch(t_main);
         }
-        else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
-            LOG_CLIENT("motor timeout\n");
-            handle_motor_control_timeout();
-            co_switch(t_main);
-        }
-        else if (timeout_id == gpio_channel_motor_a) {
-            int should_switch = handle_pwm_timeout(gpio_channel_motor_a);
-
-            if (should_switch) {
-                LOG_CLIENT("pwm timeout\n");
-                // co_switch(t_main);
-            }
-            // LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
-        }
-        else if (timeout_id == gpio_channel_motor_b) {
-            int should_switch = handle_pwm_timeout(gpio_channel_motor_b);
-
-            if (should_switch) {
-                LOG_CLIENT("pwm timeout\n");
-                // co_switch(t_main);
-            }
-            // LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
-        }
     }
     else {
         LOG_CLIENT("Unexpected channel call\n");
@@ -211,6 +180,7 @@ void notified(sddf_channel ch) {
 void init(void) {
     timer_channel = timer_config.driver_id;
 
+    // TODO: these arent used anymore as we now have a PWM driver, remove these
     // Motor GPIO channels
     gpio_channel_motor_a = gpio_config.driver_channel_ids[0];
     gpio_channel_motor_b = gpio_config.driver_channel_ids[1];
@@ -232,8 +202,6 @@ void init(void) {
     sensor_init(gpio_channel_echo_b, gpio_channel_trigger_b);
     sensor_init(gpio_channel_echo_c, gpio_channel_trigger_c);
 
-
-    motors_init();
 
     // client_main();
     LOG_CLIENT("Init\n");

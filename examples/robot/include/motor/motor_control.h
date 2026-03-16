@@ -10,6 +10,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
+#include <sddf/pwm/client.h>
 
 #define CONTROL_STOP (0)
 #define CONTROL_FORWARD (1)
@@ -31,6 +34,9 @@
 #define PWM_TIME_HIGH 1
 #define PWM_TIME_LOW 2
 
+// In microseconds
+#define PWM_MOTOR_PERIOD 20000
+
 // Time Spent (microseconds) on HIGH/LOW for Motor Control PWM Signals
 // Control, Time HIGH, Time LOW
 static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPING_ROWS] = {
@@ -39,14 +45,10 @@ static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPIN
     {CONTROL_NEUTRAL, 1500, 18500},
 };
 
-void control_forward(uint64_t miliseconds);
-void control_reverse(uint64_t miliseconds);
-void control_neutral(uint64_t miliseconds);
-void control_left(uint64_t miliseconds);
-void control_right(uint64_t miliseconds);
+void control_forward();
+void control_reverse();
+void control_neutral();
+void control_left();
+void control_right();
 void control_stop();
-
-void handle_motor_control_timeout();
-int handle_pwm_timeout(int gpio_ch);
-void motors_init();
 

@@ -31,186 +31,68 @@
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
 
+#define CH_PWM_CONTROL_PPC 0
 
-// Motor/PWM States
-int pwm_a_state = PAUSE_LOW;
-int pwm_b_state = PAUSE_LOW;
+// Motors A and B channels
+/* We use PWM2 (channel 1) which is connected to IO_GPIO13 by our pinctrl driver */
+#define PWM_CHANNEL_MOTOR_A 1
+
+/* We use PWM4 (channel 3) which is connected to IO_GPIO15 by our pinctrl driver */
+#define PWM_CHANNEL_MOTOR_B 3
 
 int motor_a_state = CONTROL_NEUTRAL;
 int motor_b_state = CONTROL_NEUTRAL;
 
-// State of Current Control
-int is_control_fulfilled = 0;
-uint64_t motor_control_end;
+// takes pulse width (microseconds), period (microseconds)
+void set_pwm(int pwm_ch, uint64_t pulse_width, uint64_t period) {
+    bool success;
+    success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, pwm_ch, period*NS_IN_US, pulse_width*NS_IN_US, /* flags */ 0);
 
-void set_pwm(int gpio_ch, uint64_t micro_s) {
-    digital_write(gpio_ch, GPIO_HIGH);
-    size_t time_ns = micro_s * NS_IN_US;
-
-    // TODO: refactor this
-    if (gpio_ch == gpio_channel_motor_a) {
-        pwm_a_state = PAUSE_HIGH;
-    }
-    else if (gpio_ch == gpio_channel_motor_b) {
-        pwm_b_state = PAUSE_HIGH;
-    }
-
-    enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
-    set_timeout(micro_s);
+    assert(success);
 }
 
-void control_forward(uint64_t miliseconds) {
-    is_control_fulfilled = 1;
-
+void control_forward() {
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_FORWARD;
 
-    set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
-    set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
-
-    // set timeout for motor control
-    motor_control_end = get_time_now() + (miliseconds * NS_IN_MS);
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+    set_pwm(PWM_CHANNEL_MOTOR_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
+    set_pwm(PWM_CHANNEL_MOTOR_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
 }
 
-// TODO complete these
-void control_reverse(uint64_t miliseconds) {
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
-
-    is_control_fulfilled = 1;
-
+void control_reverse() {
     motor_a_state = CONTROL_REVERSE;
     motor_b_state = CONTROL_REVERSE;
 
-    set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
-    set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
+    set_pwm(PWM_CHANNEL_MOTOR_A, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
+    set_pwm(PWM_CHANNEL_MOTOR_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
 }
 
-
-void control_neutral(uint64_t miliseconds) {
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
-
-    is_control_fulfilled = 1;
-
+void control_neutral() {
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_NEUTRAL;
 
-    set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
-    set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+    set_pwm(PWM_CHANNEL_MOTOR_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
+    set_pwm(PWM_CHANNEL_MOTOR_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
 }
 
-void control_left(uint64_t miliseconds) {
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
-
-    is_control_fulfilled = 1;
-
+void control_left() {
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_FORWARD;
 
-    set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
-    set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
+    set_pwm(PWM_CHANNEL_MOTOR_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
+    set_pwm(PWM_CHANNEL_MOTOR_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
 }
 
-void control_right(uint64_t miliseconds) {
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
-
-    is_control_fulfilled = 1;
-
+void control_right() {
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_NEUTRAL;
 
-    set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
-    set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+    set_pwm(PWM_CHANNEL_MOTOR_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
+    set_pwm(PWM_CHANNEL_MOTOR_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH], PWM_MOTOR_PERIOD);
 }
 
 void control_stop() {
-    digital_write(gpio_channel_motor_a, GPIO_LOW);
-    digital_write(gpio_channel_motor_b, GPIO_LOW);
+    /* disable PWM */
+    set_pwm(PWM_CHANNEL_MOTOR_A, 0, 0);
+    set_pwm(PWM_CHANNEL_MOTOR_B, 0, 0);
 }
-
-// handle current motor command timeout, update control states
-void handle_motor_control_timeout() {
-    is_control_fulfilled = 0;
-    
-    // Stop motors immediately
-    control_stop();
-
-    // Reset PWM states so any queued timeouts won't restart PWM
-    pwm_a_state = PAUSE_LOW;
-    pwm_b_state = PAUSE_LOW;
-}
-
-// upon pwm timeout, send next gpio signal
-int handle_pwm_timeout(int gpio_ch) {
-    // LOG_CONTROL("is control fulfilled in timeout %d\n", is_control_fulfilled);
-
-    // current request is invalid
-    // TODO: think we can remove this and is_control_fulfilled
-    if (!is_control_fulfilled) {
-        // LOG_CONTROL("control timeout\n");
-        control_stop();
-        return 1;
-    }
-
-    // TODO: refactor this
-    if (gpio_ch == gpio_channel_motor_a) {
-        // LOG_CONTROL("handling motor A pwm\n");
-        if (pwm_a_state == PAUSE_HIGH) {
-            size_t time_ns = pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]*NS_IN_US;
-
-            if (get_time_now() + time_ns >= motor_control_end) {
-                return 1;
-            }
-
-            digital_write(gpio_ch, GPIO_LOW);
-            enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
-            set_timeout(pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]);
-            pwm_a_state = PAUSE_LOW;
-        }
-        else {
-            size_t time_ns = pwm_delay_mappings[motor_a_state - 1][PWM_TIME_HIGH]*NS_IN_US;
-
-            if (get_time_now() + time_ns >= motor_control_end) {
-                return 1;
-            }
-
-            set_pwm(gpio_ch, pwm_delay_mappings[motor_a_state - 1][PWM_TIME_HIGH]);
-        }
-    }
-    else if (gpio_ch == gpio_channel_motor_b) {
-        if (pwm_b_state == PAUSE_HIGH) {
-    
-            size_t time_ns = pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]*NS_IN_US;
-
-            if (get_time_now() + time_ns >= motor_control_end) {
-                return 1;
-            }
-
-            digital_write(gpio_ch, GPIO_LOW);
-            enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
-            set_timeout(pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]);
-            pwm_b_state = PAUSE_LOW;
-        }
-        else {
-
-            size_t time_ns = pwm_delay_mappings[motor_b_state - 1][PWM_TIME_HIGH]*NS_IN_US;
-
-            if (get_time_now() + time_ns >= motor_control_end) {
-                return 1;
-            }
-
-            set_pwm(gpio_ch, pwm_delay_mappings[motor_b_state - 1][PWM_TIME_HIGH]);
-        }
-    }
-
-    return 0;
-}
-
-void motors_init(void) {
-    is_control_fulfilled = 0;
-
-    LOG_CONTROL("Init\n");
-    gpio_init(gpio_channel_motor_a, GPIO_DIRECTION_OUTPUT);
-    gpio_init(gpio_channel_motor_b, GPIO_DIRECTION_OUTPUT);
-}
-
