@@ -14,6 +14,9 @@ $(error MICROKIT_BOARD must be specified)
 endif
 
 export BUILD_DIR ?= build
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
+
 export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD ?= maaxboard
 export SDDF := $(abspath ../..)
