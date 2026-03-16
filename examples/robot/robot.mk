@@ -38,13 +38,17 @@ TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SDDF_CUSTOM_LIBC := 1
 CONFIGS_DIR   := $(ROBOT_TOP)/include/gpio_common
 CONFIG_HEADER := $(CONFIGS_DIR)/gpio_config.h
+PWM_DRIVER := $(SDDF)/drivers/pwm/${PWM_DRIV_DIR}
+PINCTRL_DRIVER := $(SDDF)/drivers/pinctrl/${PINCTRL_DRIV_DIR}
+CLK_DRIVER := $(SDDF)/drivers/clk/${CLK_DRIV_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 
 
 SDFGEN_OUT = ${ROBOT_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/robot.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf telemetry.elf
+IMAGES := pwm_driver.elf gpio_driver.elf timer_driver.elf client.elf telemetry.elf clk_driver.elf pinctrl_driver.elf  serial_virt_tx.elf serial_driver.elf 
 
 # Compiler flags
 CFLAGS += \
@@ -55,6 +59,9 @@ CFLAGS += \
           -I$(LIBCO) \
           -I${ROBOT_TOP} \
 		  -I$(CONFIGS_DIR)
+
+# HACK for Pinctrl
+ASFLAGS := -target aarch64-none-elf
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -109,6 +116,13 @@ endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/gpio_driver_device_resources.data gpio_driver.elf
 	$(OBJCOPY) --update-section .gpio_client_config=${SDFGEN_OUT}/gpio_client_client.data client.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
+	
+	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/pinctrl_driver_device_resources.data pinctrl_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=${SDFGEN_OUT}/serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=${SDFGEN_OUT}/serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=${SDFGEN_OUT}/serial_client_client.data client.elf
+
 	touch $@
 
 # Final image generation
@@ -130,3 +144,8 @@ include ${SDDF}/util/util.mk
 include ${LIBCO}/libco.mk
 include ${GPIO_DRIVER}/gpio_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
+include ${CLK_DRIVER}/clk_driver.mk
+include ${PWM_DRIVER}/pwm_driver.mk
+include ${SERIAL_DRIVER}/serial_driver.mk
+include ${PINCTRL_DRIVER}/pinctrl_driver.mk
+include ${SDDF}/serial/components/serial_components.mk
