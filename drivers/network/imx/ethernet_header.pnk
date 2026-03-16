@@ -88,6 +88,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern field ndescr_addr: Int @/
 /@ extern field ndescr_len: Int @/
 /@ extern field net_removed: Set[Int] @/
+/@ extern field net_added: Set[Seq[Int]] @/
 
 /@ extern predicate valid_hardware_ring_rx_write @/
 /@ extern predicate valid_hardware_ring_rx_read @/
@@ -99,6 +100,9 @@ var 1 eth_reg = ETH_REG;
 /@ extern predicate valid_hardware_ring_tx_mdata_read @/
 /@ extern field hardware_ring_tx: IArray @/
 /@ extern field hardware_ring_rx: IArray @/
+/@ extern field hardware_ring_rx_old: IArray @/
+/@ extern field hardware_ring_rx_old_addr: Set[Int] @/
+/@ extern field hardware_ring_rx_old_len: Set[Int] @/
 /@ extern field tx_await_ack: Seq[Int] @/
 /@ extern field rx_await_ack: Seq[Int] @/
 /@ extern field rx_handled: Set[Int] @/
@@ -107,8 +111,10 @@ var 1 eth_reg = ETH_REG;
 /@ extern field hw_len: Int @/
 
 /@ extern function union_elem(s: Set[Int], t: Set[Int], e: Int): Bool @/
+/@ extern function union_elem_seq(s: Set[Seq[Int]], t: Set[Seq[Int]], e: Seq[Int]): Bool @/
 /@ extern function empty_set(): Set[Int] @/
 /@ extern function element_set(e: Int): Set[Int] @/
+/@ extern function element2_seq(e1: Int, e2: Int): Seq[Int] @/
 /@ extern function empty_seq(): Seq[Int] @/
 /@ extern function append_elem(s: Seq[Int], t: Seq[Int], e: Int): Bool @/
 /@ extern function is_RXD_EMPTY(value: Int): Bool @/
@@ -119,6 +125,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern function is_valid_data_len(value: Int): Bool @/
 /@ extern function is_valid_rx_stat(value: Int): Bool @/
 /@ extern function is_valid_tx_stat(value: Int): Bool @/
+/@ extern function assign_hardware_ring_rx_old(): Bool @/
 
 #define HW_RING_BASE         35651584
 #define HW_ETH_BASE   33554432

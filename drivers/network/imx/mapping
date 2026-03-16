@@ -16,6 +16,7 @@ set_eir Int
 rx_update_ring_slot Int
 wrap_hw_rx_capacity Bitvec
 rx_return Int
+rx_return_helper Int
 rx_provide Int
 handle_irq Int
 irq_get_set_eir Bitvec
@@ -33,3 +34,4 @@ rx_hw_ring_empty Int
 rx_hw_ring_full Int
 rx_provide_helper Int
 mod_capacity Bitvec
+and_RXD_EMPTY Bitvec
