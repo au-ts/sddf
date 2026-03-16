@@ -119,6 +119,8 @@ field hw_addr: Int
 field hw_stat: Int
 field hw_len: Int
 field hardware_ring_rx: IArray
+field hardware_ring_rx_old_addr: Set[Int]
+field hardware_ring_rx_old_len: Set[Int]
 field hardware_ring_tx: IArray
 field rx_await_ack: Seq[Int]
 field tx_await_ack: Seq[Int]
@@ -158,8 +160,8 @@ field tx_handled: Set[Int]
 predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_rx, 3/4) &&
-    forall i: Int :: { slot(gv.hardware_ring_rx, i) }
-        (i >= 0 && i < hw_capacity ==> 
+    forall i: Int ::
+        (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
             bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
             (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
@@ -173,7 +175,7 @@ predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
 
 predicate valid_hardware_ring_rx_mdata_read(heap: IArray, gv: Ref)
 {
-    acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && acc(gv.hw_rx_capacity, 1/100) &&
+    acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && bounded16(gv.hw_rx_head) && acc(gv.hw_rx_capacity, 1/100) &&
     0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
     gv.hw_rx_capacity == 256 &&
     valid_hardware_ring_rx_read(heap, gv) &&
@@ -189,7 +191,7 @@ predicate valid_hardware_ring_rx_mdata_read(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_rx, write) &&
-    forall i: Int :: { slot(gv.hardware_ring_rx, i) }
+    forall i: Int ::
         (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
             bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
@@ -205,7 +207,7 @@ predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
 
 predicate valid_hardware_ring_rx_mdata_write(heap: IArray, gv: Ref)
 {
-    acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && acc(gv.hw_rx_capacity, 1/100) &&
+    acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && bounded16(gv.hw_rx_head) && acc(gv.hw_rx_capacity, 1/100) &&
     0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
     gv.hw_rx_capacity == 256 &&
     valid_hardware_ring_rx_write(heap, gv) &&
@@ -252,7 +254,7 @@ predicate valid_hardware_ring_tx_mdata_read(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, write) &&
-    forall i: Int :: { slot(gv.hardware_ring_tx, i) }
+    forall i: Int ::
         (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
             bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
@@ -600,6 +602,11 @@ function f_union_elem(heap: IArray, gv: Ref, s: Set[Int], t: Set[Int], e: Int): 
     s == t union Set(e)
 }
 
+function f_union_elem_seq(heap: IArray, gv: Ref, s: Set[Seq[Int]], t: Set[Seq[Int]], e: Seq[Int]): Bool
+{
+    s == t union Set(e)
+}
+
 function f_append_elem(heap: IArray, gv: Ref, s: Seq[Int], t: Seq[Int], e: Int): Bool
 {
     s == t ++ Seq(e)
@@ -618,4 +625,69 @@ function f_empty_seq(heap: IArray, gv: Ref): Seq[Int]
 function f_element_set(heap: IArray, gv: Ref, e: Int): Set[Int]
 {
     Set(e)
+}
+
+function f_element2_seq(heap: IArray, gv: Ref, e1: Int, e2: Int): Seq[Int]
+{
+    Seq(e1, e2)
+}
+
+method f_ffiverif_store_rx_ring_old(heap: IArray, gv: Ref, a: Int, b: Int, c: Int, d: Int)
+    requires acc(gv.hardware_ring_rx, 1/2) && acc(gv.hardware_ring_rx_old_addr, write) && acc(gv.hardware_ring_rx_old_len, write)
+    requires forall i: Int ::
+        i >= 0 && i < hw_capacity ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+                acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/4) &&
+                acc(slot(gv.hardware_ring_rx, i).hw_len, 1/4))
+    ensures acc(gv.hardware_ring_rx, 1/2) && acc(gv.hardware_ring_rx_old_addr, write) && acc(gv.hardware_ring_rx_old_len, write)
+    ensures forall i: Int ::
+        i >= 0 && i < hw_capacity ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+                acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/4) &&
+                acc(slot(gv.hardware_ring_rx, i).hw_len, 1/4))
+    ensures forall i: Int ::
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            slot(gv.hardware_ring_rx, i).hw_addr in gv.hardware_ring_rx_old_addr &&
+            slot(gv.hardware_ring_rx, i).hw_len in gv.hardware_ring_rx_old_len
+    ensures forall x: Int :: x in gv.hardware_ring_rx_old_addr ==>
+        exists i: Int :: i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+            slot(gv.hardware_ring_rx, i).hw_addr == x
+    ensures forall x: Int :: x in gv.hardware_ring_rx_old_len ==>
+        exists i: Int :: i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+            slot(gv.hardware_ring_rx, i).hw_len == x
+{
+    var ix: Int := 0
+    gv.hardware_ring_rx_old_addr := Set[Int]()
+    gv.hardware_ring_rx_old_len := Set[Int]()
+    while (ix < 256)
+        invariant acc(gv.hardware_ring_rx, 1/2) && acc(gv.hardware_ring_rx_old_addr) && acc(gv.hardware_ring_rx_old_len)
+        invariant 0 <= ix
+        invariant forall i: Int ::
+            i >= 0 && i < hw_capacity ==>
+                acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/4) &&
+                (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+                    acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/4) &&
+                    acc(slot(gv.hardware_ring_rx, i).hw_len, 1/4))
+        invariant forall i: Int ::
+            i >= 0 && i < ix && i < 256 && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+                slot(gv.hardware_ring_rx, i).hw_addr in gv.hardware_ring_rx_old_addr &&
+                slot(gv.hardware_ring_rx, i).hw_len in gv.hardware_ring_rx_old_len
+        invariant forall x: Int :: x in gv.hardware_ring_rx_old_addr ==>
+            exists i: Int :: i >= 0 && i < ix && i < 256 && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                slot(gv.hardware_ring_rx, i).hw_addr == x
+        invariant forall x: Int :: x in gv.hardware_ring_rx_old_len ==>
+            exists i: Int :: i >= 0 && i < ix && i < 256 && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                slot(gv.hardware_ring_rx, i).hw_len == x
+    {
+        if (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, ix).hw_stat))
+        {
+            gv.hardware_ring_rx_old_addr := gv.hardware_ring_rx_old_addr
+                union Set(slot(gv.hardware_ring_rx, ix).hw_addr)
+            gv.hardware_ring_rx_old_len := gv.hardware_ring_rx_old_len
+                union Set(slot(gv.hardware_ring_rx, ix).hw_len)
+        }
+        ix := ix + 1
+    }
 }

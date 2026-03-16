@@ -94,7 +94,7 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
   /@ requires bounded64(queue_ptr + BUFFERS_OFFSET + capacity * NDESC_LEN) @/ // array access
   /@ requires queue_ptr == RX_ACTIVE_BASE ==>
        acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) &&
-       acc(gv.rx_active.net_descr, 1/2) &&
+       acc(gv.rx_active.net_descr, 1/2) && acc(gv.rx_active.net_added) &&
        acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_addr) &&
        acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_len) @/
   /@ requires queue_ptr == TX_FREE_BASE ==>
@@ -109,7 +109,7 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
   /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) @/
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==>
        acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) &&
-       acc(gv.rx_active.net_descr, 1/2) &&
+       acc(gv.rx_active.net_descr, 1/2) && acc(gv.rx_active.net_added) &&
        acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr) &&
        acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len) @/
   /@ ensures queue_ptr == TX_FREE_BASE ==>
@@ -125,6 +125,9 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==> slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len == len @/
   /@ ensures queue_ptr == TX_FREE_BASE ==> slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr == io_addr @/
   /@ ensures queue_ptr == TX_FREE_BASE ==> slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len == len @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> union_elem_seq(gv.rx_active.net_added, old(gv.rx_active.net_added), element2_seq(
+       slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr,
+       slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len)) @/
 
   /* capacity must be a power of 2 */
   var tail = 0;
