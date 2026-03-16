@@ -329,11 +329,13 @@ static void handle_request(void)
             LOG_NVME("Submitted FLUSH: cid=%u req_id=%u\n", cid, id);
             continue;
         } else if (code == BLK_REQ_BARRIER) {
-            err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            LOG_NVME_ERR("BARRIER is currently unsupported\n");
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_INVALID_PARAM, 0, id);
             assert(!err);
             notify_virt = true;
             continue;
         } else {
+            LOG_NVME_ERR("invalid request code: %u\n", code);
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_INVALID_PARAM, 0, id);
             assert(!err);
             notify_virt = true;
