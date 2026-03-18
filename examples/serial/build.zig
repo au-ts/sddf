@@ -23,6 +23,7 @@ const MicrokitBoard = enum {
     star64,
     x86_64_generic,
     zcu102,
+    kria_k26,
 };
 
 const Target = struct {
@@ -157,6 +158,16 @@ const targets = [_]Target{
         },
     },
     .{
+        .board = MicrokitBoard.kria_k26,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
         .board = MicrokitBoard.rpi4b_1gb,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
@@ -254,7 +265,7 @@ pub fn build(b: *std.Build) !void {
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .rock3b, .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire, .hifive_p550, .serengeti => "ns16550a",
-        .zcu102 => "zynqmp",
+        .zcu102, .kria_k26 => "zynqmp",
         .x86_64_generic => "pc99",
     };
 
