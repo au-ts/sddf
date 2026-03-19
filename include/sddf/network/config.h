@@ -71,7 +71,8 @@ typedef struct net_virt_rx_config {
 typedef struct net_copy_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t virt_rx;
-    region_resource_t device_data;
+    //region_resource_t device_data; // TODO: copier can copy from different clients and virt, need to have multiple regions
+    region_resource_t out_data[SDDF_NET_MAX_CLIENTS];
 
     net_connection_resource_t client;
     region_resource_t client_data;
