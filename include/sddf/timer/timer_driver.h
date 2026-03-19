@@ -7,18 +7,33 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <sddf/timer/protocol.h>
+#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
+
+// #define DEBUG_TIMER_DRIVER
+#ifdef DEBUG_TIMER_DRIVER
+#define LOG_TIMER_DRIVER(...) do{ sddf_dprintf("TIMER DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_TIMER_DRIVER(...) do{}while(0)
+#endif
+
+#define LOG_TIMER_DRIVER_ERR(...) do{ sddf_dprintf("TIMER DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 // Includes for timer drivers; implementing a priority heap array
 // and structs for support of an arbitrary number of timeouts.
 #define SDDF_TIMER_MAX_TIMEOUTS (128)
 
-// Time-conversion abstraction. Each platform should generate an appropriate
-// instance of this struct for time conversion.
-typedef struct timeconv_config {
-    uint64_t clk_freq_mhz;
+// Mult-shift cache
+typedef struct ms_cache_entry {
+    sddf_timer_freq_hz_t f_a;
+    sddf_timer_freq_hz_t f_b;
     uint64_t mult;
     uint64_t shift;
-} timeconv_config_t;
+} ms_cache_entry_t;
+
+uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
+uint64_t ns_to_tick(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
 
 // Representing one timeout operation in the queue.
 typedef struct timeout {

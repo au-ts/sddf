@@ -12,13 +12,6 @@
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-#timer_driver.elf: timer/timer.o
-#	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-
-#timer/timer.o: ${TIMER_DIR}/timer.c  ${CHECK_FLAGS_BOARD_MD5} $(SDDF_LIBC_INCLUDE)|timer
-#	${CC} ${CFLAGS} -o $@ -c $<
-
-
 timer_driver.elf: timer/timer_driver.o timer/timer_common.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
