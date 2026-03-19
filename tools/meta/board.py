@@ -78,7 +78,7 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
         blk="soc@0/bus@30800000/mmc@30b40000",
         pinctrl="soc@0/bus@30000000/iomuxc@30330000",
-        gpio="soc@0/bus@30000000/gpio@30200000",
+        gpio="soc@0/bus@30000000/gpio@30220000",
         partition=2,
     ),
     Board(
