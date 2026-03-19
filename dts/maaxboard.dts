@@ -442,6 +442,10 @@
 				interrupt-controller;
 				#interrupt-cells = <0x02>;
 				gpio-ranges = <0x11 0x00 0x57 0x20>;
+				pinctrl-names = "default";
+				// gpio3myiomux
+				pinctrl-0 = <0x73>;
+				status="okay";
 			};
 
 			gpio@30240000 {
@@ -545,6 +549,11 @@
 					gpio_ledsgrp {
 						fsl,pins = <0x3c 0x2a4 0x00 0x00 0x00 0x19 0x48 0x2b0 0x00 0x00 0x00 0x19>;
 						phandle = <0x53>;
+					};
+
+					gpio3myiomux {
+						fsl,pins = <0x130 0x398 0x000 0x5 0x00 0x49>;
+						phandle =  <0x73>;
 					};
 
 					gpio_keysgrp {

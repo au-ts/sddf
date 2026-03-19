@@ -105,15 +105,17 @@ void client_main(void) {
     // time_start = sddf_timer_time_now(timer_channel);
     // digital_write(gpio_channel_echo_a, GPIO_LOW);
 
-    control_forward();
+    // control_forward();
+
+    digital_write(gpio_channel_echo_a, GPIO_HIGH);
 
     while(true)
     {
+        digital_write(gpio_channel_echo_a, GPIO_HIGH);
+        for (volatile int i = 0; i < 1000000; i++) {};
+        digital_write(gpio_channel_echo_a, GPIO_LOW);
 
-        // delay_miliseconds(10, CLIENT_TIMEOUT_ID);
-        // control_stop();
         // // control_forward(1000);
-
         // // LOG_CLIENT("Client main\n");
 
         // uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
@@ -126,13 +128,16 @@ void client_main(void) {
         
         // if (dist_sensor_a > 15) {
         //     LOG_CLIENT("attempting drive\n");
-        //     control_forward(1000);
+        //     control_forward();
         //     LOG_CLIENT("returned from drive\n");
+        // }
+        // else {
+        //     control_stop();
         // }
 
         // // NOTE: a is front, b is right, c is left
         // // if (dist_sensor_a < 5) {
-        // //     control_stop();
+        // //     control_stop(); 
         // //     // move left/right depending on where bot is located
         // //     if (dist_sensor_b > dist_sensor_a) {
         // //         control_right(1000);
