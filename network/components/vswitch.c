@@ -18,7 +18,7 @@
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
-    /* Rx/Tx swapped for the virtualizer */ // TODO: is that truly true? I am not 100% sure yet
+    /* Rx/Tx swapped for the virtualizer in the system file */
     net_queue_handle_t rx_queues[SDDF_NET_MAX_CLIENTS];
     net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
@@ -30,24 +30,26 @@ uint32_t *buffer_refs;
 
 static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
 {
-    sddf_printf_("VSWITCH Forwarding frame 1 src->id: %d dst->id: %d\n", src->id, dst->id);
+    //sddf_printf_("VSWITCH Forwarding frame 1 src->id: %d dst->id: %d\n", src->id, dst->id);
     net_buff_desc_t d_buffer;
-    if (net_dequeue_free(&state.rx_queues[dst->id], &d_buffer) != 0) {
-        return false;
-    }
+    //sddf_printf_("VSWITCH free queue AFTER dequeue head %d tail %d\n", state.rx_queues[dst->id].free->head, state.rx_queues[dst->id].free->tail);
+    //if (net_dequeue_free(&state.rx_queues[dst->id], &d_buffer) != 0) {
+    //    return false;
+    //}
+    //sddf_printf_("VSWITCH free queue AFTER dequeue head %d tail %d\n", state.rx_queues[dst->id].free->head, state.rx_queues[dst->id].free->tail);
 
     d_buffer.len = src_buf->len;
     d_buffer.io_or_offset = src_buf->io_or_offset;
     d_buffer.oid = src->id; // tag the owner of this buffer so we know which reference slot increment
     net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
+    //sddf_printf_("VSWITCH active queue after enqueue len %d\n", net_queue_length(state.rx_queues[dst->id].active));
 
     // TODO: recheck if my logic is not funky here - offsets etc
     // mark that this buffer has been passed once
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    sddf_printf_("VSWITCH index: %d src->id: %d\n", ref_index, src->id);
-    //sddf_printf_("address  of buffer_refs: %p\n", buffer_refs);
     buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]++;
-    sddf_printf_("VSWITCH id: %d buffer_refs[idx]: %d\n", src->id, buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]);
+    sddf_printf_("VSWITCH forwarding buffer with offset: %ld\n", src_buf->io_or_offset);
+    sddf_printf_("VSWITCH id: %d ref_index %d buffer_refs[idx]: %d\n", src->id, ref_index, buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]);
 
     if (net_require_signal_active(&state.rx_queues[dst->id])) {
         net_cancel_signal_active(&state.rx_queues[dst->id]);
@@ -103,56 +105,55 @@ static bool try_send(net_vswitch_port_config_t *src, const uint8_t *dest_macaddr
     return success;
 }
 
-static void rx_provide()
+// Here we read free buffers from RX, see if the refcount is 0, and then return them to TX and notify the TX clients
+static void rx_return(net_vswitch_port_config_t *port)
 {
-    // TODO: not sure if I have to handle that like it is handled in rx_virt?
-    uint64_t notifications = 0;
-    // Return empty buffers
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!config.ports[i].connected) continue;
-        sddf_printf_("VSWITCH Returning buffers from %d\n", i);
-        bool reprocess = true;
-        net_queue_handle_t *src = &state.rx_queues[i];
-        while (reprocess) {
-            while (!net_queue_empty_free(src)) {
-                net_buff_desc_t buffer;
-                int err = net_dequeue_free(src, &buffer);
-                assert(!err);
-                // TODO: handle if we need to handle the offsets etc in any special way
-                int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-                sddf_printf_("VSWITCH buffer oid: %d, ref_index: %d\n", buffer.oid, ref_index);
-                assert(buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0);
+    bool signal_tx = false;
+    net_queue_handle_t *src = &state.rx_queues[port->id];
+    net_queue_handle_t *dst;
+    //sddf_printf_("VSWITCH returning buffers from port: %d RX freeQ len: %d, activeQ len: %d\n", port->id, net_queue_length(src->free), net_queue_length(src->active));
 
-                buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index]--;
+    bool reprocess = true;
+    while (reprocess) {
+        while (!net_queue_empty_free(src)) {
+            net_buff_desc_t buffer;
+            //sddf_printf_("VSWITCH rx_return free queue BEFORE dequeue head %d tail %d\n", src->free->head, src->free->tail);
+            int err = net_dequeue_free(src, &buffer);
+            assert(!err);
+            ///sddf_printf_("VSWITCH rx_return free queue AFTER dequeue head %d tail %d\n", src->free->head, src->free->tail);
 
-                if (buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0) {
-                    continue;
-                }
+            // TODO: handle if we need to handle the offsets etc in any special way
+            int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+            sddf_printf_("VSWITCH returning buffer with offset: %ld\n", buffer.io_or_offset);
+            sddf_printf_("VSWITCH oid: %d ref_index: %d buffer_refs[idx]: %d\n", buffer.oid, ref_index, buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index]);
 
-                // return the buffer to its owner
-                // TODO: should I handle the offsets like virt does?
-                net_queue_handle_t *dst = &state.rx_queues[buffer.oid];
-                err = net_enqueue_free(dst, buffer);
-                assert(!err);
-                // TODO: do I need it at all - seems like it is necessary for rx because it's shared for the whole driver
-                notifications |= (1 << buffer.oid);
+            assert(buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0);
+
+            buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index]--;
+
+            if (buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0) {
+                continue;
             }
 
-            net_request_signal_free(src);
-            reprocess = false;
-
-            if (!net_queue_empty_free(src)) {
-                net_cancel_signal_free(src);
-                reprocess = true;
+            // return the buffer to its owner
+            dst = &state.tx_queues[buffer.oid];
+            err = net_enqueue_free(dst, buffer);
+            assert(!err);
+            //sddf_printf_("VSWITCH rx_return dst free queue after enqueue len %d\n", net_queue_length(dst->free));
+            signal_tx = true;
+            //net_request_signal_free(dst); TODO: is this necessary?
+            if (signal_tx && net_require_signal_free(dst)) {
+                net_cancel_signal_free(dst);
+                sddf_deferred_notify(config.ports[buffer.oid].tx.id); // TODO: deferred?
             }
         }
-    }
 
-    // Notify every owner
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (config.ports[i].connected && notifications & (1 << i) && net_require_signal_free(&state.rx_queues[i])) {
-            net_cancel_signal_free(&state.rx_queues[i]);
-            sddf_deferred_notify(config.ports[i].id);
+        net_request_signal_free(src);
+        reprocess = false;
+
+        if (!net_queue_empty_free(src)) {
+            net_cancel_signal_free(src);
+            reprocess = true;
         }
     }
 }
@@ -171,6 +172,7 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             net_buff_desc_t buffer;
             int err = net_dequeue_active(src, &buffer);
             assert(!err);
+            sddf_printf_("VSWITCH forwrad src active queue after dequeue len %d\n", net_queue_length(src->active));
 
             sddf_printf_("VSWITCH Address of region is: %p size: %ld buffer offset: %ld\n", port->tx_data.region.vaddr, port->tx_data.region.size, buffer.io_or_offset);
             const char *frame_data = port->tx_data.region.vaddr + buffer.io_or_offset;
@@ -184,16 +186,16 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             sddf_printf_("VSWITCH Transmitting\n");
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
                 sddf_printf_("VSWITCH Bcasting\n");
-                transmitted = try_broadcast(port, &buffer);
+                transmitted = try_broadcast(port, &buffer); // TODO: this will fail if we broadcast some and then, the last one fails setting the flag to false!
             } else {
                 sddf_printf_("VSWITCH Sending\n");
                 transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
-            sddf_printf_("VSWITCH Transmitted\n");
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
                 net_request_signal_free(src);
+                sddf_printf_("VSWITCH forwrad src free queue after enqueue len %d\n", net_queue_length(src->free));
             }
         }
 
@@ -219,10 +221,10 @@ void notified(sddf_channel ch)
             break;
         } else if (ch == config.ports[i].rx.id) {
             sddf_printf_("VSWITCH Found a match RX i: %d\n", i);
-            //rx_provide(&config.ports[i]);
+            rx_return(&config.ports[i]);
+            break;
         }
     }
-    //rx_provide(); // TODO: uncomment - some logic fallacy here - where/when we should be notified to return it? A different channel maybe?
 }
 
 void init(void)
@@ -243,10 +245,10 @@ void init(void)
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
                        config.ports[i].tx.num_buffers);
-        net_buffers_init(&state.rx_queues[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
+        //net_buffers_init(&state.rx_queues[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
 
         /* Seed the allow_list based on predefined settings */
         // for now quick hack, send all to all
-        state.allow_list[i] = UINT64_MAX;
+        state.allow_list[i] = UINT64_MAX; // TODO: later construct properly
     }
 }
