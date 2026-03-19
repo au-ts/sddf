@@ -19,7 +19,8 @@ typedef struct state {
 
 state_t state;
 
-int extract_offset(uintptr_t *phys)
+// TODO: maybe create a temp struct for that?
+int extract_offset(uintptr_t *phys, int* bufid)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_data; i++) {
@@ -27,6 +28,7 @@ int extract_offset(uintptr_t *phys)
                 && *phys
                        < config.clients[client].data[i].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
                 *phys = *phys - config.clients[client].data[i].io_addr;
+                *bufid = i;
                 return client;
             }
         }
@@ -44,7 +46,7 @@ void tx_provide(void)
                 net_buff_desc_t buffer;
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
-                sddf_printf_("VIRT TX active from client: %d\n", client);
+                sddf_printf_("VIRT TX active from client: %d buffer.oid: %d \n", client, buffer.oid);
 
                 if (buffer.io_or_offset % NET_BUFFER_SIZE
                     || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
@@ -90,9 +92,12 @@ void tx_return(void)
             int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
             assert(!err);
 
-            int client = extract_offset(&buffer.io_or_offset);
+            int bufid = 0;
+            int client = extract_offset(&buffer.io_or_offset, &bufid);
+            buffer.oid = bufid;
             assert(client >= 0);
 
+            sddf_printf_("VIRT TX returning buffer.oid: %d offset: %ld\n", buffer.oid, buffer.io_or_offset);
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
             assert(!err);
             notify_clients[client] = true;
