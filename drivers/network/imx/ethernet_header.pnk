@@ -100,9 +100,6 @@ var 1 eth_reg = ETH_REG;
 /@ extern predicate valid_hardware_ring_tx_mdata_read @/
 /@ extern field hardware_ring_tx: IArray @/
 /@ extern field hardware_ring_rx: IArray @/
-/@ extern field hardware_ring_rx_old: IArray @/
-/@ extern field hardware_ring_rx_old_addr: Set[Int] @/
-/@ extern field hardware_ring_rx_old_len: Set[Int] @/
 /@ extern field tx_await_ack: Seq[Int] @/
 /@ extern field rx_await_ack: Seq[Int] @/
 /@ extern field rx_handled: Set[Int] @/
@@ -125,7 +122,6 @@ var 1 eth_reg = ETH_REG;
 /@ extern function is_valid_data_len(value: Int): Bool @/
 /@ extern function is_valid_rx_stat(value: Int): Bool @/
 /@ extern function is_valid_tx_stat(value: Int): Bool @/
-/@ extern function assign_hardware_ring_rx_old(): Bool @/
 
 #define HW_RING_BASE         35651584
 #define HW_ETH_BASE   33554432
