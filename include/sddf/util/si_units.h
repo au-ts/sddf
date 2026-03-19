@@ -11,8 +11,11 @@
 #define GIGA (1000 * 1000 * 1000)
 
 // Seconds
+/* Number of femtoseconds in a second */
+#define FS_IN_S 1000000000000000ULL
+
 /* Number of picoseconds in a second */
-#define PS_IN_IS 1000000000000ULL
+#define PS_IN_S 1000000000000ULL
 
 /* Number of nanoseconds in a second */
 #define NS_IN_S  1000000000ULL

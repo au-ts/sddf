@@ -90,7 +90,7 @@ static uint64_t get_time_ns(void)
     uint64_t value_h = (uint64_t)timekeeper_overflow_count;
     uint64_t value_ticks = (value_h << 32) | value_l;
 
-    return tick_to_ns(value_ticks, TIMEKEEPER_PRESCALER, APBTIMER_CLK_FREQ);
+    return tick_to_ns_cached(value_ticks, TIMEKEEPER_PRESCALER, APBTIMER_CLK_FREQ);
 }
 
 /**
@@ -101,7 +101,7 @@ static uint64_t get_time_ns(void)
 static apbtimer_timeout_conf_t calculate_timeout_from_ns(uint64_t ns_delay)
 {
     // Convert nanoseconds to ticks with a prescaler of zero (x1)
-    uint64_t ticks = ns_to_tick(ns_delay, 0, APBTIMER_CLK_FREQ);
+    uint64_t ticks = ns_to_tick_cached(ns_delay, 0, APBTIMER_CLK_FREQ);
 
     uint32_t prescaler = 0;
     uint32_t cmp = ticks;

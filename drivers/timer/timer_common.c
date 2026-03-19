@@ -15,8 +15,42 @@
 // Mult-shift cache. It's relatively expensive to calculate this every time, so we just
 // don't. Usually we will just be reusing the last result, so we just remember the last
 // one. We keep a separate entry for tick->ns and ns->tick.
-ms_cache_entry_t f_a_larger_cache = {0};
-ms_cache_entry_t f_b_larger_cache = {0};
+ms_cache_entry_t tick_to_ns_cache = {0};
+ms_cache_entry_t ns_to_tick_cache = {0};
+
+/**
+ *  Given two equivalent periods, do a frequency shift calculation.
+ *  (equivalent = prescaler-equivalent frequency)
+ */
+static inline uint64_t do_cached_period_freq_shift(uint64_t t_a, sddf_timer_freq_hz_t f_a,
+                                                   sddf_timer_freq_hz_t f_b,
+                                                   ms_cache_entry_t *cache_entry)
+{
+    uint64_t mult, shift = 0;
+    // Check cache
+    if (cache_entry->f_a == f_a && cache_entry->f_b == f_b) {
+        mult = cache_entry->mult;
+        shift = cache_entry->shift;
+        LOG_TIMER_DRIVER("Used cache for f_a = %u, f_b = %u!\n", f_a, f_b);
+    } else {
+        find_mult_shift(f_a, f_b, &mult, &shift);
+        // Store result
+        cache_entry->mult = mult;
+        cache_entry->shift = shift;
+        cache_entry->f_a = f_a;
+        cache_entry->f_b = f_b;
+    }
+    return do_freq_shift(t_a, mult, shift);
+}
+
+static inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler)
+{
+    // TODO: check prescaler handling is sane
+    sddf_timer_freq_hz_t true_frequency = f / (1 << (sddf_timer_freq_hz_t)prescaler);
+    LOG_TIMER_DRIVER("Prescaler %zu maps %u MHz to equivalent freq of %u\n", prescaler,
+                     f, true_frequency / MEGA);
+    return true_frequency;
+}
 
 /**
  * Given two frequencies, return the integer arithmetic optimised multiplier
@@ -31,7 +65,7 @@ ms_cache_entry_t f_b_larger_cache = {0};
  * NOTE: the input frequencies must be EQUIVALENT frequencies, i.e. prescalers
  * should divide the true clock frequency by 2^n
  */
-static inline void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_t *f_mult, uint64_t *f_shift)
+void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_t *f_mult, uint64_t *f_shift)
 {
     // If frequencies are > 1GHz, just die because this method is no longer sound.
     assert(f_a < MAX_SANE_FREQ_HZ && f_b < MAX_SANE_FREQ_HZ);
@@ -66,47 +100,25 @@ static inline void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_
 }
 
 /**
- *  Given two equivalent periods, do a frequency shift calculation.
- *  (equivalent = prescaler-equivalent frequency)
+ * Perform a frequency shift to convert t_a periods of the input frequency f_a
+ * to t_b periods of the output frequency f_b. Use find_mult_shift to get the
+ * appropriate magic numbers for your conversion.
+ *
+ * Mult and shift collectively encode f_a and f_b.
  */
-static inline uint64_t do_period_freq_shift(uint64_t t_a, sddf_timer_freq_hz_t f_a,
-                                            sddf_timer_freq_hz_t f_b)
-{
-    uint64_t mult, shift = 0;
-    ms_cache_entry_t *cache_entry = NULL;
-    if (f_a > f_b) {
-        cache_entry = &f_a_larger_cache;
-    } else {
-        cache_entry = &f_b_larger_cache;
-    }
-    // Check cache
-    if (cache_entry->f_a == f_a && cache_entry->f_b == f_b) {
-        mult = cache_entry->mult;
-        shift = cache_entry->shift;
-        LOG_TIMER_DRIVER("Used cache for f_a = %u, f_b = %u!\n", f_a, f_b);
-    } else {
-        find_mult_shift(f_a, f_b, &mult, &shift);
-        // Store result
-        cache_entry->mult = mult;
-        cache_entry->shift = shift;
-        cache_entry->f_a = f_a;
-        cache_entry->f_b = f_b;
-    }
-    return ((t_a * mult) >> shift);
+uint64_t do_freq_shift(uint64_t t_a, uint64_t mult, uint64_t shift) {
+    return (t_a * mult) >> shift;
 }
 
-static inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler)
-{
-    // TODO: check prescaler handling is sane
-    sddf_timer_freq_hz_t true_frequency = f / (1 << (sddf_timer_freq_hz_t)prescaler);
-    LOG_TIMER_DRIVER("Prescaler %zu maps %u MHz to equivalent freq of %u\n", prescaler,
-                     f, true_frequency / MEGA);
-    return true_frequency;
-}
+
+
 
 /**
  * Convert the tick count of a timer to nanoseconds, given the expected prescaler.
  * Prescaler can be set to 0 to ignore.
+ *
+ * This function internally caches magic values for the calculation, these are recalculated
+ * each time the frequency pair changes. Use do_freq_shift() to avoid caching.
  *
  * Prescaler should be given as an exponent, i.e. prescaler counter counts to 2^N,
  * provide N.
@@ -115,19 +127,33 @@ static inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64
  * @param uint64_t prescaler exponent
  * @returns non-zero on failure.
  */
-uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq)
+uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq)
 {
     sddf_timer_freq_hz_t true_freq = find_true_freq(base_freq, prescaler);
-    // convert to F_NANOSECOND ... a frequency where a period is exactly 1ms.
+    // convert to F_NANOSECOND ... a frequency where a period is exactly 1ns.
     // this seems like a hack, but the underlying math to do unit conversions is always
     // a frequency shift!
-    uint64_t ns = do_period_freq_shift(ticks, true_freq, F_NANOSECOND);
+    uint64_t ns = do_cached_period_freq_shift(ticks, true_freq, F_NANOSECOND, &tick_to_ns_cache);
     return ns;
 }
 
-uint64_t ns_to_tick(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq) {
+/**
+ * Convert the tick count of a timer to nanoseconds, given the expected prescaler.
+ * Prescaler can be set to 0 to ignore.
+ *
+ * This function internally caches magic values for the calculation, these are recalculated
+ * each time the frequency pair changes. Use do_freq_shift() to avoid caching.
+ *
+ * Prescaler should be given as an exponent, i.e. prescaler counter counts to 2^N,
+ * provide N.
+ *
+ * @param uint64_t ticks to convert
+ * @param uint64_t prescaler exponent
+ * @returns non-zero on failure.
+ */
+uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq) {
     sddf_timer_freq_hz_t true_freq = find_true_freq(base_freq, prescaler);
-    uint64_t ticks = do_period_freq_shift(ns, F_NANOSECOND, true_freq);
+    uint64_t ticks = do_cached_period_freq_shift(ns, F_NANOSECOND, true_freq, &ns_to_tick_cache);
     return ticks;
 }
 

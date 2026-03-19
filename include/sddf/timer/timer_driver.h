@@ -32,9 +32,10 @@ typedef struct ms_cache_entry {
     uint64_t shift;
 } ms_cache_entry_t;
 
-uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
-uint64_t ns_to_tick(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
-
+uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
+uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
+uint64_t do_freq_shift(uint64_t t_a, uint64_t mult, uint64_t shift);
+void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_t *f_mult, uint64_t *f_shift);
 // Representing one timeout operation in the queue.
 typedef struct timeout {
     uint64_t timestamp;
