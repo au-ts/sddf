@@ -8,6 +8,8 @@
 #include <os/sddf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sddf/resources/common.h>
+#include <sddf/resources/device.h>
 
 #define SDDF_TIMER_MAX_CLIENTS 64
 #define SDDF_TIMER_MAGIC_LEN 5
@@ -15,8 +17,21 @@ static char SDDF_TIMER_MAGIC[SDDF_TIMER_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x6 }
 
 typedef struct timer_client_config {
     char magic[SDDF_TIMER_MAGIC_LEN];
-    uint8_t driver_id;
+    uint8_t virt_id;
+    region_resource_t time_page;
 } timer_client_config_t;
+
+typedef struct timer_virt_config {
+    char magic[SDDF_TIMER_MAGIC_LEN];
+    uint8_t driver_id;
+    region_resource_t time_page;
+} timer_virt_config_t;
+
+typedef struct timer_driver_config {
+    char magic[SDDF_TIMER_MAGIC_LEN];
+    uint8_t virt_id;
+    region_resource_t time_page;
+} timer_driver_config_t;
 
 static inline bool timer_config_check_magic(void *config)
 {
