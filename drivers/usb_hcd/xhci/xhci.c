@@ -7,18 +7,25 @@
  * driver for xHCI USB host controller.
  * TODO:
  *  - implement host controller
+ *    - implement PCI intialisation
+ *    - implement reset xHCI driver
+ *    - implement set up xHCI driver
+ *    - implement TRB handling and figure out interface to this driver
  *  - expose tinyUSB interface
+ *    - implement tinyUSB shim into interface for this driver
  */
 
 #include "xhci.h"
 #include <os/sddf.h>
 
-/* hardcoded PCI location - should be found from enumeration instead */
+/* hardcoded PCI location - should be found from enumeration instead. 
+ * (this is set using qemu arguments, not appropriate for real x86 board)
+ */
 #define XHCI_PCI_BUS 0
 #define XHCI_PCI_DEVICE 5
 #define XHCI_PCI_FUNCTION 0
 
-/* the below PCI stuff is copied from nvme.c */
+/* the below PCI stuff is copied from nvme.c and also replicated in usb build scripts */
 #define PCI_CONFIG_ADDR_IOPORT_ID 1
 #define PCI_CONFIG_DATA_IOPORT_ID 2
 #define PCI_CONFIG_ADDR_PORT 0xCF8
