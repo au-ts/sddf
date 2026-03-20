@@ -14,9 +14,9 @@
 #include <os/sddf.h>
 
 /* hardcoded PCI location - should be found from enumeration instead */
-#define XHCI_PCI_BUS
-#define XHCI_PCI_DEVICE
-#define XHCI_PCI_FUNCTION
+#define XHCI_PCI_BUS 0
+#define XHCI_PCI_DEVICE 5
+#define XHCI_PCI_FUNCTION 0
 
 /* the below PCI stuff is copied from nvme.c */
 #define PCI_CONFIG_ADDR_IOPORT_ID 1

@@ -19,8 +19,7 @@ usb_hcd.elf: usb_hcd.o
 usb_hcd.o: ${USB_HCD_DIR}/xhci.c ${CHECK_XHCI_FLAGS_MD5}
 	$(CC) -c $(CFLAGS) -I${USB_HCD_DIR} -o $@ $<
 
-# TODO figure out qemu flags for xhci
-QEMU_USB_HCD_ARGS := 
+QEMU_USB_HCD_ARGS := -device qemu-xhci,addr=0x5.0,id=xhci
 
 -include usb_hcd.d
 
