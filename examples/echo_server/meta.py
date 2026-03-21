@@ -15,7 +15,7 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -182,6 +182,7 @@ def generate(
     output_dir: str,
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
+    enable_iommu: bool,
 ):
     uart_node = None
     ethernet_node = None
@@ -282,8 +283,10 @@ def generate(
         hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
         ethernet_driver.add_map(hw_net_rings_map)
 
+        # Temporary x86/QEMU bring-up hack: map the BAR-backed modern virtio PCI
+        # window that QEMU currently assigns to the NIC.
         virtio_net_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+            sdf, "virtio_net_regs", 0x4000, paddr=0xC000000000
         )
         sdf.add_mr(virtio_net_regs)
         virtio_net_regs_map = SystemDescription.Map(
@@ -292,7 +295,7 @@ def generate(
         ethernet_driver.add_map(virtio_net_regs_map)
 
         virtio_net_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=16
+            ioapic_id=0, pin=11, vector=1, id=16, polarity=SystemDescription.IrqIoapic.Polarity.ACTIVELOW
         )
         ethernet_driver.add_irq(virtio_net_irq)
 
@@ -510,6 +513,22 @@ def generate(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
         )
 
+    if enable_iommu:
+        if board.arch != SystemDescription.Arch.X86_64:
+            raise ValueError("IOMMU is only supported for x86")
+
+        dma_regions = {}
+        for pd in [net_virt_tx, net_virt_rx, ethernet_driver]:
+            for mapping in pd.mappings:
+                mr = mapping.mr
+
+                if mr.paddr is not None and mr.name not in dma_regions:
+                    dma_regions[mr.name] = mr
+        for mr in dma_regions.values():
+            if "data" in mr.name or "hw_net_rings" in mr.name:
+                iomap = SystemDescription.IOMap(mr=mr, iovaddr=mr.paddr, pci_bus=0, pci_dev=2, pci_func=0, perms="rw")
+                ethernet_driver.add_iomap(iomap)
+
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
 
@@ -523,6 +542,7 @@ if __name__ == "__main__":
     parser.add_argument("--sdf", required=True)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
+    parser.add_argument("--iommu", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -543,4 +563,10 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, get_core)
+    generate(
+        args.sdf,
+        args.output,
+        dtb,
+        get_core,
+        args.iommu
+    )
