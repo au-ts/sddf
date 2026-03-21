@@ -27,6 +27,7 @@ SUPPORTED_BOARDS := \
 
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
+IOMMU ?= 0
 SYSTEM_FILE := echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
@@ -68,9 +69,21 @@ CFLAGS += \
 # Suppress warning from lwIP
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
+ifeq ($(IOMMU),1)
+CFLAGS += -DVIRTIO_ACCESS_PLATFORM
+endif
+
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
+
+ifeq ($(IOMMU),1)
+IOMMU_ARG := --iommu
+ifeq ($(MICROKIT_BOARD),x86_64_generic)
+QEMU_IOMMU_ARGS := -device intel-iommu,caching-mode=on
+override QEMU_NET_ARGS := -device virtio-net-pci,netdev=netdev0,addr=0x2.0,iommu_platform=on,disable-legacy=on
+endif
+endif
 
 ECHO_OBJS := echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
@@ -90,11 +103,11 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) $(IOMMU_ARG)
 else
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) $(IOMMU_ARG)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
@@ -132,7 +145,7 @@ include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_IOMMU_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
 		-netdev user,id=netdev0,\
 hostfwd=udp::1235-10.0.2.15:1235,\

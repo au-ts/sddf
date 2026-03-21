@@ -18,6 +18,8 @@
 #define PCI_ADDR_PORT_ADDR 0xCF8
 #define PCI_DATA_PORT_ID 2
 #define PCI_DATA_PORT_ADDR 0xCFC
+#define PCI_COMMAND_REG_OFF 0x04
+#define PCI_COMMAND_BUS_MASTER BIT(2)
 
 /* Multiplier for virtIO queue kick mechanism. */
 uint32_t nftn_multiplier;
@@ -163,6 +165,17 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
     return true;
 }
 
+static bool virtio_pci_device_id_matches(uint16_t expected, uint16_t actual)
+{
+    if (expected == actual) {
+        return true;
+    }
+
+    /* Initial x86 bring-up accepts either transitional or modern virtio-net. */
+    return (expected == VIRTIO_NET_PCI_DEV_ID || expected == VIRTIO_NET_PCI_MODERN_DEV_ID)
+        && (actual == VIRTIO_NET_PCI_DEV_ID || actual == VIRTIO_NET_PCI_MODERN_DEV_ID);
+}
+
 bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret,
                             uint32_t device_id)
 {
@@ -195,10 +208,17 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
                        pci_device_header.common_hdr.vendor_id);
         return false;
     }
-    if (pci_device_header.common_hdr.device_id != pci_device_id) {
+    if (!virtio_pci_device_id_matches(pci_device_id, pci_device_header.common_hdr.device_id)) {
         LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected device id 0x%x, got 0x%x!\n", bus, dev, func, pci_device_id,
                        pci_device_header.common_hdr.device_id);
         return false;
+    }
+
+    uint16_t command = pci_device_header.common_hdr.command;
+    if (!(command & PCI_COMMAND_BUS_MASTER)) {
+        uint16_t new_command = command | PCI_COMMAND_BUS_MASTER;
+        pci_x86_write_16(bus, dev, func, PCI_COMMAND_REG_OFF, new_command);
+        pci_device_header.common_hdr.command = new_command;
     }
 
     pci_debug_print_header(bus, dev, func, &pci_device_header);
@@ -233,6 +253,13 @@ uint32_t virtio_transport_get_driver_features(virtio_device_handle_t *device_han
     virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
     cfg->driver_feature_select = select;
     return cfg->driver_feature;
+}
+
+uint16_t virtio_transport_get_queue_size(virtio_device_handle_t *device_handle, uint32_t select)
+{
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    cfg->queue_select = select;
+    return cfg->queue_size;
 }
 
 void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle, uint32_t select,

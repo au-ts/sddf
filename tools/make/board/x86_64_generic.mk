@@ -20,7 +20,7 @@ SEL4_32B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4_
 QEMU := qemu-system-x86_64
 QEMU_ARCH_ARGS := -machine q35 \
 		-kernel $(SEL4_32B) \
-		-m size=2G \
+		-m size=4G \
 		-serial mon:stdio \
 		-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
 		-initrd $(IMAGE_FILE)

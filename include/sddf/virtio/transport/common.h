@@ -55,6 +55,7 @@ void virtio_transport_set_status(virtio_device_handle_t *device_handle, uint8_t 
 uint8_t virtio_transport_get_status(virtio_device_handle_t *device_handle);
 uint32_t virtio_transport_get_device_features(virtio_device_handle_t *device_handle, uint32_t select);
 uint32_t virtio_transport_get_driver_features(virtio_device_handle_t *device_handle, uint32_t select);
+uint16_t virtio_transport_get_queue_size(virtio_device_handle_t *device_handle, uint32_t select);
 void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle, uint32_t select,
                                           uint32_t driver_features);
 bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_t select, uint16_t size, uint64_t desc,
