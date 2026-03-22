@@ -125,9 +125,9 @@ typedef struct zynqmp_gem_regs {
 #define ZYNQ_GEM_NWCFG_CHSUM_EN         (1 << 24)  /* enable checksum offload on receive */
 #define ZYNQ_GEM_NWCFG_IEEE_MDC         (0x7 << 18)
 
+
 /* dmacr: DMA config register */
-#define ZYNQ_GEM_DMACR_BLENGTH          0x00000004    /* INCR4 AHB bursts */
-#define ZYNQ_GEM_DMACR_RXBUF            0x00180000    /* Set with binary 00011000 to use 1536 byte(1*max length frame/buffer) */
+#define ZYNQ_GEM_DMACR_RXBUF            0x00180000    /* RX DMA Buffer size 1536 bytes */
 #define ZYNQ_GEM_DMACR_TXPBUF_32KB      (1UL << 10)   /* TX packet buffer 32KB */
 #define ZYNQ_GEM_DMACR_TXPBUF_TCP       (1UL << 11)   /* TX checksum offload */
 #define ZYNQ_GEM_DMACR_RXPBUF_SHIFT     8
