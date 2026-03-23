@@ -456,6 +456,10 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
 #define NVME_PCIE_INTR_PIN_SHIFT  8U
 #define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
 
+/* PCI Command register bits. [PCI-3.0 §6.2.2] */
+#define NVME_PCI_CMD_MEMORY_SPACE  BIT(1) /* Memory Space Enable */
+#define NVME_PCI_CMD_BUS_MASTER    BIT(2) /* Bus Master Enable */
+
 /* PCI Configuration Mechanism #1 I/O ports. [PCI-3.0 §3.2.2.3.2] */
 /* I/O Port Configuration */
 #define NVME_PCI_CONFIG_ADDR_IOPORT_ID 1
