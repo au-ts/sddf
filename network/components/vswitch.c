@@ -62,7 +62,7 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
 
 static bool vswitch_can_send_to(int src_id, int dst_id)
 {
-    return state.allow_list[src_id] & (1 << (uint64_t)dst_id);
+    return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
 int mac_addr_find(const uint8_t *dest_macaddr) {
