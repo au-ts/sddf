@@ -860,7 +860,7 @@ void init(void)
 
     /* Enable Bus Master and Memory Space */
     uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);
-    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND, cmd | 0x6);
+    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND, cmd | NVME_PCI_CMD_MEMORY_SPACE | NVME_PCI_CMD_BUS_MASTER);
     LOG_NVME("PCI Command Register: %08x\n",
              pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND));
 
