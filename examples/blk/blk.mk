@@ -25,7 +25,15 @@ MICROKIT_CONFIG ?= debug
 # Hack - need better way to configure which driver
 ifeq ($(strip $(NVME)),1)
 	BLK_DRIV_DIR := nvme
-	QEMU_BLK_ARGS := -device nvme,drive=hd,serial=TEST1234,addr=0x4.0
+	ifeq ($(MICROKIT_BOARD),qemu_virt_aarch64)
+		QEMU_BLK_ARGS := -device nvme,drive=hd,serial=AARCH64_TEST1234,bus=pcie.0,addr=0x4.0
+	else ifeq ($(MICROKIT_BOARD),qemu_virt_riscv64)
+		QEMU_BLK_ARGS := -device nvme,drive=hd,serial=RISCV64_TEST1234,bus=pcie.0,addr=0x4.0
+	else ifeq ($(MICROKIT_BOARD),x86_64_generic)
+		QEMU_BLK_ARGS := -device nvme,drive=hd,serial=X86_64_TEST1234,addr=0x4.0
+	else
+		$(error MICROKIT_BOARD not supported for NVMe)
+	endif
 endif
 
 # Allow to user to specify a custom partition
