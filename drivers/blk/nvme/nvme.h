@@ -451,7 +451,7 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
 #define NVME_PCIE_CFG_OFFSET_BAR0        0x10
 #define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
 
-/* Interrupt information field layout. [PCIe2-0.9 §7.5.1.20] */
+/* Interrupt information field layout. [NVMe-PCIe-1.1 §3.8.1.20] */
 #define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
 #define NVME_PCIE_INTR_PIN_SHIFT  8U
 #define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
