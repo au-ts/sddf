@@ -45,8 +45,6 @@ hw_ring_t tx; /* Tx NIC ring */
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
-#define MAX_PACKET_SIZE     1536
-
 volatile zynqmp_gem_regs_t *eth;
 
 static inline bool hw_ring_full(hw_ring_t *ring)
@@ -238,6 +236,37 @@ static void handle_irq(void)
     }
 }
 
+/** Disable unused priority queue 1 by pointing it at a permanent terminator descriptor
+ * beyond the end of each active ring (i.e. at index RX_COUNT / TX_COUNT).
+ * Disabled by having the SW-ownership bit set so hardware will never process it.
+ * This region is never touched by rx_provide() / tx_provide(), so the terminator
+ * state is stable for the lifetime of the driver.
+ */
+static void disable_pq1(void) {
+    volatile struct descriptor *rx_q1_terminator =
+        (volatile struct descriptor *)(device_resources.regions[1].region.vaddr +
+                                       rx.capacity * sizeof(struct descriptor));
+    rx_q1_terminator->addr    = RXD_OWN | RXD_WRAP; /* SW owns + wrap terminator */
+    rx_q1_terminator->stat    = 0;
+    rx_q1_terminator->addr_hi = 0;
+    rx_q1_terminator->unused  = 0;
+
+    volatile struct descriptor *tx_q1_terminator =
+        (volatile struct descriptor *)(device_resources.regions[2].region.vaddr +
+                                       tx.capacity * sizeof(struct descriptor));
+    tx_q1_terminator->addr    = 0;
+    tx_q1_terminator->stat    = TXD_USED | TXD_WRAP; /* SW owns + wrap terminator */
+    tx_q1_terminator->addr_hi = 0;
+    tx_q1_terminator->unused  = 0;
+
+    uintptr_t rx_q1_ptr = device_resources.regions[1].io_addr +
+                          rx.capacity * sizeof(struct descriptor);
+    uintptr_t tx_q1_ptr = device_resources.regions[2].io_addr +
+                          tx.capacity * sizeof(struct descriptor);
+    eth->receive_q1_ptr  = (uint32_t)rx_q1_ptr;
+    eth->transmit_q1_ptr = (uint32_t)tx_q1_ptr;
+}
+
 static void eth_setup(void)
 {
     eth = (volatile zynqmp_gem_regs_t *)device_resources.regions[0].region.vaddr;
@@ -282,7 +311,7 @@ static void eth_setup(void)
     /* enable FCS removal */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_FSREM;
     
-    /* 64-bit bus */
+    /* 64 bit AMBA AXI data bus width */
     eth->nwcfg |= ZYNQ_GEM_DBUS_WIDTH;
     
     /* Gigabit speed */
@@ -290,7 +319,7 @@ static void eth_setup(void)
 
     /* MDC clock divisor, for IEEE MDC < 2.5MHz */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_IEEE_MDC;
-    
+
     /* enable checksum offload on receive */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_CHSUM_EN;
     
@@ -318,8 +347,8 @@ static void eth_setup(void)
     
     /* AXI burst length: INCR16, 16 burst packets */
     eth->dmacr |= ZYNQ_GEM_DMACR_BLENGTH_16;
-    
-    /* 64-bit AXI bus width (required for 64-bit addressing) */
+
+    /* 64-bit AXI bus width */
     eth->dmacr |= ZYNQ_GEM_DMA_BUS_WIDTH;
     
     /* 5. Initialise buffer descriptors */
@@ -359,24 +388,9 @@ static void eth_setup(void)
     eth->rxqbase = device_resources.regions[1].io_addr;
     eth->txqbase = device_resources.regions[2].io_addr;
 
-    /* Disable unused rx/tx buffer queue pointers.
-     * Set priority queue 1 to point to the last descriptor (as addr must be valid)
-     * Disable this slot by writing to reserved bit 0 (prior to enabling it)
-     * 
-     * TODO: This works, but the proper solution would be allocate an address
-     * for two 'struct descriptor's, with the proper hardware-inaccessible ownership bits set.
-     * 
-     * Undefined behaviour: in theory the status bits at the address pointed to by the
-     * rx/tx_last_descr may be overwritten by rx/tx_provide() when filling
-     * the final slot in HW_ring.
-    */
-    uintptr_t rx_last_descr = device_resources.regions[1].io_addr + 
-                                (rx.capacity - 1) * sizeof(struct descriptor);
-    uintptr_t tx_last_descr = device_resources.regions[2].io_addr + 
-                                (tx.capacity - 1) * sizeof(struct descriptor);
-    eth->receive_q1_ptr = (uint32_t)rx_last_descr | 0x1;
-    eth->transmit_q1_ptr = (uint32_t)tx_last_descr | 0x1;
-    
+    /* disable the unused priority queue 1 */
+    disable_pq1();
+
     /* 7. Enable RX/TX interrupts */
     eth->ier = ZYNQ_INT_RXC | ZYNQ_INT_TXC;
     
@@ -392,9 +406,9 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);
     
-    /* All buffers should fit within our DMA region */
-    assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
-    assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
+    /* All buffers should fit within our DMA region, plus one for queue1 terminator */
+    assert((RX_COUNT + 1) * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
+    assert((TX_COUNT + 1) * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     eth_setup();
 
