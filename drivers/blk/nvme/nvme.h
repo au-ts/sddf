@@ -445,6 +445,17 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
  *  PCIe Transport
  * ═══════════════════════════════════════════════════════════════════════ */
 
+/* Type 0/1 configuration space register offsets. [NVMe-PCIe-1.1 §3.8.1, Fig. 10] */
+#define NVME_PCIE_CFG_OFFSET_ID          0x00
+#define NVME_PCIE_CFG_OFFSET_COMMAND     0x04
+#define NVME_PCIE_CFG_OFFSET_BAR0        0x10
+#define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
+
+/* Interrupt information field layout. [PCIe2-0.9 §7.5.1.20] */
+#define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
+#define NVME_PCIE_INTR_PIN_SHIFT  8U
+#define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
+
 /* PCI Configuration Mechanism #1 I/O ports. [PCI-3.0 §3.2.2.3.2] */
 /* I/O Port Configuration */
 #define NVME_PCI_CONFIG_ADDR_IOPORT_ID 1
@@ -458,17 +469,6 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
 #define NVME_PCIE_CFG_ADDR_DEV_SHIFT   11
 #define NVME_PCIE_CFG_ADDR_FUNC_SHIFT  8
 #define NVME_PCIE_CFG_ADDR_OFFSET_MASK 0xFC
-
-/* Type 0/1 configuration space register offsets. [NVMe-PCIe-1.1 §3.8.1, Fig. 10] */
-#define NVME_PCIE_CFG_OFFSET_ID          0x00
-#define NVME_PCIE_CFG_OFFSET_COMMAND     0x04
-#define NVME_PCIE_CFG_OFFSET_BAR0        0x10
-#define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
-
-/* Interrupt information field layout. [PCIe2-0.9 §7.5.1.20] */
-#define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
-#define NVME_PCIE_INTR_PIN_SHIFT  8U
-#define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
 
 static inline uint32_t nvme_pcie_cfg_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
 {
