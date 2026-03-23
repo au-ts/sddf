@@ -382,7 +382,7 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_IO_QUEUE_SIZE    0x1000
 
 /*
- * PCI Configuration (hardcoded for x86_64)
+ * PCI Configuration (hardcoded)
  * FUTURE: Get these from PCIe enumeration
  */
 
@@ -400,12 +400,42 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_PRP_LIST_VADDR   0x20200000
 
 /* Memory Region Physical Addresses */
-#define NVME_ASQ_PADDR        0x5FDF0000
-#define NVME_ACQ_PADDR        0x5FDF1000
-#define NVME_IO_SQ_PADDR      0x5FDF2000
-#define NVME_IO_CQ_PADDR      0x5FDF3000
-#define NVME_IDENTIFY_PADDR   0x5FDF4000
-#define NVME_PRP_LIST_PADDR   0x5FE00000
+#if defined(CONFIG_ARCH_RISCV)
+#define NVME_ASQ_PADDR        0x9EDF0000
+#define NVME_ACQ_PADDR        0x9EDF1000
+#define NVME_IO_SQ_PADDR      0x9EDF2000
+#define NVME_IO_CQ_PADDR      0x9EDF3000
+#define NVME_IDENTIFY_PADDR   0x9EDF4000
+#define NVME_PRP_LIST_PADDR   0x9F800000
+#else /* ARM / x86 */
+#define NVME_ASQ_PADDR        0x5EDF0000
+#define NVME_ACQ_PADDR        0x5EDF1000
+#define NVME_IO_SQ_PADDR      0x5EDF2000
+#define NVME_IO_CQ_PADDR      0x5EDF3000
+#define NVME_IDENTIFY_PADDR   0x5EDF4000
+#define NVME_PRP_LIST_PADDR   0x5F800000
+#endif
+
+/*
+ * Architecture-specific: BAR0 physical address, IRQ, I/O port config.
+ * FUTURE: Replace with PCI enumeration.
+ */
+
+#if defined(CONFIG_ARCH_X86_64)
+
+#define NVME_IRQ 17
+
+#elif defined(CONFIG_ARCH_RISCV)
+
+#define NVME_CONTROLLER_PADDR 0x40000000
+#define NVME_IRQ 32 /* slot 4 INT_A: masked dev addr = 0x0000 -> PLIC IRQ 0x20 = 32 */
+
+#else /* ARM */
+
+#define NVME_CONTROLLER_PADDR 0x10000000
+#define NVME_IRQ 35 /* slot 4 INT_A: (1+4)%4=1 -> SPI 3 -> GIC IRQ 35 */
+
+#endif /* CONFIG_ARCH_X86_64 */
 
 /* Memory Region Sizes. */
 #define NVME_ASQ_REGION_SIZE        0x1000
@@ -421,8 +451,6 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
 #define NVME_IDENTIFY_NS_VADDR     (NVME_IDENTIFY_VADDR + NVME_IDENTIFY_BUFFER_BYTES)
 #define NVME_IDENTIFY_NS_PADDR     (NVME_IDENTIFY_PADDR + NVME_IDENTIFY_BUFFER_BYTES)
-
-#define NVME_IRQ 17
 
 /* Host page size exponent; CC.MPS encodes page size as 2^(12 + MPS). [NVMe-2.1 §3.1.4.5, Fig. 41] */
 #define NVME_PAGE_SIZE_LOG2 12
@@ -449,6 +477,7 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
 #define NVME_PCIE_CFG_OFFSET_ID          0x00
 #define NVME_PCIE_CFG_OFFSET_COMMAND     0x04
 #define NVME_PCIE_CFG_OFFSET_BAR0        0x10
+#define NVME_PCIE_CFG_OFFSET_BAR1        0x14
 #define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
 
 /* Interrupt information field layout. [NVMe-PCIe-1.1 §3.8.1.20] */
@@ -460,6 +489,7 @@ _Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
 #define NVME_PCI_CMD_MEMORY_SPACE  BIT(1) /* Memory Space Enable */
 #define NVME_PCI_CMD_BUS_MASTER    BIT(2) /* Bus Master Enable */
 
+#if defined(CONFIG_ARCH_X86_64)
 /* PCI Configuration Mechanism #1 I/O ports. [PCI-3.0 §3.2.2.3.2] */
 /* I/O Port Configuration */
 #define NVME_PCI_CONFIG_ADDR_IOPORT_ID 1
@@ -494,3 +524,32 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
     microkit_x86_ioport_write_32(NVME_PCI_CONFIG_ADDR_IOPORT_ID, NVME_PCI_CFG_ADDR_PORT, address);
     microkit_x86_ioport_write_32(NVME_PCI_CONFIG_DATA_IOPORT_ID, NVME_PCI_CFG_DATA_PORT, value);
 }
+
+#else /* !CONFIG_ARCH_X86_64 -- use ECAM (memory-mapped PCI config space) */
+
+/*
+ * ECAM (Enhanced Configuration Access Mechanism) address encoding.
+ * offset = (bus << 20) | (dev << 15) | (func << 12) | reg
+ * [PCIe2-0.9 §7.2.2]
+ */
+#define NVME_ECAM_BUS_SHIFT   20
+#define NVME_ECAM_DEV_SHIFT   15
+#define NVME_ECAM_FUNC_SHIFT  12
+
+#define NVME_ECAM_VADDR 0x20300000
+#define NVME_ECAM_BASE  (NVME_ECAM_VADDR - ((uintptr_t)NVME_PCI_DEV << NVME_ECAM_DEV_SHIFT))
+
+static inline uint32_t pci_config_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
+{
+    uintptr_t bdf_offset = ((uint32_t)bus << NVME_ECAM_BUS_SHIFT) | ((uint32_t)dev << NVME_ECAM_DEV_SHIFT)
+                         | ((uint32_t)func << NVME_ECAM_FUNC_SHIFT) | (uint32_t)offset;
+    return *(volatile uint32_t *)(NVME_ECAM_BASE + bdf_offset);
+}
+
+static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, uint32_t value)
+{
+    uintptr_t bdf_offset = ((uint32_t)bus << NVME_ECAM_BUS_SHIFT) | ((uint32_t)dev << NVME_ECAM_DEV_SHIFT)
+                         | ((uint32_t)func << NVME_ECAM_FUNC_SHIFT) | (uint32_t)offset;
+    *(volatile uint32_t *)(NVME_ECAM_BASE + bdf_offset) = value;
+}
+#endif

@@ -271,7 +271,7 @@ static int build_prp_dptr(uint32_t cid, uintptr_t data_paddr, uint16_t count, ui
         *dptr2 = data_paddr + BLK_TRANSFER_SIZE;
     } else if (count > 2) {
         /* PRP2 points to a PRP List stored in the metadata region. */
-        /* x86 hardcoded addresses */
+        /* hardcoded addresses */
         /* Each CID gets its own PRP list slot in the PRP region */
         uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE);
         uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE;
@@ -778,7 +778,7 @@ static void nvme_poll_controller_status(void)
                               .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_IDENTIFY, NVME_CDW0_PSDT_PRP),
                               .cdw10 = NVME_IDENTIFY_CNS_CONTROLLER,
                               .dptr2 = 0,
-                              .dptr1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
+                              .dptr1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded */
                           });
 
         state_ctx.state = NVME_STATE_WAIT_IDENTIFY_CTRL;
@@ -851,6 +851,18 @@ void init(void)
     assert(blk_config_check_magic(&blk_config));
     assert(timer_config_check_magic(&timer_config));
 
+#if !defined(CONFIG_ARCH_X86_64)
+    /*
+     * ARM/RISC-V: need to program PCI BARs ourselves.
+     * NVMe Memory Register Base Address is a 64-bit BAR [NVMe-PCIe-1.1 §3.8.1].
+     * MLBAR/BAR0 (0x10) = lower 32 bits, MUBAR/BAR1 (0x14) = upper 32 bits.
+     */
+    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR0,
+                        (uint32_t)NVME_CONTROLLER_PADDR);
+    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR1,
+                        (uint32_t)((uintptr_t)NVME_CONTROLLER_PADDR >> 32));
+#endif
+
     /* Check device presence first */
     uint32_t vid_did UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_ID);
     LOG_NVME("VendorID:DeviceID = %08x\n", vid_did);
@@ -860,7 +872,8 @@ void init(void)
 
     /* Enable Bus Master and Memory Space */
     uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);
-    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND, cmd | NVME_PCI_CMD_MEMORY_SPACE | NVME_PCI_CMD_BUS_MASTER);
+    pci_config_write_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND,
+                        cmd | NVME_PCI_CMD_MEMORY_SPACE | NVME_PCI_CMD_BUS_MASTER);
     LOG_NVME("PCI Command Register: %08x\n",
              pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND));
 
