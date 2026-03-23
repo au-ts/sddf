@@ -15,6 +15,8 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+#define VSWITCH_VIRT_PORT (SDDF_NET_MAX_CLIENTS - 1)
+
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
@@ -66,7 +68,7 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
 int mac_addr_find(const uint8_t *dest_macaddr) {
     mac_addr_t *mac;
     // try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS - 1; i++) { // TODO: can we simplify that loop?
+    for (int i = 0; i < VSWITCH_VIRT_PORT; i++) { // TODO: can we simplify that loop?
         for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
             mac = &config.ports[i].mac_addrs[j];
             if (mac802_addr_eq(mac->addr, dest_macaddr)) {
@@ -75,7 +77,7 @@ int mac_addr_find(const uint8_t *dest_macaddr) {
         }
     }
     // I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port
-    return 0;
+    return VSWITCH_VIRT_PORT;
 }
 
 static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
@@ -245,10 +247,10 @@ void init(void)
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
                        config.ports[i].tx.num_buffers);
-        //net_buffers_init(&state.rx_queues[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
 
         /* Seed the allow_list based on predefined settings */
         // for now quick hack, send all to all
         state.allow_list[i] = UINT64_MAX; // TODO: later construct properly
     }
+    state.allow_list[0] = ((uint64_t)0x1 << 63 | (uint64_t)0x1 << 2); // Client 0 can send only to out and to client 2
 }
