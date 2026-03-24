@@ -73,7 +73,7 @@ void fsm_virt_notified(fsm_data_t *fsm_data)
  * Reset driver data and goto request state if there's work to do. Otherwise, go to sleep.
  *
  * Succeeds: S_RESP, or any state when failing
- * Sucessor(s): S_REQ
+ * Successor(s): S_REQ
  */
 void state_idle(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {
@@ -106,7 +106,7 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
 
     // Sanity check. This should be impossible.
     if (i2c_queue_empty(queue_handle->request->ctrl)) {
-        LOG_I2C_DRIVER_ERR("State machine reached invalid state! In request state without work to do...");
+        LOG_I2C_DRIVER_ERR("State machine reached invalid state! In request state without work to do...\n");
         assert(false);
     }
 
@@ -149,7 +149,7 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
  * This sets up the await flags and rw_idx, as well as keeping track of progression through
  * the buffer. It also decides when the request is finished.
  * Succeeds: S_REQ, S_CMD_RET
- * Sucessor(s): S_CMD, S_IDLE (fatal), S_RESPONSE (done or error)
+ * Successor(s): S_CMD, S_IDLE (fatal), S_RESPONSE (done or error)
  */
 void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {
@@ -207,7 +207,7 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t 
  * Handle returning current request to virt.
  *
  * Succeeds: S_SEL_CMD (success), any other state (err set)
- * Sucessor(s): S_IDLE
+ * Successor(s): S_IDLE
  */
 void state_resp(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {

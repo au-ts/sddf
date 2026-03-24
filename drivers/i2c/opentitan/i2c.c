@@ -147,7 +147,7 @@ int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
                         || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
     if (!flags_valid) {
         LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
-                           "by hardware!");
+                           "by hardware!\n");
         return -1;
     }
     uint32_t addr_fdata = (data)&I2C_FDATA_FBYTE_MASK;
@@ -268,7 +268,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
     if (work_done) {
         fsm->next_state = S_CMD_RET;
     } else {
-        LOG_I2C_DRIVER_ERR("Warning: S_CMD exited without progress! Sleeping to retry.");
+        LOG_I2C_DRIVER_ERR("Warning: S_CMD exited without progress! Sleeping to retry.\n");
         fsm->next_state = S_CMD;
     }
     fsm->yield = true; // We want to go to sleep awaiting the IRQ coming back to us.
@@ -280,7 +280,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
  * continue working on the current command or to return to S_SEL_CMD for a new one.
  *
  * Succeeds: S_CMD
- * Sucessor(s): S_CMD (cmd not finished yet), S_SEL_CMD (cmd finished), S_RESP (error)
+ * Successor(s): S_CMD (cmd not finished yet), S_SEL_CMD (cmd finished), S_RESP (error)
  */
 void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {
@@ -328,18 +328,18 @@ void init(void)
 
     regs = (volatile opentitan_i2c_regs_t *)device_resources.regions[0].region.vaddr;
 
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: Timing parameters configuration:\n");
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_high_min = %u\n", timing_params.t_high_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_low_min = %u\n", timing_params.t_low_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_hd_dat_min = %u\n", timing_params.t_hd_dat_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_hd_sta_min = %u\n", timing_params.t_hd_sta_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_su_sta_min = %u\n", timing_params.t_su_sta_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_buf_min = %u\n", timing_params.t_buf_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_sto_min = %u\n", timing_params.t_sto_min);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_r = %u\n", timing_params.t_r);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_f = %u\n", timing_params.t_f);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_h = %u\n", timing_params.t_h);
-    LOG_I2C_DRIVER("I2C DRIVER|INFO: \t t_l = %u\n", timing_params.t_l);
+    LOG_I2C_DRIVER("Timing parameters configuration:\n");
+    LOG_I2C_DRIVER("\t t_high_min = %u\n", timing_params.t_high_min);
+    LOG_I2C_DRIVER("\t t_low_min = %u\n", timing_params.t_low_min);
+    LOG_I2C_DRIVER("\t t_hd_dat_min = %u\n", timing_params.t_hd_dat_min);
+    LOG_I2C_DRIVER("\t t_hd_sta_min = %u\n", timing_params.t_hd_sta_min);
+    LOG_I2C_DRIVER("\t t_su_sta_min = %u\n", timing_params.t_su_sta_min);
+    LOG_I2C_DRIVER("\t t_buf_min = %u\n", timing_params.t_buf_min);
+    LOG_I2C_DRIVER("\t t_sto_min = %u\n", timing_params.t_sto_min);
+    LOG_I2C_DRIVER("\t t_r = %u\n", timing_params.t_r);
+    LOG_I2C_DRIVER("\t t_f = %u\n", timing_params.t_f);
+    LOG_I2C_DRIVER("\t t_h = %u\n", timing_params.t_h);
+    LOG_I2C_DRIVER("\t t_l = %u\n", timing_params.t_l);
 
     // Perform initial set up - calculate and validate timing parameters.
     // If any of the below conditions are not true, the device cannot initialise!
@@ -447,7 +447,7 @@ void notified(microkit_channel ch)
         driver_data.err = I2C_ERR_OTHER;
         microkit_irq_ack(ch);
     } else {
-        microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+        LOG_I2C_DRIVER_ERR("unexpected notification!\n");
     }
     // Handle error IRQ if we are in the process of handling a request
     if (driver_data.err != I2C_ERR_OK && (fsm_data.curr_state == S_CMD || fsm_data.curr_state == S_CMD_RET)) {
