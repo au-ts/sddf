@@ -57,8 +57,7 @@ static inline bool hw_ring_empty(hw_ring_t *ring)
     return ring->tail - ring->head == 0;
 }
 
-static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
-                             uint16_t len, uint32_t stat)
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys, uint16_t len, uint32_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = (uint32_t)(phys & MAX_BIT_32_MASK);
@@ -245,25 +244,23 @@ static void handle_irq(void)
 static void disable_pq1(void)
 {
     volatile struct descriptor *rx_q1_terminator =
-        (volatile struct descriptor *)(device_resources.regions[1].region.vaddr +
-                                       rx.capacity * sizeof(struct descriptor));
+        (volatile struct descriptor *)(device_resources.regions[1].region.vaddr
+                                       + rx.capacity * sizeof(struct descriptor));
     rx_q1_terminator->addr = RXD_OWN | RXD_WRAP; /* SW owns + wrap terminator */
     rx_q1_terminator->stat = 0;
     rx_q1_terminator->addr_hi = 0;
     rx_q1_terminator->unused = 0;
 
     volatile struct descriptor *tx_q1_terminator =
-        (volatile struct descriptor *)(device_resources.regions[2].region.vaddr +
-                                       tx.capacity * sizeof(struct descriptor));
+        (volatile struct descriptor *)(device_resources.regions[2].region.vaddr
+                                       + tx.capacity * sizeof(struct descriptor));
     tx_q1_terminator->addr = 0;
     tx_q1_terminator->stat = TXD_USED | TXD_WRAP; /* SW owns + wrap terminator */
     tx_q1_terminator->addr_hi = 0;
     tx_q1_terminator->unused = 0;
 
-    uintptr_t rx_q1_ptr = device_resources.regions[1].io_addr +
-                          rx.capacity * sizeof(struct descriptor);
-    uintptr_t tx_q1_ptr = device_resources.regions[2].io_addr +
-                          tx.capacity * sizeof(struct descriptor);
+    uintptr_t rx_q1_ptr = device_resources.regions[1].io_addr + rx.capacity * sizeof(struct descriptor);
+    uintptr_t tx_q1_ptr = device_resources.regions[2].io_addr + tx.capacity * sizeof(struct descriptor);
     eth->receive_q1_ptr = (uint32_t)rx_q1_ptr;
     eth->transmit_q1_ptr = (uint32_t)tx_q1_ptr;
 }
