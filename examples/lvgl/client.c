@@ -48,11 +48,12 @@ void notified(sddf_channel ch)
                 clicked = event.value == 1;
             }
             if (event.type == EV_ABS) {
+                uint32_t value = MAX(0, (int32_t)event.value);
                 if (event.code == ABS_X) {
-                    mouse_x = (float)event.value * ((float)RESX / (float)32767);
+                    mouse_x = (float)value * ((float)RESX / (float)32767);
                 }
                 if (event.code == ABS_Y) {
-                    mouse_y = (float)event.value * ((float)RESY / (float)32767);
+                    mouse_y = (float)value * ((float)RESY / (float)32767);
                 }
             }
         }
@@ -69,6 +70,7 @@ static void pointer_input_cb(lv_indev_t * indev, lv_indev_data_t * data)
     if (clicked) {
         data->point.x = mouse_x;
         data->point.y = mouse_y;
+        sddf_dprintf("x: %f, y: %f\n", mouse_x, mouse_y);
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
@@ -144,10 +146,20 @@ void draw_ui(void)
     // lv_label_set_text(label, "Hello world");
     // lv_obj_center(label);
 
+    lv_obj_t *label = lv_label_create(lv_screen_active());
+    lv_label_set_text(label, "Hard working ?");
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, -40);
+
     lv_obj_t *sw = lv_switch_create(lv_screen_active());
     lv_obj_center(sw);
     lv_obj_add_state(sw, LV_STATE_CHECKED);
     // lv_obj_add_event_cb(sw, sw_event_cb, LV_EVENT_VALUE_CHANGED, label);
+
+    LV_IMAGE_DECLARE(cursor);
+    lv_obj_t *cursor_obj = lv_image_create(lv_screen_active());  /* Create image widget for cursor. */
+    lv_image_set_src(cursor_obj, &cursor);             /* Set image source. */
+    lv_indev_set_cursor(indev, cursor_obj);                 /* Connect image to input device. */
 
     sddf_timer_set_timeout(config.driver_id, NS_IN_MS * 5);
 }

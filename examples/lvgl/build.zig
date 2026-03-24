@@ -509,6 +509,7 @@ pub fn build(b: *std.Build) !void {
 
     client.addCSourceFile(.{ .file = b.path("client.c") });
     client.addCSourceFile(.{ .file = b.path("ramfb.c") });
+    client.addCSourceFile(.{ .file = b.path("cursor.c") });
     client.addIncludePath(sddf_dep.path("include"));
     client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
