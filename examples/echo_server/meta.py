@@ -280,13 +280,9 @@ def generate(
         sdf.add_mr(hw_net_rings)
         ethernet_driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
 
-        virtio_net_regs = MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
-        )
+        virtio_net_regs = MemoryRegion(sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000)
         sdf.add_mr(virtio_net_regs)
-        ethernet_driver.add_map(
-            Map(virtio_net_regs, 0x6000_0000, "rw", cached=False)
-        )
+        ethernet_driver.add_map(Map(virtio_net_regs, 0x6000_0000, "rw", cached=False))
 
         virtio_net_irq = SystemDescription.IrqIoapic(
             ioapic_id=0, pin=11, vector=1, id=16
@@ -300,9 +296,7 @@ def generate(
         ethernet_driver.add_ioport(pci_config_data_port)
 
     if board.name == "vb_105":
-        ecam_mr = MemoryRegion(
-            sdf, name="ecam", size=0x1000, paddr=0xe0100000
-        )
+        ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
         sdf.add_mr(ecam_mr)
         ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
 
@@ -318,17 +312,13 @@ def generate(
             sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
         )
         sdf.add_mr(hw_rx_ring_buffer)
-        ethernet_driver.add_map(
-            Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw")
-        )
+        ethernet_driver.add_map(Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw"))
 
         hw_tx_ring_buffer = MemoryRegion(
             sdf, name="hw_tx_ring_buffer", size=0x4000, paddr=0x10004000
         )
         sdf.add_mr(hw_tx_ring_buffer)
-        ethernet_driver.add_map(
-            Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw")
-        )
+        ethernet_driver.add_map(Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw"))
 
         # MSI
         # eth_irq = SystemDescription.IrqMsi(
@@ -348,9 +338,7 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=16, vector=8
-        )
+        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8)
 
         ethernet_driver.add_irq(eth_irq)
 

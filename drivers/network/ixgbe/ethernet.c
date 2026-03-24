@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, UNSW
+ * Copyright 2026, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -71,39 +71,47 @@ net_queue_handle_t tx_queue;
 
 volatile struct enet_regs *eth;
 
-static inline void set_reg(uintptr_t reg, uint32_t val) {
-    asm volatile("movl %0,%1" : : "r" (val), "m" (*(volatile uint32_t *)reg));
+static inline void set_reg(uintptr_t reg, uint32_t val)
+{
+    asm volatile("movl %0,%1" : : "r"(val), "m"(*(volatile uint32_t *)reg));
 }
 
-static inline uint32_t get_reg(uintptr_t reg) {
+static inline uint32_t get_reg(uintptr_t reg)
+{
     uint32_t ret;
-    asm volatile("movl %1,%0" : "=r" (ret) : "m" (*(volatile uint32_t *)reg) : "memory");
+    asm volatile("movl %1,%0" : "=r"(ret) : "m"(*(volatile uint32_t *)reg) : "memory");
     return ret;
 }
 
-static inline void set_flags(uintptr_t reg, uint32_t flags) {
+static inline void set_flags(uintptr_t reg, uint32_t flags)
+{
     set_reg(reg, get_reg(reg) | flags);
 }
 
-static inline void clear_flags(uintptr_t reg, uint32_t flags) {
+static inline void clear_flags(uintptr_t reg, uint32_t flags)
+{
     set_reg(reg, get_reg(reg) & ~flags);
 }
 
-static inline void set_reg16(uintptr_t reg, uint16_t val) {
-    asm volatile("movw %0,%1" : : "r" (val), "m" (*(volatile uint16_t *)reg));
+static inline void set_reg16(uintptr_t reg, uint16_t val)
+{
+    asm volatile("movw %0,%1" : : "r"(val), "m"(*(volatile uint16_t *)reg));
 }
 
-static inline uint16_t get_reg16(uintptr_t reg) {
+static inline uint16_t get_reg16(uintptr_t reg)
+{
     uint16_t ret;
-    asm volatile("movw %1,%0" : "=r" (ret) : "m" (*(volatile uint16_t *)reg) : "memory");
+    asm volatile("movw %1,%0" : "=r"(ret) : "m"(*(volatile uint16_t *)reg) : "memory");
     return ret;
 }
 
-static inline void set_flags16(uintptr_t reg, uint16_t flags) {
+static inline void set_flags16(uintptr_t reg, uint16_t flags)
+{
     set_reg16(reg, get_reg16(reg) | flags);
 }
 
-static inline void clear_flags16(uintptr_t reg, uint16_t flags) {
+static inline void clear_flags16(uintptr_t reg, uint16_t flags)
+{
     set_reg16(reg, get_reg16(reg) & ~flags);
 }
 
@@ -180,9 +188,12 @@ uint64_t get_link_speed(void)
         return 0;
     }
     switch (speed & IXGBE_LINKS_SPEED_82599) {
-    case IXGBE_LINKS_SPEED_100_82599: return 100;
-    case IXGBE_LINKS_SPEED_1G_82599: return 1000;
-    case IXGBE_LINKS_SPEED_10G_82599: return 10000;
+    case IXGBE_LINKS_SPEED_100_82599:
+        return 100;
+    case IXGBE_LINKS_SPEED_1G_82599:
+        return 1000;
+    case IXGBE_LINKS_SPEED_10G_82599:
+        return 10000;
     default:
         return 0;
     }
@@ -204,12 +215,8 @@ void tx_provide(void)
 
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
-            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP
-                | IXGBE_ADVTXD_DCMD_RS
-                | IXGBE_ADVTXD_DCMD_IFCS
-                | IXGBE_ADVTXD_DCMD_DEXT
-                | IXGBE_ADVTXD_DTYP_DATA
-                | (uint32_t)buffer.len;
+            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
+                                    | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
             desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
 
             /* THREAD_MEMORY_RELEASE(); */
@@ -243,7 +250,8 @@ void tx_return(void)
     while (!hw_tx_ring_empty()) {
         /* Ensure that this buffer has been sent by the device */
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
-        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0) break;
+        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
+            break;
 
         THREAD_MEMORY_RELEASE();
 
@@ -312,8 +320,10 @@ static void rx_return(void)
 
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) break;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0) break;
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
+            break;
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0)
+            break;
 
         net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
         buffer.len = desc.upper.length;
@@ -358,11 +368,9 @@ void init(void)
     device.rx_ring = (void *)hw_rx_ring_vaddr;
     device.tx_ring = (void *)hw_tx_ring_vaddr;
 
-    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr,
-                   config.virt_rx.active_queue.vaddr,
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
-    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr,
-                   config.virt_tx.active_queue.vaddr,
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
                    config.virt_tx.num_buffers);
 
     // Disable Interrupts, see Section 4.6.3.1
@@ -436,7 +444,7 @@ void init_1(void)
 
             set_reg(RDBAL(i), hw_rx_ring_paddr & 0xFFFFFFFFull);
             set_reg(RDBAH(i), hw_rx_ring_paddr >> 32);
-            set_reg(RDLEN(i), NUM_RX_DESCS * sizeof (ixgbe_adv_rx_desc_t));
+            set_reg(RDLEN(i), NUM_RX_DESCS * sizeof(ixgbe_adv_rx_desc_t));
             set_reg(RDH(0), 0);
             set_reg(RDT(0), 0);
         }
@@ -478,7 +486,7 @@ void init_1(void)
         set_reg(TDH(0), 0);
         set_reg(TDT(0), 0);
 
-        set_reg(TDLEN(i), NUM_TX_DESCS * sizeof (ixgbe_adv_tx_desc_t));
+        set_reg(TDLEN(i), NUM_TX_DESCS * sizeof(ixgbe_adv_tx_desc_t));
 
         // descriptor writeback magic values, important to get good performance and low PCIe overhead
         // see 7.2.3.4.1 and 7.2.3.5 for an explanation of these values and how to find good ones
@@ -500,7 +508,6 @@ void init_1(void)
         set_reg(TXDCTL(0), IXGBE_TXDCTL_ENABLE);
         while ((get_reg(TXDCTL(0)) & IXGBE_TXDCTL_ENABLE) == 0);
     }
-
 
     // wait some time for the link to come up
     sddf_timer_set_timeout(timer_config.driver_id, 100 * NS_IN_MS);
@@ -531,7 +538,6 @@ void init_3(void)
     enable_interrupts();
 
     device.init_stage = 4;
-
 }
 
 void notified(microkit_channel ch)
@@ -544,7 +550,7 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
         }
-    } else if (ch == device_resources.irqs[0].id){
+    } else if (ch == device_resources.irqs[0].id) {
         // write/read-to-clear, no need for auto clear
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);

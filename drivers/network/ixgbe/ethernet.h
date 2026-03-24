@@ -1,3 +1,7 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 #pragma once
 
 #include <stdint.h>
@@ -19,7 +23,7 @@
             return 0;                                                   \
         }                                                               \
         return base + offset + multiplier * index;               \
-    }                                                                   \
+    }
 
 declare_register(PCIE_CONFIG_BASE, PCI_VENDOR_ID_16, 0x00);
 declare_register(PCIE_CONFIG_BASE, PCI_DEVICE_ID_16, 0x02);
