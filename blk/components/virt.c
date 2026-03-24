@@ -123,11 +123,12 @@ static bool handle_client(int cli_id)
 {
     int err = 0;
     blk_queue_handle_t h = client_queues[cli_id];
-    uintptr_t cli_data_base_paddr = config.clients[cli_id].data.io_addr + 0x10000000;
 
-    sddf_dprintf("shifting paddr to test iommu\n");
+    uintptr_t cli_data_base_paddr = config.clients[cli_id].data.io_addr;
 
-    assert(config.clients[cli_id].data.io_addr == 0x7fdd5000);
+    // uintptr_t cli_data_base_paddr = config.clients[cli_id].data.io_addr + 0x10000000;
+    // sddf_dprintf("shifting paddr to test iommu\n");
+
     uintptr_t cli_data_base_vaddr = (uintptr_t)config.clients[cli_id].data.region.vaddr;
     uint64_t cli_data_region_size = config.clients[cli_id].data.region.size;
 

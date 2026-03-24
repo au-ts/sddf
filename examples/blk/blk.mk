@@ -37,7 +37,7 @@ endif
 IMAGE_FILE := loader.img
 REPORT_FILE  := report.txt
 SYSTEM_FILE := blk.system
-SYSTEM_FILE_IOMMU := ../blk_iommu.system
+SYSTEM_FILE_IOMMU := ../blk_nvme_iommu.system
 
 SUPPORTED_BOARDS := qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \

@@ -436,8 +436,8 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
  * FUTURE: Get these from PCIe enumeration
  */
 
-#define NVME_PCI_BUS 0
-#define NVME_PCI_DEV 4
+#define NVME_PCI_BUS 4
+#define NVME_PCI_DEV 0
 #define NVME_PCI_FUNC 0
 
 /* Memory Region Virtual Addresses */

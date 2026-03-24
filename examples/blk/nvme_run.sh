@@ -1,0 +1,1 @@
+/home/cheng/system/machine_queue/mq.sh run -s vb_105 -c success -f build/sel4.elf -f build/loader.img
