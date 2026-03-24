@@ -377,17 +377,17 @@ void init(void)
     /* clear_flags16(PCI_MSI_MASK, BIT(0)); */
 
     // Enable MSI-X, see PCI Express Technology 3.0 Chapter 17 for more details.
-    // Disable legacy interrupts. TODO: this should be done by PCI driver.
-    set_flags16(PCI_COMMAND_16, BIT(10));
-    // Set vector message address to Local APIC of CPU0
-    set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20);
-    set_reg(DEVICE_MSIX_TABLE + 0x4, 0);
-    // Set vector data to Interrupt Vector
-    set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32);
-    // Unmask vector 0 to enable interrupts through it
-    set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE);
-    // Enable MSI-X. TODO: this should be set by PCI driver.
-    set_flags(PCI_MSIX_CTRL, BIT(31));
+    /* // Disable legacy interrupts. TODO: this should be done by PCI driver. */
+    /* set_flags16(PCI_COMMAND_16, BIT(10)); */
+    /* // Set vector message address to Local APIC of CPU0 */
+    /* set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20); */
+    /* set_reg(DEVICE_MSIX_TABLE + 0x4, 0); */
+    /* // Set vector data to Interrupt Vector */
+    /* set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32); */
+    /* // Unmask vector 0 to enable interrupts through it */
+    /* set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE); */
+    /* // Enable MSI-X. TODO: this should be set by PCI driver. */
+    /* set_flags(PCI_MSIX_CTRL, BIT(31)); */
 
     // Initialise the statistic registers. Must keep. TODO: why?
     set_reg(RQSMR(0), 0);
@@ -636,13 +636,6 @@ void notified(microkit_channel ch)
             sddf_dprintf("BAR4: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x20));
             sddf_dprintf("BAR5: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x24));
             sddf_dprintf("MSI CTRL: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x50));
-            sddf_dprintf("MSI-X CTRL: 0x%x\n", get_reg(PCI_MSIX_CTRL));
-            sddf_dprintf("MSI-X OFFSET: 0x%x\n", get_reg(PCI_MSIX_OFFSET));
-            sddf_dprintf("MSI-X PENDING: 0x%x\n", get_reg(PCI_MSIX_PENDING));
-            sddf_dprintf("MSI-X Table - vector0 address low: 0x%x\n", get_reg(DEVICE_MSIX_TABLE));
-            sddf_dprintf("MSI-X Table - vector0 address high: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x4));
-            sddf_dprintf("MSI-X Table - vector0 data: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x8));
-            sddf_dprintf("MSI-X Table - vector0 control: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0xC));
         }
     } else if (ch == device_resources.irqs[0].id){
         /* bench->eth_irq_count++; */

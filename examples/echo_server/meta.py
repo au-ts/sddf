@@ -336,21 +336,21 @@ def generate(
         # )
 
         # MSI-X
-        eth_msix_table = MemoryRegion(
-            sdf, name="eth_msix_table", size=0x8000, paddr=0x6000e04000
-        )
-        sdf.add_mr(eth_msix_table)
-        ethernet_driver.add_map(
-            Map(eth_msix_table, vaddr=0x4000000, perms="rw")
-        )
-        eth_irq = SystemDescription.IrqMsi(
-            pci_bus=65, pci_device=0, pci_func=0, vector=2, handle=0
-        )
+        # eth_msix_table = MemoryRegion(
+        #     sdf, name="eth_msix_table", size=0x8000, paddr=0x6000e04000
+        # )
+        # sdf.add_mr(eth_msix_table)
+        # ethernet_driver.add_map(
+        #     Map(eth_msix_table, vaddr=0x4000000, perms="rw")
+        # )
+        # eth_irq = SystemDescription.IrqMsi(
+        #     pci_bus=65, pci_device=0, pci_func=0, vector=2, handle=0
+        # )
 
         # Legacy I/O APIC
-        # eth_irq = SystemDescription.IrqIoapic(
-        #     board.arch, ioapic_id=3, pin=4, vector=8
-        # )
+        eth_irq = SystemDescription.IrqIoapic(
+            ioapic_id=0, pin=16, vector=8
+        )
 
         ethernet_driver.add_irq(eth_irq)
 
