@@ -56,12 +56,16 @@ void fw_cfg_dma_transfer(volatile void* address, uint32_t length, uint32_t contr
 void fw_cfg_dma_read(volatile void* buf, int e, int length) {
     uint32_t control = (e << 16) | 0x08 | 0x02;
     fw_cfg_dma_transfer(DMA_ADDRESS_PADDR, length, control);
-    memcpy((void *)buf, (void *)DMA_ADDRESS_VADDR, length);
+    for (int i = 0; i < length; i++) {
+        ((char *)buf)[i] = ((char *)DMA_ADDRESS_VADDR)[i];
+    }
 }
 
 void fw_cfg_dma_write(void* buf, int e, int length) {
     uint32_t control = (e << 16) | 0x08 | 0x10;
-    memcpy((void *)DMA_ADDRESS_VADDR, buf, length);
+    for (int i = 0; i < length; i++) {
+        ((char *)DMA_ADDRESS_VADDR)[i] = ((char *)buf)[i];
+    }
     fw_cfg_dma_transfer(DMA_ADDRESS_PADDR, length, control);
 }
 
