@@ -27,7 +27,7 @@ static inline int check_data_buf(void *data_buf)
 {
     if ((uintptr_t)data_buf < (uintptr_t)I2C_DATA_REGION
         || (uintptr_t)data_buf > ((uintptr_t)I2C_DATA_REGION + i2c_config.data.size)) {
-        LOG_LIBI2C_ERR("sddf_i2c_write called with data_buf not in data region!");
+        LOG_LIBI2C_ERR("sddf_i2c_write called with data_buf not in data region!\n");
         return -1;
     }
     return 0;
@@ -56,7 +56,7 @@ static void __i2c_block(libi2c_conf_t *conf)
  */
 static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16_t len, uint8_t flag_mask)
 {
-    LOG_LIBI2C("Dispatch: to=%zu, buf = %p, flag_mask = %zu, len = %zu\n", address, buf, flag_mask, len);
+    LOG_LIBI2C("Dispatch: to=%u, buf = %p, flag_mask = 0x%x, len = %u\n", address, buf, flag_mask, len);
     // Check that supplied buffer is within bounds of data region
     if (check_data_buf(buf)) {
         return -1;
@@ -81,7 +81,7 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
 
     // Slice buffer into 255 byte long segments and enqueue.
     for (uint16_t i = 0; i < num_batches; i++) {
-        LOG_LIBI2C("Slice %zu / %zu\n", i + 1, num_batches);
+        LOG_LIBI2C("Slice %u / %u\n", i + 1, num_batches);
         uint16_t curr_offset = ((1 << 8) * i);
         // Batch of 255, unless there are fewer commands left.
         uint8_t data_len = (len - curr_offset) >= 255 ? 255 : (uint8_t)(len - curr_offset);
