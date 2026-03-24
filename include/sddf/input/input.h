@@ -1,12 +1,15 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
-enum input_event_type {
-    INPUT_EVENT_TYPE_KEY,
-    INPUT_EVENT_TYPE_MOUSE,
+struct virtio_input_event {
+    uint16_t type;
+    uint16_t code;
+    uint32_t value;
 };
 
-typedef struct input_event {
-    input_event_type type;
-} input_event_t;
+struct input_event_queue {
+    size_t n;
+    struct virtio_input_event events[];
+};

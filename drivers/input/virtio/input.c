@@ -4,6 +4,8 @@
 #include <sddf/virtio/transport/common.h>
 #include <sddf/virtio/transport/mmio.h>
 #include <sddf/virtio/queue.h>
+#include <sddf/input/input.h>
+#include <sddf/input/evdev.h>
 
 #define DEBUG_DRIVER
 
@@ -17,6 +19,7 @@
 
 #define CLIENT_CH 10
 
+#define VIRTIO_ID_NAME_QEMU_TABLET       "QEMU Virtio Tablet"
 #define VIRTIO_ID_NAME_QEMU_KEYBOARD     "QEMU Virtio Keyboard"
 #define VIRTIO_ID_NAME_QEMU_MOUSE        "QEMU Virtio Mouse"
 
@@ -28,7 +31,7 @@
 
 void *virtio_device;
 
-struct virtio_input_event *client_events = (struct virtio_input_event *)0x60000000;
+struct input_event_queue *client_events = (struct input_event_queue *)0x60000000;
 
 volatile virtio_mmio_regs_t *regs;
 
@@ -49,9 +52,6 @@ uint16_t event_last_desc_idx = 0;
 /* Allocator for event queue descriptors */
 ialloc_t event_ialloc_desc;
 uint32_t event_descriptors[EVENT_COUNT];
-
-#define EV_KEY 0x1
-#define EV_REL 0x2
 
 enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_UNSET      = 0x00,
@@ -91,12 +91,6 @@ struct virtio_input_config {
     } u;
 };
 
-struct virtio_input_event {
-    uint16_t type;
-    uint16_t code;
-    uint32_t value;
-};
-
 static void eventq_provide(void);
 
 static void virtio_input_event_print(struct virtio_input_event *event) {
@@ -118,6 +112,7 @@ static void eventq_process(void) {
     uint16_t events_processed = 0;
     uint16_t i = event_last_seen_used;
     uint16_t curr_idx = event_virtq.used->idx;
+    client_events->n = 0;
     while (i != curr_idx) {
         // LOG_DRIVER("processing event descriptor %d\n", i);
         struct virtq_used_elem used = event_virtq.used->ring[i % event_virtq.num];
@@ -132,12 +127,14 @@ static void eventq_process(void) {
 
         // TODO: clear the virtio_event_vaddr memory after using this descriptor? Probably not worth it
         struct virtio_input_event *event = &virtio_event_vaddr[used.id];
+        struct virtio_input_event *client_event = &client_events->events[client_events->n];
         // TODO: check why we get events with type 0
         if (event->type != 0) {
             // virtio_input_event_print(event);
             // TODO: terrible, fix,
-            memcpy(client_events, event, sizeof(struct virtio_input_event));
-            microkit_notify(CLIENT_CH);
+            // sddf_dprintf("event->type: 0x%x, event->code: 0x%x, event->value: 0x%x\n", event->type, event->code, event->value);
+            memcpy(client_event, event, sizeof(struct virtio_input_event));
+            client_events->n += 1;
         }
 
         int err = ialloc_free(&event_ialloc_desc, used.id);
@@ -150,6 +147,7 @@ static void eventq_process(void) {
 
     event_last_seen_used += events_processed;
 
+    microkit_notify(CLIENT_CH);
     eventq_provide();
 }
 
@@ -295,7 +293,7 @@ void input_setup() {
     volatile struct virtio_input_config *virtio_config = (volatile struct virtio_input_config *)regs->Config;
 
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_DEVIDS, 0);
-    struct virtio_input_devids *devids = &virtio_config->u.ids;
+    volatile struct virtio_input_devids *devids = &virtio_config->u.ids;
     if (virtio_config->size != 0) {
         LOG_DRIVER("devids bustype: 0x%x, vendor: 0x%x, product: 0x%x, version: 0x%x\n", devids->bustype, devids->vendor, devids->product, devids->version);
     } else {
@@ -305,10 +303,12 @@ void input_setup() {
     // Select the event types we want, right now this is hard-coded for QEMU mouse and keyboard.
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_NAME, 0);
     uint8_t ev_bits;
-    if (!strncmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_MOUSE, virtio_config->size)) {
+    if (!strncmp((char *)virtio_config->u.string, VIRTIO_ID_NAME_QEMU_MOUSE, virtio_config->size)) {
         ev_bits = EV_REL;
-    } else if (!strncmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_KEYBOARD, virtio_config->size)) {
+    } else if (!strncmp((char *)virtio_config->u.string, VIRTIO_ID_NAME_QEMU_KEYBOARD, virtio_config->size)) {
         ev_bits = EV_KEY;
+    } else if (!strncmp((char *)virtio_config->u.string, VIRTIO_ID_NAME_QEMU_TABLET, virtio_config->size)) {
+        ev_bits = EV_ABS;
     } else {
         // TODO: strings are not null-terminated, don't do this
         LOG_DRIVER("unknown device: %s\n", virtio_config->u.string);
@@ -320,6 +320,13 @@ void input_setup() {
     if (!virtio_config->size) {
         LOG_DRIVER("device did not accept EV bits 0x%x\n", ev_bits);
         assert(false);
+    }
+
+    if (ev_bits == EV_ABS) {
+        virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ABS_INFO, ABS_X);
+        sddf_dprintf("ABS X: min: %u, max: %u\n", virtio_config->u.abs.min, virtio_config->u.abs.max);
+        virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ABS_INFO, ABS_Y);
+        sddf_dprintf("ABS Y: min: %u, max: %u\n", virtio_config->u.abs.min, virtio_config->u.abs.max);
     }
 
     /* Finish initialisation */
