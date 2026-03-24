@@ -193,6 +193,7 @@ def generate(
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
     pmu_event_ids: List[int],
+    net_need_timer: bool,
 ):
     uart_node = None
     ethernet_node = None
@@ -235,7 +236,7 @@ def generate(
     sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
 
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=253, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -243,7 +244,7 @@ def generate(
         add_x86_hpet(sdf, timer_driver)
 
         hpet_regs = SystemDescription.MemoryRegion(
-            sdf, "hpet_regs", 0x1000, paddr=0xFED00000
+            sdf, "hpet_regs", 0x1000, paddr=board.timer
         )
         hpet_regs_map = SystemDescription.Map(
             hpet_regs, 0x5000_0000, "rw", cached=False
@@ -279,7 +280,7 @@ def generate(
     )
 
     if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
+        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
         uart_driver.add_ioport(serial_port)
 
     ethernet_driver = ProtectionDomain(
@@ -318,13 +319,10 @@ def generate(
         sdf.add_mr(mbox)
         ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        hw_net_rings = SystemDescription.MemoryRegion(
-            sdf, "hw_net_rings", 65536, paddr=0x7A000000
-        )
+    if board.name == "qemu_virt_x86":
+        hw_net_rings = MemoryRegion(sdf, "hw_net_rings", 65536, paddr=0x7A000000)
         sdf.add_mr(hw_net_rings)
-        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
-        ethernet_driver.add_map(hw_net_rings_map)
+        ethernet_driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
 
         # virtio_net_regs = SystemDescription.MemoryRegion(
         #     sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
@@ -349,6 +347,61 @@ def generate(
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, ethernet_driver, None, 2))
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, ethernet_driver, None, 3))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
+
+    if board.name == "vb_105":
+        ecam_mr = MemoryRegion(
+            sdf, name="ecam", size=0x1000, paddr=0xe0100000
+        )
+        sdf.add_mr(ecam_mr)
+        ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
+
+        eth_region_0 = MemoryRegion(
+            sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
+        )
+        sdf.add_mr(eth_region_0)
+        ethernet_driver.add_map(
+            Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
+        )
+
+        hw_rx_ring_buffer = MemoryRegion(
+            sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
+        )
+        sdf.add_mr(hw_rx_ring_buffer)
+        ethernet_driver.add_map(
+            Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw")
+        )
+
+        hw_tx_ring_buffer = MemoryRegion(
+            sdf, name="hw_tx_ring_buffer", size=0x4000, paddr=0x10004000
+        )
+        sdf.add_mr(hw_tx_ring_buffer)
+        ethernet_driver.add_map(
+            Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw")
+        )
+
+        # MSI
+        # eth_irq = SystemDescription.IrqMsi(
+        #     pci_bus=65, pci_device=0, pci_func=0, vector=1, handle=0
+        # )
+
+        # MSI-X
+        # eth_msix_table = MemoryRegion(
+        #     sdf, name="eth_msix_table", size=0x8000, paddr=0x6000e04000
+        # )
+        # sdf.add_mr(eth_msix_table)
+        # ethernet_driver.add_map(
+        #     Map(eth_msix_table, vaddr=0x4000000, perms="rw")
+        # )
+        # eth_irq = SystemDescription.IrqMsi(
+        #     pci_bus=65, pci_device=0, pci_func=0, vector=2, handle=0
+        # )
+
+        # Legacy I/O APIC
+        eth_irq = SystemDescription.IrqIoapic(
+            ioapic_id=0, pin=16, vector=8
+        )
+
+        ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
@@ -392,6 +445,9 @@ def generate(
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
+    if net_need_timer:
+        print("need a timer")
+        timer_system.add_client(ethernet_driver)
     net_system.add_client_with_copier(client0, client0_net_copier)
     net_system.add_client_with_copier(client1, client1_net_copier)
 
@@ -613,6 +669,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
     parser.add_argument("--bench_pmu_events", required=False)
@@ -669,4 +726,4 @@ if __name__ == "__main__":
 
         pmu_event_ids.append(bench_pmu_events[pmu_events[i]][0])
 
-    generate(args.sdf, args.output, dtb, get_core, pmu_event_ids)
+    generate(args.sdf, args.output, dtb, get_core, pmu_event_ids, args.need_timer)
