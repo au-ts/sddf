@@ -87,15 +87,30 @@ static void flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * px_m
      *frame buffer or external display controller. */
     sddf_dprintf("flush_cb called, area: x1: %d, y1: %d, x2: %d, y2: %d\n", area->x1, area->y1, area->x2, area->y2);
 
-    // TODO: do properly
-    size_t fb_off = RESX * (area->y1 + 1) * 4;
-    size_t n = 20;
+    size_t pxl_size = 4;
+    size_t fb_offset = ((RESX * area->y1) + area->x1) * pxl_size;
+    size_t px_map_offset = 0;
 
-    size_t nbytes = n * RESX * 4;
-    sddf_dprintf("copying to [0x%lx..0x%lx) from [0x%lx..0x%lx)\n", fb_address + fb_off, fb_address + fb_off + nbytes, px_map, px_map + nbytes);
-    memcpy((uint8_t *)fb_address + fb_off, px_map, nbytes);
+    size_t fb_stride = (RESX - area->x2 + area->x1 - 1) * pxl_size;
+    size_t copy_size = (area->x2 - area->x1 + 1) * pxl_size;
+    size_t n_copies = area->y2 - area->y1 + 1;
 
-    sddf_dprintf("flush_cb finish?\n");
+    uint8_t *fb_ptr = fb_address + fb_offset;
+    uint8_t *px_map_ptr = px_map + px_map_offset;
+
+    for (int i = 0; i < n_copies; i++) {
+
+        for (int i = 0; i < copy_size; i++) {
+            fb_ptr[i] = px_map_ptr[i];
+        }
+        // memcpy(fb_ptr, px_map_ptr, copy_size); << alignment fault
+
+        fb_ptr += copy_size;
+        px_map_ptr += copy_size;
+
+        fb_ptr += fb_stride;
+    }
+
     /* signal LVGL that we're done */
     lv_display_flush_ready(disp);
 }
