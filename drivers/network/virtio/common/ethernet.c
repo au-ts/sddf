@@ -410,6 +410,7 @@ static void eth_setup(void)
 
 void init(void)
 {
+    sddf_dprintf("ello\n");
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
@@ -446,6 +447,7 @@ void init(void)
 
     eth_setup();
 
+    sddf_dprintf("ello\n");
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     sddf_irq_ack(16);

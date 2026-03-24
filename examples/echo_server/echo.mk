@@ -73,7 +73,7 @@ CFLAGS += \
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a libsddf_util_debug.a \
 	--end-group
 
 ECHO_OBJS := echo.o utilization_socket.o \
@@ -86,6 +86,19 @@ all: loader.img
 echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+include ${SDDF}/util/util.mk
+include ${SDDF}/network/components/network_components.mk
+include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
+include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${BENCHMARK}/benchmark.mk
+include ${TIMER_DRIVER}/timer_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
+
+ifdef NET_NEED_TIMER
+export NET_NEED_TIMER
+endif
+
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
@@ -94,11 +107,16 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+	    $${NET_NEED_TIMER:+--need_timer}
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+	    $${NET_NEED_TIMER:+--need_timer}
+endif
+ifdef NET_NEED_TIMER
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_ethernet_driver.data eth_driver.elf
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
@@ -113,6 +131,7 @@ endif
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data echo0.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data echo0.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_ethernet_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data echo1.elf
@@ -125,15 +144,6 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)
 
-
-include ${SDDF}/util/util.mk
-include ${SDDF}/network/components/network_components.mk
-include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
-include ${ETHERNET_DRIVER}/eth_driver.mk
-include ${BENCHMARK}/benchmark.mk
-include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/serial_driver.mk
-include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
