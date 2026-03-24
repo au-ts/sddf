@@ -7,6 +7,8 @@
 #include <os/sddf.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
+#include <sddf/input/input.h>
+#include <sddf/input/evdev.h>
 #include <sddf/util/printf.h>
 
 #define LV_LVGL_H_INCLUDE_SIMPLE
@@ -25,8 +27,52 @@ uint8_t *fb_address;
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
 
+struct input_event_queue *keyboard_events = (struct input_event_queue *)0x10000000;
+struct input_event_queue *mouse_events = (struct input_event_queue *)0x20000000;
+
+#define KEYBOARD_CH 0
+#define MOUSE_CH 1
+
+float mouse_x;
+float mouse_y;
+
+bool clicked = false;
+
 void notified(sddf_channel ch)
 {
+    if (ch == MOUSE_CH) {
+        for (int i = 0; i < mouse_events->n; i++) {
+            struct virtio_input_event event = mouse_events->events[i];
+            if (event.type == EV_KEY && event.code == BTN_MOUSE) {
+                sddf_dprintf("CLIENT: got click! (%d, %d, %d)\n", event.type, event.code, event.value);
+                clicked = event.value == 1;
+            }
+            if (event.type == EV_ABS) {
+                if (event.code == ABS_X) {
+                    mouse_x = (float)event.value * ((float)RESX / (float)32767);
+                }
+                if (event.code == ABS_Y) {
+                    mouse_y = (float)event.value * ((float)RESY / (float)32767);
+                }
+            }
+        }
+    }
+
+    lv_timer_handler();
+    if (ch == config.driver_id) {
+        sddf_timer_set_timeout(config.driver_id, NS_IN_MS * 5);
+    }
+}
+
+static void pointer_input_cb(lv_indev_t * indev, lv_indev_data_t * data)
+{
+    if (clicked) {
+        data->point.x = mouse_x;
+        data->point.y = mouse_y;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
 }
 
 static uint32_t tick_cb(void)
@@ -74,9 +120,9 @@ void draw_ui(void)
     lv_display_set_flush_cb(display, flush_cb);
 
     /*Create an input device for touch handling*/
-    // lv_indev_t * indev = lv_indev_create();
-    // lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
-    // lv_indev_set_read_cb(indev, my_touch_read_cb);
+    lv_indev_t * indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(indev, pointer_input_cb);
 
     /*The drivers are in place; now we can create the UI*/
     // lv_obj_t * label = lv_label_create(lv_screen_active());
@@ -88,11 +134,7 @@ void draw_ui(void)
     lv_obj_add_state(sw, LV_STATE_CHECKED);
     // lv_obj_add_event_cb(sw, sw_event_cb, LV_EVENT_VALUE_CHANGED, label);
 
-    /*Execute the LVGL-related tasks in a loop*/
-    while(1) {
-        lv_timer_handler();
-        // my_sleep_ms(5);         /*Wait a little to let the system breathe*/
-    }
+    sddf_timer_set_timeout(config.driver_id, NS_IN_MS * 5);
 }
 
 void init(void)
@@ -106,7 +148,7 @@ void init(void)
     qemu_ramfb_configure(&cfg);
 
     fb_address = (uint8_t*)DMA_ADDRESS_VADDR;
-    for (int i = 0; i < RESY * RESX * 2; i++) {
+    for (int i = 0; i < RESY * RESX * 4; i++) {
         fb_address[i] = 0xff;
     }
 

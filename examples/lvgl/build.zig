@@ -520,6 +520,10 @@ pub fn build(b: *std.Build) !void {
 
     b.installArtifact(client);
 
+    const virtio_input_driver = sddf_dep.artifact(b.fmt("driver_input_{s}.elf", .{"virtio"}));
+    const keyboard_driver_install = b.addInstallArtifact(virtio_input_driver, .{ .dest_sub_path = "virtio_keyboard_driver.elf" });
+    const mouse_driver_install = b.addInstallArtifact(virtio_input_driver, .{ .dest_sub_path = "virtio_mouse_driver.elf" });
+
     const dtb = blk: {
         if (target.result.cpu.arch != .x86_64) {
             // For compiling the DTS into a DTB
@@ -576,6 +580,8 @@ pub fn build(b: *std.Build) !void {
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
+    microkit_tool_cmd.step.dependOn(&keyboard_driver_install.step);
+    microkit_tool_cmd.step.dependOn(&mouse_driver_install.step);
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
@@ -602,6 +608,9 @@ pub fn build(b: *std.Build) !void {
             "-m",
             "2G",
             "-device", "ramfb",
+            "-device", "virtio-keyboard-device",
+            "-device", "virtio-tablet-device",
+            "-global", "virtio-mmio.force-legacy=false",
         });
     } else if (microkit_board_option == .qemu_virt_riscv64) {
         qemu_cmd = b.addSystemCommand(&[_][]const u8{
