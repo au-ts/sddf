@@ -13,12 +13,12 @@
  * Request a timeout via PPC into the passive timer driver.
  * Use the label to indicate this request.
  * @param channel ID of the timer driver.
- * @param timeout relative timeout in nanoseconds.
+ * @param timeout absolute timestamp in nanoseconds.
  */
-static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout)
+static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timestamp)
 {
-    sddf_set_mr(0, timeout);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_SET_TIMEOUT, 0, 0, 1));
+    sddf_set_mr(0, timestamp);
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_REQ_TIMEOUT, 0, 0, 1));
 }
 
 /**

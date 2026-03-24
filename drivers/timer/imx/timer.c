@@ -39,17 +39,14 @@
 #define ICR2 8
 #define CNT 9
 
-#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
-
 #define GPT_FREQ   (24*MEGA)
 #define GPT_PRESCALER (0)
-
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static volatile uint32_t *gpt;
 static uint32_t overflow_count;
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout;
 
 static uint64_t get_ticks(void)
 {
@@ -65,22 +62,18 @@ static uint64_t get_ticks(void)
     return (overflow << 32) | cnt;
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time) {
+        sddf_notify(i);
+        // Update "current" time page with virt
+        set_shared_time_page(curr_time);
+        target_timeout = UINT64_MAX;
+        // No more work to do!
+        return;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
+    // Program timer otherwise
     if (next_timeout != UINT64_MAX && overflow_count == (next_timeout >> 32)) {
         gpt[OCR1] = (uint32_t)next_timeout;
         gpt[IR] |= 1;
@@ -108,33 +101,22 @@ void notified(sddf_channel ch)
     }
 
     uint64_t curr_time = get_ticks();
-    process_timeouts(curr_time);
+    process_target_timeout(curr_time);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = tick_to_ns_cached(get_ticks(), GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
-        // uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks();
-        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
-        // uint64_t offset_ticks = (sddf_get_mr(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
-        timeouts[ch] = curr_time + offset_ticks;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time = get_ticks();
+    // Convert to ticks and set as target
+    target_timeout = ns_to_tick_cached(timestamp, GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return (tick_to_ns_cached(get_ticks(), GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ));
 }
 
 void init(void)
@@ -143,9 +125,7 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
+    target_timeout = UINT64_MAX;
 
     gpt = (volatile uint32_t *)device_resources.regions[0].region.vaddr;
 
