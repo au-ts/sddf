@@ -64,19 +64,19 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     d->addr = (uint32_t)(phys & MAX_BIT_32_MASK);
     d->addr_hi = (uint32_t)(phys >> 32);
     d->unused = 0;
-    
+
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
      */
     THREAD_MEMORY_RELEASE();
-    
+
     d->stat = stat | (len & TXD_LEN_MASK);
 }
 
 static void rx_provide(void)
 {
     bool reprocess = true;
-    
+
     while (reprocess) {
         while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
             net_buff_desc_t buffer;
@@ -86,7 +86,7 @@ static void rx_provide(void)
             uint32_t idx = rx.tail % rx.capacity;
             uint32_t stat = RXD_MK_HW_OWNR; /* Set HW as owner */
             uintptr_t phys = buffer.io_or_offset & (RXD_ADDR_MASK & MAX_BIT_64_MASK);
-            
+
             if (idx + 1 == rx.capacity) {
                 phys |= RXD_WRAP;
             }
@@ -101,7 +101,7 @@ static void rx_provide(void)
         } else {
             net_cancel_signal_free(&rx_queue);
         }
-        
+
         reprocess = false;
 
         if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
@@ -114,7 +114,7 @@ static void rx_provide(void)
 static void rx_return(void)
 {
     bool packets_transferred = false;
-    
+
     while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         uint32_t idx = rx.head % rx.capacity;
@@ -130,7 +130,7 @@ static void rx_return(void)
         uint16_t len = d->stat & RXD_LEN_MASK;
         uintptr_t phys_addr = ((uintptr_t)d->addr_hi << 32) | (d->addr & RXD_ADDR_MASK);
         net_buff_desc_t buffer = { phys_addr, len };
-        
+
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
@@ -156,14 +156,14 @@ static void tx_provide(void)
             uint32_t idx = tx.tail % tx.capacity;
             uint32_t stat = TXD_LAST | TXD_MK_HW_OWNR; /* Set HW as owner */
             uintptr_t phys = buffer.io_or_offset & (TXD_ADDR_MASK & MAX_BIT_64_MASK);
-            
+
             if (idx + 1 == tx.capacity) {
                 stat |= TXD_WRAP;
             }
-            
+
             update_ring_slot(&tx, idx, phys, buffer.len, stat);
             tx.tail++;
-            
+
             eth->nwctrl |= ZYNQ_GEM_NWCTRL_STARTTX_MASK;
         }
 
@@ -242,28 +242,29 @@ static void handle_irq(void)
  * This region is never touched by rx_provide() / tx_provide(), so the terminator
  * state is stable for the lifetime of the driver.
  */
-static void disable_pq1(void) {
+static void disable_pq1(void)
+{
     volatile struct descriptor *rx_q1_terminator =
         (volatile struct descriptor *)(device_resources.regions[1].region.vaddr +
                                        rx.capacity * sizeof(struct descriptor));
-    rx_q1_terminator->addr    = RXD_OWN | RXD_WRAP; /* SW owns + wrap terminator */
-    rx_q1_terminator->stat    = 0;
+    rx_q1_terminator->addr = RXD_OWN | RXD_WRAP; /* SW owns + wrap terminator */
+    rx_q1_terminator->stat = 0;
     rx_q1_terminator->addr_hi = 0;
-    rx_q1_terminator->unused  = 0;
+    rx_q1_terminator->unused = 0;
 
     volatile struct descriptor *tx_q1_terminator =
         (volatile struct descriptor *)(device_resources.regions[2].region.vaddr +
                                        tx.capacity * sizeof(struct descriptor));
-    tx_q1_terminator->addr    = 0;
-    tx_q1_terminator->stat    = TXD_USED | TXD_WRAP; /* SW owns + wrap terminator */
+    tx_q1_terminator->addr = 0;
+    tx_q1_terminator->stat = TXD_USED | TXD_WRAP; /* SW owns + wrap terminator */
     tx_q1_terminator->addr_hi = 0;
-    tx_q1_terminator->unused  = 0;
+    tx_q1_terminator->unused = 0;
 
     uintptr_t rx_q1_ptr = device_resources.regions[1].io_addr +
                           rx.capacity * sizeof(struct descriptor);
     uintptr_t tx_q1_ptr = device_resources.regions[2].io_addr +
                           tx.capacity * sizeof(struct descriptor);
-    eth->receive_q1_ptr  = (uint32_t)rx_q1_ptr;
+    eth->receive_q1_ptr = (uint32_t)rx_q1_ptr;
     eth->transmit_q1_ptr = (uint32_t)tx_q1_ptr;
 }
 
@@ -290,11 +291,11 @@ static void eth_setup(void)
 
     /* disable interrupts */
     eth->idr = ZYNQ_GEM_IDR_CLEAR;
-    
+
     /* clear rx/tx buffer queue */
     eth->rxqbase = 0x0;
     eth->txqbase = 0x0;
-    
+
     /* clear hash regs */
     eth->hashl = 0x0;
     eth->hashh = 0x0;
@@ -304,16 +305,16 @@ static void eth_setup(void)
     }
     /* 2 Network configuration */
     eth->nwcfg = 0x0;
-    
+
     /* enable full duplex */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_FDEN;
-    
+
     /* enable FCS removal */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_FSREM;
-    
+
     /* 64 bit AMBA AXI data bus width */
     eth->nwcfg |= ZYNQ_GEM_DBUS_WIDTH;
-    
+
     /* Gigabit speed */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_SPEED1000;
 
@@ -322,35 +323,35 @@ static void eth_setup(void)
 
     /* enable checksum offload on receive */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_CHSUM_EN;
-    
+
     /* copy all valid frames */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES;
-    
+
     /* 3. Set MAC address */
     eth->laddr[0][LADDR_LOW] = mac_l;
     eth->laddr[0][LADDR_HIGH] = mac_h;
-    
+
     /* 4. Configure DMA */
     eth->dmacr = 0x0;
-    
+
     /* RX buffer size: 1536 bytes */
     eth->dmacr |= ZYNQ_GEM_DMACR_RXBUF;
-    
+
     /* RX packet buffer: 32KB */
     eth->dmacr |= ZYNQ_GEM_DMACR_RXPBUF_32KB;
-    
+
     /* TX packet buffer: 32KB */
     eth->dmacr |= ZYNQ_GEM_DMACR_TXPBUF_32KB;
-    
+
     /* Enable TX checksum offload */
     eth->dmacr |= ZYNQ_GEM_DMACR_TXPBUF_TCP;
-    
+
     /* AXI burst length: INCR16, 16 burst packets */
     eth->dmacr |= ZYNQ_GEM_DMACR_BLENGTH_16;
 
     /* 64-bit AXI bus width */
     eth->dmacr |= ZYNQ_GEM_DMA_BUS_WIDTH;
-    
+
     /* 5. Initialise buffer descriptors */
     /* RX descriptors */
     for (uint32_t i = 0; i < rx.capacity; i++) {
@@ -383,7 +384,7 @@ static void eth_setup(void)
      */
     eth->upper_rxqbase = 0x0;
     eth->upper_txqbase = 0x0;
-    
+
     /* Set rx/tx queue base address */
     eth->rxqbase = device_resources.regions[1].io_addr;
     eth->txqbase = device_resources.regions[2].io_addr;
@@ -393,7 +394,7 @@ static void eth_setup(void)
 
     /* 7. Enable RX/TX interrupts */
     eth->ier = ZYNQ_INT_RXC | ZYNQ_INT_TXC;
-    
+
     /* 8. Enable MDIO and transmitter (receiver enabled later after buffer init) */
     eth->nwctrl |= ZYNQ_GEM_NWCTRL_MDEN_MASK;
     eth->nwctrl |= ZYNQ_GEM_NWCTRL_TXEN_MASK;
@@ -405,7 +406,7 @@ void init(void)
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);
-    
+
     /* All buffers should fit within our DMA region, plus one for queue1 terminator */
     assert((RX_COUNT + 1) * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert((TX_COUNT + 1) * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
