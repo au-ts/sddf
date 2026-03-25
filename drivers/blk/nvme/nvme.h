@@ -386,8 +386,11 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
  * FUTURE: Get these from PCIe enumeration
  */
 
-#define NVME_PCI_BUS 0
-#define NVME_PCI_DEV 4
+/* #define NVME_PCI_BUS 0 */
+/* #define NVME_PCI_DEV 4 */
+/* #define NVME_PCI_FUNC 0 */
+#define NVME_PCI_BUS 2
+#define NVME_PCI_DEV 0
 #define NVME_PCI_FUNC 0
 
 /* Memory Region Virtual Addresses */

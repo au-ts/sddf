@@ -17,7 +17,7 @@
 #include "nvme.h"
 #include "nvme_queue.h"
 
-//#define DEBUG_DRIVER
+#define DEBUG_DRIVER
 #ifdef DEBUG_DRIVER
 #include "nvme_debug.h"
 #define UNUSED
@@ -62,6 +62,8 @@ static nvme_queue_info_t io_queue;
 
 static blk_queue_handle_t blk_queue;
 static blk_storage_info_t *storage_info;
+
+bool pci_ready = false;
 
 /*
  * State machine flow:
@@ -699,6 +701,7 @@ static void nvme_poll_controller_status(void)
 
         if (nvme_controller->csts & NVME_CSTS_RDY) {
             if (state_ctx.waited_ms < state_ctx.timeout_ms) {
+                LOG_NVME("timer ch id: %u\n", timer_config.driver_id);
                 sddf_timer_set_timeout(timer_config.driver_id, NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS);
                 state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
@@ -844,6 +847,11 @@ void nvme_controller_init()
 
 void init(void)
 {
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     LOG_NVME("Initializing NVMe Driver...\n");
 
     /* Validate device_resources */
@@ -869,6 +877,8 @@ void init(void)
 
     uint32_t bar0 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR0);
     LOG_NVME("NVMe PCI BAR0 readback: %08x\n", bar0);
+    uint32_t bar1 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR1);
+    LOG_NVME("NVMe PCI BAR1 readback: %08x\n", bar1);
 
     /* Enable Bus Master and Memory Space */
     uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);
@@ -906,10 +916,22 @@ void init(void)
 
     /* NVMe Controller Init */
     nvme_controller_init();
+    sddf_dprintf("finished\n");
 }
 
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("NVME|INFO: ch %u\n", ch);
+    if (ch == 10) {
+        pci_ready = true;
+        init();
+        return;
+    }
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     if (ch == NVME_IRQ) {
         /* Guard against early IRQ delivery before admin queues are initialised. */
         if (state_ctx.state > NVME_STATE_WAIT_READY) {
