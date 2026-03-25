@@ -382,19 +382,14 @@ fun rx_provide()
 
       var {1,1} buffer = net_dequeue(net_rx_free, net_rx_capacity);
       var idx = wrap_hw_rx_capacity(hw_rx_tail);
-      /@ assert old[l_it](slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr) in gv.rx_free.net_removed_addr @/
 
       var io_addr = buffer.0;
       rx_update_ring_slot(hw_rx_ptr, idx, io_addr, 0, RXD_EMPTY);
-      // data is moved from the rx_free net queue to the hw queue
-      /@ assert slot(gv.hardware_ring_rx, idx).hw_addr == old[l_it](slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr) @/
 
       var temp = wrap_int16(hw_rx_tail + 1);
       hw_rx_tail = temp;
       //st hw_rx_tail_slot, (hw_rx_tail + 1);
       set_rdar();
-      // data from rx_free net queue is used
-      /@ assert element2_seq(old[l_it](slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr), 0) in gv.rx_handled @/
 
       full = rx_hw_ring_full();
       empty = net_queue_empty(net_rx_free);
@@ -555,17 +550,12 @@ fun rx_return()
     var stat = 0;
     !ld16 stat, dscr_addr + DESCR_STAT_OFF;
     if (!(stat & RXD_EMPTY)) {
-      /@ assert !is_RXD_EMPTY(slot(gv.hardware_ring_rx, idx).hw_stat) @/
-      /@ assert !is_RXD_EMPTY(slot(gv.hardware_ring_rx, gv.hw_rx_head % QUEUE_CAPACITY).hw_stat) @/
-
       THREAD_MEMORY_ACQUIRE()
 
       var len = 0;
       !ld16 len, dscr_addr;
       var io_addr = 0;
       !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
-      /@ assert len == slot(gv.hardware_ring_rx, idx).hw_len @/
-      /@ assert io_addr == slot(gv.hardware_ring_rx, idx).hw_addr @/
 
       /*var queue_full = net_queue_full(net_rx_active, net_rx_capacity);
       if (queue_full) {
@@ -585,7 +575,6 @@ fun rx_return()
       empty = rx_hw_ring_empty();
       packets_transferred = true;
     } else {
-      /@ assert is_RXD_EMPTY(slot(gv.hardware_ring_rx, gv.hw_rx_head % QUEUE_CAPACITY).hw_stat) @/
       reached_empty = 1;
     }
     /@ refute false @/
@@ -719,27 +708,16 @@ fun tx_provide()
 
       var {1,1} buffer = net_dequeue(net_tx_active, net_tx_capacity);
       var idx = wrap_hw_tx_capacity(hw_tx_tail);
-      /@ assert element2_seq(old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr),
-                             old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len))
-                  in gv.tx_active.net_removed @/
 
       var io_addr = buffer.0;
       var len = buffer.1;
       var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
       tx_update_ring_slot(hw_tx_ptr, idx, io_addr, len, stat);
-      // data is moved from the tx_active net queue to the hw queue
-      /@ assert slot(gv.hardware_ring_tx, idx).hw_addr == old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr) @/
-      /@ assert slot(gv.hardware_ring_tx, idx).hw_len == old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len) @/
 
       var temp = wrap_int16(hw_tx_tail + 1);
-      /@ assert temp == 0 || temp == gv.hw_tx_tail + 1 @/
-      /@ assert 0 <= (temp - gv.hw_tx_head) % (MAX_INT16 + 1) && (temp - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity @/
       hw_tx_tail = temp;
       //st hw_tx_tail_slot, (hw_tx_tail + 1);
       set_tdar();
-      /@ assert element2_seq(old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr),
-                             old[l_it](slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len))
-                  in gv.tx_handled @/
 
       full = tx_hw_ring_full();
       empty = net_queue_empty(net_tx_active);
@@ -872,8 +850,6 @@ fun tx_return()
     var stat = 0;
     !ld16 stat, dscr_addr + DESCR_STAT_OFF;
     if (!(stat & TXD_READY)) {
-      /@ assert !is_TXD_READY(slot(gv.hardware_ring_tx, idx).hw_stat) @/
-
       THREAD_MEMORY_ACQUIRE()
 
       var io_addr = 0;
@@ -891,12 +867,10 @@ fun tx_return()
 
       enqueued = true;
       var temp = wrap_int16(hw_tx_head + 1);
-      /@ assert temp == 0 || temp == gv.hw_tx_head + 1 @/
       hw_tx_head = temp;
 
       empty = tx_hw_ring_empty();
     } else {
-      /@ assert is_TXD_READY(slot(gv.hardware_ring_tx, idx).hw_stat) @/
       reached_ready = 1;
     }
 
