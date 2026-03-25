@@ -97,6 +97,8 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_
     LOG_VIRTIO_TRANSPORT("\tHeader type: a general device\n");
     LOG_VIRTIO_TRANSPORT("\tLatency timer: 0x%x\n", pci_device_header->common_hdr.latency_timer);
     LOG_VIRTIO_TRANSPORT("\tCache line size: 0x%x\n", pci_device_header->common_hdr.cache_line_size);
+    LOG_VIRTIO_TRANSPORT("\tIRQ PIN: 0x%x\n", pci_device_header->irq_pin);
+    LOG_VIRTIO_TRANSPORT("\tIRQ LINE: 0x%x\n", pci_device_header->irq_line);
 
     for (int i = 0; i < PCI_GEN_DEV_NUM_BARS; i++) {
         LOG_VIRTIO_TRANSPORT("\tBAR%d: 0x%x\n", i, pci_device_header->base_address_registers[i]);

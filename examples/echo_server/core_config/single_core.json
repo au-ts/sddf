@@ -1,4 +1,6 @@
 {
+    "acpi_driver": 0,
+    "pci_driver": 0,
     "timer_driver": 0,
     "serial_driver": 0,
     "serial_virt_tx": 0,

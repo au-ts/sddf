@@ -53,7 +53,8 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
+	  timer_driver.elf serial_driver.elf serial_virt_tx.elf \
+	  pci_driver.elf acpi_driver.elf
 
 
 CFLAGS += \
@@ -85,21 +86,42 @@ all: loader.img
 echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pci/pci_driver.mk
+include ${SDDF}/util/util.mk
+include ${SDDF}/network/components/network_components.mk
+include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
+include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${BENCHMARK}/benchmark.mk
+include ${TIMER_DRIVER}/timer_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
+
+ifdef NET_NEED_TIMER
+export NET_NEED_TIMER
+endif
+
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
+
+test_%_table.dat: $(ECHO_SERVER)/acpi_tables/%_table.dat
+	cp $^ $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
-		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
+	    $${NET_NEED_TIMER:+--need_timer}
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
-		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
+	    $${NET_NEED_TIMER:+--need_timer}
+endif
+ifdef NET_NEED_TIMER
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_ethernet_driver.data eth_driver.elf
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
@@ -121,20 +143,14 @@ endif
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
 	touch $@
 
-${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+SPEC = capdl_spec.json
+$(BUILD_DIR):
+	mkdir -p $@
+
+${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE) $(BUILD_DIR)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
-	-o $(IMAGE_FILE) -r $(REPORT_FILE)
-
-
-include ${SDDF}/util/util.mk
-include ${SDDF}/network/components/network_components.mk
-include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
-include ${ETHERNET_DRIVER}/eth_driver.mk
-include ${BENCHMARK}/benchmark.mk
-include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/serial_driver.mk
-include ${SERIAL_COMPONENTS}/serial_components.mk
+	-o $(IMAGE_FILE) -r $(REPORT_FILE)  --capdl-json ${SPEC}
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
