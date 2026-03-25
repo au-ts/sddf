@@ -22,8 +22,6 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
-#define MASK(n) (~BIT(n))
-
 #define RX_IRQ  1
 
 // Minimum inter-interrupt interval specified in 2.048 us units
@@ -73,14 +71,14 @@ volatile struct enet_regs *eth;
 
 static inline void set_reg(uintptr_t reg, uint32_t val)
 {
-    asm volatile("movl %0,%1" : : "r"(val), "m"(*(volatile uint32_t *)reg));
+    volatile uint32_t *ptr = (volatile uint32_t *)reg;
+    *ptr = val;
 }
 
 static inline uint32_t get_reg(uintptr_t reg)
 {
-    uint32_t ret;
-    asm volatile("movl %1,%0" : "=r"(ret) : "m"(*(volatile uint32_t *)reg) : "memory");
-    return ret;
+    volatile uint32_t *ptr = (volatile uint32_t *)reg;
+    return *ptr;
 }
 
 static inline void set_flags(uintptr_t reg, uint32_t flags)
@@ -95,14 +93,14 @@ static inline void clear_flags(uintptr_t reg, uint32_t flags)
 
 static inline void set_reg16(uintptr_t reg, uint16_t val)
 {
-    asm volatile("movw %0,%1" : : "r"(val), "m"(*(volatile uint16_t *)reg));
+    volatile uint16_t *ptr = (volatile uint16_t *)reg;
+    *ptr = val;
 }
 
 static inline uint16_t get_reg16(uintptr_t reg)
 {
-    uint16_t ret;
-    asm volatile("movw %1,%0" : "=r"(ret) : "m"(*(volatile uint16_t *)reg) : "memory");
-    return ret;
+    volatile uint16_t *ptr = (volatile uint16_t *)reg;
+    return *ptr;
 }
 
 static inline void set_flags16(uintptr_t reg, uint16_t flags)
@@ -138,7 +136,7 @@ static inline bool hw_rx_ring_full(void)
 void clear_interrupts(void)
 {
     set_reg(EIMC, IXGBE_IRQ_CLEAR_MASK);
-    get_reg(EICR); // Write Flush?
+    /* get_reg(EICR); */
 }
 
 void disable_interrupts(void)
@@ -435,7 +433,7 @@ void init_1(void)
         set_flags(RDRXCTL, IXGBE_RDRXCTL_CRCSTRIP);
 
         // accept broadcast packets, promiscuous
-        set_flags(FCTRL, IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE);
+        set_reg(FCTRL, IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE);
 
         // only use queue 0
         for (int i = 0; i < 1; i++) {
