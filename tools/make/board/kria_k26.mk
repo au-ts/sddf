@@ -6,6 +6,7 @@
 # Set up variables for kria_k26
 # Should be included _before_ toolchain makefile.
 PLATFORM := zynqmp
+I2C_DRIV_DIR := ${PLATFORM}
 TIMER_DRIV_DIR := cdns
 UART_DRIV_DIR := ${PLATFORM}
 
