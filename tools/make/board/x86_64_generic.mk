@@ -8,16 +8,13 @@
 
 CPU := generic
 
-SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
-SEL4_32B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4_32.elf
+ifeq (${X86_BOARD},qemu_virt_x86)
+    BLK_DRIV_DIR ?= nvme
+    NET_DRIV_DIR ?= virtio/pci
+    ETH_DRIV ?= eth_driver_virtio.elf
+    UART_DRIV_DIR ?= pc99
 
-QEMU := qemu-system-x86_64
-QEMU_ARCH_ARGS := -machine q35 \
-		-kernel $(SEL4_32B) \
-		-m size=2G \
-		-serial mon:stdio \
-		-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
-		-initrd $(IMAGE_FILE)
+    CPU := generic
 
 # The PCI slot is hard-coded in the virtIO drivers for now, so we have to
 # specify the slot with QEMU as well.

@@ -1,4 +1,4 @@
-#
+z#
 # Copyright 2024, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
@@ -57,7 +57,7 @@ SDDF_CUSTOM_LIBC := 1
 
 include ${SDDF}/tools/make/sddf.mk
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf acpi_driver.elf pci_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
@@ -86,13 +86,13 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) \
 		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 else
 	$(PYTHON) \
-		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
+		--output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 endif
