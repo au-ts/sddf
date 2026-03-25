@@ -88,6 +88,14 @@ static bool cmd_is_read(i2c_cmd_t c)
 }
 
 /**
+ * Return TRUE if current command is a write-read operation.
+ */
+static bool cmd_is_wrrd(i2c_cmd_t c)
+{
+    return c.flag_mask & I2C_FLAG_WRRD;
+}
+
+/**
  * Return TRUE if current token corresponds to a read, else FALSE.
  * This function exists to handle correctly sending the WRRD write.
  */
