@@ -36,7 +36,6 @@ typedef struct zynq_i2c_regs {
 } zynq_i2c_regs_t;
 
 /* Hardware Parameters */
-#define I2C_FIFO_DEPTH 16
 #define ZYNQ_FIFO_DEPTH 16
 #define ZYNQ_MAX_TF_SIZE ((uint32_t)(255 - 3))
 /**
@@ -92,5 +91,3 @@ typedef struct zynq_i2c_regs {
 
 /* I2c transfer size properties */
 #define I2C_TF_SIZE_RESET_MASK  (0x00)
-
-#define SLAVE_MON_PAUSE_DEFAULT 0xF        /* Default pause value */
