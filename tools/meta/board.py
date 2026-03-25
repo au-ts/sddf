@@ -195,7 +195,7 @@ BOARDS: List[Board] = [
         ethernet="axi/ethernet@ff0e0000",
     ),
     Board(
-        name="x86_64_generic",
+        name="qemu_virt_x86",
         arch=SystemDescription.Arch.X86_64,
         paddr_top=0x70000000,
         timer=None,
