@@ -151,6 +151,7 @@ static void tx_provide(void)
             update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
             tx.tail++;
             eth->tdar = TDAR_TDAR;
+            sddf_dprintf("ETH|LOG: send the packet of len: %d oid: %d\n", buffer.len, buffer.oid);
         }
 
         net_request_signal_active(&tx_queue);
@@ -320,6 +321,7 @@ void init(void)
 void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
+        sddf_dprintf("ETH|LOG: received notification on IRQ channel: %u\n", ch);
         handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
@@ -327,8 +329,10 @@ void notified(sddf_channel ch)
          */
         sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
+        sddf_dprintf("ETH|LOG: received notification on RX channel: %u\n", ch);
         rx_provide();
     } else if (ch == config.virt_tx.id) {
+        sddf_dprintf("ETH|LOG: received notification on TX channel: %u\n", ch);
         tx_provide();
     } else {
         sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
