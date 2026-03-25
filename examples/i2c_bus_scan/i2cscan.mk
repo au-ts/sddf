@@ -20,7 +20,8 @@ export PYTHONPATH
 
 SUPPORTED_BOARDS := \
 		odroidc4 \
-		serengeti
+		serengeti \
+		kria_k26
 
 include ${SDDF}/tools/make/board/common.mk
 
