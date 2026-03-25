@@ -87,7 +87,8 @@ var 1 eth_reg = ETH_REG;
 /@ extern field net_descr: IArray @/
 /@ extern field ndescr_addr: Int @/
 /@ extern field ndescr_len: Int @/
-/@ extern field net_removed: Set[Int] @/
+/@ extern field net_removed_addr: Set[Int] @/
+/@ extern field net_removed: Set[Seq[Int]] @/
 /@ extern field net_added: Set[Seq[Int]] @/
 
 /@ extern predicate valid_hardware_ring_rx_write @/
@@ -98,11 +99,14 @@ var 1 eth_reg = ETH_REG;
 /@ extern predicate valid_hardware_ring_tx_mdata_write @/
 /@ extern predicate valid_hardware_ring_rx_mdata_read @/
 /@ extern predicate valid_hardware_ring_tx_mdata_read @/
+/@ extern predicate valid_net_queue_produce @/
+/@ extern predicate valid_net_queue_consume @/
 /@ extern field hardware_ring_tx: IArray @/
 /@ extern field hardware_ring_rx: IArray @/
 /@ extern field tx_await_ack: Seq[Int] @/
 /@ extern field rx_await_ack: Seq[Int] @/
-/@ extern field rx_handled: Set[Int] @/
+/@ extern field tx_handled: Set[Seq[Int]] @/
+/@ extern field rx_handled: Set[Seq[Int]] @/
 /@ extern field hw_addr: Int @/
 /@ extern field hw_stat: Int @/
 /@ extern field hw_len: Int @/
