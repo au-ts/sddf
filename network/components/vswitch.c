@@ -46,11 +46,10 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
     //sddf_printf_("VSWITCH active queue after enqueue len %d\n", net_queue_length(state.rx_queues[dst->id].active));
 
-    // TODO: recheck if my logic is not funky here - offsets etc
     // mark that this buffer has been passed once
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
     buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]++;
-    sddf_printf_("VSWITCH forwarding buffer with offset: %ld\n", src_buf->io_or_offset);
+    sddf_printf_("VSWITCH forwarding buffer with offset: %ld buflen: %d\n", src_buf->io_or_offset, src_buf->len);
     sddf_printf_("VSWITCH id: %d ref_index %d buffer_refs[idx]: %d\n", src->id, ref_index, buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]);
 
     if (net_require_signal_active(&state.rx_queues[dst->id])) {
@@ -124,7 +123,6 @@ static void rx_return(net_vswitch_port_config_t *port)
             assert(!err);
             ///sddf_printf_("VSWITCH rx_return free queue AFTER dequeue head %d tail %d\n", src->free->head, src->free->tail);
 
-            // TODO: handle if we need to handle the offsets etc in any special way
             int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
             sddf_printf_("VSWITCH returning buffer with offset: %ld\n", buffer.io_or_offset);
             sddf_printf_("VSWITCH oid: %d ref_index: %d buffer_refs[idx]: %d\n", buffer.oid, ref_index, buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index]);
@@ -163,7 +161,6 @@ static void rx_return(net_vswitch_port_config_t *port)
 static void forward_traffic_from(net_vswitch_port_config_t *port)
 {
     // Here we read from TX and fill in the corresponding RX (switched for virtualizer but we handle that in SDF)
-    // TODO: Think if we don't need to do some other handling for virt, should be fine
     net_queue_handle_t *src = &state.tx_queues[port->id];
 
     sddf_printf_("VSWITCH Forward traffic from port: %d\n", port->id);
@@ -185,19 +182,19 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             // find the receiver(s)
             // Forward frame
             // queue packets for the receivers (inside forward_frame)
-            sddf_printf_("VSWITCH Transmitting\n");
+            //sddf_printf_("VSWITCH Transmitting\n");
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
-                sddf_printf_("VSWITCH Bcasting\n");
+                //sddf_printf_("VSWITCH Bcasting\n");
                 transmitted = try_broadcast(port, &buffer); // TODO: this will fail if we broadcast some and then, the last one fails setting the flag to false!
             } else {
-                sddf_printf_("VSWITCH Sending\n");
+                //sddf_printf_("VSWITCH Sending\n");
                 transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
                 net_request_signal_free(src);
-                sddf_printf_("VSWITCH forwrad src free queue after enqueue len %d\n", net_queue_length(src->free));
+                //sddf_printf_("VSWITCH forwrad src free queue after enqueue len %d\n", net_queue_length(src->free));
             }
         }
 
