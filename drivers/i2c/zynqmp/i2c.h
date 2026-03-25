@@ -22,7 +22,7 @@
  */
 typedef struct zynq_i2c_regs {
     uint32_t ctrl;          /* 0x0 - Control reg */
-    uint32_t status;        /* 0x4 - Status reg */     
+    uint32_t status;        /* 0x4 - Status reg */
     uint32_t i2c_addr;      /* 0x8 - I2C address reg */
     uint32_t i2c_data;      /* 0xc - I2C data reg */
     uint32_t isr;           /* 0x10 - Interrupt status reg */
