@@ -95,6 +95,10 @@ void notified(sddf_channel ch)
 
 void init(void)
 {
+    //sddf_printf_("COPYCFG virt_rx.id=%u client.id=%u\n",
+    //             config.virt_rx.id, config.client.id);
+    //sddf_printf_("COPYCFG out_data[0].vaddr=%p out_data[1].vaddr=%p\n",
+     //            config.out_data[0].vaddr, config.out_data[1].vaddr);
     assert(net_config_check_magic(&config));
     /* Set up the queues */
     net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr,
