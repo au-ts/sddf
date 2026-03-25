@@ -162,7 +162,7 @@ BOARDS: List[Board] = [
         serial="axi/serial@ff000000",
     ),
     Board(
-        name="x86_64_generic",
+        name="qemu_virt_x86",
         arch=SystemDescription.Arch.X86_64,
         paddr_top=0x7FFDF000,
         timer=None,
