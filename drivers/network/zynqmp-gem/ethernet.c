@@ -63,9 +63,8 @@ static inline bool hw_ring_empty(hw_ring_t *ring)
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys, uint16_t len, uint32_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
-    d->addr = (uint32_t)(phys & MAX_BIT_32_MASK);
+    d->addr = (uint32_t)(phys);
     d->addr_hi = (uint32_t)(phys >> 32);
-    d->unused = 0;
 
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
@@ -87,7 +86,7 @@ static void rx_provide(void)
 
             uint32_t idx = rx.tail % rx.capacity;
             uint32_t stat = RXD_MK_HW_OWNR; /* Set HW as owner */
-            uintptr_t phys = buffer.io_or_offset & (RXD_ADDR_MASK & MAX_BIT_64_MASK);
+            uintptr_t phys = buffer.io_or_offset & RXD_ADDR_MASK;
 
             if (idx + 1 == rx.capacity) {
                 phys |= RXD_WRAP;
@@ -157,7 +156,7 @@ static void tx_provide(void)
 
             uint32_t idx = tx.tail % tx.capacity;
             uint32_t stat = TXD_LAST | TXD_MK_HW_OWNR; /* Set HW as owner */
-            uintptr_t phys = buffer.io_or_offset & (TXD_ADDR_MASK & MAX_BIT_64_MASK);
+            uintptr_t phys = buffer.io_or_offset & TXD_ADDR_MASK;
 
             if (idx + 1 == tx.capacity) {
                 stat |= TXD_WRAP;
@@ -252,7 +251,6 @@ static void disable_pq1(void)
     rx_q1_terminator->addr = RXD_OWN | RXD_WRAP; /* SW owns + wrap terminator */
     rx_q1_terminator->stat = 0;
     rx_q1_terminator->addr_hi = 0;
-    rx_q1_terminator->unused = 0;
 
     volatile struct descriptor *tx_q1_terminator =
         (volatile struct descriptor *)(device_resources.regions[2].region.vaddr
@@ -260,7 +258,6 @@ static void disable_pq1(void)
     tx_q1_terminator->addr = 0;
     tx_q1_terminator->stat = TXD_USED | TXD_WRAP; /* SW owns + wrap terminator */
     tx_q1_terminator->addr_hi = 0;
-    tx_q1_terminator->unused = 0;
 
     uintptr_t rx_q1_ptr = device_resources.regions[1].io_addr + rx.capacity * sizeof(struct descriptor);
     uintptr_t tx_q1_ptr = device_resources.regions[2].io_addr + tx.capacity * sizeof(struct descriptor);
@@ -359,7 +356,6 @@ static void eth_setup(void)
         d->addr = 0;
         d->stat = RXD_MK_HW_OWNR; /* HW owns initially */
         d->addr_hi = 0;
-        d->unused = 0;
         if (i == rx.capacity - 1) {
             d->addr |= RXD_WRAP;
         }
@@ -371,7 +367,6 @@ static void eth_setup(void)
         d->addr = 0;
         d->stat = TXD_USED; /* SW owns initially */
         d->addr_hi = 0;
-        d->unused = 0;
         if (i == tx.capacity - 1) {
             d->stat |= TXD_WRAP;
         }
