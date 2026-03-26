@@ -24,20 +24,12 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 /* IRQs */
 // NAK *must* be lowest ID for correctness!
-// #define IRQ_NAK_CH              (device_resources.irqs[0].id)
-// #define IRQ_RXTHRESH_CH         (device_resources.irqs[1].id)
-// #define IRQ_FMTTHRESH_CH        (device_resources.irqs[2].id)
-// #define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[3].id)
-// #define IRQ_BAD_STOP_CH         (device_resources.irqs[4].id)
-// #define IRQ_TIMEOUT_CH          (device_resources.irqs[5].id)
-
-// without fmt irq
 #define IRQ_NAK_CH              (device_resources.irqs[0].id)
-#define IRQ_RXTHRESH_CH         (device_resources.irqs[1].id)
-#define IRQ_FMTTHRESH_CH        (999)
-#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[2].id)
-#define IRQ_BAD_STOP_CH         (device_resources.irqs[3].id)
-#define IRQ_TIMEOUT_CH          (device_resources.irqs[4].id)
+#define IRQ_FMTTHRESH_CH        (device_resources.irqs[1].id)
+#define IRQ_RXTHRESH_CH         (device_resources.irqs[2].id)
+#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[3].id)
+#define IRQ_BAD_STOP_CH         (device_resources.irqs[4].id)
+#define IRQ_TIMEOUT_CH          (device_resources.irqs[5].id)
 
 /* Transport */
 i2c_queue_handle_t queue_handle;
@@ -150,14 +142,16 @@ int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
 {
     // Parse flags
     // Validate using minterm function - if readb=X, rcont=Y, stop=W, nakok=Z, then
-    // F = !X!Y + !W!Z + W!ZX!Y
-    // bool flags_valid = ((!flags->readb && !flags->rcont) || (!flags->stop && !flags->nakok)
-    //                     || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
-    // if (!flags_valid) {
-    //     LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
-    //                        "by hardware!\n");
-    //     return -1;
-    // }
+    // F = !X!Y + !WZ + W!ZX!Y
+    bool flags_valid = ((!flags->readb && !flags->rcont) || (!flags->stop && flags->nakok)
+                        || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
+    if (!flags_valid) {
+        LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
+                           "by hardware!\n");
+        LOG_I2C_DRIVER_ERR("start = %u - stop = %u - readb = %u - rcont = %u - nakok = %u\n", flags->start, flags->stop,
+                           flags->readb, flags->rcont, flags->nakok);
+        return -1;
+    }
     uint32_t addr_fdata = (data)&I2C_FDATA_FBYTE_MASK;
 
     // Apply flags.
@@ -190,9 +184,6 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
     i2c_cmd_t cmd = data->active_cmd;
     bool work_done = false;
 
-    // Clear here - we only want to receive this IRQ in this state and it gets sent spuriously
-    // otherwise.
-    clear_irq(I2C_INTR_STATE_FMT_THRESHOLD_BIT);
     // Wait until FIFOs are empty
     i2c_halt();
 
@@ -202,7 +193,8 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
     // The following code loops through all available space in the registers there is either:
     // a. no space in a needed register (just FMT fifo in this case)
     // b. the command is over
-    while (get_fmt_fifo_lvl() < OPENTITAN_I2C_FIFO_DEPTH && data->rw_idx < data->active_cmd.data_len) {
+    while (get_fmt_fifo_lvl() < OPENTITAN_I2C_FIFO_DEPTH
+           && (data->await_addr || data->rw_idx < data->active_cmd.data_len)) {
         LOG_I2C_DRIVER("fmt fifo level: %u\n", get_fmt_fifo_lvl());
         fdata_fmt_flags_t flags = { 0, 0, 0, 0, 0 };
         uint8_t fmt_byte = 0;
@@ -245,6 +237,11 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
             LOG_I2C_DRIVER("Selected ADDR = %X... read = %d\n", fmt_byte, cmd_is_read(cmd));
             LOG_I2C_DRIVER("Raw address: %u\n", i2c_curr_addr(data), cmd_is_read(cmd));
             data->await_addr = false;
+            if (data->await_stop && cmd.data_len == 0) {
+                // There aren't any data bytes to attach the stop to, so we have to attach it to
+                // the address byte instead.
+                flags.stop = 1;
+            }
 
         // Handle writing data
         } else {
@@ -257,8 +254,8 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
                 LOG_I2C_DRIVER("\t reading %u bytes\n", fmt_byte);
                 data->rw_idx += fmt_byte;
                 assert(data->rw_idx <= cmd.data_len);
-                // Always set continuing read unless this is the final read of this command or a stop is set.
-                flags.rcont = (!((data->rw_idx < cmd.data_len - 1))) && !flags.stop;
+                // Always set continuing read unless this is the final read of this command
+                flags.rcont = data->rw_idx < cmd.data_len;
                 if (flags.rcont) {
                     LOG_I2C_DRIVER("\t continuing read!\n");
                 }
@@ -339,7 +336,7 @@ void init(void)
     // Check sdfgen properties
     assert(i2c_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
-    assert(device_resources.num_irqs == 5);
+    assert(device_resources.num_irqs == 6);
     assert(device_resources.num_regions == 1);
 
     regs = (volatile opentitan_i2c_regs_t *)device_resources.regions[0].region.vaddr;
@@ -379,11 +376,9 @@ void init(void)
     i2c_halt();
 
     // Set up interrupts
-    regs->intr_enable =
-        I2C_INTR_ENABLE_RX_THRESHOLD_BIT
-        | I2C_INTR_ENABLE_NAK_BIT
-        // regs->intr_enable = I2C_INTR_ENABLE_FMT_THRESHOLD_BIT | I2C_INTR_ENABLE_RX_THRESHOLD_BIT | I2C_INTR_ENABLE_NAK_BIT
-        | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_UNEXP_STOP_BIT | I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
+    regs->intr_enable = I2C_INTR_ENABLE_FMT_THRESHOLD_BIT | I2C_INTR_ENABLE_RX_THRESHOLD_BIT | I2C_INTR_ENABLE_NAK_BIT
+                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_UNEXP_STOP_BIT
+                      | I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
 
     // Configure FIFO interrupt thresholds.
     // FMT: interrupt once emptied.
@@ -391,7 +386,7 @@ void init(void)
     // Both values require 0 in their respective fields, and this is unfortunately not documented
     // anywhere human readable. See `i2c.hjson` from opentitan.
     regs->fifo_ctrl &= (~I2C_FIFO_CTRL_RXILVL_MASK);
-    // regs->fifo_ctrl &= (~I2C_FIFO_CTRL_FMTILVL_MASK);
+    regs->fifo_ctrl &= (~I2C_FIFO_CTRL_FMTILVL_MASK);
 
     // Prepare transport layer
     queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
@@ -407,8 +402,7 @@ void notified(microkit_channel ch)
     } else if (ch == IRQ_FMTTHRESH_CH) {
         // Asserted when FMT FIFO has < 1 entry.
         LOG_I2C_DRIVER("IRQ_FMTTHRESH\n");
-        // ack on starting next command instead. this gets sent spuriously on reads!
-        // clear_irq(I2C_INTR_STATE_FMT_THRESHOLD_BIT);
+        clear_irq(I2C_INTR_STATE_FMT_THRESHOLD_BIT);
         microkit_irq_ack(ch);
 
         // We can ignore this IRQ unless we are in S_CMD and awaiting commands to process
