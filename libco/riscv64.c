@@ -96,7 +96,7 @@ section(text) const uint32_t co_swap_function[] = {
         // Begin saving callee saved registers of current context
 
         // We first shift the context buffer ptr down 15 words, then saving from there
-    0xf885859b, // addiw a1, a1, -120
+    0xf8858593, // addi a1, a1, -120
 
     0x0015b023, // sd ra, 0(a1)
     0x0025b423, // sd sp, 8(a1)
@@ -117,7 +117,7 @@ section(text) const uint32_t co_swap_function[] = {
     0x0615b823, // sd ra, 112(a1)
 
         // Begin loading callee saved registers of the context we are switching to
-    0xf885051b, // addiw a0, a0, -120
+    0xf8850513, // addi a0, a0, -120
 
     0x00053083, // ld ra, 0(a0)
     0x00853103, // ld sp, 8(a0)
@@ -148,7 +148,7 @@ section(text)
         // RV64I InsSet
         // Begin saving callee saved registers of current context
 
-        0xf285859b, // addiw a1, a1, -216
+        0xf2858593, // addi a1, a1, -216
 
         0x0015b023, // sd ra, 0(a1)
         0x0025b423, // sd sp, 8(a1)
@@ -181,7 +181,7 @@ section(text)
         // When co_swap is called, `ra` have the PC we need to resume the `from` cothread!
         0x0c15b823, // sd ra, 208(a1)
 
-        0xf285051b, // addiw a0, a0, -216
+        0xf2850513, // addi a0, a0, -216
 
         // Begin loading callee saved registers of the context we are switching to
         0x00053083, // ld ra, 0(a0)
