@@ -140,10 +140,8 @@ static inline void load_timing_params(i2c_timing_params_t *p)
 int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
 {
     // Parse flags
-    // Validate using minterm function - if readb=X, rcont=Y, stop=W, nakok=Z, then
-    // F = !X!Y + !WZ + W!ZX!Y
-    bool flags_valid = ((!flags->readb && !flags->rcont) || (!flags->stop && flags->nakok)
-                        || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
+    bool flags_valid = !(flags->rcont && !flags->readb) && !(flags->start && flags->readb)
+                    && !(flags->stop && flags->rcont) && !(flags->nakok && flags->readb);
     if (!flags_valid) {
         LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
                            "by hardware!\n");
@@ -190,9 +188,11 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
     i2c_stop_host();
 
     // The following code loops through all available space in the registers there is either:
-    // a. no space in a needed register (just FMT fifo in this case)
-    // b. the command is over
+    // a. no space in the FMT fifo
+    // b. no space in the RX fifo which is not either filled or reserved for a previously-issued read
+    // c. the command is over
     while (get_fmt_fifo_lvl() < OPENTITAN_I2C_FIFO_DEPTH
+           && (!cmd_is_read(cmd) || data->rw_idx - data->bytes_read < OPENTITAN_I2C_FIFO_DEPTH)
            && (data->await_addr || data->rw_idx < data->active_cmd.data_len)) {
         LOG_I2C_DRIVER("fmt fifo level: %u\n", get_fmt_fifo_lvl());
         fdata_fmt_flags_t flags = { 0, 0, 0, 0, 0 };
@@ -249,7 +249,8 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
             if (cmd_is_read(cmd)) {
                 // Reads replace data byte with an integer of bytes to read
                 flags.readb = 1;
-                fmt_byte = MIN(cmd.data_len - data->rw_idx, OPENTITAN_I2C_READ_MAX);
+                fmt_byte = MIN(cmd.data_len - data->rw_idx,
+                               OPENTITAN_I2C_FIFO_DEPTH - (data->rw_idx - data->bytes_read));
                 LOG_I2C_DRIVER("\t reading %u bytes\n", fmt_byte);
                 data->rw_idx += fmt_byte;
                 assert(data->rw_idx <= cmd.data_len);
