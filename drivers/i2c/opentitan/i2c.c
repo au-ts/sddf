@@ -27,9 +27,8 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 #define IRQ_NAK_CH              (device_resources.irqs[0].id)
 #define IRQ_FMTTHRESH_CH        (device_resources.irqs[1].id)
 #define IRQ_RXTHRESH_CH         (device_resources.irqs[2].id)
-#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[3].id)
-#define IRQ_BAD_STOP_CH         (device_resources.irqs[4].id)
-#define IRQ_TIMEOUT_CH          (device_resources.irqs[5].id)
+#define IRQ_TIMEOUT_CH          (device_resources.irqs[3].id)
+#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[4].id)
 
 /* Transport */
 i2c_queue_handle_t queue_handle;
@@ -336,7 +335,7 @@ void init(void)
     // Check sdfgen properties
     assert(i2c_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
-    assert(device_resources.num_irqs == 6);
+    assert(device_resources.num_irqs == 5);
     assert(device_resources.num_regions == 1);
 
     regs = (volatile opentitan_i2c_regs_t *)device_resources.regions[0].region.vaddr;
@@ -377,8 +376,7 @@ void init(void)
 
     // Set up interrupts
     regs->intr_enable = I2C_INTR_ENABLE_FMT_THRESHOLD_BIT | I2C_INTR_ENABLE_RX_THRESHOLD_BIT | I2C_INTR_ENABLE_NAK_BIT
-                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_UNEXP_STOP_BIT
-                      | I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
+                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_STRETCH_TIMEOUT_BIT;
 
     // Configure FIFO interrupt thresholds.
     // FMT: interrupt once emptied.
@@ -451,14 +449,8 @@ void notified(microkit_channel ch)
     } else if (ch == IRQ_TIMEOUT_CH) {
         i2c_halt();
         LOG_I2C_DRIVER("IRQ_TIMEOUT\n");
-        clear_irq(I2C_INTR_STATE_HOST_TIMEOUT_BIT);
+        clear_irq(I2C_INTR_STATE_STRETCH_TIMEOUT_BIT);
         driver_data.err = I2C_ERR_TIMEOUT;
-        microkit_irq_ack(ch);
-    } else if (ch == IRQ_BAD_STOP_CH) {
-        i2c_halt();
-        LOG_I2C_DRIVER("IRQ_UNEXPECTED_STOP\n");
-        clear_irq(I2C_INTR_STATE_UNEXP_STOP_BIT);
-        driver_data.err = I2C_ERR_OTHER;
         microkit_irq_ack(ch);
     } else {
         LOG_I2C_DRIVER_ERR("unexpected notification!\n");
@@ -474,9 +466,7 @@ void notified(microkit_channel ch)
     } else if (driver_data.err != I2C_ERR_OK) {
         LOG_I2C_DRIVER_ERR("Spurious error interrupt received! err=%u\n", driver_data.err);
         LOG_I2C_DRIVER_ERR("Current state: %s\n", state_to_str(fsm_data.curr_state));
-        if (ch == IRQ_BAD_STOP_CH)
-            LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
-        else if (ch == IRQ_TIMEOUT_CH)
+        if (ch == IRQ_TIMEOUT_CH)
             LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
         else if (ch == IRQ_NAK_CH)
             LOG_I2C_DRIVER_ERR("IRQ_NAK\n");
