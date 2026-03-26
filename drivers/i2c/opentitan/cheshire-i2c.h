@@ -69,7 +69,6 @@ typedef struct opentitan_i2c_regs {
 
 /* HW properties */
 #define OPENTITAN_I2C_FIFO_DEPTH    (64)
-#define OPENTITAN_I2C_READ_MAX      (64)
 
 /*
  * Register fields.
