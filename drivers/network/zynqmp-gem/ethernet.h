@@ -13,10 +13,6 @@
  * The ethernet device is described in Chapter 34
  */
 
-/* General */
-#define MAX_BIT_32_MASK      0xFFFFFFFF
-#define MAX_BIT_64_MASK      0xFFFFFFFFFFFFFFFF
-
 /* Table 34-8: TX Buffer Descriptor Entry
  *
  */
