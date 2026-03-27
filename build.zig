@@ -20,7 +20,7 @@ const DriverClass = struct {
         apb_timer,
         arm,
         cdns,
-        hpet,
+        tsc_hpet,
         meson,
         imx,
         jh7110,
