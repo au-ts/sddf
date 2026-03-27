@@ -99,8 +99,10 @@ static void rx_provide(void)
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            /* RXD_ADDR_MASK also sets HW ownership */
-            uintptr_t phys = buffer.io_or_offset & RXD_ADDR_MASK; 
+
+            /* Buffer must be word-aligned; bits [1:0] are reserved by HW for wrap/ownership */
+            assert((buffer.io_or_offset & ~RXD_ADDR_MASK) == 0);
+            uintptr_t phys = buffer.io_or_offset;
 
             if (idx + 1 == rx.capacity) {
                 phys |= RXD_WRAP;
@@ -170,7 +172,7 @@ static void tx_provide(void)
 
             uint32_t idx = tx.tail % tx.capacity;
             uint32_t stat = TXD_LAST | TXD_MK_HW_OWNR; /* Set HW as owner */
-            uintptr_t phys = buffer.io_or_offset & TXD_ADDR_MASK;
+            uintptr_t phys = buffer.io_or_offset;
 
             if (idx + 1 == tx.capacity) {
                 stat |= TXD_WRAP;
