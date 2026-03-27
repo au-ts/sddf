@@ -60,7 +60,21 @@ static inline bool hw_ring_empty(hw_ring_t *ring)
     return ring->tail - ring->head == 0;
 }
 
-static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys, uint16_t len, uint32_t stat)
+static void update_ring_slot_rx(hw_ring_t *ring, unsigned int idx, uintptr_t phys)
+{
+    volatile struct descriptor *d = &(ring->descr[idx]);
+    d->addr_hi = (uint32_t)(phys >> 32);
+    d->stat = 0;  /* HW fills on receive */
+    
+    /* Ensure all writes to the descriptor complete, before we set the flags
+     * that makes hardware aware of this slot. Recall d->addr includes ownership bit.
+     */
+    THREAD_MEMORY_RELEASE();
+    
+    d->addr = (uint32_t)(phys);
+}
+
+static void update_ring_slot_tx(hw_ring_t *ring, unsigned int idx, uintptr_t phys, uint16_t len, uint32_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = (uint32_t)(phys);
@@ -85,14 +99,14 @@ static void rx_provide(void)
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            uint32_t stat = RXD_MK_HW_OWNR; /* Set HW as owner */
-            uintptr_t phys = buffer.io_or_offset & RXD_ADDR_MASK;
+            /* RXD_ADDR_MASK also sets HW ownership */
+            uintptr_t phys = buffer.io_or_offset & RXD_ADDR_MASK; 
 
             if (idx + 1 == rx.capacity) {
                 phys |= RXD_WRAP;
             }
 
-            update_ring_slot(&rx, idx, phys, 0, stat);
+            update_ring_slot_rx(&rx, idx, phys);
             rx.tail++;
         }
 
@@ -162,7 +176,7 @@ static void tx_provide(void)
                 stat |= TXD_WRAP;
             }
 
-            update_ring_slot(&tx, idx, phys, buffer.len, stat);
+            update_ring_slot_tx(&tx, idx, phys, buffer.len, stat);
             tx.tail++;
 
             eth->nwctrl |= ZYNQ_GEM_NWCTRL_STARTTX_MASK;
