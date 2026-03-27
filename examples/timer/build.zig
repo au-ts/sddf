@@ -250,7 +250,7 @@ pub fn build(b: *std.Build) !void {
         .zcu102, .kria_k26 => "cdns",
         .rock3b => "rk3568",
         .rpi4b_1gb => "bcm2835",
-        .x86_64_generic => "hpet",
+        .x86_64_generic => "tsc_hpet",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{driver_class}));

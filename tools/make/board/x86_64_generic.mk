@@ -9,7 +9,7 @@
 BLK_DRIV_DIR ?= virtio/pci
 NET_DRIV_DIR ?= virtio/pci
 ETH_DRIV ?= eth_driver_virtio.elf
-TIMER_DRIV_DIR ?= hpet
+TIMER_DRIV_DIR ?= tsc_hpet
 UART_DRIV_DIR ?= pc99
 
 CPU := generic
