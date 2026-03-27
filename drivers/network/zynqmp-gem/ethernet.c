@@ -100,7 +100,7 @@ static void rx_provide(void)
 
             uint32_t idx = rx.tail % rx.capacity;
 
-            /* Buffer must be word-aligned; bits [1:0] are reserved by HW for wrap/ownership */
+            /* Buffer must be word-aligned; bits [1:0] are reserved for wrap/ownership */
             assert((buffer.io_or_offset & ~RXD_ADDR_MASK) == 0);
             uintptr_t phys = buffer.io_or_offset;
 
