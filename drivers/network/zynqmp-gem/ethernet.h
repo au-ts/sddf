@@ -134,7 +134,9 @@ typedef struct zynqmp_gem_regs {
 
 /* rxsr/txsr: Receive/Transmit status register */
 #define ZYNQ_GEM_RXSR_CLEAR             0x0F
+#define ZYNQ_GEM_RXSR_ERR_MASK          0x0D
 #define ZYNQ_GEM_TXSR_CLEAR             0xFF
+#define ZYNQ_GEM_TXSR_ERR_MASK          0x450
 
 /* idr/isr: Interrupt Disable/Status register */
 #define ZYNQ_GEM_IDR_CLEAR              0x7FFFEFF
