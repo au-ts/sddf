@@ -10,9 +10,13 @@
 //#include <types.h>
 #include <sel4/bootinfo_types.h>
 
+#include "acpi.h"
+
+
 // A system could have up to 65536 PCI Segment Groups in theory, but 16 is
 // sufficient in our use cases.
 #define MAX_NUM_PCI_SEG_GROUP 16
+#define MAX_BYTES_DSDT 10000
 
 uintptr_t remaining_untypeds_vaddr;
 typedef struct {
@@ -77,6 +81,12 @@ typedef struct acpi_mcfg {
     uint8_t reserved[8];
     pci_seg_group_t pci_seg_group[MAX_NUM_PCI_SEG_GROUP];
 } __attribute__((packed)) acpi_mcfg_t;
+
+
+typedef struct acpi_dsdt {
+    acpi_header_t header;
+    uint8_t content[MAX_BYTES_DSDT];
+} __attribute__((packed)) acpi_dsdt_t;
 
 typedef struct bootinfo_rsdp {
     seL4_BootInfoHeader header;
@@ -255,10 +265,12 @@ void init(void)
     microkit_dbg_putc(acpi_rsdt->header.signature[1]);
     microkit_dbg_putc(acpi_rsdt->header.signature[2]);
     microkit_dbg_putc(acpi_rsdt->header.signature[3]);
+    microkit_dbg_puts("\n");
 
     seL4_Word acpi_ut_paddr;
-    for (int i = 1; i * 4096 < rsdt_offset + 4096; i++) {
-        uint32_t following_acpi_ut_idx = find_untyped_id_by_paddr(rsdt_addr);
+    // Map all the frames covering the RSDT table
+    for (int i = 1; i * 4096 < rsdt_offset + acpi_rsdt->header.length; i++) {
+        uint32_t following_acpi_ut_idx = find_untyped_id_by_paddr(rsdt_addr + i * 4096);
         free_slot++;
 
         if (following_acpi_ut_idx == acpi_ut_idx) {
@@ -267,7 +279,9 @@ void init(void)
             acpi_ut_paddr = capDLBootInfo->untypedList[following_acpi_ut_idx].paddr;
         }
 
-        microkit_dbg_puts("retype\n");
+        microkit_dbg_puts("map ");
+        microkit_dbg_put32(i);
+        microkit_dbg_puts("th page\n");
         retype_at_offset(capDLBootInfo->untyped_cnode_cptr + following_acpi_ut_idx,
                          acpi_ut_paddr,
                          capDLBootInfo->untyped_cnode_cptr,
@@ -278,7 +292,6 @@ void init(void)
                           acpi_vaddr + i * 4096,
                           seL4_CanRead,
                           seL4_X86_Default_VMAttributes);
-
     }
 
     // TODO: XSDT has different struct size
@@ -291,7 +304,7 @@ void init(void)
     microkit_dbg_put32(rsdt_offset);
     microkit_dbg_puts("\n");
 
-    microkit_dbg_puts("length:");
+    microkit_dbg_puts("length: ");
     microkit_dbg_put32(acpi_rsdt->header.length);
     microkit_dbg_puts("\n");
 
@@ -366,6 +379,8 @@ void init(void)
         microkit_dbg_puts("\n=====================\n");
     }
 
+
+    free_slot = capDLBootInfo->untypeds.end + frame + 1;
     // Parse DSDT table
     acpi_ut_idx = find_untyped_id_by_paddr(acpi_dsdt_addr);
     retype_at_offset(capDLBootInfo->untyped_cnode_cptr + acpi_ut_idx,
@@ -377,7 +392,8 @@ void init(void)
                           seL4_CanRead,
                           seL4_X86_Default_VMAttributes);
 
-    acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + (acpi_dsdt_addr & 0xfff));
+    uint32_t dsdt_offset = acpi_dsdt_addr & 0xfff;
+    acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + dsdt_offset);
     microkit_dbg_puts("Table signature: ");
     microkit_dbg_putc(header->signature[0]);
     microkit_dbg_putc(header->signature[1]);
@@ -386,6 +402,87 @@ void init(void)
     microkit_dbg_puts("\nlength: ");
     microkit_dbg_put32(header->length);
     microkit_dbg_puts("\n");
+
+    // Map all the frames covering the DSDT table
+    for (int i = 1; i * 4096 < dsdt_offset + header->length; i++) {
+        uint32_t following_acpi_ut_idx = find_untyped_id_by_paddr(acpi_dsdt_addr + i * 4096);
+        free_slot++;
+
+        if (following_acpi_ut_idx == acpi_ut_idx) {
+            acpi_ut_paddr =  acpi_dsdt_addr + i * 4096;
+        } else {
+            acpi_ut_paddr = capDLBootInfo->untypedList[following_acpi_ut_idx].paddr;
+        }
+
+        microkit_dbg_puts("map ");
+        microkit_dbg_put32(i);
+        microkit_dbg_puts("th page\n");
+        microkit_dbg_puts("paddr: ");
+        microkit_dbg_put32(acpi_dsdt_addr + i * 4096);
+        microkit_dbg_puts(" , ut_paddr: ");
+        microkit_dbg_put32(acpi_ut_paddr);
+        microkit_dbg_puts("\n");
+        retype_at_offset(capDLBootInfo->untyped_cnode_cptr + following_acpi_ut_idx,
+                         acpi_ut_paddr,
+                         capDLBootInfo->untyped_cnode_cptr,
+                         acpi_dsdt_addr + i * 4096, &free_slot);
+
+        seL4_X86_Page_Map(capDLBootInfo->untyped_cnode_cptr + free_slot,
+                          seL4_CapInitThreadVSpace,
+                          acpi_vaddr + i * 4096,
+                          seL4_CanRead,
+                          seL4_X86_Default_VMAttributes);
+    }
+
+    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
+    char name_str[20];
+    int i = 0;
+    for (;;) {
+        if (acpi_dsdt_table->content[i] == SCOPE_OP) {
+            sddf_dprintf("scope op\n");
+            uint8_t pktlen_bytes = 0;
+            uint32_t pkt_len = get_pkt_len(&acpi_dsdt_table->content[i+1], &pktlen_bytes);
+            sddf_dprintf("pkt_len: %u, pktlen_bytes: %u\n", pkt_len, pktlen_bytes);
+
+            uint32_t name_len = get_name_string(&acpi_dsdt_table->content[i + 2 + pktlen_bytes], name_str);
+            name_str[name_len] = '\0';
+            sddf_dprintf("name_str: %s, len: %d\n", name_str, name_len);
+
+            // pktLength starts from the first byte of pktLength field itself
+            i = i + 1 + pkt_len;
+        } else if (acpi_dsdt_table->content[i] == NAME_OP) {
+
+            /* sddf_dprintf("name op\n"); */
+            /* uint8_t pktlen_bytes = 0; */
+            /* uint32_t pkt_len = get_pkt_len(&acpi_dsdt_table->content[i+1], &pktlen_bytes); */
+            /* sddf_dprintf("pkt_len: %u, pktlen_bytes: %u\n", pkt_len, pktlen_bytes); */
+
+            uint32_t name_len = get_name_string(&acpi_dsdt_table->content[i + 1], name_str);
+            name_str[name_len] = '\0';
+            sddf_dprintf("name_str: %s, len: %d\n", name_str, name_len);
+
+            i = i + name_len;
+        } else {
+            break;
+        }
+    }
+    /* microkit_dbg_puts("\n"); */
+
+    /* uint8_t *str = (uint8_t *)header; */
+    /* for (int i = 0; i < acpi_dsdt_table->header.length; i++) { */
+    /*     if (i % 32 == 0) { */
+    /*         microkit_dbg_puts("\n"); */
+    /*     } */
+    /*     microkit_dbg_put8(str[i]); */
+    /*     microkit_dbg_puts(" "); */
+    /* } */
+    /* microkit_dbg_puts("\n"); */
+
+
+    error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58);
+    microkit_dbg_puts("seL4_CNode_Revoke Error: ");
+    microkit_dbg_put32(error);
+    microkit_dbg_puts("\n=====================\n");
 
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used
