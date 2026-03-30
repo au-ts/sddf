@@ -358,18 +358,9 @@ static void eth_setup(void)
     eth->dmacr = dmacr;
 
     /* 5. Initialise buffer descriptors */
-    /* RX descriptors */
-    for (uint32_t i = 0; i < rx.capacity; i++) {
-        volatile struct descriptor *d = &(rx.descr[i]);
-        d->addr = 0;
-        d->stat = RXD_MK_HW_OWNR; /* HW owns initially */
-        d->addr_hi = 0;
-        if (i == rx.capacity - 1) {
-            d->addr |= RXD_WRAP;
-        }
-    }
+    /* RX descriptors are initialised by rx_provide() before NIC is enabled */
 
-    /* TX descriptors */
+    /* TX descriptors must started as SW owned */
     for (uint32_t i = 0; i < tx.capacity; i++) {
         volatile struct descriptor *d = &(tx.descr[i]);
         d->addr = 0;
