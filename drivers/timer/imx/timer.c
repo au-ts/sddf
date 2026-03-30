@@ -43,6 +43,7 @@
 #define GPT_PRESCALER (0)
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 static volatile uint32_t *gpt;
 static uint32_t overflow_count;
@@ -65,17 +66,15 @@ static uint64_t get_ticks(void)
 static void process_target_timeout(uint64_t curr_time)
 {
     if (target_timeout <= curr_time) {
-        sddf_notify(i);
+        sddf_notify(config.virt_id);
         // Update "current" time page with virt
-        set_shared_time_page(curr_time);
+        set_shared_time_page(get_current_time());
         target_timeout = UINT64_MAX;
-        // No more work to do!
-        return;
     }
 
     // Program timer otherwise
-    if (next_timeout != UINT64_MAX && overflow_count == (next_timeout >> 32)) {
-        gpt[OCR1] = (uint32_t)next_timeout;
+    if (target_timeout != UINT64_MAX && overflow_count == (target_timeout >> 32)) {
+        gpt[OCR1] = (uint32_t)target_timeout;
         gpt[IR] |= 1;
     }
 }
@@ -109,6 +108,7 @@ bool set_new_timeout(uint64_t timestamp)
     uint64_t curr_time = get_ticks();
     // Convert to ticks and set as target
     target_timeout = ns_to_tick_cached(timestamp, GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
+    LOG_TIMER_DRIVER("Setting timeout for %zu ticks\n", target_timeout);
 
     process_target_timeout(curr_time);
     return true;

@@ -47,10 +47,14 @@ TOP := ${SDDF}/examples/timer
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
+TIMER := $(SDDF)/timer
 SYSTEM_FILE := timer.system
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := timer_driver.elf client.elf
+IMAGES := \
+		timer_driver.elf \
+		timer_virt.elf \
+		client.elf
 
 CFLAGS += \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
@@ -64,6 +68,7 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 all: $(IMAGE_FILE)
 
 include ${TIMER_DRIVER}/timer_driver.mk
+include ${TIMER}/components/timer_virt.mk
 include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a
@@ -81,6 +86,8 @@ else
 endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+	$(OBJCOPY) --update-section .timer_virt_config=timer_virt.data timer_virt.elf
+	$(OBJCOPY) --update-section .timer_driver_config=timer_driver.data timer_driver.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)

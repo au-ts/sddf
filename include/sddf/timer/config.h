@@ -17,20 +17,20 @@ static char SDDF_TIMER_MAGIC[SDDF_TIMER_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x6 }
 
 typedef struct timer_client_config {
     char magic[SDDF_TIMER_MAGIC_LEN];
-    uint8_t virt_id;
     region_resource_t time_page;
+    uint8_t virt_id;
 } timer_client_config_t;
 
 typedef struct timer_virt_config {
     char magic[SDDF_TIMER_MAGIC_LEN];
-    uint8_t driver_id;
     region_resource_t time_page;
+    uint8_t driver_id;
 } timer_virt_config_t;
 
 typedef struct timer_driver_config {
     char magic[SDDF_TIMER_MAGIC_LEN];
-    uint8_t virt_id;
     region_resource_t time_page;
+    uint8_t virt_id;
 } timer_driver_config_t;
 
 static inline bool timer_config_check_magic(void *config)

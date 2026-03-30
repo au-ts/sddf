@@ -35,7 +35,7 @@ static inline uint64_t do_cached_period_freq_shift(uint64_t t_a, sddf_timer_freq
     if (cache_entry->f_a == f_a && cache_entry->f_b == f_b) {
         mult = cache_entry->mult;
         shift = cache_entry->shift;
-        LOG_TIMER_DRIVER("Used cache for f_a = %u, f_b = %u!\n", f_a, f_b);
+        // LOG_TIMER_DRIVER("Used cache for f_a = %u, f_b = %u!\n", f_a, f_b);
     } else {
         find_mult_shift(f_a, f_b, &mult, &shift);
         // Store result

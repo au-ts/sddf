@@ -17,8 +17,8 @@ typedef enum {
 typedef enum {
     SDDF_TIMER_ERR_OK = 0U,
     SDDF_TIMER_ERR_UNAVAILABLE, // no capacity
-    SDDF_TIMER_ERR_EINVAL,     // invalid args
-    SDDF_TIMER_ERR_PCC      // bogus PPC
+    SDDF_TIMER_ERR_EINVAL,      // invalid args
+    SDDF_TIMER_ERR_PPC          // bogus PPC
 } sddf_timer_err_t;
 
 // lower than this will be noisy with lower freq timers and means PPC delays are notable!
@@ -52,7 +52,7 @@ typedef uint32_t sddf_timer_freq_hz_t;
  *  -> updated whenever the timer driver finishes servicing a timeout for the current client
  *  -> does not contain current time.
  */
-inline uint64_t read_time_page(uint64_t *time_page)
+static inline uint64_t read_timeout_stamp_page(uint64_t *time_page)
 {
    return (*time_page);
 }

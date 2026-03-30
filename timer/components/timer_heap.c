@@ -25,7 +25,7 @@ static inline uint64_t generate_timeout_id(timer_heap_t *heap)
     __builtin_unreachable();
 }
 
-inline void free_timeout_id(timer_heap_t *heap, uint64_t id)
+void free_timeout_id(timer_heap_t *heap, uint64_t id)
 {
     // INVARIANT: this bit exists
     size_t byte_idx = id / ID_FIELD_BITS;
@@ -43,13 +43,43 @@ static inline bool timeout_id_in_use(timer_heap_t *heap, uint64_t id)
     return ((heap->id_field[byte_idx] & (1U << bit_idx)) != 0);
 }
 
+bool timer_heap_delete(timer_heap_t *heap, uint64_t timer_id, unsigned int client)
+{
+    timeout_t *victim = NULL;
+    // Traverse heap linearly from front->back
+    for (size_t i = 0; i < SDDF_TIMER_MAX_TIMEOUTS; i++) {
+        if (heap->timeouts[i].id == timer_id) {
+            // check client is correct
+            if (heap->timeouts[i].client_channel == client) {
+                victim = &heap->timeouts[i];
+                break;
+            } else {
+                // Wrong client!
+                break;
+            }
+        } else {
+            continue;
+        }
+    }
+
+    if (victim == NULL) {
+        return false;   // Not found or invalid
+    }
+    // Delete!
+    free_timeout_id(heap, victim->id);
+    *victim = heap->timeouts[heap->size - 1];
+    heap->size--;
+    timer_heap_heapify_down(heap, 0);
+    return true;
+}
+
 void timer_heap_init(timer_heap_t *heap)
 {
     heap->size = 0;
     // Init bit field for IDs
     assert(SDDF_TIMER_MAX_TIMEOUTS % 64 == 0);
-    for (int i = 0; i < SDDF_TIMER_MAX_TIMEOUTS / 64]; i++) {
-        heap->id_field = 0;
+    for (int i = 0; i < SDDF_TIMER_MAX_TIMEOUTS / 64; i++) {
+        heap->id_field[i] = 0;
     }
 }
 
@@ -168,7 +198,7 @@ bool timer_heap_reinsert_periodic(timer_heap_t *heap, timeout_t *timeout)
     heap->timeouts[heap->size].id = timeout->id;
     timer_heap_heapify_up(heap, heap->size);
     heap->size++;
-
+    return true;
 }
 
 timeout_t *timer_heap_peek(timer_heap_t *heap)
@@ -186,7 +216,6 @@ bool timer_heap_pop(timer_heap_t *heap, timeout_t *result)
     }
 
     *result = heap->timeouts[0];
-    free_timeout_id(heap, heap->timeouts[0].id);
     heap->timeouts[0] = heap->timeouts[heap->size - 1];
     heap->size--;
     timer_heap_heapify_down(heap, 0);

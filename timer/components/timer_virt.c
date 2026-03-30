@@ -16,8 +16,8 @@ static timer_heap_t timeouts;
 
 static void process_timeouts(void)
 {
-    uint64_t curr_time = timer_virt_get_time(config.driver_id);
-    LOG_TIMER_VIRT("Processing timeouts. Current time: %zu ns\n", curr_time);
+    uint64_t curr_time = read_timeout_stamp_page((uint64_t *)config.time_page.vaddr);
+    LOG_TIMER_VIRT("Processing timeouts. Last timeout: %zu ns\n", curr_time);
 
     // Pop from priority heap until all timeouts are serviced
     while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
@@ -25,12 +25,14 @@ static void process_timeouts(void)
         assert(timer_heap_pop(&timeouts, &expired));
         // If the expired timeout is periodic, re-enqueue it.
         if (expired.period != 0) {
-            // NOTE: this method updates the timestamp based on the period.
+            // NOTE: this func updates the timestamp based on the period.
             // If this assert fails, the heap is broken. We should always be able
             // to reinsert if we just popped.
+            LOG_TIMER_VIRT("Re-inserting periodic timeout with period=%zu\n", expired.period);
             assert(timer_heap_reinsert_periodic(&timeouts, &expired));
         } else {
             // Free the ID of this timeout if we're discarding it
+
             free_timeout_id(&timeouts, expired.id);
         }
         LOG_TIMER_VIRT("timeout #%zu expired for client %u\n", expired.id, expired.client_channel);
@@ -77,11 +79,24 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         bool success = timer_heap_insert(&timeouts, target_time, period, ch, &id);
         if (success) {
             process_timeouts();
+            microkit_mr_set(0, id); // return timeout id
             ret = microkit_msginfo_new(SDDF_TIMER_ERR_OK, 1);
-            microkit_mr_set(0, id);
         } else {
             // Heap is full!
             ret = microkit_msginfo_new(SDDF_TIMER_ERR_UNAVAILABLE, 0);
+        }
+        break;
+    }
+    case SDDF_TIMER_CANCEL_TIMEOUT: {
+        uint64_t target_id = microkit_mr_get(SDDF_TIMER_CANCEL_TIMEOUT_ID);
+        bool success = timer_heap_delete(&timeouts, target_id, ch);
+        if (!success) {
+            LOG_TIMER_VIRT_ERR("Failed to delete timeout with ID=%zu for client %u!\n",
+                               target_id, ch);
+            LOG_TIMER_VIRT_ERR("Ensure timeout ID and requesting client is correct.\n");
+            ret = microkit_msginfo_new(SDDF_TIMER_ERR_EINVAL, 0);
+        } else {
+            ret = microkit_msginfo_new(SDDF_TIMER_ERR_OK, 0);
         }
         break;
     }
@@ -99,4 +114,5 @@ void init(void)
 {
     // Initialise priority heap
     timer_heap_init(&timeouts);
+    LOG_TIMER_VIRT("Driver id: %u\n", config.driver_id);
 }

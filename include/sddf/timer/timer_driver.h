@@ -11,7 +11,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-// #define DEBUG_TIMER_DRIVER
+#define DEBUG_TIMER_DRIVER
 #ifdef DEBUG_TIMER_DRIVER
 #define LOG_TIMER_DRIVER(...) do{ sddf_dprintf("TIMER DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
@@ -47,7 +47,7 @@ void set_shared_time_page(uint64_t curr_time);
 // time_conv.c
 uint64_t do_freq_shift(uint64_t t_a, uint64_t mult, uint64_t shift);
 void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_t *f_mult, uint64_t *f_shift);
-inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler);
+sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler);
 
 // Methods for (nearly) universal common driver -> timer_common.c.
 // These are good enough for almost all drivers, but you may want to replace them for complex
