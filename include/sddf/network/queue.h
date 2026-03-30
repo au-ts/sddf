@@ -17,9 +17,9 @@ typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
     uint64_t io_or_offset;
     /* length of data inside buffer */
-    uint16_t len: 10;
+    uint16_t len : 10;
     /* id of the owning PD */
-    uint16_t oid: 6;
+    uint16_t oid : 6;
 } net_buff_desc_t;
 
 typedef struct net_queue {
@@ -218,7 +218,10 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
     for (uint32_t i = 0; i < queue->capacity; i++) {
-        net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0, };
+        net_buff_desc_t buffer = {
+            (NET_BUFFER_SIZE * i) + base_addr,
+            0,
+        };
         int err = net_enqueue_free(queue, buffer);
         assert(!err);
     }
