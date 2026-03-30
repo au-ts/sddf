@@ -40,7 +40,13 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     d_buffer.io_or_offset = src_buf->io_or_offset;
     /* tag the owner of this buffer so we know which reference slot increment */
     d_buffer.oid = src->id;
-    net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
+
+    /* Drop if the dest queue is full */
+    if (!net_queue_full_active(&state.rx_queues[dst->id])) {
+        net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
+    } else {
+        return false;
+    }
 
     /* mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
@@ -51,6 +57,9 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
         sddf_notify(dst->rx.id);
         return true;
     }
+
+    /* failed to enqueue, decrement the ref */
+    buffer_refs[src->id * NUM_BUFFERS + ref_index]--;
     return false;
 }
 
