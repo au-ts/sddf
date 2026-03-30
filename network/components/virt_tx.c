@@ -22,7 +22,7 @@ state_t state;
 int extract_offset(uintptr_t *phys, int *oid)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        for (int i = 0; i < config.clients[client].num_data; i++) {
+        for (int i = 0; i < config.clients[client].num_regions; i++) {
             if (*phys >= config.clients[client].data[i].io_addr
                 && *phys < config.clients[client].data[i].io_addr
                                + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {

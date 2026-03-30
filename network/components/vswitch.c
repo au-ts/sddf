@@ -59,14 +59,14 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
-int mac_addr_find(const uint8_t *dest_macaddr)
+int mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
     /* try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts */
     for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
         for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
             mac = &config.ports[i].mac_addrs[j];
-            if (mac802_addr_eq(mac->addr, dest_macaddr)) {
+            if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
                 return i; // this is the ID of the client we matched
             }
         }
@@ -89,7 +89,7 @@ static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffe
     return success;
 }
 
-static bool try_send(net_vswitch_port_config_t *src, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
+static bool try_send(net_vswitch_port_config_t *src, const mac_addr_t *dest_macaddr, net_buff_desc_t *buffer)
 {
     bool success = false;
     int dst_id = mac_addr_find(dest_macaddr);
@@ -164,10 +164,10 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             const struct ether_addr *macaddr = (void *)frame_data;
             bool transmitted = false;
 
-            if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
+            if (mac802_addr_is_bcast(macaddr->dest.addr)) {
                 transmitted = try_broadcast(port, &buffer);
             } else {
-                transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
+                transmitted = try_send(port, &macaddr->dest, &buffer);
             }
 
             if (!transmitted) {
