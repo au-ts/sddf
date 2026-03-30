@@ -334,27 +334,14 @@ static void eth_setup(void)
     }
     /* 2 Network configuration */
     eth->nwcfg = 0x0;
-
-    /* enable full duplex */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_FDEN;
-
-    /* enable FCS removal */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_FSREM;
-
-    /* 64 bit AMBA AXI data bus width */
-    eth->nwcfg |= ZYNQ_GEM_DBUS_WIDTH;
-
-    /* Gigabit speed */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_SPEED1000;
-
-    /* MDC clock divisor, for IEEE MDC < 2.5MHz */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_IEEE_MDC;
-
-    /* enable checksum offload on receive */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_CHSUM_EN;
-
-    /* copy all valid frames */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES;
+    uint32_t nwcfg = ZYNQ_GEM_NWCFG_FDEN            /* Full duplex */
+                   | ZYNQ_GEM_NWCFG_FSREM           /* FCS removal */
+                   | ZYNQ_GEM_DBUS_WIDTH            /* 64-bit AMBA AXI data bus width */
+                   | ZYNQ_GEM_NWCFG_SPEED1000       /* Gigabit speed */
+                   | ZYNQ_GEM_NWCFG_IEEE_MDC        /* MDC clock divisor, IEEE MDC < 2.5MHz */
+                   | ZYNQ_GEM_NWCFG_CHSUM_EN        /* RX checksum offload to HW */
+                   | ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES; /* Copy all valid frames */
+    eth->nwcfg = nwcfg;
 
     /* 3. Set MAC address */
     eth->laddr[0][LADDR_LOW] = mac_l;
@@ -362,24 +349,13 @@ static void eth_setup(void)
 
     /* 4. Configure DMA */
     eth->dmacr = 0x0;
-
-    /* RX buffer size: 1536 bytes */
-    eth->dmacr |= ZYNQ_GEM_DMACR_RXBUF;
-
-    /* RX packet buffer: 32KB */
-    eth->dmacr |= ZYNQ_GEM_DMACR_RXPBUF_32KB;
-
-    /* TX packet buffer: 32KB */
-    eth->dmacr |= ZYNQ_GEM_DMACR_TXPBUF_32KB;
-
-    /* Enable TX checksum offload */
-    eth->dmacr |= ZYNQ_GEM_DMACR_TXPBUF_TCP;
-
-    /* AXI burst length: INCR16, 16 burst packets */
-    eth->dmacr |= ZYNQ_GEM_DMACR_BLENGTH_16;
-
-    /* 64-bit AXI bus width */
-    eth->dmacr |= ZYNQ_GEM_DMA_BUS_WIDTH;
+    uint32_t dmacr = ZYNQ_GEM_DMACR_RXBUF           /* RX buffer size: 1536 bytes */
+                   | ZYNQ_GEM_DMACR_RXPBUF_32KB     /* RX packet buffer: 32KB */
+                   | ZYNQ_GEM_DMACR_TXPBUF_32KB     /* TX packet buffer: 32KB */
+                   | ZYNQ_GEM_DMACR_TXPBUF_TCP      /* TX checksum offload to HW */
+                   | ZYNQ_GEM_DMACR_BLENGTH_16      /* AXI burst length: INCR16 */
+                   | ZYNQ_GEM_DMA_BUS_WIDTH;        /* 64-bit AXI bus width */
+    eth->dmacr = dmacr;
 
     /* 5. Initialise buffer descriptors */
     /* RX descriptors */
