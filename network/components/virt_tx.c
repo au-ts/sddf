@@ -19,7 +19,7 @@ typedef struct state {
 
 state_t state;
 
-int extract_offset(uintptr_t *phys, int *bufid)
+int extract_offset(uintptr_t *phys, int *oid)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_data; i++) {
@@ -27,7 +27,7 @@ int extract_offset(uintptr_t *phys, int *bufid)
                 && *phys < config.clients[client].data[i].io_addr
                                + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
                 *phys = *phys - config.clients[client].data[i].io_addr;
-                *bufid = i;
+                *oid= i;
                 return client;
             }
         }
@@ -91,9 +91,9 @@ void tx_return(void)
             int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
             assert(!err);
 
-            int bufid = 0;
-            int client = extract_offset(&buffer.io_or_offset, &bufid);
-            buffer.oid = bufid;
+            int oid = 0;
+            int client = extract_offset(&buffer.io_or_offset, &oid);
+            buffer.oid = oid;
             assert(client >= 0);
 
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
