@@ -16,122 +16,6 @@
 #include <sddf/util/util.h>
 
 
-typedef struct __attribute__((__packed__)) eth_hdr {
-    /* destination MAC address */
-    uint8_t ethdst_addr[ETH_HWADDR_LEN];
-    /* source MAC address */
-    uint8_t ethsrc_addr[ETH_HWADDR_LEN];
-    /* if ethtype <= 1500 it holds the length of the frame. Otherwise, it holds
-    the protocol of payload encapsulated in the frame */
-    uint16_t ethtype;
-} eth_hdr_t;
-
-/* Length of ethernet header */
-#define ETH_HDR_LEN sizeof(eth_hdr_t)
-
-/* Ethernet type values */
-#define ETH_TYPE_IP 0x0800U /* IPV4 packet */
-#define ETH_TYPE_ARP 0x0806U /* ARP packet */
-
-typedef struct __attribute__((__packed__)) ipv4_hdr {
-    /* internet header length in 32-bit words, variable due to optional fields */
-    uint8_t ihl:4;
-    /* IP version, always 4 for IPv4 */
-    uint8_t version:4;
-    /* explicit congestion notification, optional */
-    uint8_t ecn:2;
-    /* differentiated services code point */
-    uint8_t dscp:6;
-    /* total packet length in bytes, including header and data */
-    uint16_t tot_len;
-    /* identifier of packet, used in packet fragmentation */
-    uint16_t id;
-    /* offset in 8 bytes of fragment relative to the beginning of the original
-    unfragmented IP datagram. Fragment offset is a 13 byte value split accross
-    frag_offset1 and frag_offset2 */
-    uint8_t frag_offset1:5;
-    /* if packet belongs to fragmented group, 1 indicates this is not the last
-    fragment */
-    uint8_t more_frag:1;
-    /* specifies whether datagram can be fragmented or not */
-    uint8_t no_frag:1;
-    /* reserved, set to 0 */
-    uint8_t reserved:1;
-    /* offset in 8 bytes of fragment relative to the beginning of the original
-    unfragmented IP datagram. Fragment offset is a 13 byte value split accross
-    frag_offset1 and frag_offset2 */
-    uint8_t frag_offset2;
-    /* time to live, in seconds but in practice router hops */
-    uint8_t ttl;
-    /* transport layer protocol of encapsulated packet */
-    uint8_t protocol;
-    /* internet checksum of IPv4 header */
-    uint16_t check;
-    /* source IP address */
-    uint32_t src_ip;
-    /* destination IP address */
-    uint32_t dst_ip;
-    /* optional fields excluded */
-} ipv4_hdr_t;
-
-/* Offset of the start of the IPV4 header */
-#define IPV4_HDR_OFFSET ETH_HDR_LEN
-
-/* Length of IPv4 header with no optional fields */
-#define IPV4_HDR_LEN_MIN sizeof(ipv4_hdr_t)
-
-/* IPv4 differentiated services code point values */
-#define IPV4_DSCP_NET_CTRL 48 /* Network control */
-
-/* IPv4 transport layer protocols */
-#define IPV4_PROTO_ICMP 0x01
-#define IPV4_PROTO_TCP 0x06
-#define IPV4_PROTO_UDP 0x11
-
-#define IPV4_ADDR_BUFLEN 16
-
-static char ip_addr_buf0[IPV4_ADDR_BUFLEN];
-static char ip_addr_buf1[IPV4_ADDR_BUFLEN];
-
-/**
- * Convert a big-endian ip address integer to a string.
- *
- * @param ip big-endian ip address.
- * @param buf buffer used to output ip address as a string.
- *
- * @return buffer or NULL upon failure.
- */
-static inline char *ipaddr_to_string(uint32_t ip, char *buf)
-{
-    char inv[3], *rp;
-    uint8_t *ap, rem, n, i;
-    int len = 0;
-
-    rp = buf;
-    ap = (uint8_t *)&ip;
-    for (n = 0; n < 4; n++) {
-        i = 0;
-        do {
-            rem = *ap % (uint8_t)10;
-            *ap /= (uint8_t)10;
-            inv[i++] = (char)('0' + rem);
-        } while (*ap);
-        while (i--) {
-            if (len++ >= IPV4_ADDR_BUFLEN) {
-                return NULL;
-            }
-            *rp++ = inv[i];
-        }
-        if (len++ >= IPV4_ADDR_BUFLEN) {
-            return NULL;
-        }
-        *rp++ = '.';
-        ap++;
-    }
-    *--rp = 0;
-    return buf;
-}
-
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
 #define BROADCAST_ID (-2)
@@ -159,9 +43,6 @@ int get_mac_addr_match(struct ethernet_header *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_macs; i++) {
-            ////sddf_printf_("VIRT RX MATCHING MAC from client: %d\n", client);
-            ////sddf_printf_("SRC "PR_MAC802_ADDR"\n", PR_MAC802_SRC_ADDR_ARGS((struct ether_addr *)buffer));
-            ////sddf_printf_("DST "PR_MAC802_ADDR"\n", PR_MAC802_DEST_ADDR_ARGS((struct ether_addr *)buffer));
             if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
                 return client;
             }
@@ -203,14 +84,6 @@ void rx_return(void)
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
 
-            struct eth_hdr * hdr = (struct eth_hdr *)buffer_vaddr;
-            if (hdr->ethtype == HTONS(ETH_TYPE_IP)) {
-                struct ipv4_hdr * ip = (struct ipv4_hdr *)(buffer_vaddr + sizeof(eth_hdr_t));
-                if (ip->protocol == IPV4_PROTO_UDP) {
-                    sddf_printf_("VIRT RX got SRC IP: %s DST IP: %s client: %d\n", ipaddr_to_string(ip->src_ip, ip_addr_buf0), ipaddr_to_string(ip->dst_ip, ip_addr_buf1), client);
-                }
-            }
-            //sddf_printf_("VIRT RX active from client: %d\n", client);
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
@@ -251,7 +124,6 @@ void rx_return(void)
 
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
-            sddf_printf_("VIRT RX notifying client signal active: %d\n", client);
             net_cancel_signal_active(&state.rx_queue_clients[client]);
             sddf_notify(config.clients[client].conn.id);
         }
@@ -271,7 +143,6 @@ void rx_provide(void)
                        && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_drv.capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-                //sddf_printf_("VIRT RX free ref_index: %d, buffer_refs: %d\n",ref_index, buffer_refs[ref_index]);
                 assert(buffer_refs[ref_index] != 0);
 
                 buffer_refs[ref_index]--;

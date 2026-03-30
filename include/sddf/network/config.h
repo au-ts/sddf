@@ -33,9 +33,6 @@ typedef struct net_driver_config {
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
     device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
-    //uint8_t data_id[SDDF_NET_MAX_CLIENTS]; // TODO: do we need that?
-    // should we maintain that? Right now we have 2 ways of doing that - indexing by client_id in vswitch and here it's sequential
-    // when we receive a buffer then it's oid is the owning ID -> client_id which is not necessarily an index here
     uint8_t num_data;
 } net_virt_tx_client_config_t;
 
@@ -71,7 +68,6 @@ typedef struct net_virt_rx_config {
 typedef struct net_copy_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t virt_rx;
-    //region_resource_t device_data; // TODO: copier can copy from different clients and virt, need to have multiple regions
     region_resource_t out_data[SDDF_NET_MAX_CLIENTS];
 
     net_connection_resource_t client;
@@ -91,20 +87,17 @@ typedef struct net_client_config {
 
 typedef struct net_vswitch_port_config {
     net_connection_resource_t rx;
-    region_resource_t rx_data; // TODO: check that we need that
     net_connection_resource_t tx;
     device_region_resource_t tx_data;
     /* unused for the virts */
     mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT]; // TODO: fix the dimension
-    uint8_t id; // TODO: might not need that
+    uint8_t id;
     bool connected;
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
 
-    // TODO: we need the data buffers mapped since we are forwarding packets and need to access them, unless we specify a way of proxying them without introspection
-    // Ports
     /* Rx/Tx swapped for the virtualizer */
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;

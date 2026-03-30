@@ -47,7 +47,6 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     buffer_refs[src->id * NUM_BUFFERS + ref_index]++;
 
     if (net_require_signal_active(&state.rx_queues[dst->id])) {
-//        sddf_printf_("VSWITCH ACTUALLY SENDING TO dst: %d rx.id: %d\n", dst->id, dst->rx.id);
         net_cancel_signal_active(&state.rx_queues[dst->id]);
         sddf_notify(dst->rx.id);
         return true;
@@ -153,10 +152,8 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
     /* Read from TX and fill in the corresponding RX (switched for virtualizer but we handle that in SDF) */
     net_queue_handle_t *src = &state.tx_queues[port->id];
 
-    sddf_printf_("VSWITCH Forward traffic from port: %d\n", port->id);
     bool reprocess = true;
     while (reprocess) {
-        // read from active queue
         while (!net_queue_empty_active(src)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(src, &buffer);
@@ -167,17 +164,14 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             bool transmitted = false;
 
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
-                sddf_printf_("VSWITCH Bcasting\n");
-                transmitted = try_broadcast(port, &buffer); // TODO: this will fail if we broadcast some and then, the last one fails setting the flag to false!
+                transmitted = try_broadcast(port, &buffer);
             } else {
-                sddf_printf_("VSWITCH Sending\n");
                 transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
                 net_request_signal_free(src);
-                sddf_printf_("VSWITCH forwrad src free queue after enqueue len %d\n", net_queue_length(src->free));
             }
         }
 
@@ -193,16 +187,12 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
 
 void notified(sddf_channel ch)
 {
-    //sddf_printf_("VSWITCH Notified on channel %d\n", ch);
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (!config.ports[i].connected) continue;
-        //sddf_printf_("VSWITCH i: %d Port ids RX: %d TX: %d\n", i, config.ports[i].rx.id, config.ports[i].tx.id);
         if (ch == config.ports[i].tx.id) {
-            //sddf_printf_("VSWITCH Found a match TX i: %d\n", i);
             forward_traffic_from(&config.ports[i]);
             break;
         } else if (ch == config.ports[i].rx.id) {
-            //sddf_printf_("VSWITCH Found a match RX i: %d\n", i);
             rx_return(&config.ports[i]);
             break;
         }
