@@ -137,12 +137,6 @@ void notified(sddf_channel ch)
 
 void init(void)
 {
-    //sddf_printf_("VIRT_TX num_clients: %d\n",
-                 //config.num_clients);
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; ++i) {
-        //sddf_printf_("VIRT_TX cli: %d num_data %d data[0].vaddr=%p\n",
-                  //   i, config.clients[i].num_data, config.clients[i].data[0].region.vaddr);
-    }
     assert(net_config_check_magic(&config));
 
     /* Set up driver queues */
