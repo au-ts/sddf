@@ -435,38 +435,10 @@ void init(void)
     }
 
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
-    char name_str[20];
-    int i = 0;
-    for (;;) {
-        if (acpi_dsdt_table->content[i] == SCOPE_OP) {
-            sddf_dprintf("scope op\n");
-            uint8_t pktlen_bytes = 0;
-            uint32_t pkt_len = get_pkt_len(&acpi_dsdt_table->content[i+1], &pktlen_bytes);
-            sddf_dprintf("pkt_len: %u, pktlen_bytes: %u\n", pkt_len, pktlen_bytes);
-
-            uint32_t name_len = get_name_string(&acpi_dsdt_table->content[i + 2 + pktlen_bytes], name_str);
-            name_str[name_len] = '\0';
-            sddf_dprintf("name_str: %s, len: %d\n", name_str, name_len);
-
-            // pktLength starts from the first byte of pktLength field itself
-            i = i + 1 + pkt_len;
-        } else if (acpi_dsdt_table->content[i] == NAME_OP) {
-
-            /* sddf_dprintf("name op\n"); */
-            /* uint8_t pktlen_bytes = 0; */
-            /* uint32_t pkt_len = get_pkt_len(&acpi_dsdt_table->content[i+1], &pktlen_bytes); */
-            /* sddf_dprintf("pkt_len: %u, pktlen_bytes: %u\n", pkt_len, pktlen_bytes); */
-
-            uint32_t name_len = get_name_string(&acpi_dsdt_table->content[i + 1], name_str);
-            name_str[name_len] = '\0';
-            sddf_dprintf("name_str: %s, len: %d\n", name_str, name_len);
-
-            i = i + name_len;
-        } else {
-            break;
-        }
-    }
-    /* microkit_dbg_puts("\n"); */
+    aml_path_seg_t path;
+    /* pci_resources_t pci_res; */
+    extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), &path);
+    sddf_dprintf("DSDT has been parsed!\n");
 
     /* uint8_t *str = (uint8_t *)header; */
     /* for (int i = 0; i < acpi_dsdt_table->header.length; i++) { */
