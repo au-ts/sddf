@@ -59,7 +59,8 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
-int mac_addr_find(const uint8_t *dest_macaddr) {
+int mac_addr_find(const uint8_t *dest_macaddr)
+{
     mac_addr_t *mac;
     /* try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts */
     for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
@@ -188,7 +189,8 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
 void notified(sddf_channel ch)
 {
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!config.ports[i].connected) continue;
+        if (!config.ports[i].connected)
+            continue;
         if (ch == config.ports[i].tx.id) {
             forward_traffic_from(&config.ports[i]);
             break;
@@ -207,7 +209,8 @@ void init(void)
 
     /* Set up client queues and buffers for copying? */
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!config.ports[i].connected) continue;
+        if (!config.ports[i].connected)
+            continue;
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,

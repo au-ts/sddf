@@ -19,13 +19,13 @@ typedef struct state {
 
 state_t state;
 
-int extract_offset(uintptr_t *phys, int* bufid)
+int extract_offset(uintptr_t *phys, int *bufid)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_data; i++) {
             if (*phys >= config.clients[client].data[i].io_addr
-                && *phys
-                       < config.clients[client].data[i].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+                && *phys < config.clients[client].data[i].io_addr
+                               + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
                 *phys = *phys - config.clients[client].data[i].io_addr;
                 *bufid = i;
                 return client;
@@ -55,7 +55,8 @@ void tx_provide(void)
                     continue;
                 }
 
-                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data[buffer.oid].region.vaddr;
+                uintptr_t buffer_vaddr = buffer.io_or_offset
+                                       + (uintptr_t)config.clients[client].data[buffer.oid].region.vaddr;
                 cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
                 buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data[buffer.oid].io_addr;

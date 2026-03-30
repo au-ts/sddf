@@ -15,7 +15,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 
-
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
 #define BROADCAST_ID (-2)
