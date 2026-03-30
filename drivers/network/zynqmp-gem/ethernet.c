@@ -65,12 +65,12 @@ static void update_ring_slot_rx(hw_ring_t *ring, unsigned int idx, uintptr_t phy
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr_hi = (uint32_t)(phys >> 32);
     d->stat = 0;  /* HW fills on receive */
-    
+
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot. Recall d->addr includes ownership bit.
      */
     THREAD_MEMORY_RELEASE();
-    
+
     d->addr = (uint32_t)(phys);
 }
 
@@ -334,12 +334,12 @@ static void eth_setup(void)
     }
     /* 2 Network configuration */
     eth->nwcfg = 0x0;
-    uint32_t nwcfg = ZYNQ_GEM_NWCFG_FDEN            /* Full duplex */
-                   | ZYNQ_GEM_NWCFG_FSREM           /* FCS removal */
-                   | ZYNQ_GEM_DBUS_WIDTH            /* 64-bit AMBA AXI data bus width */
-                   | ZYNQ_GEM_NWCFG_SPEED1000       /* Gigabit speed */
-                   | ZYNQ_GEM_NWCFG_IEEE_MDC        /* MDC clock divisor, IEEE MDC < 2.5MHz */
-                   | ZYNQ_GEM_NWCFG_CHSUM_EN        /* RX checksum offload to HW */
+    uint32_t nwcfg = ZYNQ_GEM_NWCFG_FDEN /* Full duplex */
+                   | ZYNQ_GEM_NWCFG_FSREM /* FCS removal */
+                   | ZYNQ_GEM_DBUS_WIDTH /* 64-bit AMBA AXI data bus width */
+                   | ZYNQ_GEM_NWCFG_SPEED1000 /* Gigabit speed */
+                   | ZYNQ_GEM_NWCFG_IEEE_MDC /* MDC clock divisor, IEEE MDC < 2.5MHz */
+                   | ZYNQ_GEM_NWCFG_CHSUM_EN /* RX checksum offload to HW */
                    | ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES; /* Copy all valid frames */
     eth->nwcfg = nwcfg;
 
@@ -349,12 +349,12 @@ static void eth_setup(void)
 
     /* 4. Configure DMA */
     eth->dmacr = 0x0;
-    uint32_t dmacr = ZYNQ_GEM_DMACR_RXBUF           /* RX buffer size: 1536 bytes */
-                   | ZYNQ_GEM_DMACR_RXPBUF_32KB     /* RX packet buffer: 32KB */
-                   | ZYNQ_GEM_DMACR_TXPBUF_32KB     /* TX packet buffer: 32KB */
-                   | ZYNQ_GEM_DMACR_TXPBUF_TCP      /* TX checksum offload to HW */
-                   | ZYNQ_GEM_DMACR_BLENGTH_16      /* AXI burst length: INCR16 */
-                   | ZYNQ_GEM_DMA_BUS_WIDTH;        /* 64-bit AXI bus width */
+    uint32_t dmacr = ZYNQ_GEM_DMACR_RXBUF /* RX buffer size: 1536 bytes */
+                   | ZYNQ_GEM_DMACR_RXPBUF_32KB /* RX packet buffer: 32KB */
+                   | ZYNQ_GEM_DMACR_TXPBUF_32KB /* TX packet buffer: 32KB */
+                   | ZYNQ_GEM_DMACR_TXPBUF_TCP /* TX checksum offload to HW */
+                   | ZYNQ_GEM_DMACR_BLENGTH_16 /* AXI burst length: INCR16 */
+                   | ZYNQ_GEM_DMA_BUS_WIDTH; /* 64-bit AXI bus width */
     eth->dmacr = dmacr;
 
     /* 5. Initialise buffer descriptors */
