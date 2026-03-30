@@ -12,12 +12,12 @@
 #define PR_MAC802_ADDR  "%x:%x:%x:%x:%x:%x"
 
 /* Expects a *pointer* to a struct ether_addr */
-#define PR_MAC802_ADDR_ARGS(a, dir)     (a)->ether_##dir##_addr_octet[0], \
-                                        (a)->ether_##dir##_addr_octet[1], \
-                                        (a)->ether_##dir##_addr_octet[2], \
-                                        (a)->ether_##dir##_addr_octet[3], \
-                                        (a)->ether_##dir##_addr_octet[4], \
-                                        (a)->ether_##dir##_addr_octet[5]
+#define PR_MAC802_ADDR_ARGS(a, dir)     (a)->##dir##->addr[0], \
+                                        (a)->##dir##->addr[1], \
+                                        (a)->##dir##->addr[2], \
+                                        (a)->##dir##->addr[3], \
+                                        (a)->##dir##->addr[4], \
+                                        (a)->##dir##->addr[5]
 
 #define PR_MAC802_DEST_ADDR_ARGS(a) PR_MAC802_ADDR_ARGS(a, dest)
 #define PR_MAC802_SRC_ADDR_ARGS(a) PR_MAC802_ADDR_ARGS(a, src)
@@ -25,14 +25,14 @@
 #define MAC802_BYTES 6
 
 typedef struct mac_addr {
-    uint8_t addr[6];
+    uint8_t addr[MAC802_BYTES];
 } mac_addr_t;
 
 /* This is a name for the 96 bit ethernet addresses available on many
    systems.  */
 struct ether_addr {
-    uint8_t ether_dest_addr_octet[MAC802_BYTES];
-    uint8_t ether_src_addr_octet[MAC802_BYTES];
+    mac_addr_t dest;
+    mac_addr_t src;
     uint8_t etype[2]; // Ethertype
     uint8_t payload[46];
     uint8_t crc[4];
