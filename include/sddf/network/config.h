@@ -33,7 +33,7 @@ typedef struct net_driver_config {
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
     device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
-    uint8_t num_data;
+    uint8_t num_regions;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
@@ -46,12 +46,11 @@ typedef struct net_virt_tx_config {
 // TODO: remove
 #define TEMP_MAX_MACS_PER_CLIENT 3
 
-// TODO: later rename? Connections instead of clients?
-typedef struct net_virt_rx_config_client {
+typedef struct net_virt_rx_config_connection {
     net_connection_resource_t conn;
     mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT * SDDF_NET_MAX_CLIENTS];
     uint8_t num_macs;
-} net_virt_rx_config_client_t;
+} net_virt_rx_config_connection_t;
 
 typedef struct net_virt_rx_config {
     char magic[SDDF_NET_MAGIC_LEN];
@@ -61,7 +60,7 @@ typedef struct net_virt_rx_config {
     // use by the RX virtualiser. The size of this region must be at least
     // sizeof(int*)*drv_queue_capacity. It must be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
-    net_virt_rx_config_client_t clients[SDDF_NET_MAX_CLIENTS];
+    net_virt_rx_config_connection_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
 } net_virt_rx_config_t;
 
