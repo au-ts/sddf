@@ -371,11 +371,13 @@ static void eth_setup(void)
         }
     }
 
-    /* 6. Configure buffer descriptor queue addresses */
-    /* Clear upper address registers
-     * If you are actually using > 4GB memory addresses,
-     * set this to your actual upper address bits
+    /* 6. Configure buffer descriptor queue addresses
+     * Upper address registers are cleared assuming 32-bit addresses.
+     * If you are using > 4GB memory addresses,
+     * set these to your upper address bits.
      */
+    assert((device_resources.regions[1].io_addr >> 32) == 0);
+    assert((device_resources.regions[2].io_addr >> 32) == 0);
     eth->upper_rxqbase = 0x0;
     eth->upper_txqbase = 0x0;
 
