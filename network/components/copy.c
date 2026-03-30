@@ -81,7 +81,6 @@ void rx_return(void)
         sddf_notify(config.client.id);
     }
 
-
     if (virt_enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
         sddf_deferred_notify(config.virt_rx.id);

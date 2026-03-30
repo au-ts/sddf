@@ -36,8 +36,7 @@ struct ether_addr {
     uint8_t etype[2]; // Ethertype
     uint8_t payload[46];
     uint8_t crc[4];
-} __attribute__ ((__packed__));
-
+} __attribute__((__packed__));
 
 static inline bool mac802_addr_eq_num(const uint8_t *addr0, const uint8_t *addr1, unsigned int num)
 {
@@ -56,6 +55,6 @@ static inline bool mac802_addr_eq(const uint8_t *addr0, const uint8_t *addr1)
 
 static inline bool mac802_addr_is_bcast(const uint8_t *addr)
 {
-    const uint8_t bcast_macaddr[MAC802_BYTES] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    const uint8_t bcast_macaddr[MAC802_BYTES] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
     return mac802_addr_eq(addr, bcast_macaddr);
 }
