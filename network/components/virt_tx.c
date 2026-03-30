@@ -19,7 +19,6 @@ typedef struct state {
 
 state_t state;
 
-// TODO: maybe create a temp struct for that?
 int extract_offset(uintptr_t *phys, int* bufid)
 {
     for (int client = 0; client < config.num_clients; client++) {
@@ -46,7 +45,6 @@ void tx_provide(void)
                 net_buff_desc_t buffer;
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
-                sddf_printf_("VIRT TX active from client: %d buffer.oid: %d \n", client, buffer.oid);
 
                 if (buffer.io_or_offset % NET_BUFFER_SIZE
                     || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
@@ -97,7 +95,6 @@ void tx_return(void)
             buffer.oid = bufid;
             assert(client >= 0);
 
-            sddf_printf_("VIRT TX returning buffer.oid: %d offset: %ld\n", buffer.oid, buffer.io_or_offset);
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
             assert(!err);
             notify_clients[client] = true;
@@ -114,7 +111,6 @@ void tx_return(void)
 
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
-            sddf_printf_("VIRT TX free to client: %d\n", client);
             net_cancel_signal_free(&state.tx_queue_clients[client]);
             sddf_notify(config.clients[client].conn.id);
         }
@@ -129,12 +125,6 @@ void notified(sddf_channel ch)
 
 void init(void)
 {
-    //sddf_printf_("VIRT_TX num_clients: %d\n",
-                 //config.num_clients);
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; ++i) {
-        //sddf_printf_("VIRT_TX cli: %d num_data %d data[0].vaddr=%p\n",
-                  //   i, config.clients[i].num_data, config.clients[i].data[0].region.vaddr);
-    }
     assert(net_config_check_magic(&config));
 
     /* Set up driver queues */
