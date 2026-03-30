@@ -41,8 +41,6 @@ void rx_return(void)
                 err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
                 assert(!err);
 
-                sddf_printf_("COPY (vswitch/free) buffer oid: %d\n", virt_buffer.oid);
-
                 void *cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
                 void *virt_addr = config.out_data[virt_buffer.oid].vaddr + virt_buffer.io_or_offset;
 
@@ -65,8 +63,6 @@ void rx_return(void)
 
                 err = net_enqueue_free(&rx_queue_virt, virt_buffer);
                 assert(!err);
-
-                sddf_printf_("COPY chosen the weird branch\n");
             }
             virt_enqueued = true;
         }
@@ -81,14 +77,12 @@ void rx_return(void)
     }
 
     if (client_enqueued && net_require_signal_active(&rx_queue_cli)) {
-        //sddf_printf_("COPY notifying CLIENT\n");
         net_cancel_signal_active(&rx_queue_cli);
         sddf_notify(config.client.id);
     }
 
 
     if (virt_enqueued && net_require_signal_free(&rx_queue_virt)) {
-        //sddf_printf_("COPY notifying VSWITCH\n");
         net_cancel_signal_free(&rx_queue_virt);
         sddf_deferred_notify(config.virt_rx.id);
     }
