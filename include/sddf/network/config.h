@@ -43,12 +43,9 @@ typedef struct net_virt_tx_config {
     uint8_t num_clients;
 } net_virt_tx_config_t;
 
-// TODO: remove
-#define TEMP_MAX_MACS_PER_CLIENT 3
-
 typedef struct net_virt_rx_config_connection {
     net_connection_resource_t conn;
-    mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT * SDDF_NET_MAX_CLIENTS];
+    mac_addr_t mac_addrs[SDDF_NET_MAX_CLIENTS];
     uint8_t num_macs;
 } net_virt_rx_config_connection_t;
 
@@ -89,7 +86,7 @@ typedef struct net_vswitch_port_config {
     net_connection_resource_t tx;
     device_region_resource_t tx_data;
     /* unused for the virts */
-    mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT]; // TODO: fix the dimension
+    mac_addr_t mac_addr;
     uint8_t id;
     bool connected;
 } net_vswitch_port_config_t;
