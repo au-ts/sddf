@@ -20,8 +20,8 @@ on:
     - cron: '37 7 * * 4'
 
 env:
-  MICROKIT_VERSION: 2.1.0-dev.33+da0ca91
-  MICROKIT_URL: https://trustworthy.systems/Downloads/microkit/
+  MICROKIT_VERSION: 2.2.0
+  MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.2.0/
   SDFGEN_VERSION: 0.28.1
   ZIG_VERSION: 0.15.1
 
