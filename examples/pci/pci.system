@@ -7,7 +7,7 @@
 <system>
     <memory_region name="remaining_untypeds" size="0x2000" receive_all_untypeds="true"/>
 
-    <protection_domain name="acpi_driver">
+    <protection_domain name="acpi_driver" stack_size="0x50000">
         <program_image path="acpi_driver.elf" />
         <map mr="remaining_untypeds" vaddr="0x20_000_000" setvar_vaddr="remaining_untypeds_vaddr" />
     </protection_domain>

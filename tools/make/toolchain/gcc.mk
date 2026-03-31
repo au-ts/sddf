@@ -7,11 +7,14 @@ ifndef BOARD_DIR
 $(error BOARD_DIR not defined)
 endif
 
-ARCH := $(shell sed -n 's/#define *CONFIG_SEL4_ARCH  *\([^ ]*\).*$$/\1/p'  $(BOARD_DIR)/include/kernel/gen_config.h)
+# ARCH := $(shell sed -n 's/#define *CONFIG_SEL4_ARCH  *\([^ ]*\).*$$/\1/p'  $(BOARD_DIR)/include/kernel/gen_config.h)
+ARCH := x86_64
 ifeq ($(ARCH),aarch64)
 	TRIPLE := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	TRIPLE := riscv64-unknown-elf
+else ifeq ($(ARCH),x86_64)
+	TRIPLE := x86_64-elf
 else
 $(error Unsupported ARCH given)
 endif
@@ -35,7 +38,6 @@ OPTIMISATION ?= -g -O2
 
 CFLAGS += \
 	-MD \
-	-mstrict-align \
 	-ffreestanding \
 	${OPTIMISATION} \
 	-Wall \
