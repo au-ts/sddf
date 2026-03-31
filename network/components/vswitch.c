@@ -73,11 +73,9 @@ int mac_addr_find(const mac_addr_t *dest_macaddr)
     mac_addr_t *mac;
     /* try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts */
     for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
-        for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
-            mac = &config.ports[i].mac_addrs[j];
-            if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
-                return i; // this is the ID of the client we matched
-            }
+        mac = &config.ports[i].mac_addr;
+        if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
+            return i; // this is the ID of the client we matched
         }
     }
     /* I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port */
