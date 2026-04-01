@@ -112,7 +112,11 @@ static void rx_provide(void)
             assert(!err);
 
             uint32_t idx = rx.tail & rx.desc_id_mask;
-            update_ring_slot(&rx, idx, buffer.io_or_offset, 0);
+            // The NIC uses the first CHECKSUM_TSB_LENGTH bytes for checksum
+            // offload. Since our Rx virtualiser expects the ethernet header to
+            // start at byte 0, we let the NIC write the checksum offload data
+            // to the earlier bytes
+            update_ring_slot(&rx, idx, buffer.io_or_offset - CHECKSUM_TSB_LENGTH, 0);
             rx.tail++;
         }
         THREAD_MEMORY_RELEASE();
@@ -151,7 +155,8 @@ static void rx_return(void)
         volatile struct genet_dma_desc *d = &(rx.descr[idx]);
 
         uint64_t addr = ((uint64_t)(d->addr_hi) << 32) | d->addr_lo;
-        net_buff_desc_t buffer = { addr, d->status >> DMA_BUFLENGTH_SHIFT };
+        // Return the buffer address to its previous value
+        net_buff_desc_t buffer = { addr + CHECKSUM_TSB_LENGTH, d->status >> DMA_BUFLENGTH_SHIFT };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
@@ -411,6 +416,14 @@ static void eth_setup(void)
     rx.desc_id_mask = NUM_DESCS - 1;
     rx.index_mask = 0xFFFF;
     rx.descr = (struct genet_dma_desc *)&eth->dma_rx.descs;
+
+    // Since we assume that the first CHECKSUM_TSB_LENGTH (64) bytes before each
+    // buffer can be used as a checksum scratchpad for the NIC, we cannot use
+    // the first sDDF buffer Fill empty buffers for Rx. So we dequeue it and
+    // drop it at init time
+    net_buff_desc_t buffer;
+    int err = net_dequeue_free(&rx_queue, &buffer);
+    assert(!err);
 
     // Fill empty buffers for Rx
     rx_provide();

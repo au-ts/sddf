@@ -270,3 +270,23 @@ struct mbox_regs {
     uint32_t config;                 // 0x1C
     uint32_t write;                  // 0x20
 };
+
+/* TSB structure for BCM GENET hardware checksum offload */
+struct bcmgenet_tsb {
+    uint32_t length_status;      /* length and peripheral status */
+    uint32_t ext_status;         /* Extended status*/
+    uint32_t rx_csum;            /* partial rx checksum */
+    uint32_t unused1[9];         /* unused */
+    /**
+     * Tx checksum info.
+     * Bits 14-0 contain the checksum destination offset.
+     * Bit 15 calculate UDP/TCP checksum.
+     * Bits 30-16 contain the offset of first byte to be checksummed.
+     * Bit 31 enables checksum offloading.
+     * Note the transport layer header must be initialised with pseudo header checksum.
+     */
+    uint32_t tx_csum_info;
+    uint32_t unused2[3];         /* unused */
+};
+
+#define CHECKSUM_TSB_LENGTH sizeof(struct bcmgenet_tsb)
