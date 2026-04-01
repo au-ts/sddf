@@ -435,9 +435,10 @@ void init(void)
     }
 
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
-    aml_path_seg_t path;
+    /* aml_path_seg_t path; */
+    char path_name[AML_MAX_PATH_STR] = { '\0' };
     /* pci_resources_t pci_res; */
-    extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), &path);
+    extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), path_name, 0);
     sddf_dprintf("DSDT has been parsed!\n");
 
     /* uint8_t *str = (uint8_t *)header; */
