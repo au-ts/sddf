@@ -491,9 +491,9 @@ def generate(
     assert client1_lib_sddf_lwip.serialise_config(output_dir)
 
     if board.name == "rpi4b_1gb":
-        update_elf_section("eth_driver.elf",
-                           "timer_client_config",
-                           "timer_client_ethernet_driver")
+        update_elf_section(
+            "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
+        )
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
