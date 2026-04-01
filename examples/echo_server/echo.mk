@@ -23,7 +23,8 @@ SUPPORTED_BOARDS := \
 		    qemu_virt_riscv64 \
 			rock3b \
 			star64 \
-			x86_64_generic
+			x86_64_generic \
+			rpi4b_1gb
 
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
@@ -73,7 +74,8 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
 ECHO_OBJS := echo.o utilization_socket.o \
-	     udp_echo_socket.o tcp_echo_socket.o
+	     udp_echo_socket.o tcp_echo_socket.o \
+		 pseudo_checksum.o
 
 DEPS := $(ECHO_OBJS:.o=.d)
 

@@ -19,6 +19,7 @@
 #include "lwip/pbuf.h"
 
 #include "echo.h"
+#include "pseudo_checksum.h"
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
@@ -67,9 +68,13 @@ void init(void)
     net_queue_init(&net_tx_handle, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
                    net_config.tx.num_buffers);
     net_buffers_init(&net_tx_handle, 0);
-
+#if defined(CONFIG_PLAT_BCM2711)
+    sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
+                   netif_status_callback, NULL, pbuf_needs_checksum, add_checksum_and_transmit);
+#else
     sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
                    netif_status_callback, NULL, NULL, NULL);
+#endif
     set_timeout();
 
     setup_udp_socket();
