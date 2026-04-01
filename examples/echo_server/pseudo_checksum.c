@@ -45,8 +45,8 @@ typedef struct pseudo_header {
     uint32_t src_ip;
     uint32_t dst_ip;
     /* Always set to 0 */
-    uint8_t  reserved;
-    uint8_t  protocol;
+    uint8_t reserved;
+    uint8_t protocol;
     /* Transport layer packet length */
     uint16_t len;
 } pseudo_header_t;
@@ -54,14 +54,16 @@ typedef struct pseudo_header {
 /* Minimum ethernet frame size */
 #define MIN_ETH_PKT_LEN 60
 
-bool pbuf_needs_checksum(struct pbuf *p) {
+bool pbuf_needs_checksum(struct pbuf *p)
+{
     if (p == &checksum_pbuf) {
         return false;
     }
     return true;
 }
 
-net_sddf_err_t add_checksum_and_transmit(struct pbuf *p) {
+net_sddf_err_t add_checksum_and_transmit(struct pbuf *p)
+{
     /* Construct pbuf to prepend to packet pbuf */
     checksum_pbuf.payload = &device_checksum;
     checksum_pbuf.len = sizeof(struct bcmgenet_tsb);
@@ -92,18 +94,21 @@ net_sddf_err_t add_checksum_and_transmit(struct pbuf *p) {
             assert(p->len >= sizeof(struct ethernet_header) + ipv4_header_length(ip_hdr) + sizeof(struct udp_header));
             checksum_addr = (uintptr_t)&udp_hdr->check;
             break;
-        } case IP_PROTOCOL_TCP: {
+        }
+        case IP_PROTOCOL_TCP: {
             struct tcp_header *tcp_hdr = (struct tcp_header *)ipv4_payload_start(ip_hdr);
             /* TCP header checksum must lie within this pbuf's payload so pseudo header checksum can be written */
             assert(p->len >= sizeof(struct ethernet_header) + ipv4_header_length(ip_hdr) + sizeof(struct tcp_header));
             checksum_addr = (uintptr_t)&tcp_hdr->check;
             break;
-        } case IP_PROTOCOL_ICMP: {
+        }
+        case IP_PROTOCOL_ICMP: {
             struct icmp_header *icmp_hdr = (struct icmp_header *)ipv4_payload_start(ip_hdr);
             checksum_addr = (uintptr_t)&icmp_hdr->check;
             pseudo = false;
             break;
-        } default:
+        }
+        default:
             supported = false;
             break;
         }
@@ -115,8 +120,8 @@ net_sddf_err_t add_checksum_and_transmit(struct pbuf *p) {
 
         if (pseudo) {
             /* Construct pseudo header */
-            pseudo_header_t pseudo_data = { ip_hdr->src_ip, ip_hdr->dst_ip, 0,
-                ip_hdr->protocol, HTONS(ipv4_payload_length(ip_hdr))};
+            pseudo_header_t pseudo_data = { ip_hdr->src_ip, ip_hdr->dst_ip, 0, ip_hdr->protocol,
+                                            HTONS(ipv4_payload_length(ip_hdr)) };
 
             /* Sum up the pseudo-header */
             uint32_t sum = 0;
@@ -135,10 +140,12 @@ net_sddf_err_t add_checksum_and_transmit(struct pbuf *p) {
         }
 
         device_checksum.tx_csum_info = STATUS_TX_CSUM_LV | STATUS_TX_CSUM_PROTO_UDP
-                                       | checksum_addr - (uintptr_t)p->payload // checksum destination offset
-                                       | ((uintptr_t)ipv4_payload_start(ip_hdr) - (uintptr_t)p->payload) << 16; // start byte
+                                     | checksum_addr - (uintptr_t)p->payload // checksum destination offset
+                                     | ((uintptr_t)ipv4_payload_start(ip_hdr) - (uintptr_t)p->payload)
+                                           << 16; // start byte
         break;
-    } default:
+    }
+    default:
         device_checksum.tx_csum_info = MAX(MIN_ETH_PKT_LEN, p->tot_len) << 16 | MAX(MIN_ETH_PKT_LEN, p->tot_len);
         break;
     }

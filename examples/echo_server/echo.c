@@ -70,7 +70,7 @@ void init(void)
     net_buffers_init(&net_tx_handle, 0);
 #if defined(CONFIG_PLAT_BCM2711)
     sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
-                netif_status_callback, NULL, pbuf_needs_checksum, add_checksum_and_transmit);
+                   netif_status_callback, NULL, pbuf_needs_checksum, add_checksum_and_transmit);
 #else
     sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
                    netif_status_callback, NULL, NULL, NULL);
