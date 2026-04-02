@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/util/udivmodti4.h>
 
 #define DEBUG_TIMER
@@ -29,6 +30,7 @@
  */
 
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 /* CPUID related definitions for TSC detection. */
 
@@ -122,12 +124,10 @@ uintptr_t HPET_REGION = 0x50000000;
 
 volatile hpet_timer_t *timer_0;
 uint64_t tick_period_fs; // main counter tick period in femtoseconds
-uint64_t tsc_freq = 0;
+static sddf_timer_freq_hz_t hpet_clk_freq = 0;
+static sddf_timer_freq_hz_t tsc_clk_freq = 0;
 
-#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
-
-uint64_t timeouts[MAX_TIMEOUTS];
-uint64_t next_timeout = UINT64_MAX;
+uint64_t target_timeout = UINT64_MAX;
 
 static inline uint64_t rdtsc(void)
 {
@@ -148,16 +148,12 @@ uint64_t get_hpet_ticks(void)
 
 uint64_t ns_to_hpet_ticks(uint64_t ns)
 {
-    __uint128_t fs = (__uint128_t)ns * (__uint128_t)FS_IN_NS;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(fs), LOW_WORD(fs), tick_period_fs, &rem);
+    return ns_to_tick_cached(ns, 0, hpet_clk_freq);
 }
 
 uint64_t hpet_ticks_to_ns(uint64_t ticks)
 {
-    __uint128_t counter_as_fs = (__uint128_t)ticks * (__uint128_t)tick_period_fs;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(counter_as_fs), LOW_WORD(counter_as_fs), FS_IN_NS, &rem);
+    return tick_to_ns_cached(ticks, 0, hpet_clk_freq);
 }
 
 void set_timeout(uint64_t timeout)
@@ -165,20 +161,17 @@ void set_timeout(uint64_t timeout)
     timer_0->comparator = timeout;
 }
 
-static void process_timeouts(uint64_t curr_ticks)
+static void process_target_timeout(uint64_t curr_ticks)
 {
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_ticks) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        } else if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
+    if (target_timeout <= curr_ticks) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    if (next_timeout != UINT64_MAX) {
-        set_timeout(next_timeout);
+    if (target_timeout != UINT64_MAX) {
+        set_timeout(target_timeout);
     }
 }
 
@@ -258,9 +251,7 @@ static uint64_t get_tsc_frequency(void)
 
 static uint64_t tsc_ticks_to_ns(uint64_t tsc)
 {
-    __uint128_t numerator = (__uint128_t)tsc * (__uint128_t)NS_IN_S;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(numerator), LOW_WORD(numerator), tsc_freq, &rem);
+    return tick_to_ns_cached(tsc, 0, tsc_clk_freq);
 }
 
 void init(void)
@@ -272,6 +263,8 @@ void init(void)
     /* Read the tick period so we can convert between ticks <-> nanoseconds. */
     volatile uint64_t capability = *((uint64_t *)(HPET_REGION + HPET_GENERAL_CAP_ID_REG));
     tick_period_fs = capability >> 32;
+    hpet_clk_freq = FS_IN_S / tick_period_fs;
+    sddf_dprintf("Found clk_freq as %u\n", hpet_clk_freq);
 
     /* Make sure that the main counter is 64-bit wide and legacy IRQ routing capable. */
     assert(capability & BIT(COUNT_SIZE_CAP));
@@ -304,11 +297,6 @@ void init(void)
     /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
     *general_config_reg |= BIT(LEG_RT_CNF);
 
-    next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
-
     microkit_deferred_irq_ack(IRQ_CH);
 
     /* Detect TSC */
@@ -326,8 +314,8 @@ void init(void)
              * TSC took 0.601s, HPET took 12.263s!
              */
         } else {
-            tsc_freq = get_tsc_frequency();
-            if (!tsc_freq) {
+            tsc_clk_freq = get_tsc_frequency();
+            if (!tsc_clk_freq) {
                 LOG_TIMER_WARN("cannot detect TSC frequency via cpuid, expect performance degradation.\n");
                 /* Because same reason as above. */
             } else {
@@ -339,34 +327,6 @@ void init(void)
     }
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
-{
-    switch (microkit_msginfo_get_label(msginfo)) {
-
-    case SDDF_TIMER_GET_TIME: {
-        if (tsc_freq) {
-            microkit_mr_set(0, tsc_ticks_to_ns(rdtsc()));
-        } else {
-            microkit_mr_set(0, hpet_ticks_to_ns(get_hpet_ticks()));
-        }
-        return microkit_msginfo_new(0, 1);
-    }
-
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t ticks_now = get_hpet_ticks();
-        uint64_t delta = microkit_mr_get(0);
-        uint64_t delta_ticks = ns_to_hpet_ticks(delta);
-
-        timeouts[ch] = ticks_now + delta_ticks;
-        process_timeouts(ticks_now);
-        return microkit_msginfo_new(0, 0);
-    }
-
-    default:
-        return microkit_msginfo_new(0, 0);
-    }
-}
-
 void notified(microkit_channel ch)
 {
     if (ch != IRQ_CH) {
@@ -375,5 +335,46 @@ void notified(microkit_channel ch)
 
     microkit_deferred_irq_ack(IRQ_CH);
 
-    process_timeouts(get_hpet_ticks());
+    // IMPORTANT: use hpet time, not tsc time for handling timeouts.
+    process_target_timeout(get_hpet_ticks());
+    set_shared_time_page(get_current_time());
+}
+
+// Protocol common functions
+bool set_new_timeout(uint64_t timestamp)
+{
+    // This timer uses ticks for timeouts, not nanoseconds.
+    uint64_t curr_time_hpet = get_hpet_ticks();
+
+    if (tsc_clk_freq) {
+        uint64_t curr_time_tsc = tsc_ticks_to_ns(rdtsc());
+        // The timebase is different for the hpet, so we need to create an hpet-equivalent
+        // absolute timestamp. INVARIANT: timestamp > tsc_time. Guaranteed by common protected()
+        // logic.
+        assert(timestamp > curr_time_tsc);
+        LOG_TIMER_DRIVER("hpet time: %zu, tsc time: %zu, target: %zu\n", curr_time_hpet, curr_time_tsc, timestamp);
+        uint64_t delta_hpet = ns_to_hpet_ticks(timestamp - curr_time_tsc);
+        uint64_t hpet_timestamp = curr_time_hpet + delta_hpet;
+        LOG_TIMER_DRIVER("delta: %zu, hpet target timestamp: %zu\n", delta_hpet, hpet_timestamp);
+        // Convert to ticks and set as target
+        target_timeout = hpet_timestamp;
+    } else {
+        LOG_TIMER_DRIVER("setting timeout directly from hpet...\n");
+        target_timeout = ns_to_hpet_ticks(timestamp);
+    }
+    LOG_TIMER_DRIVER("Setting timeout for %zu ticks\n", target_timeout);
+
+    process_target_timeout(curr_time_hpet);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    uint64_t time = 0;
+    if (tsc_clk_freq) {
+        time = tsc_ticks_to_ns(rdtsc());
+    } else {
+        time = hpet_ticks_to_ns(get_hpet_ticks());
+    }
+    return time;
 }

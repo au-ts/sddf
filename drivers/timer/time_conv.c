@@ -27,8 +27,6 @@ sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler)
  */
 void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_t *f_mult, uint64_t *f_shift)
 {
-    // If frequencies are > 1GHz, just die because this method is no longer sound.
-    assert(f_a < MAX_SANE_FREQ_HZ && f_b < MAX_SANE_FREQ_HZ);
     // shift_acc: number of bits used by largest possible ticks value in do_period_freq_shift
     uint64_t shift_acc = 32;
     uint64_t tmp = (uint64_t)(UINT32_MAX * f_a) >> 32;

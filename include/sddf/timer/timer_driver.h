@@ -11,7 +11,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define DEBUG_TIMER_DRIVER
+// #define DEBUG_TIMER_DRIVER
 #ifdef DEBUG_TIMER_DRIVER
 #define LOG_TIMER_DRIVER(...) do{ sddf_dprintf("TIMER DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
@@ -20,7 +20,6 @@
 
 #define LOG_TIMER_DRIVER_ERR(...) do{ sddf_dprintf("TIMER DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define MAX_SANE_FREQ_HZ (1 << 30)  // ~1GHz ... nothing should be close to this!
 #define F_NANOSECOND     (NS_IN_S)  // equivalent shift frequency for nanoseconds
 
 // Mult-shift cache

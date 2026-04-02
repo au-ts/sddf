@@ -12,7 +12,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define DEBUG_TIMER_VIRT
+// #define DEBUG_TIMER_VIRT
 #ifdef DEBUG_TIMER_VIRT
 #define LOG_TIMER_VIRT(...) do{ sddf_dprintf("TIMER VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
