@@ -12,8 +12,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 
-#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
-
 // This is a virtual timer - it has no clock rate and just returns nanoseconds directly.
 // This is equivalent to a 1GHz clock, but we don't attempt time conversion here since
 // it would be pointless.
@@ -32,6 +30,7 @@ typedef struct {
 } goldfish_timer_regs_t;
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 static volatile goldfish_timer_regs_t *timer_regs;
 
 static inline uint64_t get_ticks_in_ns(void)
@@ -48,26 +47,19 @@ void set_timeout(uint64_t timeout)
     timer_regs->irq_enabled = 1U;
 }
 
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time_ns)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time_ns) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        set_timeout(next_timeout);
+    if (target_timeout != UINT64_MAX) {
+        set_timeout(target_timeout);
     }
 }
 
@@ -77,10 +69,6 @@ void init()
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
     timer_regs = (goldfish_timer_regs_t *)device_resources.regions[0].region.vaddr;
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 }
 
 void notified(sddf_channel ch)
@@ -91,29 +79,22 @@ void notified(sddf_channel ch)
     /* Handled irq -> clear device interrupt */
     timer_regs->clear_interrupt = 1;
     uint64_t curr_time = get_ticks_in_ns();
-    process_timeouts(curr_time);
+    process_target_timeout(curr_time);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+// Protocol common functions
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_ticks_in_ns();
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_us = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch] = curr_time + offset_us;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time_ns = get_ticks_in_ns();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("Setting timeout for %zu ns\n", target_timeout);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time_ns);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return get_ticks_in_ns();
 }

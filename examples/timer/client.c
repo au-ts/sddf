@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+// This client will attempt to test all calls in the timer API sequentially,
+// before finally just counting the current time in seconds.
+
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/timer/client.h>
@@ -92,7 +95,8 @@ void notified(sddf_channel ch)
                 }
                 stage = STAGE_DONE;
                 sddf_printf("CLIENT|INFO: Finished testing timer features! Proceeding to counting the time.\n");
-                err = sddf_timer_set_timeout(timer_channel, 0, NS_IN_S, &timeout_id);
+                sddf_printf("CLIENT|INFO: time is: %zu ns\n", now);
+                err = sddf_timer_set_timeout(timer_channel, now, NS_IN_S, &timeout_id);
                 if (err) {
                     sddf_printf("CLIENT|ERROR: failed to start time count!\n");
                 }

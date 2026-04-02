@@ -42,6 +42,7 @@ static uint64_t timer_freq;
 #define CNTFRQ "cntfrq_el0"
 
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 static inline uint64_t get_ticks(void)
 {
@@ -90,31 +91,27 @@ static inline void generic_timer_disable(void)
     generic_timer_or_ctrl(~GENERIC_TIMER_ENABLE);
 }
 
-void set_timeout(uint64_t timeout)
+void set_timeout(uint64_t timeout_ns)
 {
-    generic_timer_set_compare(ns_to_tick_cached(timeout, 0, timer_freq));
+    generic_timer_set_compare(ns_to_tick_cached(timeout_ns, 0, timer_freq));
 }
 
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time_ticks)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    uint64_t curr_time = tick_to_ns_cached(curr_time_ticks, 0, timer_freq);
+    LOG_TIMER_DRIVER("Process timeout: time is %zu ns\n", curr_time);
+    if (target_timeout <= curr_time) {
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        sddf_notify(config.virt_id);
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        set_timeout(next_timeout);
+    // Program timer otherwise
+    if (target_timeout != UINT64_MAX) {
+        set_timeout(target_timeout);
     }
 
 }
@@ -124,10 +121,6 @@ void init()
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 0);
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 
     generic_timer_set_compare(UINT64_MAX);
     generic_timer_enable();
@@ -140,30 +133,26 @@ void notified(sddf_channel ch)
     sddf_deferred_irq_ack(ch);
 
     generic_timer_set_compare(UINT64_MAX);
-    uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
-    process_timeouts(curr_time);
+    uint64_t curr_time = tick_to_ns_cached(get_ticks(), 0, timer_freq);
+    process_target_timeout(curr_time);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = tick_to_ns_cached(get_ticks(), 0, timer_freq);
-        uint64_t offset_us = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch] = curr_time + offset_us;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time = get_ticks();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("Setting timeout for %zu ticks\n", target_timeout);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time);
+    return true;
 }
+
+uint64_t get_current_time(void)
+{
+    return (tick_to_ns_cached(get_ticks(), 0, (sddf_timer_freq_hz_t) timer_freq));
+}
+
+
+
+

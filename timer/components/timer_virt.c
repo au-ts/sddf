@@ -13,14 +13,18 @@ __attribute__((__section__(".timer_virt_config"))) timer_virt_config_t config;
 
 // Priority heap for managing timeouts
 static timer_heap_t timeouts;
+static uint64_t last_issued_timeout = 0;
 
 static void process_timeouts(void)
 {
     uint64_t curr_time = read_timeout_stamp_page((uint64_t *)config.time_page.vaddr);
-    LOG_TIMER_VIRT("Processing timeouts. Last timeout: %zu ns\n", curr_time);
+    LOG_TIMER_VIRT("Processing timeouts.\n");
 
     // Pop from priority heap until all timeouts are serviced
     while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
+        // Refresh current time each loop, in case we are pre-empted by driver.
+        curr_time = read_timeout_stamp_page((uint64_t *)config.time_page.vaddr);
+        LOG_TIMER_VIRT("Last timeout: %zu ns\n", curr_time);
         timeout_t expired;
         assert(timer_heap_pop(&timeouts, &expired));
         // If the expired timeout is periodic, re-enqueue it.
@@ -28,6 +32,17 @@ static void process_timeouts(void)
             // NOTE: this func updates the timestamp based on the period.
             // If this assert fails, the heap is broken. We should always be able
             // to reinsert if we just popped.
+            if (expired.timestamp < curr_time - expired.period) {
+                // If the timestamp was further in the past than one period, we should
+                // adjust the timestamp to skip any repeated periods that would happen at the
+                // same moment. This is necessary to prevent triggering potentially hundreds
+                // of thousands of timeouts with a single PPC, at the same time!
+                uint64_t timestamp_period_delta = curr_time - expired.timestamp;
+                uint64_t old_timestamp = expired.timestamp;
+                expired.timestamp += expired.period * ((timestamp_period_delta / expired.period));
+                LOG_TIMER_VIRT_ERR("Periodic timeout requested with past time. Skipping %zu -> %zu\n",
+                                   old_timestamp, expired.timestamp);
+            }
             LOG_TIMER_VIRT("Re-inserting periodic timeout with period=%zu\n", expired.period);
             assert(timer_heap_reinsert_periodic(&timeouts, &expired));
         } else {
@@ -35,17 +50,22 @@ static void process_timeouts(void)
 
             free_timeout_id(&timeouts, expired.id);
         }
-        LOG_TIMER_VIRT("timeout #%zu expired for client %u\n", expired.id, expired.client_channel);
+        LOG_TIMER_VIRT("timeout #%zu @ %zu ns expired for client %u\n", expired.id, expired.timestamp, expired.client_channel);
         microkit_notify(expired.client_channel);
     }
 
     timeout_t *next = timer_heap_peek(&timeouts);
     // Reissue next timeout irq, if needed.
     if (next != NULL) {
-        uint64_t next_timeout = next->timestamp;
-        LOG_TIMER_VIRT("next delay: %zu\n", next_timeout);
-        // Load next timeout into driver
-        timer_virt_set_timeout(config.driver_id, next_timeout);
+        if (next->timestamp != last_issued_timeout) {
+            uint64_t next_timeout = next->timestamp;
+            LOG_TIMER_VIRT("next delay: %zu\n", next_timeout);
+            // Load next timeout into driver
+            timer_virt_set_timeout(config.driver_id, next_timeout);
+            last_issued_timeout = next_timeout;
+        } else {
+            LOG_TIMER_VIRT("Next timeout already issued. Not re-issuing.\n");
+        }
     } else {
         LOG_TIMER_VIRT("No more timeouts remain. Idling.\n");
     }

@@ -1,5 +1,5 @@
 #
-# Copyright 2024, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -31,7 +31,6 @@ timer/time_conv.o: ${TIMER_DIR}/../time_conv.c |timer $(SDDF_LIBC_INCLUDE)
 timer/timer_driver_virt.o: CFLAGS+=-I${TIMER_DIR}
 timer/timer_driver_virt.o: ${TIMER_DIR}/../timer_driver_virt.c |timer $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
-
 
 timer:
 	mkdir -p timer

@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 
@@ -50,6 +51,7 @@
 #define CMP_IRQ(n)          (device_resources.irqs[(2*n)+1].id)
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 // Timer block implements NUM_TIMERS separate timers with back-to-back registers
 struct timer_regs {
@@ -69,9 +71,7 @@ volatile struct timer_regs *regs;
  * on other devices.
  */
 uint32_t timekeeper_overflow_count = 0;
-
-// Priority heap for managing timeouts
-static timer_heap_t timeouts;
+static uint64_t target_timeout;
 
 typedef struct apbtimer_timeout_conf {
     uint32_t cmp;
@@ -100,32 +100,10 @@ static uint64_t get_time_ns(void)
  */
 static apbtimer_timeout_conf_t calculate_timeout_from_ns(uint64_t ns_delay)
 {
-    // Convert nanoseconds to ticks with a prescaler of zero (x1)
     uint64_t ticks = ns_to_tick_cached(ns_delay, 0, APBTIMER_CLK_FREQ);
-
     uint32_t prescaler = 0;
     uint32_t cmp = ticks;
-    // NOTE: at the time of writing, the APB timer's prescaler logic is completely
-    // broken. The prescaler calculator is disabled as a result.
-
-    // if (ticks < UINT32_MAX - 1) {
-    //     // No prescaler needed
-    //     cmp = ticks;
-    // } else {
-    //     // Find smallest suitable prescaler
-    //     for (int i = 1; i < APBTIMER_PRESCALER_MAX; i++) {
-    //         if (ticks / (i + 1) <= UINT32_MAX) {
-    //             prescaler = i;
-    //             cmp = ticks / (i + 1);
-    //             break;
-    //         }
-    //     }
-    //     // Fall through: set everything to max because this is a large timeout.
-    //     if (prescaler == 0) {
-    //         prescaler = APBTIMER_PRESCALER_MAX;
-    //         cmp = UINT32_MAX;
-    //     }
-    // }
+    // NOTE: apb timer's prescaler logic is broken in the hardware, ignore for now...
     apbtimer_timeout_conf_t ret = { .cmp = cmp, .prescaler = prescaler };
     return ret;
 }
@@ -170,51 +148,49 @@ static inline void timeout_set_enable(bool enable)
     }
 }
 
-/**
- * Process timeouts from the queue using the timeout timer.
- * This *differs* from most other sDDF timers because we process timeouts
- * on a relative basis rather than with respect to the absolute time, as such
- * a method is cumbersome and inefficient with 32 bit timers.
- *
- * Timeouts are stored using absolute time upon PPC, this function converts the
- * next timeout into a relative stamp from the current time and awaits it using
- * the timeout timer. Automatically sets prescaler to satisfy most granular time
- * resolution.
- */
-static void process_timeouts(void)
+static void process_target_timeout(uint64_t curr_time_ns)
 {
-    uint64_t curr_time = get_time_ns();
-    LOG_APBTIMER("Processing timeouts. Current time: %zu ns\n", curr_time);
-
-    // Pop from priority heap until all timeouts are serviced
-    while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
-        timeout_t expired;
-        bool ret = timer_heap_pop(&timeouts, &expired);
-        assert(ret); // This should never happen! Peek should catch empty queue
-        LOG_APBTIMER("timeout expired for client %u\n", expired.client_channel);
-        microkit_notify(expired.client_channel);
+    if (target_timeout <= curr_time_ns) {
+        LOG_APBTIMER("timeout@%llu reached @ %llu\n", target_timeout, curr_time);
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
-
-    timeout_t *next = timer_heap_peek(&timeouts);
-    // Reissue next timeout irq, if needed.
-    if (next != NULL) {
-        uint64_t next_delay = next->timestamp - curr_time;
+    if (target_timeout != UINT64_MAX) {
+        uint64_t next_delay = target_timeout - curr_time_ns;
         apbtimer_timeout_conf_t next_conf = calculate_timeout_from_ns(next_delay);
         LOG_APBTIMER("Next delay: %zu - prescaler = %d - cmp = %u\n", next_delay, next_conf.prescaler, next_conf.cmp);
-        set_timeout_prescaler(next_conf.prescaler);
+        // set_timeout_prescaler(next_conf.prescaler);  // disabled: prescaler hardware broken
         regs[TIMER_TIMEOUT].cmp = next_conf.cmp;
         assert(regs[TIMER_TIMEOUT].cmp == next_conf.cmp);
-        LOG_APBTIMER("next delay: %zu\n", next_delay);
+        LOG_APBTIMER("next delay: %zu (abs = \n", next_delay);
         // Start timeout timer running
         timeout_set_enable(true);
-    } else {
-        LOG_APBTIMER("No more timeouts remain. Idling.\n");
     }
+
+}
+
+// Protocol common functions
+uint64_t get_current_time(void)
+{
+    return get_time_ns();
+}
+
+bool set_new_timeout(uint64_t timestamp)
+{
+    uint64_t curr_time = get_time_ns();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("The time is %zu. next timeout: %zu\n", curr_time, target_timeout);
+
+    process_target_timeout(curr_time);
+    return true;
 }
 
 void notified(microkit_channel ch)
 {
-
+    uint64_t curr_time = get_time_ns();
     LOG_APBTIMER("notified by channel %u\n", ch);
     if (ch == OVERFLOW_IRQ(TIMER_TIMEKEEPER)) {
         LOG_APBTIMER("timekeeper overflow irq!\n");
@@ -223,39 +199,13 @@ void notified(microkit_channel ch)
         LOG_APBTIMER("timeout irq!\n");
         timeout_set_enable(0);
         regs[TIMER_TIMEOUT].timer = 0;
-        process_timeouts();
+        process_target_timeout(curr_time);
     } else {
         LOG_APBTIMER("unexpected notification from channel %u\n", ch);
         return;
     }
 
     microkit_deferred_irq_ack(ch);
-}
-
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
-{
-    LOG_APBTIMER("ppc from channel %u\n", ch);
-    switch (microkit_msginfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_time_ns();
-        seL4_SetMR(0, time_ns);
-        LOG_APBTIMER("getting time\n");
-        return microkit_msginfo_new(0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_time_ns();
-        uint64_t offset_ns = seL4_GetMR(0);
-        LOG_APBTIMER("setting timeout for %zu\n", offset_ns);
-        timer_heap_insert(&timeouts, curr_time + offset_ns, ch);
-        process_timeouts();
-        break;
-    }
-    default:
-        LOG_APBTIMER("Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-        break;
-    }
-
-    return microkit_msginfo_new(0, 0);
 }
 
 void init(void)
@@ -268,7 +218,4 @@ void init(void)
     regs = (volatile struct timer_regs *)timer_base;
 
     setup_timekeeper();
-
-    // Initialise priority heap
-    timer_heap_init(&timeouts);
 }

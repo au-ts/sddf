@@ -1,5 +1,5 @@
 #
-# Copyright 2025, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -12,7 +12,7 @@
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-timer_driver.elf: timer/timer_driver.o timer/timer_common.o
+timer_driver.elf: timer/timer_driver.o timer/timer_common.o timer/time_conv.o timer/timer_driver_virt.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 timer/timer_driver.o: CFLAGS+=-I${TIMER_DIR}
@@ -23,6 +23,15 @@ timer/timer_common.o: CFLAGS+=-I${TIMER_DIR}
 timer/timer_common.o: ${TIMER_DIR}/../timer_common.c |timer $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
+timer/time_conv.o: CFLAGS+=-I${TIMER_DIR}
+timer/time_conv.o: ${TIMER_DIR}/../time_conv.c |timer $(SDDF_LIBC_INCLUDE)
+	${CC} ${CFLAGS} -c -o $@ $<
+
+timer/timer_driver_virt.o: CFLAGS+=-I${TIMER_DIR}
+timer/timer_driver_virt.o: ${TIMER_DIR}/../timer_driver_virt.c |timer $(SDDF_LIBC_INCLUDE)
+	${CC} ${CFLAGS} -c -o $@ $<
+
+
 timer:
 	mkdir -p timer
 
@@ -30,3 +39,4 @@ clean::
 	rm -rf timer
 clobber::
 	rm -f timer_driver.elf
+

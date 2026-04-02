@@ -26,8 +26,10 @@ void set_shared_time_page(uint64_t curr_time)
 // This file implements virt-driver interaction for timer drivers.
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    LOG_TIMER_DRIVER("Notified by %u\n", ch);
     uint64_t time = get_current_time();
+    // Always update time page when virt interacts with us.
+    set_shared_time_page(time);
+
     if (ch != config.virt_id) {
         LOG_TIMER_DRIVER_ERR("Protected called from channel %u ... not virt (%u)!\n",
                              ch, config.virt_id);
@@ -40,8 +42,15 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     }
     case SDDF_TIMER_REQ_TIMEOUT: {
         uint64_t target = microkit_mr_get(0);
-        bool success = set_new_timeout(target);
-        LOG_TIMER_DRIVER("Next timeout: %zu ns\n", target);
+        bool success = true;
+        if (target < time) {
+            // Don't bother setting a timeout if this is already
+            // in the past. Notify immediately instead.
+            microkit_notify(config.virt_id);
+        } else {
+            success = set_new_timeout(target);
+            LOG_TIMER_DRIVER("Next timeout: %zu ns\n", target);
+        }
         microkit_mr_set(0, (uint64_t)success);
         return microkit_msginfo_new(0, 1);
         break;
@@ -51,9 +60,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
                      microkit_msginfo_get_label(msginfo), ch);
         break;
     }
-
-    // Always update time page when virt interacts with us.
-    set_shared_time_page(time);
 
     return microkit_msginfo_new(0, 0);
 }

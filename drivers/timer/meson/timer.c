@@ -35,6 +35,7 @@
 // Change this if the timebase changes!
 #define MESON_TIMER_CLK_FREQ ((sddf_timer_freq_hz_t) 1*MEGA)
 
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 struct timer_regs {
@@ -54,11 +55,7 @@ struct timer_regs {
 };
 
 volatile struct timer_regs *regs;
-
-/* Right now, we only service a single timeout per client.
- * This timeout array indicates when a timeout should occur,
- * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
 static uint64_t get_ticks(void)
 {
@@ -75,25 +72,34 @@ static uint64_t get_ticks(void)
 
 static void process_timeouts(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
+    if (target_timeout != UINT64_MAX) {
         regs->mux &= ~TIMER_A_MODE;
-        regs->timer_a = next_timeout - curr_time;
+        regs->timer_a = target_timeout - curr_time;
         regs->mux |= TIMER_A_EN;
     }
+}
+
+bool set_new_timeout(uint64_t timestamp)
+{
+    uint64_t curr_time = get_ticks();
+    // Convert to ticks and set as target
+    target_timeout = ns_to_tick_cached(timestamp, 0, (sddf_timer_freq_hz_t) MESON_TIMER_CLK_FREQ);
+    LOG_TIMER_DRIVER("Setting timeout for %zu ticks\n", target_timeout);
+
+    process_timeouts(curr_time);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return (tick_to_ns_cached(get_ticks(), 0, (sddf_timer_freq_hz_t) MESON_TIMER_CLK_FREQ));
 }
 
 void notified(sddf_channel ch)
@@ -110,40 +116,11 @@ void notified(sddf_channel ch)
     process_timeouts(curr_time);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
-{
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = tick_to_ns_cached(get_ticks(), 0, MESON_TIMER_CLK_FREQ);
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks();
-        // Ticks are 1us on this clock
-        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), 0, MESON_TIMER_CLK_FREQ);
-        timeouts[ch] = curr_time + offset_ticks;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
-
-    return seL4_MessageInfo_new(0, 0, 0, 0);
-}
-
 void init(void)
 {
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 
     regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 

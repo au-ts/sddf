@@ -64,6 +64,7 @@ typedef struct {
 } starfive_timer_regs_t;
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 static volatile starfive_timer_regs_t *counter_regs;
 static volatile starfive_timer_regs_t *timeout_regs;
@@ -82,7 +83,7 @@ uint32_t timeout_timer_elapses = 0;
 /* Right now, we only service a single timeout per client.
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
 static uint64_t get_ticks_in_ns(void)
 {
@@ -101,24 +102,17 @@ static uint64_t get_ticks_in_ns(void)
     return tick_to_ns_cached(value_ticks, 0, JH7110_CLK_FREQ);
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(CLIENT_CH_START + i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        uint64_t ns = next_timeout - curr_time;
+    if (target_timeout != UINT64_MAX) {
+        uint64_t ns = target_timeout - curr_time;
         timeout_regs->enable = STARFIVE_TIMER_DISABLED;
         timeout_timer_elapses = 0;
         timeout_regs->ctrl = STARFIVE_TIMER_MODE_SINGLE;
@@ -157,7 +151,7 @@ void notified(sddf_channel ch)
         timeout_regs->intclr = 1;
 
         uint64_t curr_time = get_ticks_in_ns();
-        process_timeouts(curr_time);
+       process_target_timeout(curr_time);
     } else {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
@@ -166,28 +160,21 @@ void notified(sddf_channel ch)
     sddf_deferred_irq_ack(ch);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+// Protocol common functions
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_ticks_in_ns();
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_ns = sddf_get_mr(0);
-        timeouts[ch - CLIENT_CH_START] = curr_time + offset_ns;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time_ns = get_ticks_in_ns();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("Setting timeout for %zu ns\n", target_timeout);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time_ns);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return get_ticks_in_ns();
 }
 
 void init(void)
@@ -195,10 +182,6 @@ void init(void)
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 
     counter_irq = device_resources.irqs[0].id;
     timeout_irq = device_resources.irqs[1].id;

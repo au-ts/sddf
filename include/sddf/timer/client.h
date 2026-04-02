@@ -11,6 +11,9 @@
 
 /**
  * Request a timeout via PPC into the passive timer virt.
+ * If a period is specified, the timeout will recurr every `period` nanoseconds.
+ * If the timestamp is further in the past than `period`, the timer virt will
+ * "fast-forward" to skip all previous repeats that would happen at the same time.
  * @param channel ID of the timer virt.
  * @param timeout absolute timestamp in nanoseconds.
  * @param period period of this timeout for repeats. set to 0 for no period.

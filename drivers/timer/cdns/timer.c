@@ -14,6 +14,7 @@
 #include <sddf/resources/device.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 /*
  * Zynq UltraScale+ MPSoC contains a timer (Cadence Triple Timer Clock) with 3 32-bit counters.
@@ -91,7 +92,7 @@ sddf_channel timeout_irq;
 /* offset for the 2 interrupt channels */
 #define CLIENT_CH_START 2
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
 static inline uint64_t get_ticks_in_ns(void)
 {
@@ -131,24 +132,17 @@ void set_timeout(uint64_t ns)
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] ^= CDNS_TIMER_DISABLE;
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time_ns)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(CLIENT_CH_START + i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time_ns) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        uint64_t ns = next_timeout - curr_time;
+    if (target_timeout != UINT64_MAX) {
+        uint64_t ns = target_timeout - curr_time_ns;
         set_timeout(ns);
     }
 }
@@ -158,10 +152,6 @@ void init()
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 
     timer_regs = (cdns_timer_regs_t *)device_resources.regions[0].region.vaddr;
     counter_irq = device_resources.irqs[TTC_COUNTER_TIMER].id;
@@ -227,7 +217,7 @@ void notified(sddf_channel ch)
         /* Timeout counter reached 0, stop the timeout timer */
         timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= CDNS_TIMER_DISABLE;
         uint64_t curr_time = get_ticks_in_ns();
-        process_timeouts(curr_time);
+        process_target_timeout(curr_time);
         /* interrupt cleared on read by device */
         uint32_t int_sts = timer_regs->int_sts[TTC_TIMEOUT_TIMER];
         assert(int_sts == CDNS_TIMER_ENABLE_INTERVAL_INTERRUPT);
@@ -238,26 +228,19 @@ void notified(sddf_channel ch)
     sddf_deferred_irq_ack(ch);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+// Protocol common functions
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_ticks_in_ns();
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_ns = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch - CLIENT_CH_START] = curr_time + offset_ns;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time_ns = get_ticks_in_ns();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("Setting timeout for %zu ns\n", target_timeout);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time_ns);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return get_ticks_in_ns();
 }

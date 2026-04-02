@@ -13,16 +13,7 @@
 #include <sddf/resources/device.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
-//#define DEBUG_TIMER
-
-#ifdef DEBUG_TIMER
-#define LOG_TIMER(...) do{ sddf_printf("LOG_TIMER|INFO: ");sddf_printf(__VA_ARGS__); }while(0)
-#else
-#define LOG_TIMER(...) do{}while(0)
-#endif // DEBUG_TIMER
-
-#define LOG_TIMER_ERR(...) do{ sddf_printf("LOG_TIMER|ERROR: ");sddf_printf(__VA_ARGS__); }while(0)
+__attribute__((__section__(".timer_driver_config"))) timer_driver_config_t config;
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
@@ -51,16 +42,16 @@ static volatile rk3568_timer_regs_t *timeout_timer;
 sddf_channel timestamp_irq;
 sddf_channel timeout_irq;
 
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t target_timeout = UINT64_MAX;
 
 static void print_regs(volatile rk3568_timer_regs_t *timer)
 {
-    LOG_TIMER("regs load_count0 : 0x%x\n", timer->load_count0);
-    LOG_TIMER("regs load_count1 : 0x%x\n", timer->load_count1);
-    LOG_TIMER("regs current_value0: 0x%x\n", timer->current_value0);
-    LOG_TIMER("regs current_value1: 0x%x\n", timer->current_value1);
-    LOG_TIMER("regs control_reg: 0x%x\n", timer->control_reg);
-    LOG_TIMER("regs int_status: 0x%x\n", timer->int_status);
+    LOG_TIMER_DRIVER("regs load_count0 : 0x%x\n", timer->load_count0);
+    LOG_TIMER_DRIVER("regs load_count1 : 0x%x\n", timer->load_count1);
+    LOG_TIMER_DRIVER("regs current_value0: 0x%x\n", timer->current_value0);
+    LOG_TIMER_DRIVER("regs current_value1: 0x%x\n", timer->current_value1);
+    LOG_TIMER_DRIVER("regs control_reg: 0x%x\n", timer->control_reg);
+    LOG_TIMER_DRIVER("regs int_status: 0x%x\n", timer->int_status);
 }
 
 static inline void acknowledge_irq(void)
@@ -93,30 +84,21 @@ void set_timeout(uint64_t ns)
 
     timeout_timer->control_reg = (RK3568_TIMER_CONTROL_TIMER_ENABLE | RK3568_TIMER_CONTROL_MODE_USER
                                   | RK3568_TIMER_CONTROL_INTERRUPT_ENABLE);
-    LOG_TIMER("set_timeout timeout_ns: %lu ticks: %lu\n", ns, num_ticks);
+    LOG_TIMER_DRIVER("set_timeout timeout_ns: %lu ticks: %lu\n", ns, num_ticks);
     return;
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_target_timeout(uint64_t curr_time)
 {
-    LOG_TIMER("process timeouts curr_time: %lu\n", curr_time);
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(device_resources.num_irqs + i);
-            timeouts[i] = UINT64_MAX;
-        }
+    if (target_timeout <= curr_time) {
+        sddf_notify(config.virt_id);
+        // Update "current" time page with virt
+        set_shared_time_page(get_current_time());
+        target_timeout = UINT64_MAX;
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            LOG_TIMER("next timeout at %lu i=%d\n", timeouts[i], i);
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        uint64_t ns = next_timeout - curr_time;
+    if (target_timeout != UINT64_MAX) {
+        uint64_t ns = target_timeout - curr_time;
         set_timeout(ns);
     }
 
@@ -132,10 +114,6 @@ void init()
     /* Ack any IRQs that were delivered before the driver started. */
     for (int i = 0; i < device_resources.num_irqs; i++) {
         sddf_irq_ack(device_resources.irqs[i].id);
-    }
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
     }
 
     timestamp_timer = device_resources.regions[0].region.vaddr;
@@ -169,31 +147,26 @@ void notified(sddf_channel ch)
     } else if (ch == timeout_irq) {
         /* acknowledge the interrupt and disable the timer */
         acknowledge_irq();
-        process_timeouts(get_ticks_in_ns());
+        process_target_timeout(get_ticks_in_ns());
     } else {
-        LOG_TIMER_ERR("unexpected notification from channel %u\n", ch);
+        LOG_TIMER_DRIVER_ERR("unexpected notification from channel %u\n", ch);
     }
     sddf_deferred_irq_ack(ch);
 }
 
-seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+// Protocol common functions
+bool set_new_timeout(uint64_t timestamp)
 {
-    switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        sddf_set_mr(0, get_ticks_in_ns());
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
-    case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_ns = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch - device_resources.num_irqs] = curr_time + offset_ns;
-        process_timeouts(curr_time);
-        break;
-    }
-    default:
-        LOG_TIMER_ERR("Unknown request %lu to timer from channel %u\n", seL4_MessageInfo_get_label(msginfo), ch);
-        break;
-    }
+    uint64_t curr_time_ns = get_ticks_in_ns();
+    // Convert to ticks and set as target
+    target_timeout = timestamp;
+    LOG_TIMER_DRIVER("Setting timeout for %zu ns\n", target_timeout);
 
-    return seL4_MessageInfo_new(0, 0, 0, 0);
+    process_target_timeout(curr_time_ns);
+    return true;
+}
+
+uint64_t get_current_time(void)
+{
+    return get_ticks_in_ns();
 }
