@@ -50,9 +50,18 @@ typedef struct {
 typedef uint32_t aml_pkg_len_t;
 
 typedef struct {
-    char path[AML_MAX_PATH_STR];
-    uint32_t len;
+    char path_name[AML_MAX_PATH_STR];
+    uint32_t path_len;
+    uint32_t bus_start;
+    uint32_t bus_end;
+} pci_bridge_t;
+
+typedef struct {
+    pci_bridge_t bridges[10];
+    uint32_t num_bridges;
 } pci_resources_t;
+
+pci_resources_t pci_resources;
 
 uint32_t get_pkt_len(uint8_t *pktlen_encoding)
 {
@@ -96,12 +105,12 @@ uint32_t get_name_string(uint8_t *name_encoding, char *name_str)
         // Dual Name Segment
         memcpy(name_str, &name_encoding[1], 8);
         name_str[8] = '\0';
-        return 8;
+        return 9;
     } else if (name_encoding[0] == 0x2F) {
         // Multiple Name Segment
         memcpy(name_str, &name_encoding[2], name_encoding[1]);
         name_str[name_encoding[1]] = '\0';
-        return name_encoding[1];
+        return 1 + name_encoding[1];
     }
     return 0;
 }
@@ -124,9 +133,9 @@ uint32_t get_name_data_len(uint8_t *data_encoding)
             while (data_encoding[++i]);
             return i + 1;
         case DATA_OBJ_BUFFER:
-            return 1 + get_pktlen_bytes(&data_encoding[1]);
+            return 1 + get_pkt_len(&data_encoding[1]);
         case DATA_OBJ_PACKAGE:
-            return 1 + get_pktlen_bytes(&data_encoding[1]);
+            return 1 + get_pkt_len(&data_encoding[1]);
         }
     }
     return 0;
@@ -163,6 +172,7 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
     uint32_t arg_idx;
     uint16_t ext_op_prefix = 0;
     for (int i = 0; i < obj_len;) {
+        sddf_dprintf("base addr: 0x%lx, obj_len: %u, byte address: 0x%lx, i: 0x%x\n", (uintptr_t)cur_obj, obj_len, (uintptr_t)&(cur_obj[i]), i);
         switch (ext_op_prefix | cur_obj[i]) {
             case SCOPE_OP: {
                 sddf_dprintf("== SCOPE_OP\n");
@@ -180,12 +190,9 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
 
                 // Parse objects inside the scope
                 arg_idx = arg_idx + name_len;
-                /* path_len += name_len; */
-                /* sddf_dprintf("===1 path: %s, path len: %d, name_len: %d\n", path->name_str, path_len, name_len); */
                 sddf_dprintf("===1 path len: %d\n", path_len);
-                extract_device_resources(&cur_obj[arg_idx], pkt_len - get_pktlen_bytes(&cur_obj[arg_idx]), path_name, path_len + name_len);
+                extract_device_resources(&cur_obj[arg_idx], pkt_len - (arg_idx - i - 1), path_name, path_len + name_len);
                 sddf_dprintf("===2 path len: %d\n", path_len);
-                /* path_len -= name_len; */
                 path_name[path_len] = '\0';
 
                 i = i + 1 + pkt_len;
@@ -207,7 +214,14 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                     sddf_dprintf("Decoded EISA ID: %s, path: %s\n", eisa_id, path_name);
                     if (!strcmp(eisa_id, "PNP0A08")) {
                         sddf_dprintf("Found a PCI device\n");
+                        memcpy(pci_resources.bridges[pci_resources.num_bridges].path_name, path_name, path_len);
+                        pci_resources.bridges[pci_resources.num_bridges].path_len = path_len;
+                        pci_resources.num_bridges++;
                     }
+                }
+                if (!strcmp(name_str, "_CRS")) {
+                    sddf_dprintf("_CRS for path: %s\n", path_name);
+                    /* extract_crs(&cur_obj[i + 2 + name_len], data_len, path_name, path_len); */
                 }
                 i = i + 1 + name_len + data_len;
                 break;
@@ -241,11 +255,9 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
 
                 // Parse objects inside the scope
                 arg_idx = arg_idx + name_len;
-                /* path_len = path_len + name_len; */
                 sddf_dprintf("===3 path: %s, path len: %d, name_len: %d\n", path_name, path_len, name_len);
-                extract_device_resources(&cur_obj[arg_idx], pkt_len - get_pktlen_bytes(&cur_obj[arg_idx]), path_name, path_len + name_len);
+                extract_device_resources(&cur_obj[arg_idx], pkt_len - (arg_idx - i - 1), path_name, path_len + name_len);
                 sddf_dprintf("===4 path len: %d\n", path_len);
-                /* path_len = path_len - name_len; */
                 path_name[path_len] = '\0';
 
                 ext_op_prefix = 0;
