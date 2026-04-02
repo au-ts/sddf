@@ -115,7 +115,7 @@ uint32_t get_name_string(uint8_t *name_encoding, char *name_str)
     return 0;
 }
 
-// get length of data included in Name Object
+// get length of data included in Name Object, including bytes specifying length
 uint32_t get_name_data_len(uint8_t *data_encoding)
 {
     switch (data_encoding[0]) {
@@ -136,6 +136,29 @@ uint32_t get_name_data_len(uint8_t *data_encoding)
             return 1 + get_pkt_len(&data_encoding[1]);
         case DATA_OBJ_PACKAGE:
             return 1 + get_pkt_len(&data_encoding[1]);
+        }
+    }
+    return 0;
+}
+
+// get length of bytes specifing length of data in Name Object
+uint32_t get_name_data_len_len(uint8_t *data_encoding)
+{
+    switch (data_encoding[0]) {
+        case DATA_OBJ_ZERO:
+        case DATA_OBJ_ONE:
+        case DATA_OBJ_BYTE:
+        case DATA_OBJ_WORD:
+        case DATA_OBJ_DWORD:
+            return 1;
+        case DATA_OBJ_STRING: {
+            uint32_t i = 0;
+            while (data_encoding[++i]);
+            return 1;
+        case DATA_OBJ_BUFFER:
+            return 1 + get_pktlen_bytes(&data_encoding[1]);
+        case DATA_OBJ_PACKAGE:
+            return 1 + get_pktlen_bytes(&data_encoding[1]);
         }
     }
     return 0;
@@ -172,7 +195,7 @@ bool match_path(char *path_a, char *path_b)
     uint8_t j = 0;
     while (path_b[j] == '\\') j++;
     sddf_dprintf("path_a: %s, i = %d, path_b: %s, j = %d\n", path_a, i, path_b, j);
-    return strcmp(&path_a[i], &path_b[j]);
+    return !strcmp(&path_a[i], &path_b[j]);
 }
 
 bool extract_crs(uint8_t *resource_data, uint32_t data_len, char *path_name, uint32_t path_len)
@@ -200,6 +223,7 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 sddf_dprintf("== SCOPE_OP\n");
 
                 // pktLength Encoding
+                // TODO: remove this by something like advance()
                 arg_idx = i + 1;
                 uint32_t pkt_len = get_pkt_len(&cur_obj[arg_idx]);
                 sddf_dprintf("pkt_len: %u\n", pkt_len);
@@ -242,6 +266,7 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 }
                 if (!strcmp(name_str, "_CRS")) {
                     sddf_dprintf("_CRS for path: %s\n", path_name);
+                    sddf_dprintf("length of data length: %d\n", get_name_data_len_len(&cur_obj[i + 1 + name_len]));
                     extract_crs(&cur_obj[i + 2 + name_len], data_len, path_name, path_len);
                 }
                 i = i + 1 + name_len + data_len;
