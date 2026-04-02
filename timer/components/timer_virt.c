@@ -96,6 +96,12 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         uint64_t period = seL4_GetMR(SDDF_TIMER_REQ_TIMEOUT_PERIOD);
         uint64_t id;
         LOG_TIMER_VIRT("setting timeout for %zuns\n", target_time);
+        // Check period is sane
+        if (period <= SDDF_TIMER_MIN_PERIOD_NS) {
+            LOG_TIMER_VIRT_ERR("Tried to set a periodic timeout with invalid period %zu!\n", period);
+            ret = microkit_msginfo_new(SDDF_TIMER_ERR_EINVAL, 0);
+            break;
+        }
         bool success = timer_heap_insert(&timeouts, target_time, period, ch, &id);
         if (success) {
             process_timeouts();
