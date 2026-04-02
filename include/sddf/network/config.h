@@ -98,11 +98,12 @@ typedef struct net_vswitch_config {
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
-    // Reference counting buffers; interfaced as array[NUM_CLIENTS + 1][drv_queue_capacity]
+    // Reference counting buffers; interfaced as array[MAX_NUM_CLIENTS][buffers_per_client]
     // The system designer must allocate a buffer big enough to contain reference counters for buffers.
-    // The size of this region must be at least (NUM_CLIENTS + 1) * drv_queue_capacity * sizeof(int*).
+    // The size of this region must be at least (MAX_NUM_CLIENTS) * buffers_per_client * sizeof(int*).
     // It must be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
+    uint16_t buffers_per_client;
 } net_vswitch_config_t;
 
 static inline bool net_config_check_magic(void *config)

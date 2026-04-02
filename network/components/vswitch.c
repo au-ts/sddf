@@ -17,8 +17,6 @@
 
 #define VSWITCH_VIRT_PORT (SDDF_NET_MAX_CLIENTS - 1)
 
-#define NUM_BUFFERS (512)
-
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
@@ -50,7 +48,7 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
 
     /* mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs[src->id * NUM_BUFFERS + ref_index]++;
+    buffer_refs[src->id * config.buffers_per_client + ref_index]++;
 
     if (net_require_signal_active(&state.rx_queues[dst->id])) {
         net_cancel_signal_active(&state.rx_queues[dst->id]);
@@ -59,7 +57,7 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     }
 
     /* failed to enqueue, decrement the ref */
-    buffer_refs[src->id * NUM_BUFFERS + ref_index]--;
+    buffer_refs[src->id * config.buffers_per_client + ref_index]--;
     return false;
 }
 
@@ -124,11 +122,11 @@ static void rx_return(net_vswitch_port_config_t *port)
             assert(!err);
 
             int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-            assert(buffer_refs[buffer.oid * NUM_BUFFERS + ref_index] != 0);
+            assert(buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0);
 
-            buffer_refs[buffer.oid * NUM_BUFFERS + ref_index]--;
+            buffer_refs[buffer.oid * config.buffers_per_client + ref_index]--;
 
-            if (buffer_refs[buffer.oid * NUM_BUFFERS + ref_index] != 0) {
+            if (buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0) {
                 continue;
             }
 
