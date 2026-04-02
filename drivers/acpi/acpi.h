@@ -165,6 +165,28 @@ void read_eisa_id(uint8_t *eisa_id_bytes, char *eisa_id_str) {
     eisa_id_str[7] = '\0';
 }
 
+bool match_path(char *path_a, char *path_b)
+{
+    uint8_t i = 0;
+    while (path_a[i] == '\\') i++;
+    uint8_t j = 0;
+    while (path_b[j] == '\\') j++;
+    sddf_dprintf("path_a: %s, i = %d, path_b: %s, j = %d\n", path_a, i, path_b, j);
+    return strcmp(&path_a[i], &path_b[j]);
+}
+
+bool extract_crs(uint8_t *resource_data, uint32_t data_len, char *path_name, uint32_t path_len)
+{
+    for (uint8_t i = 0; i < pci_resources.num_bridges; i++) {
+        sddf_dprintf("----------\n");
+        if (match_path(pci_resources.bridges[i].path_name, path_name)) {
+            sddf_dprintf("matched path: %s\n", path_name);
+        }
+
+    }
+    return false;
+}
+
 uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path_name, uint32_t path_len)
 {
     sddf_dprintf("#######################start extract##########\n");
@@ -193,7 +215,6 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 sddf_dprintf("===1 path len: %d\n", path_len);
                 extract_device_resources(&cur_obj[arg_idx], pkt_len - (arg_idx - i - 1), path_name, path_len + name_len);
                 sddf_dprintf("===2 path len: %d\n", path_len);
-                path_name[path_len] = '\0';
 
                 i = i + 1 + pkt_len;
                 break;
@@ -221,7 +242,7 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 }
                 if (!strcmp(name_str, "_CRS")) {
                     sddf_dprintf("_CRS for path: %s\n", path_name);
-                    /* extract_crs(&cur_obj[i + 2 + name_len], data_len, path_name, path_len); */
+                    extract_crs(&cur_obj[i + 2 + name_len], data_len, path_name, path_len);
                 }
                 i = i + 1 + name_len + data_len;
                 break;
@@ -258,7 +279,6 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 sddf_dprintf("===3 path: %s, path len: %d, name_len: %d\n", path_name, path_len, name_len);
                 extract_device_resources(&cur_obj[arg_idx], pkt_len - (arg_idx - i - 1), path_name, path_len + name_len);
                 sddf_dprintf("===4 path len: %d\n", path_len);
-                path_name[path_len] = '\0';
 
                 ext_op_prefix = 0;
                 i = i + 1 + pkt_len;
