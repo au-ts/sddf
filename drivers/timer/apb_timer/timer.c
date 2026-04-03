@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_heap.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 
