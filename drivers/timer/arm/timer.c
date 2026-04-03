@@ -140,7 +140,7 @@ void notified(sddf_channel ch)
     sddf_deferred_irq_ack(ch);
 
     generic_timer_set_compare(UINT64_MAX);
-    uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+    uint64_t curr_time = tick_to_ns_cached(get_ticks(), 0, timer_freq);
     process_timeouts(curr_time);
 }
 
@@ -148,7 +148,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
     switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+        uint64_t time_ns = tick_to_ns_cached(get_ticks(), 0, timer_freq);
         sddf_set_mr(0, time_ns);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
