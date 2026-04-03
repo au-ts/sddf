@@ -137,6 +137,7 @@ BOARDS: List[Board] = [
         paddr_top=0x2_000_000,
         serial="soc/serial@7e215040",
         timer="soc/timer@7e003000",
+        ethernet="scb/ethernet@7d580000",
     ),
     Board(
         name="serengeti",
