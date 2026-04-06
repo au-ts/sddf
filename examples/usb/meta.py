@@ -32,11 +32,23 @@ def generate(
     # TODO: Sddf.Usb - add somewhere?
 
     if board.arch == SystemDescription.Arch.X86_64:
-        # TODO: xHCI BAR map.. basically, all the registers?
-
+        # xHCI MMIO space (paddr hardcoded from reading PCI BAR0) 
+        xhci_bar0_mr = SystemDescription.MemoryRegion(
+            sdf, "xhci_bar0", 0x4000, paddr=0xFEBD4000
+        )
+        sdf.add_mr(xhci_bar0_mr)
+        xhci_bar0_map = SystemDescription.Map(
+            xhci_bar0_mr, 0x20000000, "rw", cached=False
+        )
+        usb_hcd.add_map(xhci_bar0_map)
+    
         # TODO: xHCI DMA memory for rings, TRBs, etc
 
         # TODO: configure PCI interrupts and map it here SystemDescription.IrqIoapic?
+
+        # hardcoded: should be found by PCI enumeration.
+        xhci_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=10, vector=1, id=18)
+        usb_hcd.add_irq(xhci_irq)
 
         # PCI IO ports for talking over PCI and setting up BAR etc
         pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
@@ -44,6 +56,7 @@ def generate(
 
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         usb_hcd.add_ioport(pci_config_data_port)
+
 
     pds = [usb_hcd, client]
 
