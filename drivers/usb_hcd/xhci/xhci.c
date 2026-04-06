@@ -33,7 +33,13 @@
 
 #define LOG_XHCI(...) do { sddf_dprintf("XHCI: "); sddf_dprintf(__VA_ARGS__); } while(0)
 
-static volatile void* xhci_regs;
+static volatile struct xhci_op_regs* xhci_op_regs;
+static volatile struct xhci_cap_regs* xhci_cap_regs;
+static volatile struct xhci_runtime_regs* xhci_runtime_regs;
+static volatile struct xhci_doorbell_regs* xhci_doorbell_regs;
+
+#define XHCI_PADDR 
+#define XHCI_VADDR 0x20000000
 
 static uint32_t pci_config_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
 {
@@ -52,8 +58,16 @@ static void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
 }
 
 void xhci_init() {
-    /* stop */
-    
+    /* set up regs */
+    xhci_cap_regs = (void *) XHCI_VADDR;
+    xhci_op_regs = (void *) XHCI_VADDR + xhci_cap_regs->caplength;
+    xhci_runtime_regs = (void *) XHCI_VADDR + xhci_cap_regs->rtsoff;
+    xhci_doorbell_regs = (void *) XHCI_VADDR + xhci_cap_regs->dboff;
+
+    /* spin until ready */
+     
+    /* configure MaxPorts */
+
     /* set up rings */
 
     /* set up interrupters */
@@ -75,9 +89,6 @@ void init() {
     uint8_t intr_line = intr_info & 0xFF;
     uint8_t intr_pin = (intr_info >> 8) & 0xFF;
     LOG_XHCI("PCI Interrupt Line: %d, Pin: %d\n", intr_line, intr_pin);
-
-    /* hardcoded from meta.py */
-    xhci_regs = (void*) 0x20000000;
 
     xhci_init();
 }
