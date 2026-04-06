@@ -64,16 +64,35 @@ void xhci_init() {
     xhci_runtime_regs = (void *) XHCI_VADDR + xhci_cap_regs->rtsoff;
     xhci_doorbell_regs = (void *) XHCI_VADDR + xhci_cap_regs->dboff;
 
+    /* stop controller */
+    xhci_op_regs->usb_cmd.structured.rs = 0;
+
+    /* spin until controller halted */
+    while (!xhci_op_regs->usb_sts.structured.hch);
+
+    /* reset controller */
+    xhci_op_regs->usb_cmd.structured.hcrst = 1;
+
+    /* spin until controller reset and ready */
+    while (xhci_op_regs->usb_cmd.structured.hcrst || xhci_op_regs->usb_sts.structured.cnr);
+
     /* spin until ready */
+    LOG_XHCI("controller ready for init!\n");
+
+    /* program max device slots enabled */
+    xhci_op_regs->config.structured.max_slots_en = XHCI_MAX_DEVICE_SLOTS;
+
+    /* program device context base address array pointer  (DCBAAP)*/    
+
+    /* set up command ring: program command ring control register (CRCR)*/
      
-    /* configure MaxPorts */
+    /* initialise event ring */
 
-    /* set up rings */
+    /* set up interrupter 0 (use pin based) */
 
-    /* set up interrupters */
-    
-    /* start */
+    /* enable interrupts */
 
+    /* start the controller again */
 
 }
 

@@ -7,6 +7,9 @@
 /*
  * xHCI regs and data
  */
+
+#define XHCI_MAX_DEVICE_SLOTS 64
+
 struct xhci_cap_regs {
     uint8_t caplength;
     uint8_t rsvd;
@@ -33,38 +36,37 @@ struct xhci_op_regs {
     union {
         uint32_t raw;
         struct {
-            uint32_t rsvd0      : 16;
-            uint32_t vtio       : 1;
-            uint32_t etc_tsc    : 1;
-            uint32_t ete        : 1;
-            uint32_t cme        : 1;
-            uint32_t rsvd1      : 1;
-            uint32_t eu3s       : 1;
-            uint32_t ewe        : 1;
-            uint32_t crs        : 1;
-            uint32_t css        : 1;
-            uint32_t lhcrst     : 1;
-            uint32_t hsee       : 1;
-            uint32_t inte       : 1;
-            uint32_t hcrst      : 1;
             uint32_t rs         : 1;
+            uint32_t hcrst      : 1;
+            uint32_t inte       : 1;
+            uint32_t hsee       : 1;
+            uint32_t css        : 1;
+            uint32_t crs        : 1;
+            uint32_t ewe        : 1;
+            uint32_t eu3s       : 1;
+            uint32_t rsvd1      : 1;
+            uint32_t cme        : 1;
+            uint32_t ete        : 1;
+            uint32_t etc_tsc    : 1;
+            uint32_t vtio       : 1;
+            uint32_t rsvd0      : 16;
         } structured;
     } usb_cmd;
     union {
         uint32_t raw;
         struct {
-            uint32_t rsvd0      : 19;
-            uint32_t hce        : 1;
-            uint32_t cnr        : 1;
-            uint32_t sre        : 1;
-            uint32_t rss        : 1;
-            uint32_t sss        : 1;
-            uint32_t rsvd1      : 3;
-            uint32_t pcd        : 1;
-            uint32_t eint       : 1;
-            uint32_t hse        : 1;
-            uint32_t rsvd2      : 1;
             uint32_t hch        : 1;
+            uint32_t rsvd2      : 1;
+            uint32_t hse        : 1;
+            uint32_t eint       : 1;
+            uint32_t pcd        : 1;
+            uint32_t rsvd1      : 3;
+            uint32_t sss        : 1;
+            uint32_t rss        : 1;
+            uint32_t sre        : 1;
+            uint32_t cnr        : 1;
+            uint32_t hce        : 1;
+            uint32_t rsvd0      : 19;
         } structured;
     } usb_sts;
     uint32_t pagesize;
@@ -73,7 +75,15 @@ struct xhci_op_regs {
     uint32_t crcr;
     uint32_t rsvd1[4];
     uint64_t dcbaap;
-    uint32_t config;
+    union {
+        uint32_t raw;
+        struct {
+            uint32_t max_slots_en   : 8;
+            uint32_t u3e            : 1;
+            uint32_t cie            : 1;
+            uint32_t rsvd0          : 22;
+        } structured;
+    } config;
     uint32_t rsvd2[241];
     struct xhci_port_regs ports[64]; /* hardcoded=64, configured as such in xhci.c */
 };
@@ -100,9 +110,9 @@ struct xhci_doorbell_regs {
     union {
         uint32_t raw;
         struct {
-            uint32_t db_stream_id   : 16;
-            uint32_t rsvd0          : 8;
             uint32_t db_target      : 8;
+            uint32_t rsvd0          : 8;
+            uint32_t db_stream_id   : 16;
         } structured;
     } db[256];
 };
