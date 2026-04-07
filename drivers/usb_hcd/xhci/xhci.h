@@ -9,6 +9,8 @@
  */
 
 #define XHCI_MAX_DEVICE_SLOTS 64
+#define XHCI_MAX_SCRATCHPADS 64
+#define PAGE_SIZE 4096 // TOOD: probably shouldn't assume this or define this here
 
 struct xhci_cap_regs {
     uint8_t caplength;
@@ -221,6 +223,7 @@ struct xhci_device_context {
 _Static_assert(sizeof(struct xhci_device_context) == 0x400, "bad struct xhci_device_context");
 
 struct xhci_device_context_base_address_array {
-    void *scratchpads;
-    struct xhci_device_context *device_contexts[];
+    uint64_t *scratchpads;
+    struct xhci_device_context *device_contexts[XHCI_MAX_DEVICE_SLOTS - 1];
 };
+_Static_assert(sizeof(struct xhci_device_context_base_address_array) == 0x200, "bad struct xhci_dcbaa");

@@ -37,6 +37,7 @@ static volatile struct xhci_op_regs* xhci_op_regs;
 static volatile struct xhci_cap_regs* xhci_cap_regs;
 static volatile struct xhci_runtime_regs* xhci_runtime_regs;
 static volatile struct xhci_doorbell_regs* xhci_doorbell_regs;
+static volatile struct xhci_device_context_base_address_array* xhci_dcbaa;
 
 #define XHCI_PADDR 
 #define XHCI_VADDR 0x20000000
@@ -71,13 +72,13 @@ void *dmalloc(int nbytes, int aligned_to) {
     }
 
     if (dma_bump + align_by > DMA_END) {
-        LOG_XHCI("out of DMA!");
+        LOG_XHCI("out of DMA!\n");
         return NULL;
     }
     dma_bump += align_by;
 
     if (dma_bump + nbytes > DMA_END) {
-        LOG_XHCI("out of DMA!");
+        LOG_XHCI("out of DMA!\n");
         return NULL;
     }
 
@@ -112,10 +113,28 @@ void xhci_init() {
     xhci_op_regs->config.structured.max_slots_en = XHCI_MAX_DEVICE_SLOTS;
 
     /* program device context base address array pointer  (DCBAAP)*/    
+    xhci_dcbaa = dmalloc(sizeof(struct xhci_device_context_base_address_array), 1);
 
-    /* element 0: scratchpad buffer */
-    /* elements 1->max_slots_en: device_context ptr, initially 0 */
+    /* element 0: scratchpad buffers - QEMU doesn't use any */
+    int n_scratchpads = xhci_cap_regs->hcsparams2.structured.max_sp_buf_hi << 5;
+    n_scratchpads |= xhci_cap_regs->hcsparams2.structured.max_sp_buf_lo;
+    if (n_scratchpads > XHCI_MAX_SCRATCHPADS) {
+        LOG_XHCI("too many scratchpads!\n");
+        return;
+    }
 
+    if (n_scratchpads) {
+        LOG_XHCI("not implemented\n");
+        return;
+    }
+
+    /* elements 1->max_slots_en: device_context ptrs, initially 0 */
+    for (int i = 0; i < XHCI_MAX_DEVICE_SLOTS - 1; i++) {
+        xhci_dcbaa->device_contexts[i] = NULL;
+    }
+
+    xhci_op_regs->dcbaap = (uint64_t) xhci_dcbaa;
+    
     /* set up command ring: program command ring control register (CRCR)*/
      
     /* initialise event ring */
