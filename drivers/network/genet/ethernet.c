@@ -119,7 +119,7 @@ static void rx_provide(void)
         /* The following barrier orders the write to the doorbell register to be after the write to
          * the descriptors updated in function update_ring_slot().
          */
-        wmb();
+        wwmb();
 
         // Doorbell the device
         ring_rx->cons_index = (rx.tail - NUM_DESCS) & rx.index_mask;
@@ -152,7 +152,7 @@ static void rx_return(void)
      * The following barrier orders the following reads from the descriptor to be after
      * the read from the 'prod_index' field of the rx ring.
      */
-    rmb();
+    rrmb();
 
     while (!hw_ring_empty(&rx)) {
         if ((rx.head & rx.index_mask) == prod_index) {
@@ -196,7 +196,7 @@ static void tx_provide()
         /* The following barrier orders the write to the 'prod_index' field of the tx ring
          * to be after the write to the descriptors updated in function update_ring_slot().
          */
-        wmb();
+        wwmb();
 
         ring_tx->prod_index = tx.tail & tx.index_mask;
 
@@ -219,7 +219,7 @@ static void tx_return(void)
      * The following barrier orders the following reads from the descriptor to be after
      * the read from the 'cons_index' field of the tx ring.
      */
-    rmb();
+    rrmb();
 
     while (!hw_ring_empty(&tx)) {
         if ((tx.head & tx.index_mask) == cons_index) {

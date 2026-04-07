@@ -67,7 +67,7 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
     /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    wmb();
+    wwmb();
     d->status = status;
 }
 
@@ -91,7 +91,7 @@ static void rx_provide()
             /* The following barrier orders the write to the DMA register to be after the write to
              * the 'status' field of the descriptor in function update_ring_slot().
              */
-            wmb();
+            wwmb();
 
             eth_dma->rxpolldemand = POLL_DATA;
 
@@ -123,7 +123,7 @@ static void rx_return(void)
          * The following barrier orders the following reads from the descriptor to be after
          * the read from the 'status' field of the descriptor.
          */
-        rmb();
+        rrmb();
 
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
@@ -138,7 +138,7 @@ static void rx_return(void)
             /* The following barrier orders the write to the DMA register to be after the write to
              * the 'status' field of the descriptor in function update_ring_slot().
              */
-            wmb();
+            wwmb();
 
             eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
@@ -192,7 +192,7 @@ static void tx_provide(void)
     /* The following barrier orders the write to the DMA register to be after the write to
      * the 'status' fields of the descriptors updated in function update_ring_slot().
      */
-    wmb();
+    wwmb();
 
     eth_dma->txpolldemand = POLL_DATA;
 }
@@ -212,7 +212,7 @@ static void tx_return(void)
          * The following barrier orders the following reads to the descriptor to be after
          * the read to the 'status' field of the descriptor.
          */
-        rmb();
+        rrmb();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);

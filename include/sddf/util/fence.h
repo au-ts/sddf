@@ -39,27 +39,27 @@
 #define THREAD_MEMORY_ACQUIRE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 
 /*
- * rmb: Prevents read-read reordering.
+ * rrmb: Prevents read-read reordering.
  */
 #if defined(CONFIG_ARCH_X86_64)
-#define rmb() asm volatile("" ::: "memory")
+#define rrmb() asm volatile("" ::: "memory")
 #elif defined(CONFIG_ARCH_AARCH64)
-#define rmb() asm volatile("dmb ld" ::: "memory")
+#define rrmb() asm volatile("dmb ld" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
-#define rmb() asm volatile("fence ir, ir" ::: "memory")
+#define rrmb() asm volatile("fence ir, ir" ::: "memory")
 #else
 #error "Unknown architecture for rmb"
 #endif
 
 /*
- * wmb: Prevents write-write reordering.
+ * wwmb: Prevents write-write reordering.
  */
 #if defined(CONFIG_ARCH_X86_64)
-#define wmb() asm volatile("" ::: "memory")
+#define wwmb() asm volatile("" ::: "memory")
 #elif defined(CONFIG_ARCH_AARCH64)
-#define wmb() asm volatile("dmb st" ::: "memory")
+#define wwmb() asm volatile("dmb st" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
-#define wmb() asm volatile("fence ow, ow" ::: "memory")
+#define wwmb() asm volatile("fence ow, ow" ::: "memory")
 #else
 #error "Unknown architecture for wmb"
 #endif
