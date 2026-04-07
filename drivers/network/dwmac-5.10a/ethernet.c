@@ -192,7 +192,7 @@ static void tx_provide(void)
             update_ring_slot(&tx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, des2, des3);
 
             /* The following barrier orders the write to the DMA register to be after the write to
-             * the 'des3' field of the descriptor in function update_ring_slot().
+             * the 'des3' fields of the descriptors updated in function update_ring_slot().
              */
             wmb();
 
