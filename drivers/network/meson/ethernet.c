@@ -136,7 +136,7 @@ static void rx_return(void)
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, d->addr, 0);
 
             /* The following barrier orders the write to the DMA register to be after the write to
-             * the 'des3' field of the descriptor in function update_ring_slot().
+             * the 'status' field of the descriptor in function update_ring_slot().
              */
             wmb();
 
@@ -190,7 +190,7 @@ static void tx_provide(void)
     }
 
     /* The following barrier orders the write to the DMA register to be after the write to
-     * the 'status' field of the descriptor in function update_ring_slot().
+     * the 'status' fields of the descriptors updated in function update_ring_slot().
      */
     wmb();
 
