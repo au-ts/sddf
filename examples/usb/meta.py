@@ -43,7 +43,16 @@ def generate(
         usb_hcd.add_map(xhci_bar0_map)
     
         # TODO: xHCI DMA memory for rings, TRBs, etc
+        xhci_dma = SystemDescription.MemoryRegion(
+            sdf, "ehci_dma", 0x40000, paddr=0x7000_0000
+        )
+        sdf.add_mr(xhci_dma)
 
+        xhci_dma_map = SystemDescription.Map(
+            xhci_dma, 0x7000_0000, "rw", cached=False
+        ) # identity mapping
+        usb_hcd.add_map(xhci_dma_map)
+ 
         # TODO: configure PCI interrupts and map it here SystemDescription.IrqIoapic?
 
         # hardcoded: should be found by PCI enumeration.

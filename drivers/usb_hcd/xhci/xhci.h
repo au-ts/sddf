@@ -15,7 +15,17 @@ struct xhci_cap_regs {
     uint8_t rsvd;
     uint16_t hciversion;
     uint32_t hcsparams1;
-    uint32_t hcsparams2;
+    union {
+        uint32_t raw;
+        struct {
+            uint32_t ist            : 4;
+            uint32_t erst_max       : 4;
+            uint32_t rsvd0          : 13;
+            uint32_t max_sp_buf_hi  : 5;
+            uint32_t spr            : 1;
+            uint32_t max_sp_buf_lo  : 5;
+        } structured;
+    } hcsparams2;
     uint32_t hcsparams3;
     uint32_t hccparams1;
     uint32_t dboff;
@@ -85,7 +95,7 @@ struct xhci_op_regs {
         } structured;
     } config;
     uint32_t rsvd2[241];
-    struct xhci_port_regs ports[64]; /* hardcoded=64, configured as such in xhci.c */
+    struct xhci_port_regs ports[XHCI_MAX_DEVICE_SLOTS];
 };
 _Static_assert(sizeof(struct xhci_op_regs) == 0x800, "bad xhci_op_regs struct");
 
@@ -203,3 +213,14 @@ struct xhci_endpoint_context {
     uint32_t rsvd0[3];
 };
 _Static_assert(sizeof(struct xhci_endpoint_context) == 0x20, "bad struct xhci_slot_context");
+
+struct xhci_device_context {
+    struct xhci_slot_context slot_context;
+    struct xhci_endpoint_context endpoint_contexts[31];
+};
+_Static_assert(sizeof(struct xhci_device_context) == 0x400, "bad struct xhci_device_context");
+
+struct xhci_device_context_base_address_array {
+    void *scratchpads;
+    struct xhci_device_context *device_contexts[];
+};

@@ -57,6 +57,35 @@ static void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
     microkit_x86_ioport_write_32(PCI_CONFIG_DATA_IOPORT_ID, PCI_CONFIG_DATA_PORT, value);
 }
 
+#define DMA_START (0x70000000)
+#define DMA_END (DMA_START + 0x40000)
+
+uint64_t dma_bump = DMA_START;
+
+void *dmalloc(int nbytes, int aligned_to) {
+    uint64_t align_by = (dma_bump % aligned_to);
+    if (align_by) {
+        align_by = aligned_to - align_by;
+    } else {
+        align_by = 0;
+    }
+
+    if (dma_bump + align_by > DMA_END) {
+        LOG_XHCI("out of DMA!");
+        return NULL;
+    }
+    dma_bump += align_by;
+
+    if (dma_bump + nbytes > DMA_END) {
+        LOG_XHCI("out of DMA!");
+        return NULL;
+    }
+
+    void *allocated = (void *) dma_bump;
+    dma_bump += nbytes;
+    return allocated;
+}
+
 void xhci_init() {
     /* set up regs */
     xhci_cap_regs = (void *) XHCI_VADDR;
@@ -83,6 +112,9 @@ void xhci_init() {
     xhci_op_regs->config.structured.max_slots_en = XHCI_MAX_DEVICE_SLOTS;
 
     /* program device context base address array pointer  (DCBAAP)*/    
+
+    /* element 0: scratchpad buffer */
+    /* elements 1->max_slots_en: device_context ptr, initially 0 */
 
     /* set up command ring: program command ring control register (CRCR)*/
      
