@@ -162,7 +162,7 @@ static void tx_provide(void)
             update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
 
             /* The following barrier orders the write to the 'tdar' MMIO register to be after the write to
-             * the 'stat' field of the descriptor in function update_ring_slot().
+             * the 'stat' fields of the descriptors updated in function update_ring_slot().
              */
             wmb();
 
