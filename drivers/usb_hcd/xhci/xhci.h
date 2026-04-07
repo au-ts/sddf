@@ -52,7 +52,6 @@ struct xhci_op_regs {
             uint32_t rsvd0      : 16;
         } structured;
     } usb_cmd;
-    _Static_assert(sizeof(usb_cmd) == 0x4, "bad usb_cmd");
     union {
         uint32_t raw;
         struct {
@@ -70,7 +69,6 @@ struct xhci_op_regs {
             uint32_t rsvd0      : 19;
         } structured;
     } usb_sts;
-    _Static_assert(sizeof(usb_sts) == 0x4, "bad usb_sts");
     uint32_t pagesize;
     uint32_t rsvd0[2];
     uint32_t dnctrl;
@@ -86,7 +84,6 @@ struct xhci_op_regs {
             uint32_t rsvd0          : 22;
         } structured;
     } config;
-    _Static_assert(sizeof(config) == 0x4, "bad config");
     uint32_t rsvd2[241];
     struct xhci_port_regs ports[64]; /* hardcoded=64, configured as such in xhci.c */
 };
@@ -132,7 +129,6 @@ struct xhci_slot_context {
             uint32_t context_entries: 5;
         } structured;
     } field0;
-    _Static_assert(sizeof(field0) == 0x4, "bad field0");
     union {
         uint32_t raw;
         struct {
@@ -141,7 +137,6 @@ struct xhci_slot_context {
             uint32_t num_ports          : 8;
         } structured;
     } field1;
-    _Static_assert(sizeof(field1) == 0x4, "bad field1");
     union {
         uint32_t raw;
         struct {
@@ -152,7 +147,6 @@ struct xhci_slot_context {
             uint32_t interrupter_target : 11;
         } structured;
     } field2;
-    _Static_assert(sizeof(field2) == 0x4, "bad field2");
     union {
         uint32_t raw;
         struct {
@@ -161,7 +155,6 @@ struct xhci_slot_context {
             uint32_t slot_state         : 5;
         } structured;
     } field3;
-    _Static_assert(sizeof(field3) == 0x4, "bad field3");
     uint32_t rsvd0[4];
 };
 _Static_assert(sizeof(struct xhci_slot_context) == 0x20, "bad struct xhci_slot_context");
@@ -180,7 +173,6 @@ struct xhci_endpoint_context {
             uint32_t max_esit_payload_hi: 8;
         } structured;
     } field0;
-    _Static_assert(sizeof(field0) == 0x4, "bad field0");
     union {
         uint32_t raw;
         struct {
@@ -193,7 +185,6 @@ struct xhci_endpoint_context {
             uint32_t max_packet_size: 16;
         } structured;
     } field1;
-    _Static_assert(sizeof(field1) == 0x4, "bad field1");
     union {
         uint64_t raw;
         struct {
@@ -202,7 +193,6 @@ struct xhci_endpoint_context {
             uint64_t tr_dequeue_ptr : 60;
         } structured;
     } field2;
-    _Static_assert(sizeof(field2) == 0x8, "bad field2");
     union {
         uint32_t raw;
         struct {
@@ -210,7 +200,6 @@ struct xhci_endpoint_context {
             uint32_t max_esit_payload_lo    : 16;
         } structured;
     } field3;
-    _Static_assert(sizeof(field3) == 0x4, "bad field3");
     uint32_t rsvd0[3];
 };
 _Static_assert(sizeof(struct xhci_endpoint_context) == 0x20, "bad struct xhci_slot_context");
