@@ -227,10 +227,9 @@ static void tx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads from the descriptor to be after
-         * the read from the 'des3' field of the descriptor.
+         * There doesn't need to be any barrier here, as we never read device memory again
+         * (we access our own descriptor metadata book-keeping array 'descr_mdata').
          */
-        rrmb();
 
         net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);
