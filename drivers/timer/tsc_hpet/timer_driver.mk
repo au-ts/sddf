@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the x86 HPET driver
+# the x86 TSC_HPET driver
 #
 # NOTES:
 #  Generates timer_driver.elf

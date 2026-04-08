@@ -20,12 +20,13 @@ void notified(sddf_channel ch)
      * so we know it's a notification from the driver telling
      * us that the timeout we set has gone off.
      */
-    sddf_printf("CLIENT|INFO: Got a timeout!\n");
     /* Get the current time */
     uint64_t time = sddf_timer_time_now(timer_channel);
-    sddf_printf("CLIENT|INFO: Now the time (in nanoseconds) is: %lu\n", time);
     /* Set another timeout */
     sddf_timer_set_timeout(timer_channel, NS_IN_S);
+
+    sddf_printf("CLIENT|INFO: Got a timeout!\n");
+    sddf_printf("CLIENT|INFO: The time (in nanoseconds) was: %lu\n", time);
 }
 
 void init(void)
@@ -38,9 +39,9 @@ void init(void)
 
     // lets get the time!
     uint64_t time = sddf_timer_time_now(timer_channel);
-    sddf_printf("CLIENT|INFO: The time now is: %lu\n", time);
-
     // lets set a timeout
-    sddf_printf("CLIENT|INFO: Setting a time out for 1 second\n");
     sddf_timer_set_timeout(timer_channel, NS_IN_S);
+
+    sddf_printf("CLIENT|INFO: The time was is: %lu\n", time);
+    sddf_printf("CLIENT|INFO: Set a time out for 1 second\n");
 }
