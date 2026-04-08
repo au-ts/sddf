@@ -11,6 +11,7 @@
 #include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
+#include <sddf/network/util.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/timer/client.h>
@@ -30,14 +31,32 @@ __attribute__((__section__(".benchmark_client_config"))) benchmark_client_config
 
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lib_sddf_lwip_config;
 
+__attribute__((__section__(".client_config"))) vswitch_client_config_t client_config;
+
 serial_queue_handle_t serial_tx_queue_handle;
 
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
 
-uint32_t ip_addrs[SDDF_NET_MAX_CLIENTS];
+static uint32_t ip_addrs[SDDF_NET_MAX_CLIENTS];
 
 #define LWIP_TICK_MS 100
+
+// Add PPC that fires just after the DHCP has finished
+// Save that into an array of IPs from neighbors, then we can ping each other and ensure that vswitch works
+static void query_ips()
+{
+    sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_QUERY_IP_ADDR, 0, 0, 0));
+    uint8_t num_clients = sddf_get_mr(0), client_id = 0; // TODO: somehow this is wrong!? it gets 0 num clients, ask tomorrow
+    uint32_t ipaddr = 0;
+    sddf_dprintf("ECHO|LOG: received IP from vswitch num_clients: %d\n", num_clients);
+    for (int i = 0; i < num_clients; i++) {
+        client_id = sddf_get_mr(1 + 2 * i);
+        ipaddr = sddf_get_mr(1 + 2 * i + 1);
+        ip_addrs[client_id] = ipaddr;
+        sddf_dprintf("ECHO|LOG: received IP from vswitch client_id: %d IP: 0x%x\n", client_id, ipaddr);
+    }
+}
 
 /**
  * Netif status callback function that output's client's name and
@@ -48,8 +67,10 @@ uint32_t ip_addrs[SDDF_NET_MAX_CLIENTS];
 void netif_status_callback(char *ip_addr)
 {
     sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
-    // TODO: Here we call the PPCs to neighbors
-    // don't send it to myself tho
+    // TODO: Here we PPC to vswitch, it then replies with the map of client_id and IPs that we can call into later
+    uint32_t ip = sddf_lwip_ipaddr_aton(ip_addr);
+    sddf_set_mr(0, ip);
+    sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_REPORT_IP_ADDR, 0, 0, 1));
 }
 
 /**
@@ -83,6 +104,8 @@ void init(void)
     sddf_lwip_maybe_notify();
 }
 
+static uint8_t cnt = 0;
+
 void notified(sddf_channel ch)
 {
     if (ch == net_config.rx.id) {
@@ -90,6 +113,12 @@ void notified(sddf_channel ch)
     } else if (ch == timer_config.driver_id) {
         sddf_lwip_process_timeout();
         set_timeout();
+        // Throttle it a bit - hacky
+        cnt++;
+        if (cnt == 100) {
+            query_ips();
+            cnt = 0;
+        }
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {
         // Nothing to do
     } else {
@@ -99,15 +128,3 @@ void notified(sddf_channel ch)
     sddf_lwip_maybe_notify();
 }
 
-// Add PPC that fires just after the DHCP has finished
-// Save that into an array of IPs from neighbors, then we can ping each other and ensure that vswitch works
-
-//seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
-//{
-//    size_t label = microkit_msginfo_get_label(msginfo); // TODO: what is a label?
-//    uint32_t ip_addr = microkit_mr_get(0);
-//    uint32_t client_id = ch - CLIENT_CH_OFFSET;
-//
-//    sddf_dprintf("ECHO|LOG: received PPC from ch: %u cliend_id: %d ip_addr: %d\n", ch, client_id, ip_addr);
-//    ip_addrs[client_id] = ip_addr;
-//}

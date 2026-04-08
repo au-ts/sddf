@@ -144,6 +144,21 @@ class BenchmarkConfig:
             *child_bytes_list,
         )
 
+class ClientConfig:
+    def __init__(self, ch_id: int):
+        self.ch_id = ch_id
+
+    """
+        Matches struct definition:
+        {
+            uint8_t;
+        }
+    """
+
+    def serialise(self) -> bytes:
+        return struct.pack(
+            "<c", self.ch_id.to_bytes(1, "little")
+        )
 
 # Adds ".elf" to elf strings
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
@@ -296,7 +311,7 @@ def generate(
 
     client0_elf = copy_elf("echo", "echo", 0)
     client0 = ProtectionDomain(
-        "client0", client0_elf, priority=97, budget=20000, cpu=get_core("client0")
+        "client0", client0_elf, priority=96, budget=20000, cpu=get_core("client0")
     )
     client0_net_copier = ProtectionDomain(
         "client0_net_copier",
@@ -308,7 +323,7 @@ def generate(
 
     client1_elf = copy_elf("echo", "echo", 1)
     client1 = ProtectionDomain(
-        "client1", client1_elf, priority=97, budget=20000, cpu=get_core("client1")
+        "client1", client1_elf, priority=96, budget=20000, cpu=get_core("client1")
     )
     client1_net_copier = ProtectionDomain(
         "client1_net_copier",
@@ -317,7 +332,7 @@ def generate(
         budget=20000,
         cpu=get_core("client1_net_copier"),
     )
-    vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97) # TODO: prio?
+    vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
@@ -452,6 +467,16 @@ def generate(
         core_objs[num_cores - 1]["children"],
     )
 
+    # Add channels from clients to vswitch for PPC
+    client0_to_vswitch = Channel(client0, vswitch, pp_a=True)
+    client1_to_vswitch = Channel(client1, vswitch, pp_a=True)
+    sdf.add_channel(client0_to_vswitch)
+    sdf.add_channel(client1_to_vswitch)
+
+    # Create Client PD configs
+    client0_config = ClientConfig(client0_to_vswitch.pd_a_id)
+    client1_config = ClientConfig(client1_to_vswitch.pd_a_id)
+
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
@@ -489,6 +514,17 @@ def generate(
         update_elf_section(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
         )
+
+    with open(f"{output_dir}/client_config0.data", "wb+") as f:
+        f.write(client0_config.serialise())
+    update_elf_section(
+        client0_elf, "client_config", "client_config0"
+    )
+    with open(f"{output_dir}/client_config1.data", "wb+") as f:
+        f.write(client1_config.serialise())
+    update_elf_section(
+        client1_elf, "client_config", "client_config1"
+    )
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

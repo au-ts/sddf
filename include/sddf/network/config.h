@@ -109,6 +109,10 @@ typedef struct net_vswitch_config {
     uint16_t buffers_per_client;
 } net_vswitch_config_t;
 
+// TODO: where to place it?
+#define VSWITCH_REPORT_IP_ADDR 0
+#define VSWITCH_QUERY_IP_ADDR 1
+
 static inline bool net_config_check_magic(void *config)
 {
     char *magic = (char *)config;
