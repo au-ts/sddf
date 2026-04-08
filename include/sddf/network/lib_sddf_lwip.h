@@ -74,6 +74,7 @@ typedef bool (*sddf_lwip_tx_intercept_condition_fn)(struct pbuf *p);
  */
 typedef net_sddf_err_t (*sddf_lwip_tx_handle_intercept_fn)(struct pbuf *p);
 
+uint32_t sddf_lwip_ipaddr_aton(const char *cp);
 /**
  * Check whether the pbuf pool is empty.
  *

@@ -100,6 +100,13 @@ static void pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
     pbuf_pool.pbufs[pbuf_count - 1].next_free = SIZE_MAX;
 }
 
+inline uint32_t sddf_lwip_ipaddr_aton(const char *cp)
+{
+    ip4_addr_t ret;
+    ipaddr_aton(cp, &ret);
+    return ip4_addr_get_u32(&ret);
+}
+
 inline bool sddf_lwip_pbuf_pool_empty(void)
 {
     return pbuf_pool.first_free == SIZE_MAX;

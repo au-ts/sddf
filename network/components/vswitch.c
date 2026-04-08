@@ -331,3 +331,36 @@ void init(void)
         }
     }
 }
+
+seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+{
+    size_t label = microkit_msginfo_get_label(msginfo);
+    switch (label) {
+    case VSWITCH_REPORT_IP_ADDR: {
+        uint32_t ip_addr = microkit_mr_get(0);
+        uint32_t client_id = ch;
+        state.clients.info[state.clients.num].ip_addr = ip_addr;
+        state.clients.info[state.clients.num].id = client_id;
+        state.clients.num += 1;
+        sddf_dprintf("VSWITCH: PPC received REPORT PPC with label: %zu from ch: %u client_id: %d ip_addr: %d num_clients: %d\n", label, ch, client_id, ip_addr, state.clients.num);
+        break;
+    }
+    case VSWITCH_QUERY_IP_ADDR: {
+        sddf_dprintf("VSWITCH: PPC received QUERY PPC with label: %zu from ch: %u num_clients: %d\n", label, ch, state.clients.num);
+        sddf_set_mr(0, state.clients.num * 2 + 1);
+        sddf_dprintf("VSWITCH: PPC reg: 0 val: %d\n", state.clients.num * 2 + 1);
+        for (int i = 0; i < state.clients.num; i++) {
+            sddf_set_mr(i * 2, state.clients.info[i].id);
+            sddf_set_mr(i * 2 + 1, state.clients.info[i].ip_addr);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2, state.clients.info[i].id);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 1, state.clients.info[i].ip_addr);
+        }
+        return seL4_MessageInfo_new(0, 0, 0, state.clients.num * 2 + 1);
+    }
+    default: {
+        sddf_printf_("VSWITCH: PPC - Wrong label passed\n");
+        break;
+    }
+    }
+    return seL4_MessageInfo_new(0, 0, 0, 0);
+}

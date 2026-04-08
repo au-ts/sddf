@@ -98,7 +98,7 @@ endif
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf # TODO: why 2 files here?
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
@@ -109,6 +109,8 @@ endif
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
+	#$(OBJCOPY) --update-section .client_config=client0_config.data echo0.elf # apparently not needed as done in meta.py
+	#$(OBJCOPY) --update-section .client_config=client1_config.data echo1.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
 	touch $@
 

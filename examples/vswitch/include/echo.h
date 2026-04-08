@@ -13,6 +13,10 @@
 
 #define TCP_ECHO_MAX_CONNS 4
 
+typedef struct vswitch_client_config {
+    uint8_t channel_id;
+} vswitch_client_config_t;
+
 int setup_udp_socket(void);
 int setup_utilization_socket(void *benchmark_config);
 int setup_tcp_socket(void);
