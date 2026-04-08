@@ -39,6 +39,13 @@ enum aml_data_object_type {
     DATA_OBJ_PACKAGE = 0x12,
 };
 
+enum aml_data_resource_type {
+    IO_PORT_DESCRIPTOR = 0x47,
+    DWORD_AS_DESCRIPTOR = 0x87,
+    WORD_AS_DESCRIPTOR = 0x88,
+    QWORD_AS_DESCRIPTOR = 0x8A,
+};
+
 // Each path segment has exactly 4 characters, up to 25 segments are assumed
 #define AML_MAX_PATH_STR 100
 typedef struct {
@@ -62,6 +69,57 @@ typedef struct {
 } pci_resources_t;
 
 pci_resources_t pci_resources;
+
+typedef struct {
+    uint8_t  tag;            // 0x88
+    uint16_t length;         // Length of data (usually 13 bytes)
+    uint8_t  resource_type;  // 0=Memory, 1=IO, 2=BusNumber
+    uint8_t  flags;          // General flags (Dec, Min, Max, etc.)
+    uint8_t  type_flags;     // Type-specific flags
+    uint16_t granularity;    // Address granularity
+    uint16_t min_address;    // Range minimum
+    uint16_t max_address;    // Range maximum
+    uint16_t translation;    // Address translation offset
+    uint16_t address_length; // Length of the address range
+    // Optional 'Resource Source' string could follow here
+} __attribute__((packed)) acpi_word_address_space_t;
+
+typedef struct {
+    uint8_t  tag;            // 0x87
+    uint16_t length;         // 0x0017 (23 bytes)
+    uint8_t  resource_type;  // 0=Memory, 1=IO, 2=BusNumber
+    uint8_t  flags;          // General Flags (Producer, Decode, etc.)
+    uint8_t  type_flags;     // Type-specific flags (e.g., Cacheable)
+    uint32_t granularity;    // Address Granularity
+    uint32_t min_address;    // Address Minimum
+    uint32_t max_address;    // Address Maximum
+    uint32_t translation;    // Address Translation Offset
+    uint32_t address_length; // Address Length
+    // Optional: Resource Source Index and String could follow
+} __attribute__((packed)) acpi_dword_address_space_t;
+
+typedef struct {
+    uint8_t  tag;            // 0x8A
+    uint16_t length;         // 0x002B (43 bytes)
+    uint8_t  resource_type;  // 0=Memory, 1=IO, 2=BusNumber
+    uint8_t  flags;          // General Flags (Producer, Decode, etc.)
+    uint8_t  type_flags;     // Type-specific flags
+    uint64_t granularity;    // Address Granularity
+    uint64_t min_address;    // Address Minimum
+    uint64_t max_address;    // Address Maximum
+    uint64_t translation;    // Address Translation Offset
+    uint64_t address_length; // Address Length
+    // Optional: Resource Source Index and String follow if length > 43
+} __attribute__((packed)) acpi_qword_address_space_t;
+
+typedef struct {
+    uint8_t  tag;            // 0x47 (Type 0x08, Length 7)
+    uint8_t  info;           // Flags (16-bit decode, etc.)
+    uint16_t min_address;    // Minimum I/O address
+    uint16_t max_address;    // Maximum I/O address
+    uint8_t  alignment;      // Alignment requirement
+    uint8_t  address_length; // Number of ports used
+} __attribute__((packed)) acpi_io_port_t;
 
 uint32_t get_pkt_len(uint8_t *pktlen_encoding)
 {
@@ -155,10 +213,26 @@ uint32_t get_name_data_len_len(uint8_t *data_encoding)
             uint32_t i = 0;
             while (data_encoding[++i]);
             return 1;
+        }
         case DATA_OBJ_BUFFER:
             return 1 + get_pktlen_bytes(&data_encoding[1]);
         case DATA_OBJ_PACKAGE:
             return 1 + get_pktlen_bytes(&data_encoding[1]);
+    }
+    return 0;
+}
+
+uint32_t get_integer_data(uint8_t *data_encoding)
+{
+    switch (data_encoding[0]) {
+        case DATA_OBJ_BYTE:
+            return data_encoding[1];
+        case DATA_OBJ_WORD:
+            return (data_encoding[2] << 8) + data_encoding[1];
+        case DATA_OBJ_DWORD:
+            return (data_encoding[3] << 24) + (data_encoding[2] << 16) + (data_encoding[1] << 8) + data_encoding[0];
+        default: {
+            sddf_dprintf("Not implemented data type: 0x%x\n", data_encoding[0]);
         }
     }
     return 0;
@@ -198,12 +272,89 @@ bool match_path(char *path_a, char *path_b)
     return !strcmp(&path_a[i], &path_b[j]);
 }
 
+// Section 6.4
+void parse_resource_data(uint8_t *resource_data, uint32_t buffer_size)
+{
+
+    for (uint32_t i = 0; i < buffer_size;) {
+        uint32_t descriptor_type = resource_data[i];
+        uint32_t descriptor_len = (resource_data[i] & 0x80) ? ((resource_data[i+2] << 8) + resource_data[i+1] + 3) : ((resource_data[i] & 0x7) + 1);
+        switch (descriptor_type) {
+            case WORD_AS_DESCRIPTOR: {
+                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)&resource_data[i];
+                sddf_dprintf("  =========\n");
+                switch (word_as->resource_type) {
+                    case 0: { sddf_dprintf("  type: Word Memory\n"); break; }
+                    case 1: { sddf_dprintf("  type: Word I/O\n"); break; }
+                    case 2: { sddf_dprintf("  type: Word Bus Number Range\n"); break; }
+                }
+                sddf_dprintf("  granularity: 0x%x\n", word_as->granularity);
+                sddf_dprintf("  min_addr: 0x%x\n", word_as->min_address);
+                sddf_dprintf("  max_addr: 0x%x\n", word_as->max_address);
+                sddf_dprintf("  translation: 0x%x\n", word_as->translation);
+                sddf_dprintf("  addr_len: 0x%x\n", word_as->address_length);
+                break;
+            }
+            case IO_PORT_DESCRIPTOR: {
+                acpi_io_port_t *io_port = (acpi_io_port_t *)&resource_data[i];
+                sddf_dprintf("  =========\n");
+                sddf_dprintf("  type: I/O Port\n");
+                sddf_dprintf("  min_addr: 0x%x\n", io_port->min_address);
+                sddf_dprintf("  max_addr: 0x%x\n", io_port->max_address);
+                sddf_dprintf("  alignment: 0x%x\n", io_port->alignment);
+                sddf_dprintf("  addr_len: 0x%x\n", io_port->address_length);
+                break;
+            }
+            case DWORD_AS_DESCRIPTOR: {
+                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)&resource_data[i];
+                sddf_dprintf("  =========\n");
+                switch (dword_as->resource_type) {
+                    case 0: { sddf_dprintf("  type: DWord Memory\n"); break; }
+                    case 1: { sddf_dprintf("  type: DWord I/O\n"); break; }
+                    case 2: { sddf_dprintf("  type: DWord Bus Number Range\n"); break; }
+                }
+
+                sddf_dprintf("  granularity: 0x%x\n", dword_as->granularity);
+                sddf_dprintf("  min_addr: 0x%x\n", dword_as->min_address);
+                sddf_dprintf("  max_addr: 0x%x\n", dword_as->max_address);
+                sddf_dprintf("  translation: 0x%x\n", dword_as->translation);
+                sddf_dprintf("  addr_len: 0x%x\n", dword_as->address_length);
+                break;
+            }
+            case QWORD_AS_DESCRIPTOR: {
+                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)&resource_data[i];
+                sddf_dprintf("  =========\n");
+                switch (qword_as->resource_type) {
+                    case 0: { sddf_dprintf("  type: QWord Memory\n"); break; }
+                    case 1: { sddf_dprintf("  type: QWord I/O\n"); break; }
+                    case 2: { sddf_dprintf("  type: QWord Bus Number Range\n"); break; }
+                }
+
+                sddf_dprintf("  granularity: 0x%lx\n", qword_as->granularity);
+                sddf_dprintf("  min_addr: 0x%lx\n", qword_as->min_address);
+                sddf_dprintf("  max_addr: 0x%lx\n", qword_as->max_address);
+                sddf_dprintf("  translation: 0x%lx\n", qword_as->translation);
+                sddf_dprintf("  addr_len: 0x%lx\n", qword_as->address_length);
+                break;
+            }
+            default: {
+                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", descriptor_type);
+            }
+        }
+        i = i + descriptor_len;
+    }
+}
+
 bool extract_crs(uint8_t *resource_data, uint32_t data_len, char *path_name, uint32_t path_len)
 {
     for (uint8_t i = 0; i < pci_resources.num_bridges; i++) {
         sddf_dprintf("----------\n");
         if (match_path(pci_resources.bridges[i].path_name, path_name)) {
             sddf_dprintf("matched path: %s\n", path_name);
+            uint32_t buffer_size = get_integer_data(resource_data);
+            uint32_t buffer_size_bytes = get_name_data_len(resource_data);
+            sddf_dprintf("buffer_size: %d, buffer_size_bytes: %d\n", buffer_size, buffer_size_bytes);
+            parse_resource_data(&resource_data[buffer_size_bytes], buffer_size);
         }
 
     }
@@ -266,8 +417,9 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 }
                 if (!strcmp(name_str, "_CRS")) {
                     sddf_dprintf("_CRS for path: %s\n", path_name);
-                    sddf_dprintf("length of data length: %d\n", get_name_data_len_len(&cur_obj[i + 1 + name_len]));
-                    extract_crs(&cur_obj[i + 2 + name_len], data_len, path_name, path_len);
+                    uint32_t datalen_len = get_name_data_len_len(&cur_obj[i + 1 + name_len]);
+                    sddf_dprintf("length of data length: %d\n", datalen_len);
+                    extract_crs(&cur_obj[i + 1 + name_len + datalen_len], data_len - datalen_len, path_name, path_len);
                 }
                 i = i + 1 + name_len + data_len;
                 break;
