@@ -6,7 +6,6 @@
 #include <sddf/timer/timer_driver.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/util/util.h>
-#include <sddf/util/div64.h>
 
 sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler)
 {
