@@ -1194,7 +1194,7 @@
 			compatible = "starfive,jh7110-timer";
 			reg = <0x00 0x13050000 0x00 0x10000>;
 			interrupts = <0x45 0x46 0x47 0x48>;
-			interrupt-names = "timer0\0timer1\0timer2\0timer3";
+			interrupt-names = "timer0", "timer1", "timer2", "timer3";
 			status = "okay";
 		};
 
