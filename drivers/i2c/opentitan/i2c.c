@@ -25,11 +25,10 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 /* IRQs */
 // NAK *must* be lowest ID for correctness!
 #define IRQ_NAK_CH              (device_resources.irqs[0].id)
-#define IRQ_RXTHRESH_CH         (device_resources.irqs[1].id)
-#define IRQ_FMTTHRESH_CH        (device_resources.irqs[2].id)
-#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[3].id)
-#define IRQ_BAD_STOP_CH         (device_resources.irqs[4].id)
-#define IRQ_TIMEOUT_CH          (device_resources.irqs[5].id)
+#define IRQ_FMTTHRESH_CH        (device_resources.irqs[1].id)
+#define IRQ_RXTHRESH_CH         (device_resources.irqs[2].id)
+#define IRQ_TIMEOUT_CH          (device_resources.irqs[3].id)
+#define IRQ_CMD_COMPLETE_CH     (device_resources.irqs[4].id)
 
 /* Transport */
 i2c_queue_handle_t queue_handle;
@@ -101,7 +100,7 @@ int i2c_halt(void)
     regs->fifo_ctrl |= I2C_FIFO_CTRL_FMTRST_BIT | I2C_FIFO_CTRL_RXRST_BIT | I2C_FIFO_CTRL_ACQRST_BIT
                      | I2C_FIFO_CTRL_TXRST_BIT;
 
-    while (regs->ctrl & I2C_CTRL_ENHOST_BIT) {}
+    while (!(regs->status & I2C_STATUS_HOSTIDLE_BIT)) {}
     return 0;
 }
 
@@ -141,13 +140,13 @@ static inline void load_timing_params(i2c_timing_params_t *p)
 int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
 {
     // Parse flags
-    // Validate using minterm function - if readb=X, rcont=Y, stop=W, nakok=Z, then
-    // F = !X!Y + !W!Z + W!ZX!Y
-    bool flags_valid = ((!flags->readb && !flags->rcont) || (!flags->stop && flags->nakok)
-                        || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
+    bool flags_valid = !(flags->rcont && !flags->readb) && !(flags->start && flags->readb)
+                    && !(flags->stop && flags->rcont) && !(flags->nakok && flags->readb);
     if (!flags_valid) {
         LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
                            "by hardware!\n");
+        LOG_I2C_DRIVER_ERR("start = %u - stop = %u - readb = %u - rcont = %u - nakok = %u\n", flags->start, flags->stop,
+                           flags->readb, flags->rcont, flags->nakok);
         return -1;
     }
     uint32_t addr_fdata = (data)&I2C_FDATA_FBYTE_MASK;
@@ -189,9 +188,12 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
     i2c_stop_host();
 
     // The following code loops through all available space in the registers there is either:
-    // a. no space in a needed register (just FMT fifo in this case)
-    // b. the command is over
-    while (get_fmt_fifo_lvl() < OPENTITAN_I2C_FIFO_DEPTH && data->rw_idx < data->active_cmd.data_len) {
+    // a. no space in the FMT fifo
+    // b. no space in the RX fifo which is not either filled or reserved for a previously-issued read
+    // c. the command is over
+    while (get_fmt_fifo_lvl() < OPENTITAN_I2C_FIFO_DEPTH
+           && (!cmd_is_read(cmd) || data->rw_idx - data->bytes_read < OPENTITAN_I2C_FIFO_DEPTH)
+           && (data->await_addr || data->rw_idx < data->active_cmd.data_len)) {
         LOG_I2C_DRIVER("fmt fifo level: %u\n", get_fmt_fifo_lvl());
         fdata_fmt_flags_t flags = { 0, 0, 0, 0, 0 };
         uint8_t fmt_byte = 0;
@@ -214,13 +216,14 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
             // 1. Write address
             if (data->await_wrrd == WRRD_WRADDR) {
                 // Make fmt op: write address byte, leaving read bit as zero
-                fmt_byte = (i2c_curr_addr(data) & 0x7) << 1;
+                fmt_byte = (i2c_curr_addr(data) << 1) & 0xFE;
+                LOG_I2C_DRIVER("WRRD: Writing address byte %X..\n", fmt_byte);
                 data->await_wrrd--;
             // 2. Write subaddress
             } else if (data->await_wrrd == WRRD_SUBADDR) {
                 // Make fmt op: write sub-address byte
                 fmt_byte = cmd.payload.data[0];
-                LOG_I2C_DRIVER("WRRD Register subaddress: %X\n", cmd.payload.data[0]);
+                LOG_I2C_DRIVER("WRRD: Writing SUBaddress byte %X..\n", fmt_byte);
                 flags.readb = 0;
                 data->await_wrrd = 0;   // We don't need to resend the start condition on this platform
                 // Always reset await_start - can't switch back to read otherwise
@@ -229,34 +232,44 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
 
         } else if (data->await_addr) {
             // Write address and read bit
-            LOG_I2C_DRIVER("Selected ADDR ... read = %d\n", cmd_is_read(cmd));
-            fmt_byte = ((i2c_curr_addr(data) << 1) & 0xFE) | ((cmd_is_read(cmd) != 0) << 7);
+            fmt_byte = ((i2c_curr_addr(data) << 1) & 0xFE) | ((cmd_is_read(cmd) != 0));
+            LOG_I2C_DRIVER("Selected ADDR = %X... read = %d\n", fmt_byte, cmd_is_read(cmd));
+            LOG_I2C_DRIVER("Raw address: %u\n", i2c_curr_addr(data), cmd_is_read(cmd));
             data->await_addr = false;
+            if (data->await_stop && cmd.data_len == 0) {
+                // There aren't any data bytes to attach the stop to, so we have to attach it to
+                // the address byte instead.
+                flags.stop = 1;
+            }
 
         // Handle writing data
         } else {
             LOG_I2C_DRIVER("Resuming in-progress read/write. rd=%d remaining=%d\n", cmd_is_read(cmd),
                            cmd.data_len - data->rw_idx);
-            // Send stop if needed (this is last op of command)
-            if (data->await_stop && data->rw_idx == cmd.data_len - 1) {
-                flags.stop = 1;
-                data->await_stop = 0;
-            }
-
             if (cmd_is_read(cmd)) {
                 // Reads replace data byte with an integer of bytes to read
                 flags.readb = 1;
-                fmt_byte = MIN(cmd.data_len - data->rw_idx, OPENTITAN_I2C_READ_MAX);
+                fmt_byte = MIN(cmd.data_len - data->rw_idx,
+                               OPENTITAN_I2C_FIFO_DEPTH - (data->rw_idx - data->bytes_read));
                 LOG_I2C_DRIVER("\t reading %u bytes\n", fmt_byte);
                 data->rw_idx += fmt_byte;
                 assert(data->rw_idx <= cmd.data_len);
                 // Always set continuing read unless this is the final read of this command
-                flags.rcont = !((data->rw_idx < cmd.data_len));
+                flags.rcont = data->rw_idx < cmd.data_len;
+                if (flags.rcont) {
+                    LOG_I2C_DRIVER("\t continuing read!\n");
+                }
             } else {
                 // Writes insert a single byte to write
                 fmt_byte = cmd.payload.data[data->rw_idx];
                 LOG_I2C_DRIVER("\t writing %u\n", fmt_byte);
                 data->rw_idx++;
+            }
+            // Send stop if needed (this is last op of command)
+            if (data->await_stop && data->rw_idx > cmd.data_len - 1) {
+                flags.stop = 1;
+                data->await_stop = 0;
+                LOG_I2C_DRIVER("sending stop!\n");
             }
         }
         assert(!i2c_fmt_write(fmt_byte, &flags));
@@ -323,7 +336,7 @@ void init(void)
     // Check sdfgen properties
     assert(i2c_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
-    assert(device_resources.num_irqs == 6);
+    assert(device_resources.num_irqs == 5);
     assert(device_resources.num_regions == 1);
 
     regs = (volatile opentitan_i2c_regs_t *)device_resources.regions[0].region.vaddr;
@@ -364,8 +377,7 @@ void init(void)
 
     // Set up interrupts
     regs->intr_enable = I2C_INTR_ENABLE_FMT_THRESHOLD_BIT | I2C_INTR_ENABLE_RX_THRESHOLD_BIT | I2C_INTR_ENABLE_NAK_BIT
-                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_UNEXP_STOP_BIT
-                      | I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
+                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_STRETCH_TIMEOUT_BIT;
 
     // Configure FIFO interrupt thresholds.
     // FMT: interrupt once emptied.
@@ -394,6 +406,7 @@ void notified(microkit_channel ch)
 
         // We can ignore this IRQ unless we are in S_CMD and awaiting commands to process
         // (i.e. the FMT FIFO was full last time we tried to push commands)
+        // also do it in cmd_ret to sanity check.
         if (fsm_data.curr_state == S_CMD) {
             fsm(&fsm_data);
         }
@@ -437,14 +450,8 @@ void notified(microkit_channel ch)
     } else if (ch == IRQ_TIMEOUT_CH) {
         i2c_halt();
         LOG_I2C_DRIVER("IRQ_TIMEOUT\n");
-        clear_irq(I2C_INTR_STATE_HOST_TIMEOUT_BIT);
+        clear_irq(I2C_INTR_STATE_STRETCH_TIMEOUT_BIT);
         driver_data.err = I2C_ERR_TIMEOUT;
-        microkit_irq_ack(ch);
-    } else if (ch == IRQ_BAD_STOP_CH) {
-        i2c_halt();
-        LOG_I2C_DRIVER("IRQ_UNEXPECTED_STOP\n");
-        clear_irq(I2C_INTR_STATE_UNEXP_STOP_BIT);
-        driver_data.err = I2C_ERR_OTHER;
         microkit_irq_ack(ch);
     } else {
         LOG_I2C_DRIVER_ERR("unexpected notification!\n");
@@ -460,9 +467,7 @@ void notified(microkit_channel ch)
     } else if (driver_data.err != I2C_ERR_OK) {
         LOG_I2C_DRIVER_ERR("Spurious error interrupt received! err=%u\n", driver_data.err);
         LOG_I2C_DRIVER_ERR("Current state: %s\n", state_to_str(fsm_data.curr_state));
-        if (ch == IRQ_BAD_STOP_CH)
-            LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
-        else if (ch == IRQ_TIMEOUT_CH)
+        if (ch == IRQ_TIMEOUT_CH)
             LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
         else if (ch == IRQ_NAK_CH)
             LOG_I2C_DRIVER_ERR("IRQ_NAK\n");

@@ -135,7 +135,8 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
         LOG_I2C_DRIVER_ERR("Incoherent request size! %u!\n", header.payload.i2c_header.batch_len);
         assert(false); // Virt is broken.
     }
-    LOG_I2C_DRIVER("Loading request for bus address 0x%x\n", header.payload.i2c_header.address);
+    LOG_I2C_DRIVER("Loading request for bus address 0x%x with %u command(s)\n", header.payload.i2c_header.address,
+                   header.payload.i2c_header.batch_len);
 
     memcpy(&(data->curr_request), &header, sizeof(i2c_cmd_t));
     data->err = I2C_ERR_OK;
