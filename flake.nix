@@ -83,6 +83,18 @@
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen
             ts_ci
+            (
+              ps.buildPythonPackage rec {
+                pname = "devicetree";
+                version = "0.0.2";
+                src = ps.fetchPypi {
+                  inherit pname version;
+                  hash = "sha256-4bHoTmZwXFGQ3dfqq3JC1JSNSt0yC9UXrEdm80zpwMY=";
+                };
+                dependencies = [ ps.pyyaml ];
+                pythonImportsCheck = [ "devicetree" ];
+              }
+            )
           ]);
         in
         {

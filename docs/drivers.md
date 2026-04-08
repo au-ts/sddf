@@ -46,6 +46,13 @@ Device Tree compatible strings/platforms it is known to work with.
 * virtIO GPU (2D only)
     * `virtio,mmio`
 
+## Pinctrl
+
+* i.MX8 IOMUXC
+    * `fsl,imx8mm-iomuxc`
+    * `fsl,imx8mp-iomuxc`
+    * `fsl,imx8mq-iomuxc`
+
 ## Serial
 
 * ARM UART
