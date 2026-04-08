@@ -41,7 +41,7 @@
 	#address-cells = <0x02>;
 	#size-cells = <0x02>;
 	model = "Avnet Maaxboard";
-	compatible = "avnet/embest,maaxboard\0fsl,imx8mq";
+	compatible = "avnet/embest,maaxboard", "fsl,imx8mq";
 
 	aliases {
 		csi0 = "/soc@0/bus@30800000/mipi_csi1@30a70000";
@@ -317,9 +317,9 @@
 	busfreq {
 		compatible = "fsl,imx_busfreq";
 		clocks = <0x02 0xea 0x02 0x76 0x02 0x77 0x02 0x77 0x02 0xfc 0x02 0xfb 0x02 0x46 0x02 0x4d 0x02 0x48 0x02 0x4e 0x02 0x71 0x02 0x67 0x02 0x74 0x02 0x02 0x02 0x55 0x02 0x49>;
-		clock-names = "dram_pll\0dram_alt_src\0dram_apb_src\0dram_apb_pre_div\0dram_core\0dram_alt_root\0sys1_pll_40m\0sys1_pll_400m\0sys1_pll_100m\0sys1_pll_800m\0noc_div\0main_axi_src\0ahb_div\0osc_25m\0sys2_pll_333m\0sys1_pll_133m";
+		clock-names = "dram_pll", "dram_alt_src", "dram_apb_src", "dram_apb_pre_div", "dram_core", "dram_alt_root", "sys1_pll_40m", "sys1_pll_400m", "sys1_pll_100m", "sys1_pll_800m", "noc_div", "main_axi_src", "ahb_div", "osc_25m", "sys2_pll_333m", "sys1_pll_133m";
 		interrupts = <0x00 0x66 0x04 0x00 0x6d 0x04 0x00 0x6e 0x04 0x00 0x6f 0x04>;
-		interrupt-name = "irq_busfreq_0\0irq_busfreq_1\0irq_busfreq_2\0irq_busfreq_3";
+		interrupt-name = "irq_busfreq_0", "irq_busfreq_1", "irq_busfreq_2", "irq_busfreq_3";
 	};
 
 	soc@0 {
@@ -335,56 +335,56 @@
 		};
 
 		bus@30000000 {
-			compatible = "fsl,imx8mq-aips-bus\0simple-bus";
+			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
 			ranges = <0x30000000 0x30000000 0x400000>;
 
 			sai@30010000 {
-				compatible = "fsl,imx8mq-sai\0fsl,imx6sx-sai";
+				compatible = "fsl,imx8mq-sai", "fsl,imx6sx-sai";
 				reg = <0x30010000 0x10000>;
 				interrupts = <0x00 0x5f 0x04>;
 				clocks = <0x02 0xee 0x02 0x00 0x02 0xc4 0x02 0x00 0x02 0x00>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 				dmas = <0x10 0x08 0x01 0x00 0x10 0x09 0x01 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				fsl,dataline = <0x00 0xff 0xff>;
 				status = "disabled";
 			};
 
 			sai@30030000 {
-				compatible = "fsl,imx8mq-sai\0fsl,imx6sx-sai";
+				compatible = "fsl,imx8mq-sai", "fsl,imx6sx-sai";
 				reg = <0x30030000 0x10000>;
 				interrupts = <0x00 0x5a 0x04>;
 				clocks = <0x02 0xf3 0x02 0x00 0x02 0xc9 0x02 0x00 0x02 0x00>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 				dmas = <0x10 0x04 0x18 0x00 0x10 0x05 0x18 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				fsl,shared-interrupt;
 				status = "disabled";
 			};
 
 			sai@30040000 {
-				compatible = "fsl,imx8mq-sai\0fsl,imx6sx-sai";
+				compatible = "fsl,imx8mq-sai", "fsl,imx6sx-sai";
 				reg = <0x30040000 0x10000>;
 				interrupts = <0x00 0x5a 0x04>;
 				clocks = <0x02 0xf2 0x02 0x00 0x02 0xc8 0x02 0x00 0x02 0x00>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 				dmas = <0x10 0x02 0x18 0x00 0x10 0x03 0x18 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				fsl,shared-interrupt;
 				fsl,dataline = <0x00 0x0f 0x0f>;
 				status = "disabled";
 			};
 
 			sai@30050000 {
-				compatible = "fsl,imx8mq-sai\0fsl,imx6sx-sai";
+				compatible = "fsl,imx8mq-sai", "fsl,imx6sx-sai";
 				reg = <0x30050000 0x10000>;
 				interrupts = <0x00 0x64 0x04>;
 				clocks = <0x02 0xf1 0x02 0x00 0x02 0xc7 0x02 0x00 0x02 0x00 0x02 0x1b 0x02 0x20>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3\0pll8k\0pll11k";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
 				dmas = <0x10 0x00 0x18 0x00 0x10 0x01 0x18 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				fsl,dataline = <0x00 0x00 0x0f>;
 				status = "okay";
 				assigned-clocks = <0x02 0x84>;
@@ -394,7 +394,7 @@
 			};
 
 			gpio@30200000 {
-				compatible = "fsl,imx8mq-gpio\0fsl,imx35-gpio";
+				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
 				reg = <0x30200000 0x10000>;
 				interrupts = <0x00 0x40 0x04 0x00 0x41 0x04>;
 				clocks = <0x02 0x103>;
@@ -407,7 +407,7 @@
 			};
 
 			gpio@30210000 {
-				compatible = "fsl,imx8mq-gpio\0fsl,imx35-gpio";
+				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
 				reg = <0x30210000 0x10000>;
 				interrupts = <0x00 0x42 0x04 0x00 0x43 0x04>;
 				clocks = <0x02 0x104>;
@@ -420,7 +420,7 @@
 			};
 
 			gpio@30220000 {
-				compatible = "fsl,imx8mq-gpio\0fsl,imx35-gpio";
+				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
 				reg = <0x30220000 0x10000>;
 				interrupts = <0x00 0x44 0x04 0x00 0x45 0x04>;
 				clocks = <0x02 0x105>;
@@ -433,7 +433,7 @@
 			};
 
 			gpio@30230000 {
-				compatible = "fsl,imx8mq-gpio\0fsl,imx35-gpio";
+				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
 				reg = <0x30230000 0x10000>;
 				interrupts = <0x00 0x46 0x04 0x00 0x47 0x04>;
 				clocks = <0x02 0x106>;
@@ -445,7 +445,7 @@
 			};
 
 			gpio@30240000 {
-				compatible = "fsl,imx8mq-gpio\0fsl,imx35-gpio";
+				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
 				reg = <0x30240000 0x10000>;
 				interrupts = <0x00 0x48 0x04 0x00 0x49 0x04>;
 				clocks = <0x02 0x107>;
@@ -479,7 +479,7 @@
 			};
 
 			watchdog@30280000 {
-				compatible = "fsl,imx8mq-wdt\0fsl,imx21-wdt";
+				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
 				reg = <0x30280000 0x10000>;
 				interrupts = <0x00 0x4e 0x04>;
 				clocks = <0x02 0xd4>;
@@ -490,7 +490,7 @@
 			};
 
 			watchdog@30290000 {
-				compatible = "fsl,imx8mq-wdt\0fsl,imx21-wdt";
+				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
 				reg = <0x30290000 0x10000>;
 				interrupts = <0x00 0x4f 0x04>;
 				clocks = <0x02 0xd5>;
@@ -498,7 +498,7 @@
 			};
 
 			watchdog@302a0000 {
-				compatible = "fsl,imx8mq-wdt\0fsl,imx21-wdt";
+				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
 				reg = <0x302a0000 0x10000>;
 				interrupts = <0x00 0x0a 0x04>;
 				clocks = <0x02 0xd6>;
@@ -506,11 +506,11 @@
 			};
 
 			sdma@302c0000 {
-				compatible = "fsl,imx8mq-sdma\0fsl,imx7d-sdma";
+				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
 				reg = <0x302c0000 0x10000>;
 				interrupts = <0x00 0x67 0x04>;
 				clocks = <0x02 0xe4 0x02 0xe4>;
-				clock-names = "ipg\0ahb";
+				clock-names = "ipg", "ahb";
 				#dma-cells = <0x03>;
 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
 				phandle = <0x10>;
@@ -523,7 +523,7 @@
 			};
 
 			lcdif@30320000 {
-				compatible = "fsl,imx8mq-lcdif\0fsl,imx28-lcdif";
+				compatible = "fsl,imx8mq-lcdif", "fsl,imx28-lcdif";
 				reg = <0x30320000 0x10000>;
 				clocks = <0x02 0x80>;
 				clock-names = "pix";
@@ -665,7 +665,7 @@
 			};
 
 			syscon@30340000 {
-				compatible = "fsl,imx8mq-iomuxc-gpr\0fsl,imx6q-iomuxc-gpr\0syscon\0simple-mfd";
+				compatible = "fsl,imx8mq-iomuxc-gpr", "fsl,imx6q-iomuxc-gpr", "syscon", "simple-mfd";
 				reg = <0x30340000 0x10000>;
 				phandle = <0x39>;
 
@@ -678,7 +678,7 @@
 			};
 
 			ocotp-ctrl@30350000 {
-				compatible = "fsl,imx8mq-ocotp\0syscon";
+				compatible = "fsl,imx8mq-ocotp", "syscon";
 				reg = <0x30350000 0x10000>;
 				clocks = <0x02 0xfa>;
 				#address-cells = <0x01>;
@@ -696,7 +696,7 @@
 			};
 
 			syscon@30360000 {
-				compatible = "fsl,imx8mq-anatop\0syscon";
+				compatible = "fsl,imx8mq-anatop", "syscon";
 				reg = <0x30360000 0x10000>;
 				interrupts = <0x00 0x31 0x04>;
 			};
@@ -716,7 +716,7 @@
 			};
 
 			snvs@30370000 {
-				compatible = "fsl,sec-v4.0-mon\0syscon\0simple-mfd";
+				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
 				reg = <0x30370000 0x10000>;
 				phandle = <0x14>;
 
@@ -747,7 +747,7 @@
 				interrupts = <0x00 0x55 0x04 0x00 0x56 0x04>;
 				#clock-cells = <0x01>;
 				clocks = <0x15 0x16 0x17 0x18 0x19 0x1a 0x1b>;
-				clock-names = "ckil\0osc_25m\0osc_27m\0clk_ext1\0clk_ext2\0clk_ext3\0clk_ext4";
+				clock-names = "ckil", "osc_25m", "osc_27m", "clk_ext1", "clk_ext2", "clk_ext3", "clk_ext4";
 				assigned-clocks = <0x02 0x69 0x02 0x75 0x02 0x19 0x02 0x1e>;
 				assigned-clock-parents = <0x02 0x4c 0x02 0x56>;
 				assigned-clock-rates = <0x00 0x00 0x2ee00000 0x2b110000>;
@@ -755,7 +755,7 @@
 			};
 
 			reset-controller@30390000 {
-				compatible = "fsl,imx8mq-src\0syscon";
+				compatible = "fsl,imx8mq-src", "syscon";
 				reg = <0x30390000 0x10000>;
 				#reset-cells = <0x01>;
 				phandle = <0x28>;
@@ -845,27 +845,27 @@
 		};
 
 		bus@30400000 {
-			compatible = "fsl,imx8mq-aips-bus\0simple-bus";
+			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
 			ranges = <0x30400000 0x30400000 0x400000>;
 
 			pwm@30660000 {
-				compatible = "fsl,imx8mq-pwm\0fsl,imx27-pwm";
+				compatible = "fsl,imx8mq-pwm", "fsl,imx27-pwm";
 				reg = <0x30660000 0x10000>;
 				interrupts = <0x00 0x51 0x04>;
 				clocks = <0x02 0xbf 0x02 0xbf>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				#pwm-cells = <0x02>;
 				status = "disabled";
 			};
 
 			pwm@30670000 {
-				compatible = "fsl,imx8mq-pwm\0fsl,imx27-pwm";
+				compatible = "fsl,imx8mq-pwm", "fsl,imx27-pwm";
 				reg = <0x30670000 0x10000>;
 				interrupts = <0x00 0x52 0x04>;
 				clocks = <0x02 0xc0 0x02 0xc0>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				#pwm-cells = <0x02>;
 				status = "okay";
 				pinctrl-names = "default";
@@ -873,21 +873,21 @@
 			};
 
 			pwm@30680000 {
-				compatible = "fsl,imx8mq-pwm\0fsl,imx27-pwm";
+				compatible = "fsl,imx8mq-pwm", "fsl,imx27-pwm";
 				reg = <0x30680000 0x10000>;
 				interrupts = <0x00 0x53 0x04>;
 				clocks = <0x02 0xc1 0x02 0xc1>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				#pwm-cells = <0x02>;
 				status = "disabled";
 			};
 
 			pwm@30690000 {
-				compatible = "fsl,imx8mq-pwm\0fsl,imx27-pwm";
+				compatible = "fsl,imx8mq-pwm", "fsl,imx27-pwm";
 				reg = <0x30690000 0x10000>;
 				interrupts = <0x00 0x54 0x04>;
 				clocks = <0x02 0xc2 0x02 0xc2>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				#pwm-cells = <0x02>;
 				status = "okay";
 				pinctrl-names = "default";
@@ -904,30 +904,30 @@
 		};
 
 		bus@30800000 {
-			compatible = "fsl,imx8mq-aips-bus\0simple-bus";
+			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
 			ranges = <0x30800000 0x30800000 0x400000 0x8000000 0x8000000 0x10000000>;
 
 			spdif@30810000 {
-				compatible = "fsl,imx8mm-spdif\0fsl,imx35-spdif";
+				compatible = "fsl,imx8mm-spdif", "fsl,imx35-spdif";
 				reg = <0x30810000 0x10000>;
 				interrupts = <0x00 0x06 0x04>;
 				clocks = <0x02 0xec 0x02 0x02 0x02 0x87 0x02 0x00 0x02 0x00 0x02 0x00 0x02 0xec 0x02 0x00 0x02 0x00 0x02 0x00>;
-				clock-names = "core\0rxtx0\0rxtx1\0rxtx2\0rxtx3\0rxtx4\0rxtx5\0rxtx6\0rxtx7\0spba";
+				clock-names = "core", "rxtx0", "rxtx1", "rxtx2", "rxtx3", "rxtx4", "rxtx5", "rxtx6", "rxtx7", "spba";
 				dmas = <0x21 0x08 0x12 0x00 0x21 0x09 0x12 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
 			spi@30820000 {
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				compatible = "fsl,imx8mq-ecspi\0fsl,imx51-ecspi";
+				compatible = "fsl,imx8mq-ecspi", "fsl,imx51-ecspi";
 				reg = <0x30820000 0x10000>;
 				interrupts = <0x00 0x1f 0x04>;
 				clocks = <0x02 0xb3 0x02 0xb3>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <0x22>;
@@ -935,7 +935,7 @@
 				cs-gpios = <0x23 0x09 0x00>;
 
 				spidev@0 {
-					compatible = "fsl,spidev\0semtech,sx1301";
+					compatible = "fsl,spidev", "semtech,sx1301";
 					reg = <0x00>;
 					spi-max-frequency = <0x1e8480>;
 				};
@@ -944,31 +944,31 @@
 			spi@30830000 {
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				compatible = "fsl,imx8mq-ecspi\0fsl,imx51-ecspi";
+				compatible = "fsl,imx8mq-ecspi", "fsl,imx51-ecspi";
 				reg = <0x30830000 0x10000>;
 				interrupts = <0x00 0x20 0x04>;
 				clocks = <0x02 0xb4 0x02 0xb4>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "disabled";
 			};
 
 			spi@30840000 {
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				compatible = "fsl,imx8mq-ecspi\0fsl,imx51-ecspi";
+				compatible = "fsl,imx8mq-ecspi", "fsl,imx51-ecspi";
 				reg = <0x30840000 0x10000>;
 				interrupts = <0x00 0x21 0x04>;
 				clocks = <0x02 0xb5 0x02 0xb5>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "disabled";
 			};
 
 			serial@30860000 {
-				compatible = "fsl,imx8mq-uart\0fsl,imx6q-uart";
+				compatible = "fsl,imx8mq-uart", "fsl,imx6q-uart";
 				reg = <0x30860000 0x10000>;
 				interrupts = <0x00 0x1a 0x04>;
 				clocks = <0x02 0xca 0x02 0xca>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <0x24>;
@@ -977,20 +977,20 @@
 			};
 
 			serial@30880000 {
-				compatible = "fsl,imx8mq-uart\0fsl,imx6q-uart";
+				compatible = "fsl,imx8mq-uart", "fsl,imx6q-uart";
 				reg = <0x30880000 0x10000>;
 				interrupts = <0x00 0x1c 0x04>;
 				clocks = <0x02 0xcc 0x02 0xcc>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "disabled";
 			};
 
 			serial@30890000 {
-				compatible = "fsl,imx8mq-uart\0fsl,imx6q-uart";
+				compatible = "fsl,imx8mq-uart", "fsl,imx6q-uart";
 				reg = <0x30890000 0x10000>;
 				interrupts = <0x00 0x1b 0x04>;
 				clocks = <0x02 0xcb 0x02 0xcb>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <0x25>;
@@ -999,13 +999,13 @@
 			};
 
 			spdif@308a0000 {
-				compatible = "fsl,imx8mm-spdif\0fsl,imx35-spdif";
+				compatible = "fsl,imx8mm-spdif", "fsl,imx35-spdif";
 				reg = <0x308a0000 0x10000>;
 				interrupts = <0x00 0x0d 0x04>;
 				clocks = <0x02 0xec 0x02 0x02 0x02 0x88 0x02 0x00 0x02 0x00 0x02 0x00 0x02 0xec 0x02 0x00 0x02 0x00 0x02 0x00>;
-				clock-names = "core\0rxtx0\0rxtx1\0rxtx2\0rxtx3\0rxtx4\0rxtx5\0rxtx6\0rxtx7\0spba";
+				clock-names = "core", "rxtx0", "rxtx1", "rxtx2", "rxtx3", "rxtx4", "rxtx5", "rxtx6", "rxtx7", "spba";
 				dmas = <0x21 0x10 0x12 0x00 0x21 0x11 0x12 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -1015,9 +1015,9 @@
 				reg = <0x308b0000 0x10000>;
 				interrupts = <0x00 0x60 0x04>;
 				clocks = <0x02 0xef 0x02 0x00 0x02 0xc5 0x02 0x00 0x02 0x00>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 				dmas = <0x21 0x0a 0x18 0x00 0x21 0x0b 0x18 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <0x26>;
@@ -1028,13 +1028,13 @@
 			};
 
 			sai@308c0000 {
-				compatible = "fsl,imx8mq-sai\0fsl,imx6sx-sai";
+				compatible = "fsl,imx8mq-sai", "fsl,imx6sx-sai";
 				reg = <0x308c0000 0x10000>;
 				interrupts = <0x00 0x32 0x04>;
 				clocks = <0x02 0xf0 0x02 0x00 0x02 0xc6 0x02 0x00 0x02 0x00>;
-				clock-names = "bus\0mclk0\0mclk1\0mclk2\0mclk3";
+				clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 				dmas = <0x21 0x0c 0x18 0x00 0x21 0x0d 0x18 0x00>;
-				dma-names = "rx\0tx";
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -1046,7 +1046,7 @@
 				ranges = <0x00 0x30900000 0x40000>;
 				interrupts = <0x00 0x5b 0x04>;
 				clocks = <0x02 0x74 0x02 0xec>;
-				clock-names = "aclk\0ipg";
+				clock-names = "aclk", "ipg";
 
 				jr@1000 {
 					compatible = "fsl,sec-v4.0-job-ring";
@@ -1087,14 +1087,14 @@
 				compatible = "fsl,imx8mq-nwl-dsi";
 				reg = <0x30a00000 0x300>;
 				clocks = <0x02 0xa3 0x02 0xf4 0x02 0xf5 0x02 0xa4 0x02 0x23 0x02 0x80>;
-				clock-names = "core\0rx_esc\0tx_esc\0phy_ref\0video_pll\0lcdif";
+				clock-names = "core", "rx_esc", "tx_esc", "phy_ref", "video_pll", "lcdif";
 				assigned-clocks = <0x02 0xa4 0x02 0xa3 0x02 0xf4 0x02 0xf5>;
 				assigned-clock-parents = <0x02 0x25 0x02 0x4c 0x02 0x47>;
 				assigned-clock-rates = <0x19bfcc0 0xfdad680 0x4c4b400 0x1312d00>;
 				interrupts = <0x00 0x22 0x04>;
 				power-domains = <0x27>;
 				resets = <0x28 0x15 0x28 0x17 0x28 0x18 0x28 0x19>;
-				reset-names = "byte\0dpi\0esc\0pclk";
+				reset-names = "byte", "dpi", "esc", "pclk";
 				mux-controls = <0x29 0x00>;
 				phys = <0x2a>;
 				phy-names = "dphy";
@@ -1102,7 +1102,7 @@
 			};
 
 			i2c@30a20000 {
-				compatible = "fsl,imx8mq-i2c\0fsl,imx21-i2c";
+				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
 				reg = <0x30a20000 0x10000>;
 				interrupts = <0x00 0x23 0x04>;
 				clocks = <0x02 0xb8>;
@@ -1137,7 +1137,7 @@
 							regulator-ramp-delay = <0x4e2>;
 							rohm,dvs-run-voltage = <0xdbba0>;
 							rohm,dvs-idle-voltage = <0xcf850>;
-							rohm,dvs-suspend-voltage = <0xc3500>;
+							rohm,dvs-suspend-voltage = "", "\f5";
 						};
 
 						BUCK2 {
@@ -1286,7 +1286,7 @@
 			};
 
 			i2c@30a30000 {
-				compatible = "fsl,imx8mq-i2c\0fsl,imx21-i2c";
+				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
 				reg = <0x30a30000 0x10000>;
 				interrupts = <0x00 0x24 0x04>;
 				clocks = <0x02 0xb9>;
@@ -1309,7 +1309,7 @@
 			};
 
 			i2c@30a40000 {
-				compatible = "fsl,imx8mq-i2c\0fsl,imx21-i2c";
+				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
 				reg = <0x30a40000 0x10000>;
 				interrupts = <0x00 0x25 0x04>;
 				clocks = <0x02 0xba>;
@@ -1322,7 +1322,7 @@
 			};
 
 			i2c@30a50000 {
-				compatible = "fsl,imx8mq-i2c\0fsl,imx21-i2c";
+				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
 				reg = <0x30a50000 0x10000>;
 				interrupts = <0x00 0x26 0x04>;
 				clocks = <0x02 0xbb>;
@@ -1335,11 +1335,11 @@
 			};
 
 			serial@30a60000 {
-				compatible = "fsl,imx8mq-uart\0fsl,imx6q-uart";
+				compatible = "fsl,imx8mq-uart", "fsl,imx6q-uart";
 				reg = <0x30a60000 0x10000>;
 				interrupts = <0x00 0x1d 0x04>;
 				clocks = <0x02 0xcd 0x02 0xcd>;
-				clock-names = "ipg\0per";
+				clock-names = "ipg", "per";
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <0x36>;
@@ -1354,7 +1354,7 @@
 				reg = <0x30a70000 0x1000>;
 				interrupts = <0x00 0x2c 0x04>;
 				clocks = <0x02 0xa7 0x02 0xa9 0x02 0xa8>;
-				clock-names = "clk_core\0clk_esc\0clk_pxl";
+				clock-names = "clk_core", "clk_esc", "clk_pxl";
 				assigned-clocks = <0x02 0xa7 0x02 0xa8 0x02 0xa9>;
 				assigned-clock-rates = <0x7ed6b40 0x5f5e100 0x3ef1480>;
 				power-domains = <0x38>;
@@ -1381,11 +1381,11 @@
 			};
 
 			csi1_bridge@30a90000 {
-				compatible = "fsl,imx8mq-csi\0fsl,imx6s-csi";
+				compatible = "fsl,imx8mq-csi", "fsl,imx6s-csi";
 				reg = <0x30a90000 0x10000>;
 				interrupts = <0x00 0x2a 0x04>;
 				clocks = <0x02 0x00 0x02 0xe0 0x02 0x00>;
-				clock-names = "disp-axi\0csi_mclk\0disp_dcic";
+				clock-names = "disp-axi", "csi_mclk", "disp_dcic";
 				status = "okay";
 				fsl,mipi-mode;
 				fsl,two-8bit-sensor-mode;
@@ -1400,7 +1400,7 @@
 			};
 
 			mu@30aa0000 {
-				compatible = "fsl,imx8mq-mu\0fsl,imx6sx-mu";
+				compatible = "fsl,imx8mq-mu", "fsl,imx6sx-mu";
 				reg = <0x30aa0000 0x10000>;
 				interrupts = <0x00 0x58 0x04>;
 				clocks = <0x02 0xfd>;
@@ -1410,18 +1410,18 @@
 			};
 
 			mmc@30b40000 {
-				compatible = "fsl,imx8mq-usdhc\0fsl,imx7d-usdhc";
+				compatible = "fsl,imx8mq-usdhc", "fsl,imx7d-usdhc";
 				reg = <0x30b40000 0x10000>;
 				interrupts = <0x00 0x16 0x04>;
 				clocks = <0x02 0xec 0x02 0x69 0x02 0xd2>;
-				clock-names = "ipg\0ahb\0per";
+				clock-names = "ipg", "ahb", "per";
 				assigned-clocks = <0x02 0x8e>;
 				assigned-clock-rates = <0x17d78400>;
 				fsl,tuning-start-tap = <0x14>;
 				fsl,tuning-step = <0x02>;
 				bus-width = <0x04>;
 				status = "okay";
-				pinctrl-names = "default\0state_100mhz\0state_200mhz";
+				pinctrl-names = "default", "state_100mhz", "state_200mhz";
 				pinctrl-0 = <0x3d>;
 				pinctrl-1 = <0x3e>;
 				pinctrl-2 = <0x3f>;
@@ -1431,11 +1431,11 @@
 			};
 
 			mmc@30b50000 {
-				compatible = "fsl,imx8mq-usdhc\0fsl,imx7d-usdhc";
+				compatible = "fsl,imx8mq-usdhc", "fsl,imx7d-usdhc";
 				reg = <0x30b50000 0x10000>;
 				interrupts = <0x00 0x17 0x04>;
 				clocks = <0x02 0xec 0x02 0x69 0x02 0xd3>;
-				clock-names = "ipg\0ahb\0per";
+				clock-names = "ipg", "ahb", "per";
 				fsl,tuning-start-tap = <0x14>;
 				fsl,tuning-step = <0x02>;
 				bus-width = <0x04>;
@@ -1465,7 +1465,7 @@
 				reg = <0x30b60000 0x1000>;
 				interrupts = <0x00 0x2d 0x04>;
 				clocks = <0x02 0xaa 0x02 0xac 0x02 0xab>;
-				clock-names = "clk_core\0clk_esc\0clk_pxl";
+				clock-names = "clk_core", "clk_esc", "clk_pxl";
 				assigned-clocks = <0x02 0xaa 0x02 0xab 0x02 0xac>;
 				assigned-clock-rates = <0x7ed6b40 0x5f5e100 0x3ef1480>;
 				power-domains = <0x44>;
@@ -1475,43 +1475,43 @@
 			};
 
 			csi2_bridge@30b80000 {
-				compatible = "fsl,imx8mq-csi\0fsl,imx6s-csi";
+				compatible = "fsl,imx8mq-csi", "fsl,imx6s-csi";
 				reg = <0x30b80000 0x10000>;
 				interrupts = <0x00 0x2b 0x04>;
 				clocks = <0x02 0x00 0x02 0xe1 0x02 0x00>;
-				clock-names = "disp-axi\0csi_mclk\0disp_dcic";
+				clock-names = "disp-axi", "csi_mclk", "disp_dcic";
 				status = "disabled";
 			};
 
 			spi@30bb0000 {
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				compatible = "fsl,imx8mq-qspi\0fsl,imx7d-qspi";
+				compatible = "fsl,imx8mq-qspi", "fsl,imx7d-qspi";
 				reg = <0x30bb0000 0x10000 0x8000000 0x10000000>;
-				reg-names = "QuadSPI\0QuadSPI-memory";
+				reg-names = "QuadSPI", "QuadSPI-memory";
 				interrupts = <0x00 0x6b 0x04>;
 				clocks = <0x02 0xc3 0x02 0xc3>;
-				clock-names = "qspi_en\0qspi";
+				clock-names = "qspi_en", "qspi";
 				status = "disabled";
 			};
 
 			sdma@30bd0000 {
-				compatible = "fsl,imx8mq-sdma\0fsl,imx7d-sdma";
+				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
 				reg = <0x30bd0000 0x10000>;
 				interrupts = <0x00 0x02 0x04>;
 				clocks = <0x02 0xe3 0x02 0x74>;
-				clock-names = "ipg\0ahb";
+				clock-names = "ipg", "ahb";
 				#dma-cells = <0x03>;
 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
 				phandle = <0x21>;
 			};
 
 			ethernet@30be0000 {
-				compatible = "fsl,imx8mq-fec\0fsl,imx6sx-fec";
+				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
 				reg = <0x30be0000 0x10000>;
 				interrupts = <0x00 0x76 0x04 0x00 0x77 0x04 0x00 0x78 0x04>;
 				clocks = <0x02 0xb6 0x02 0xb6 0x02 0x8a 0x02 0x89 0x02 0x8b>;
-				clock-names = "ipg\0ahb\0ptp\0enet_clk_ref\0enet_out";
+				clock-names = "ipg", "ahb", "ptp", "enet_clk_ref", "enet_out";
 				fsl,num-tx-queues = <0x03>;
 				fsl,num-rx-queues = <0x03>;
 				nvmem-cells = <0x45>;
@@ -1542,7 +1542,7 @@
 		};
 
 		bus@32c00000 {
-			compatible = "fsl,imx8mq-aips-bus\0simple-bus";
+			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
 			ranges = <0x32c00000 0x32c00000 0x400000>;
@@ -1550,7 +1550,7 @@
 			hdmi@32c00000 {
 				reg = <0x32c00000 0x100000 0x32e40000 0x40000>;
 				interrupts = <0x00 0x10 0x04 0x00 0x19 0x04>;
-				interrupt-names = "plug_in\0plug_out";
+				interrupt-names = "plug_in", "plug_out";
 				compatible = "cdn,imx8mq-hdmi";
 				lane-mapping = <0xe4>;
 				status = "okay";
@@ -1565,7 +1565,7 @@
 			};
 
 			interrupt-controller@32e2d000 {
-				compatible = "fsl,imx8m-irqsteer\0fsl,imx-irqsteer";
+				compatible = "fsl,imx8m-irqsteer", "fsl,imx-irqsteer";
 				reg = <0x32e2d000 0x1000>;
 				interrupts = <0x00 0x12 0x04>;
 				clocks = <0x02 0xf8>;
@@ -1584,10 +1584,10 @@
 				compatible = "nxp,imx8mq-dcss";
 				reg = <0x32e00000 0x2d000 0x32e2f000 0x1000>;
 				interrupts = <0x06 0x08 0x09 0x10 0x11>;
-				interrupt-names = "ctx_ld\0ctxld_kick\0vblank\0dtrc_ch1\0dtrc_ch2";
+				interrupt-names = "ctx_ld", "ctxld_kick", "vblank", "dtrc_ch1", "dtrc_ch2";
 				interrupt-parent = <0x49>;
 				clocks = <0x02 0xf8 0x02 0xf7 0x02 0xf9 0x02 0xfe 0x02 0x7a 0x02 0x10a 0x02 0x10b>;
-				clock-names = "apb\0axi\0rtrm\0pix\0dtrc\0pll_src\0pll_phy_ref";
+				clock-names = "apb", "axi", "rtrm", "pix", "dtrc", "pll_src", "pll_phy_ref";
 				assigned-clocks = <0x02 0x6b 0x02 0x6d 0x02 0x10a>;
 				assigned-clock-parents = <0x02 0x4e 0x02 0x4e 0x02 0x03>;
 				assigned-clock-rates = <0x2faf0800 0x17d78400>;
@@ -1608,7 +1608,7 @@
 			reg = <0x38000000 0x40000>;
 			interrupts = <0x00 0x03 0x04>;
 			clocks = <0x02 0xd7 0x02 0x66 0x02 0x6f 0x02 0x70>;
-			clock-names = "core\0shader\0bus\0reg";
+			clock-names = "core", "shader", "bus", "reg";
 			assigned-clocks = <0x02 0x61 0x02 0x64 0x02 0x6f 0x02 0x70 0x02 0x10>;
 			assigned-clock-parents = <0x02 0x11 0x02 0x11 0x02 0x11 0x02 0x11 0x02 0x0f>;
 			assigned-clock-rates = <0x2faf0800 0x2faf0800 0x2faf0800 0x2faf0800 0x00>;
@@ -1617,16 +1617,16 @@
 		};
 
 		usb@38100000 {
-			compatible = "fsl,imx8mq-dwc3\0snps,dwc3";
+			compatible = "fsl,imx8mq-dwc3", "snps,dwc3";
 			reg = <0x38100000 0x10000>;
 			clocks = <0x02 0xce 0x02 0x98 0x02 0x01>;
-			clock-names = "bus_early\0ref\0suspend";
+			clock-names = "bus_early", "ref", "suspend";
 			assigned-clocks = <0x02 0x6e 0x02 0x98>;
 			assigned-clock-parents = <0x02 0x56 0x02 0x48>;
 			assigned-clock-rates = <0x1dcd6500 0x5f5e100>;
 			interrupts = <0x00 0x28 0x04>;
 			phys = <0x4c 0x4c>;
-			phy-names = "usb2-phy\0usb3-phy";
+			phy-names = "usb2-phy", "usb3-phy";
 			usb3-resume-missing-cas;
 			snps,power-down-scale = <0x02>;
 			status = "okay";
@@ -1647,16 +1647,16 @@
 		};
 
 		usb@38200000 {
-			compatible = "fsl,imx8mq-dwc3\0snps,dwc3";
+			compatible = "fsl,imx8mq-dwc3", "snps,dwc3";
 			reg = <0x38200000 0x10000>;
 			clocks = <0x02 0xcf 0x02 0x98 0x02 0x01>;
-			clock-names = "bus_early\0ref\0suspend";
+			clock-names = "bus_early", "ref", "suspend";
 			assigned-clocks = <0x02 0x6e 0x02 0x98>;
 			assigned-clock-parents = <0x02 0x56 0x02 0x48>;
 			assigned-clock-rates = <0x1dcd6500 0x5f5e100>;
 			interrupts = <0x00 0x29 0x04>;
 			phys = <0x4d 0x4d>;
-			phy-names = "usb2-phy\0usb3-phy";
+			phy-names = "usb2-phy", "usb3-phy";
 			power-domains = <0x4e>;
 			usb3-resume-missing-cas;
 			snps,power-down-scale = <0x02>;
@@ -1678,10 +1678,10 @@
 		};
 
 		dma-apbh@33000000 {
-			compatible = "fsl,imx7d-dma-apbh\0fsl,imx28-dma-apbh";
+			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
 			reg = <0x33000000 0x2000>;
 			interrupts = <0x00 0x0c 0x04 0x00 0x0c 0x04 0x00 0x0c 0x04 0x00 0x0c 0x04>;
-			interrupt-names = "gpmi0\0gpmi1\0gpmi2\0gpmi3";
+			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
 			#dma-cells = <0x01>;
 			dma-channels = <0x04>;
 			clocks = <0x02 0x100>;
@@ -1693,11 +1693,11 @@
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
 			reg = <0x33002000 0x2000 0x33004000 0x4000>;
-			reg-names = "gpmi-nand\0bch";
+			reg-names = "gpmi-nand", "bch";
 			interrupts = <0x00 0x0e 0x04>;
 			interrupt-names = "bch";
 			clocks = <0x02 0xe2 0x02 0x100>;
-			clock-names = "gpmi_io\0gpmi_bch_apb";
+			clock-names = "gpmi_io", "gpmi_bch_apb";
 			dmas = <0x4f 0x00>;
 			dma-names = "rx-tx";
 			status = "disabled";
@@ -1706,7 +1706,7 @@
 		pcie@33800000 {
 			compatible = "fsl,imx8mq-pcie";
 			reg = <0x33800000 0x400000 0x1ff00000 0x80000>;
-			reg-names = "dbi\0config";
+			reg-names = "dbi", "config";
 			#address-cells = <0x03>;
 			#size-cells = <0x02>;
 			device_type = "pci";
@@ -1715,21 +1715,21 @@
 			num-lanes = <0x01>;
 			num-viewport = <0x04>;
 			interrupts = <0x00 0x7a 0x04 0x00 0x7f 0x04>;
-			interrupt-names = "msi\0dma";
+			interrupt-names = "msi", "dma";
 			#interrupt-cells = <0x01>;
 			interrupt-map-mask = <0x00 0x00 0x00 0x07>;
 			interrupt-map = <0x00 0x00 0x00 0x01 0x07 0x00 0x7d 0x04 0x00 0x00 0x00 0x02 0x07 0x00 0x7c 0x04 0x00 0x00 0x00 0x03 0x07 0x00 0x7b 0x04 0x00 0x00 0x00 0x04 0x07 0x00 0x7a 0x04>;
 			fsl,max-link-speed = <0x02>;
 			power-domains = <0x50>;
 			resets = <0x28 0x1a 0x28 0x1c 0x28 0x1d>;
-			reset-names = "pciephy\0apps\0turnoff";
+			reset-names = "pciephy", "apps", "turnoff";
 			status = "disabled";
 		};
 
 		pcie@33c00000 {
 			compatible = "fsl,imx8mq-pcie";
 			reg = <0x33c00000 0x400000 0x27f00000 0x80000>;
-			reg-names = "dbi\0config";
+			reg-names = "dbi", "config";
 			#address-cells = <0x03>;
 			#size-cells = <0x02>;
 			device_type = "pci";
@@ -1737,14 +1737,14 @@
 			num-lanes = <0x01>;
 			num-viewport = <0x04>;
 			interrupts = <0x00 0x4a 0x04 0x00 0x50 0x04>;
-			interrupt-names = "msi\0dma";
+			interrupt-names = "msi", "dma";
 			#interrupt-cells = <0x01>;
 			interrupt-map-mask = <0x00 0x00 0x00 0x07>;
 			interrupt-map = <0x00 0x00 0x00 0x01 0x07 0x00 0x4d 0x04 0x00 0x00 0x00 0x02 0x07 0x00 0x4c 0x04 0x00 0x00 0x00 0x03 0x07 0x00 0x4b 0x04 0x00 0x00 0x00 0x04 0x07 0x00 0x4a 0x04>;
 			fsl,max-link-speed = <0x02>;
 			power-domains = <0x50>;
 			resets = <0x28 0x22 0x28 0x24 0x28 0x25>;
-			reset-names = "pciephy\0apps\0turnoff";
+			reset-names = "pciephy", "apps", "turnoff";
 			status = "disabled";
 		};
 
@@ -1759,7 +1759,7 @@
 		};
 
 		ddr-pmu@3d800000 {
-			compatible = "fsl,imx8mq-ddr-pmu\0fsl,imx8m-ddr-pmu";
+			compatible = "fsl,imx8mq-ddr-pmu", "fsl,imx8m-ddr-pmu";
 			reg = <0x3d800000 0x400000>;
 			interrupt-parent = <0x07>;
 			interrupts = <0x00 0x62 0x04>;
@@ -1770,9 +1770,9 @@
 			reg = <0x38300000 0x200000>;
 			reg-names = "regs_hantro";
 			interrupts = <0x00 0x07 0x04 0x00 0x08 0x04>;
-			interrupt-names = "irq_hantro_g1\0irq_hantro_g2";
+			interrupt-names = "irq_hantro_g1", "irq_hantro_g2";
 			clocks = <0x02 0xe5 0x02 0xe6 0x02 0xdf>;
-			clock-names = "clk_hantro_g1\0clk_hantro_g2\0clk_hantro_bus";
+			clock-names = "clk_hantro_g1", "clk_hantro_g2", "clk_hantro_bus";
 			assigned-clocks = <0x02 0x78 0x02 0x79 0x02 0x6a>;
 			assigned-clock-parents = <0x02 0x16 0x02 0x16 0x02 0x4e>;
 			assigned-clock-rates = <0x23c34600 0x23c34600 0x2faf0800>;
@@ -1782,13 +1782,13 @@
 	};
 
 	gpu3d@38000000 {
-		compatible = "fsl,imx8mq-gpu\0fsl,imx6q-gpu";
+		compatible = "fsl,imx8mq-gpu", "fsl,imx6q-gpu";
 		reg = <0x00 0x38000000 0x00 0x40000 0x00 0x40000000 0x00 0xc0000000 0x00 0x00 0x00 0x10000000>;
-		reg-names = "iobase_3d\0phys_baseaddr\0contiguous_mem";
+		reg-names = "iobase_3d", "phys_baseaddr", "contiguous_mem";
 		interrupts = <0x00 0x03 0x04>;
 		interrupt-names = "irq_3d";
 		clocks = <0x02 0xd7 0x02 0x66 0x02 0x6f 0x02 0x70>;
-		clock-names = "gpu3d_clk\0gpu3d_shader_clk\0gpu3d_axi_clk\0gpu3d_ahb_clk";
+		clock-names = "gpu3d_clk", "gpu3d_shader_clk", "gpu3d_axi_clk", "gpu3d_ahb_clk";
 		assigned-clocks = <0x02 0x61 0x02 0x64 0x02 0x6f 0x02 0x70>;
 		assigned-clock-parents = <0x02 0x11 0x02 0x11 0x02 0x11 0x02 0x11>;
 		assigned-clock-rates = <0x2faf0800 0x2faf0800 0x2faf0800 0x2faf0800>;
@@ -1798,7 +1798,7 @@
 
 	rpmsg {
 		compatible = "fsl,imx8mq-rpmsg";
-		mbox-names = "tx\0rx\0rxdb";
+		mbox-names = "tx", "rx", "rxdb";
 		mboxes = <0x52 0x00 0x01 0x52 0x01 0x01 0x52 0x03 0x01>;
 		status = "disabled";
 	};
@@ -1871,7 +1871,7 @@
 	};
 
 	sound-hdmi {
-		compatible = "fsl,imx8mq-evk-cdnhdmi\0fsl,imx-audio-cdnhdmi";
+		compatible = "fsl,imx8mq-evk-cdnhdmi", "fsl,imx-audio-cdnhdmi";
 		model = "imx-audio-hdmi";
 		audio-cpu = <0x55>;
 		protocol = <0x01>;
@@ -1932,8 +1932,8 @@
 		simple-audio-card,frame-master = <0x58>;
 		simple-audio-card,format = "i2s";
 		status = "okay";
-		simple-audio-card,widgets = "Microphone\0Mic Jack\0Line\0Line In\0Line\0Line Out\0Speaker\0Speaker\0Headphone\0Headphone Jack";
-		simple-audio-card,routing = "Headphone Jack\0HP_L\0Headphone Jack\0HP_R\0Speaker\0SPK_LP\0Speaker\0SPK_LN\0Speaker\0SPK_RP\0Speaker\0SPK_RN\0LINPUT1\0Mic Jack\0LINPUT3\0Mic Jack\0RINPUT1\0Mic Jack\0RINPUT2\0Mic Jack\0Mic Jack\0MICB";
+		simple-audio-card,widgets = "Microphone", "Mic Jack", "Line", "Line In", "Line", "Line Out", "Speaker", "Speaker", "Headphone", "Headphone Jack";
+		simple-audio-card,routing = "Headphone Jack", "HP_L", "Headphone Jack", "HP_R", "Speaker", "SPK_LP", "Speaker", "SPK_LN", "Speaker", "SPK_RP", "Speaker", "SPK_RN", "LINPUT1", "Mic Jack", "LINPUT3", "Mic Jack", "RINPUT1", "Mic Jack", "RINPUT2", "Mic Jack", "Mic Jack", "MICB";
 
 		simple-audio-card,cpu {
 			sound-dai = <0x59>;
