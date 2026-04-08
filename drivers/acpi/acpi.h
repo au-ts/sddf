@@ -225,6 +225,10 @@ uint32_t get_name_data_len_len(uint8_t *data_encoding)
 uint32_t get_integer_data(uint8_t *data_encoding)
 {
     switch (data_encoding[0]) {
+        case DATA_OBJ_ZERO:
+            return 0;
+        case DATA_OBJ_ONE:
+            return 1;
         case DATA_OBJ_BYTE:
             return data_encoding[1];
         case DATA_OBJ_WORD:
@@ -361,6 +365,52 @@ bool extract_crs(uint8_t *resource_data, uint32_t data_len, char *path_name, uin
     return false;
 }
 
+void save_if_apic_routing_table(uint8_t *name_object, char *name_str)
+{
+    // Check if package object
+    if (name_object[0] != 0x12) return;
+
+    sddf_dprintf("Package Object\n");
+    uint32_t pkt_len = get_pkt_len(&name_object[1]);
+    uint32_t pkt_len_bytes = get_pktlen_bytes(&name_object[1]);
+    uint32_t num_elements = name_object[1 + pkt_len_bytes];
+    sddf_dprintf("pkt_len: %d, pkt_len_bytes: %d, num_elements: 0x%x\n", pkt_len, pkt_len_bytes, num_elements);
+
+    if (name_object[2 + pkt_len_bytes] != 0x12) return;
+
+    for (int i = 2 + pkt_len_bytes; i < pkt_len;) {
+        // Check if element is also Package Object
+        if (name_object[i] != 0x12) return;
+
+        uint32_t element_pkt_len = get_pkt_len(&name_object[i + 1]);
+        uint32_t element_pkt_len_bytes = get_pktlen_bytes(&name_object[i + 1]);
+        uint32_t element_num_elements = name_object[i + 1 + element_pkt_len_bytes];
+
+        // Check if num of elements is 4
+        if (element_num_elements != 4) return;
+
+        // Parse address, i.e. PCI slot
+        uint32_t arg_idx = i + 2 + element_pkt_len_bytes;
+        uint32_t element_1 = get_integer_data(&name_object[arg_idx]);
+
+        // Parse PIN
+        arg_idx = arg_idx + get_name_data_len(&name_object[arg_idx]);
+        uint32_t element_2 = get_integer_data(&name_object[arg_idx]);
+
+        // Parse Source, i.e. GSI number
+        arg_idx = arg_idx + get_name_data_len(&name_object[arg_idx]);
+        char name_str[20];
+        uint32_t source_len = get_name_string(&name_object[arg_idx], name_str);
+
+        // Parse Source Index, i.e. index in I/O APIC
+        arg_idx = arg_idx + source_len;
+        uint32_t element_4 = get_integer_data(&name_object[arg_idx]);
+        sddf_dprintf("{ 0x%X, 0x%x, %s, 0x%x}\n", element_1, element_2, name_str, element_4);
+
+        i = i + 1 + element_pkt_len;
+    }
+}
+
 uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path_name, uint32_t path_len)
 {
     sddf_dprintf("#######################start extract##########\n");
@@ -400,7 +450,7 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                 sddf_dprintf("name_str: %s, len: %d\n", name_str, name_len);
                 uint32_t data_len = get_name_data_len(&cur_obj[i + 1 + name_len]);
                 sddf_dprintf("name object data len: %d\n", data_len);
-                if (!strcmp(name_str, "_HID")) {
+                if (!strcmp(name_str, "_HID")) { // Add entry if it's a PCI bridge
                     char eisa_id[8];
                     if (data_len == 5) { // Compressed EISA ID
                         read_eisa_id(&cur_obj[i + 1 + name_len + 1], eisa_id);
@@ -414,12 +464,13 @@ uint32_t extract_device_resources(uint8_t *cur_obj, uint32_t obj_len, char *path
                         pci_resources.bridges[pci_resources.num_bridges].path_len = path_len;
                         pci_resources.num_bridges++;
                     }
-                }
-                if (!strcmp(name_str, "_CRS")) {
+                } else if (!strcmp(name_str, "_CRS")) { // Save CRS
                     sddf_dprintf("_CRS for path: %s\n", path_name);
                     uint32_t datalen_len = get_name_data_len_len(&cur_obj[i + 1 + name_len]);
                     sddf_dprintf("length of data length: %d\n", datalen_len);
                     extract_crs(&cur_obj[i + 1 + name_len + datalen_len], data_len - datalen_len, path_name, path_len);
+                } else {
+                    save_if_apic_routing_table(&cur_obj[i + 1 + name_len], name_str);
                 }
                 i = i + 1 + name_len + data_len;
                 break;
