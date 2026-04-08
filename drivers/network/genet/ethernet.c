@@ -115,7 +115,12 @@ static void rx_provide(void)
             update_ring_slot(&rx, idx, buffer.io_or_offset, 0);
             rx.tail++;
         }
-        THREAD_MEMORY_RELEASE();
+
+        /* The following barrier orders the write to the doorbell register to be after the write to
+         * the descriptors updated in function update_ring_slot().
+         */
+        wwmb();
+
         // Doorbell the device
         ring_rx->cons_index = (rx.tail - NUM_DESCS) & rx.index_mask;
 
@@ -142,7 +147,13 @@ static void rx_return(void)
     // for optimisation. The packets arrived before clearing IRQ status will
     // be handled in next iteration.
     uint32_t prod_index = ring_rx->prod_index & rx.index_mask;
-    THREAD_MEMORY_ACQUIRE();
+
+    /*
+     * The following barrier orders the following reads from the descriptor to be after
+     * the read from the 'prod_index' field of the rx ring.
+     */
+    rrmb();
+
     while (!hw_ring_empty(&rx)) {
         if ((rx.head & rx.index_mask) == prod_index) {
             break;
@@ -181,7 +192,12 @@ static void tx_provide()
 
             tx.tail++;
         }
-        THREAD_MEMORY_RELEASE();
+
+        /* The following barrier orders the write to the 'prod_index' field of the tx ring
+         * to be after the write to the descriptors updated in function update_ring_slot().
+         */
+        wwmb();
+
         ring_tx->prod_index = tx.tail & tx.index_mask;
 
         net_request_signal_active(&tx_queue);
@@ -198,7 +214,13 @@ static void tx_return(void)
 {
     bool enqueued = false;
     uint32_t cons_index = ring_tx->cons_index & tx.index_mask;
-    THREAD_MEMORY_ACQUIRE();
+
+    /*
+     * The following barrier orders the following reads from the descriptor to be after
+     * the read from the 'cons_index' field of the tx ring.
+     */
+    rrmb();
+
     while (!hw_ring_empty(&tx)) {
         if ((tx.head & tx.index_mask) == cons_index) {
             break;

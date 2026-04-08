@@ -162,7 +162,6 @@ static void benchmark_start(void)
 
 #if ENABLE_PMU_EVENTS
     sel4bench_reset_counters();
-    THREAD_MEMORY_RELEASE();
     sel4bench_start_counters(benchmark_bf);
 #endif
 

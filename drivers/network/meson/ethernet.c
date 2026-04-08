@@ -64,10 +64,10 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
     d->addr = phys;
     d->next = next;
     d->cntl = cntl;
-    /* Ensure all writes to the descriptor complete, before we set the flags
+    /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
+    wwmb();
     d->status = status;
 }
 
@@ -87,8 +87,6 @@ static void rx_provide()
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-            eth_dma->rxpolldemand = POLL_DATA;
-
             rx.tail++;
         }
 
@@ -100,11 +98,21 @@ static void rx_provide()
             reprocess = true;
         }
     }
+
+    /*
+     * The following barrier orders the write to the DMA register to be after
+     * the writes to the 'status' fields of the descriptors updated in function
+     * update_ring_slot().
+     */
+    wwmb();
+
+    eth_dma->rxpolldemand = POLL_DATA;
 }
 
 static void rx_return(void)
 {
     bool packets_transferred = false;
+    bool error = false;
     while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         uint32_t idx = rx.head % rx.capacity;
@@ -113,7 +121,11 @@ static void rx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'status' field of the descriptor.
+         */
+        rrmb();
 
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
@@ -124,8 +136,8 @@ static void rx_return(void)
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, d->addr, 0);
-            eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
+            error = true;
         } else {
             net_buff_desc_t buffer = { d->addr, (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT };
             int err = net_enqueue_active(&rx_queue, buffer);
@@ -138,6 +150,18 @@ static void rx_return(void)
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         sddf_notify(config.virt_rx.id);
+    }
+
+    if (error) {
+
+        /*
+        * The following barrier orders the write to the DMA register to be after
+        * the writes to the 'status' fields of the descriptors updated in function
+        * update_ring_slot().
+        */
+        wwmb();
+
+        eth_dma->rxpolldemand = POLL_DATA;
     }
 }
 
@@ -172,6 +196,12 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
+
+    /* The following barrier orders the write to the DMA register to be after the write to
+     * the 'status' fields of the descriptors updated in function update_ring_slot().
+     */
+    wwmb();
+
     eth_dma->txpolldemand = POLL_DATA;
 }
 
@@ -186,7 +216,11 @@ static void tx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads to the descriptor to be after
+         * the read to the 'status' field of the descriptor.
+         */
+        rrmb();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);

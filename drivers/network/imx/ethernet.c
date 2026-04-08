@@ -66,10 +66,10 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     d->addr = phys;
     d->len = len;
 
-    /* Ensure all writes to the descriptor complete, before we set the flags
+    /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
+    wwmb();
     d->stat = stat;
 }
 
@@ -88,8 +88,15 @@ static void rx_provide(void)
                 stat |= WRAP;
             }
             update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
-            rx.tail++;
+
+            /* The following barrier orders the write to the 'rdar' MMIO register to be after the write to
+             * the 'stat' field of the descriptor in function update_ring_slot().
+             */
+            wwmb();
+
             eth->rdar = RDAR_RDAR;
+
+            rx.tail++;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
@@ -118,7 +125,11 @@ static void rx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read to the 'stat' field of the descriptor.
+         */
+        rrmb();
 
         net_buff_desc_t buffer = { d->addr, d->len };
         int err = net_enqueue_active(&rx_queue, buffer);
@@ -149,8 +160,15 @@ static void tx_provide(void)
                 stat |= WRAP;
             }
             update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
-            tx.tail++;
+
+            /* The following barrier orders the write to the 'tdar' MMIO register to be after the write to
+             * the 'stat' fields of the descriptors updated in function update_ring_slot().
+             */
+            wwmb();
+
             eth->tdar = TDAR_TDAR;
+
+            tx.tail++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -174,7 +192,11 @@ static void tx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'stat' field of the descriptor.
+         */
+        rrmb();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);

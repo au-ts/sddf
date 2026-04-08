@@ -77,10 +77,10 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t addr_lo
     d->addr_low = addr_low;
     d->addr_high = addr_high;
     d->des2 = des2;
-    /* Ensure all writes to the descriptor complete, before we set the flags
+    /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
+    wwmb();
     d->des3 = des3;
 }
 
@@ -97,9 +97,15 @@ static void rx_provide()
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
+
+            /* The following barrier orders the write to the DMA register to be after the write to
+             * the 'des3' field of the descriptor in function update_ring_slot().
+             */
+            wwmb();
+
             /* We will update the hardware register that stores the tail address. This tells
-            the device that we have new descriptors to use. */
-            THREAD_MEMORY_RELEASE();
+             * the device that we have new descriptors to use.
+             */
             *DMA_REG(DMA_CH0_RXDESC_TAIL_PTR) = rx_desc_base + sizeof(struct descriptor) * idx;
             rx.tail++;
         }
@@ -125,7 +131,11 @@ static void rx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'des3' field of the descriptor.
+         */
+        rrmb();
 
         net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
@@ -134,6 +144,11 @@ static void rx_return(void)
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
+
+            /* The following barrier orders the write to the DMA register to be after the write to
+             * the 'des3' field of the descriptor in function update_ring_slot().
+             */
+            wwmb();
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -176,12 +191,18 @@ static void tx_provide(void)
             tx.descr_mdata[idx] = buffer;
             update_ring_slot(&tx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, des2, des3);
 
-            tx.tail++;
+            /* The following barrier orders the write to the DMA register to be after the write to
+             * the 'des3' fields of the descriptors updated in function update_ring_slot().
+             */
+            wwmb();
+
             /* Set the tail in hardware to the latest tail we have inserted in.
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per batch.
              */
             *DMA_REG(DMA_CH0_TXDESC_TAIL_PTR) = tx_desc_base + sizeof(struct descriptor) * (idx);
+
+            tx.tail++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -204,7 +225,11 @@ static void tx_return(void)
         if (d->des3 & DESC_TXSTS_OWNBYDMA) {
             break;
         }
-        THREAD_MEMORY_ACQUIRE();
+
+        /*
+         * There doesn't need to be any barrier here, as we never read device memory again
+         * (we access our own descriptor metadata book-keeping array 'descr_mdata').
+         */
 
         net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);

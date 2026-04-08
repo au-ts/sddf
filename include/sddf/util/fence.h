@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <os/sddf.h>
 
 /* Prevent the compiler from re-ordering any read or write across the fence. */
 #define COMPILER_MEMORY_FENCE() __atomic_signal_fence(__ATOMIC_ACQ_REL)
@@ -36,6 +37,32 @@
  * forcing all loads beyond this point to occur after this point.
  */
 #define THREAD_MEMORY_ACQUIRE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
+
+/*
+ * rrmb: Prevents read-read reordering.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define rrmb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define rrmb() asm volatile("dmb ld" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define rrmb() asm volatile("fence ir, ir" ::: "memory")
+#else
+#error "Unknown architecture for rmb"
+#endif
+
+/*
+ * wwmb: Prevents write-write reordering.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define wwmb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define wwmb() asm volatile("dmb st" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define wwmb() asm volatile("fence ow, ow" ::: "memory")
+#else
+#error "Unknown architecture for wmb"
+#endif
 
 /* load_acquire_32: synchronises with a store_release_32 that writes the same value to the same location
  */
