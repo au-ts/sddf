@@ -87,14 +87,6 @@ static void rx_provide()
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-
-            /* The following barrier orders the write to the DMA register to be after the write to
-             * the 'status' field of the descriptor in function update_ring_slot().
-             */
-            wwmb();
-
-            eth_dma->rxpolldemand = POLL_DATA;
-
             rx.tail++;
         }
 
@@ -106,11 +98,21 @@ static void rx_provide()
             reprocess = true;
         }
     }
+
+    /*
+     * The following barrier orders the write to the DMA register to be after
+     * the writes to the 'status' fields of the descriptors updated in function
+     * update_ring_slot().
+     */
+    wwmb();
+
+    eth_dma->rxpolldemand = POLL_DATA;
 }
 
 static void rx_return(void)
 {
     bool packets_transferred = false;
+    bool error = false;
     while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         uint32_t idx = rx.head % rx.capacity;
@@ -134,14 +136,8 @@ static void rx_return(void)
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, d->addr, 0);
-
-            /* The following barrier orders the write to the DMA register to be after the write to
-             * the 'status' field of the descriptor in function update_ring_slot().
-             */
-            wwmb();
-
-            eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
+            error = true;
         } else {
             net_buff_desc_t buffer = { d->addr, (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT };
             int err = net_enqueue_active(&rx_queue, buffer);
@@ -154,6 +150,18 @@ static void rx_return(void)
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         sddf_notify(config.virt_rx.id);
+    }
+
+    if (error) {
+
+        /*
+        * The following barrier orders the write to the DMA register to be after
+        * the writes to the 'status' fields of the descriptors updated in function
+        * update_ring_slot().
+        */
+        wwmb();
+
+        eth_dma->rxpolldemand = POLL_DATA;
     }
 }
 
