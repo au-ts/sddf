@@ -7,18 +7,11 @@
 #include <sddf/timer/timer_driver.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/util/util.h>
-#include <sddf/util/div64.h>
 
 // This file implements cached time conversion which is suitable for almost
 // all timer drivers. Omit this file and use your own time conversion in your driver
-// if you do not want the caching behaviour. All non-caching common code is
-// contained in timer_driver_virt.c and time_conv.c.
-// NOTE: this file depends on time_conv.c!
+// if you do not want the caching behaviour.
 
-
-// Mult-shift cache. It's relatively expensive to calculate this every time, so we just
-// don't. Usually we will just be reusing the last result, so we just remember the last
-// one. We keep a separate entry for tick->ns and ns->tick.
 ms_cache_entry_t tick_to_ns_cache = {0};
 ms_cache_entry_t ns_to_tick_cache = {0};
 
@@ -54,11 +47,8 @@ static inline uint64_t do_cached_period_freq_shift(uint64_t t_a, sddf_timer_freq
  * This function internally caches magic values for the calculation, these are recalculated
  * each time the frequency pair changes. Use do_freq_shift() to avoid caching.
  *
- * Prescaler should be given as an exponent, i.e. prescaler counter counts to 2^N,
- * provide N.
- *
  * @param uint64_t ticks to convert
- * @param uint64_t prescaler exponent
+ * @param uint64_t prescaler exponent - i.e. if scaling to 2^N give N.
  * @returns non-zero on failure.
  */
 uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq)
@@ -78,11 +68,8 @@ uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_h
  * This function internally caches magic values for the calculation, these are recalculated
  * each time the frequency pair changes. Use do_freq_shift() to avoid caching.
  *
- * Prescaler should be given as an exponent, i.e. prescaler counter counts to 2^N,
- * provide N.
- *
  * @param uint64_t ticks to convert
- * @param uint64_t prescaler exponent
+ * @param uint64_t prescaler exponent - i.e. if scaling to 2^N give N.
  * @returns non-zero on failure.
  */
 uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq) {
