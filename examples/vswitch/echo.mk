@@ -66,7 +66,7 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
 VSWITCH_OBJS := echo.o utilization_socket.o \
-	     udp_echo_socket.o tcp_echo_socket.o
+	     udp_echo_socket.o tcp_echo_socket.o icmp.o
 
 DEPS := $(VSWITCH_OBJS:.o=.d)
 

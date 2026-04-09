@@ -20,6 +20,7 @@
 #include "lwip/pbuf.h"
 
 #include "echo.h"
+#include "icmp.h"
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
@@ -38,22 +39,51 @@ serial_queue_handle_t serial_tx_queue_handle;
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
 
-static uint32_t ip_addrs[SDDF_NET_MAX_CLIENTS];
+typedef struct neighbors {
+    bool connected;
+    bool pinged;
+    uint8_t id;
+    //bool ping_received;
+    icmp_context_t icmp_ctx;
+} neighbors_t;
+static neighbors_t neighbors[SDDF_NET_MAX_CLIENTS];
 
 #define LWIP_TICK_MS 100
 
+//static void query_icmp_replies()
+//{
+//    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+//        if (!neighbors[i].connected || !neighbors[i].pinged || neighbors[i].ping_received)
+//            continue;
+//
+//        // TODO: cancel ping
+//    }
+//}
+
+static void ping_neighbors()
+{
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (!neighbors[i].connected || neighbors[i].pinged || client_config.my_id == neighbors[i].id)//|| neighbors[i].ping_received) // TODO: later enable
+            continue;
+
+        send_icmp_request(&neighbors[i].icmp_ctx);
+        neighbors[i].pinged = true;
+    }
+}
 // Add PPC that fires just after the DHCP has finished
 // Save that into an array of IPs from neighbors, then we can ping each other and ensure that vswitch works
 static void query_ips()
 {
     sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_QUERY_IP_ADDR, 0, 0, 0));
-    uint8_t num_clients = sddf_get_mr(0), client_id = 0; // TODO: somehow this is wrong!? it gets 0 num clients, ask tomorrow
+    uint8_t num_clients = sddf_get_mr(0), client_id = 0;
     uint32_t ipaddr = 0;
     sddf_dprintf("ECHO|LOG: received IP from vswitch num_clients: %d\n", num_clients);
     for (int i = 0; i < num_clients; i++) {
         client_id = sddf_get_mr(1 + 2 * i);
         ipaddr = sddf_get_mr(1 + 2 * i + 1);
-        ip_addrs[client_id] = ipaddr;
+        neighbors[client_id].icmp_ctx.ip_addr = ipaddr;
+        neighbors[client_id].connected = true;
+        neighbors[client_id].id = client_id;
         sddf_dprintf("ECHO|LOG: received IP from vswitch client_id: %d IP: 0x%x\n", client_id, ipaddr);
     }
 }
@@ -67,10 +97,12 @@ static void query_ips()
 void netif_status_callback(char *ip_addr)
 {
     sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
+    sddf_lwip_print_set_gateway();
     // TODO: Here we PPC to vswitch, it then replies with the map of client_id and IPs that we can call into later
     uint32_t ip = sddf_lwip_ipaddr_aton(ip_addr);
     sddf_set_mr(0, ip);
-    sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_REPORT_IP_ADDR, 0, 0, 1));
+    sddf_set_mr(1, client_config.my_id);
+    sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_REPORT_IP_ADDR, 0, 0, 2));
 }
 
 /**
@@ -100,6 +132,7 @@ void init(void)
     setup_udp_socket();
     setup_utilization_socket(&benchmark_config);
     setup_tcp_socket();
+    icmp_init_raw();
 
     sddf_lwip_maybe_notify();
 }
@@ -117,6 +150,9 @@ void notified(sddf_channel ch)
         cnt++;
         if (cnt == 100) {
             query_ips();
+            // also see if any pings got their replies
+            //query_icmp_replies(); // TODO: implement later
+            ping_neighbors();
             cnt = 0;
         }
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {

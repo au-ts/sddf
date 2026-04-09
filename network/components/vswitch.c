@@ -338,7 +338,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     switch (label) {
     case VSWITCH_REPORT_IP_ADDR: {
         uint32_t ip_addr = microkit_mr_get(0);
-        uint32_t client_id = ch;
+        uint32_t client_id = microkit_mr_get(1);
         state.clients.info[state.clients.num].ip_addr = ip_addr;
         state.clients.info[state.clients.num].id = client_id;
         state.clients.num += 1;
