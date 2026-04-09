@@ -114,21 +114,22 @@ void client_main(void) {
         // LOG_CLIENT("Client main\n");
 
         uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
-        // uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
-        // uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
+        uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
+        uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
 
         // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
-        LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
-        // LOG_CLIENT("dist sensor c: %d", dist_sensor_c);
+        // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
+        // LOG_CLIENT("dist sensor b: %lu\n", dist_sensor_b);
+        LOG_CLIENT("dist sensor c: %lu\n", dist_sensor_c);
         
-        if (dist_sensor_a > 40) {
-            LOG_CLIENT("attempting drive\n");
-            control_forward();
-            LOG_CLIENT("returned from drive\n");
-        }
-        else {
-            control_stop();
-        }
+        // if (dist_sensor_a > 40) {
+        //     LOG_CLIENT("attempting drive\n");
+        //     control_forward();
+        //     LOG_CLIENT("returned from drive\n");
+        // }
+        // else {
+        //     control_stop();
+        // }
 
         // NOTE: a is front, b is right, c is left
         // if (dist_sensor_a < 5) {
@@ -160,6 +161,7 @@ void notified(sddf_channel ch) {
 
     if (ch == timer_channel) {
         int timeout_id = dequeue(&timeout_queue);
+        // LOG_CLIENT("timeout now\n");
         // LOG_CLIENT("timeout id: %d\n", timeout_id);
 
         // TODO: horrible style, refactor this and how timeouts are handled (especially for motors)
