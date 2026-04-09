@@ -292,13 +292,13 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     }
     case VSWITCH_QUERY_IP_ADDR: {
         sddf_dprintf("VSWITCH: PPC received QUERY PPC with label: %zu from ch: %u num_clients: %d\n", label, ch, state.clients.num);
-        sddf_set_mr(0, state.clients.num * 2 + 1);
+        sddf_set_mr(0, state.clients.num);
         sddf_dprintf("VSWITCH: PPC reg: 0 val: %d\n", state.clients.num * 2 + 1);
         for (int i = 0; i < state.clients.num; i++) {
-            sddf_set_mr(i * 2, state.clients.info[i].id);
-            sddf_set_mr(i * 2 + 1, state.clients.info[i].ip_addr);
-            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2, state.clients.info[i].id);
-            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 1, state.clients.info[i].ip_addr);
+            sddf_set_mr(i * 2 + 1, state.clients.info[i].id);
+            sddf_set_mr(i * 2 + 2, state.clients.info[i].ip_addr);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 1, state.clients.info[i].id);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 2, state.clients.info[i].ip_addr);
         }
         return seL4_MessageInfo_new(0, 0, 0, state.clients.num * 2 + 1);
     }
