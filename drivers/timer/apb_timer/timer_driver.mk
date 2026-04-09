@@ -34,4 +34,3 @@ clean::
 	rm -rf timer
 clobber::
 	rm -f timer_driver.elf
-
