@@ -6,6 +6,7 @@
 
 #include <microkit.h>
 #include <libco.h>
+#include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
@@ -16,14 +17,8 @@
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/libi2c.h>
 
-#define DEBUG_CLIENT
-
-#ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("SCAN|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
-#else
-#define LOG_CLIENT(...) do{}while(0)
-#endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("SCAN|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_printf("INA219|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("INA219|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 bool delay_ms(size_t milliseconds);
 
@@ -47,48 +42,58 @@ static char t_client_main_stack[STACK_SIZE];
 #define I2C_DATA_REGION ((uint8_t *)i2c_config.data.vaddr)
 #endif
 
-#define INA219_ADDR (0x41)
+#define INA219_ADDR                 (0x44)  // 3v3 rail
+#define INA219_CONFIG_ADDR          (0x0)
+#define INA219_SHUNT_V_ADDR         (0x1)
+#define INA219_BUS_V_ADDR           (0x2)
+#define INA219_POWER_ADDR           (0x3)
+#define INA219_CURRENT_ADDR         (0x4)
+#define INA219_CALIBRATION_ADDR     (0x5)
+
+// Constants for genesys2
+// beware endianness!
+const uint8_t config[2] = { 0x08, 0x67 };
+const uint8_t calibration[2] = { 0x40, 0x00 };
 
 void client_main(void)
 {
-    LOG_CLIENT("client_main: started\n");
+    volatile uint8_t *data = (volatile uint8_t *)data_region;
+
+    // Kick I2C bus before doing anything.
+    sddf_i2c_write(&libi2c_conf, 0x1, data, 1);
+    delay_ms(100);
+
+    // Initial: reset, then program registers.
+    memcpy((volatile uint8_t *)(data + 1), config, 2);
+    data[0] = INA219_CONFIG_ADDR;
+    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, data, 3) == 0);
+
+    memcpy((volatile uint8_t *)(data + 1), calibration, 2);
+    data[0] = INA219_CALIBRATION_ADDR;
+    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, data, 3) == 0);
+
+    // BRNG value for bus voltage range. Config reg bit 13
+    uint8_t brng = ((config[1] & (0b100000)) >> 5) & 0x1;
+
     while (true) {
-        // Try probe all addresses
-        uint8_t *data = (uint8_t *)data_region;
-        data[0] = 0;
-        sddf_printf("INA219: Beginning scan...\n");
+        // Read current, voltage and power
+        uint16_t voltage, power, current;
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_BUS_V_ADDR, data, 2) == 0);
 
-        // try access first:
-        const uint8_t target_reg = 0x5; // calibration: default is 0x0
-        const uint8_t value = 0x77;
-        data[0] = target_reg;
-        data[1] = value;
+        // Low 3 bits of voltage reg are control bits
+        voltage = ((data[0] << 8) | data[1]) >> 3;
+        // Range = 32V if brng=1, else 16V
+        double voltage_human_readable = ((double)voltage / (0x1FFF)) * (16 * (1 + brng));
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_CURRENT_ADDR, data, 2) == 0);
 
-        int ret = sddf_i2c_write(&libi2c_conf, INA219_ADDR, data, 2);
-        if (ret == 0) {
-            sddf_printf("\n           \t ... is present on write!\n");
-        } else {
-            sddf_printf(" not detected on write.\n");
-        }
-        delay_ms(1000);
-        sddf_printf("\n\n####################################\n\n");
+        current = (uint16_t)((data[0] << 8) | data[1]);
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_POWER_ADDR, data, 2) == 0);
+        power = ((data[0] << 8) | data[1]);
 
-        int ret2 = sddf_i2c_read(&libi2c_conf, INA219_ADDR, data, 1);
-        if (ret2 == 0) {
-            sddf_printf("\n           \t ... is present on raw!\n");
-        } else {
-            sddf_printf(" not detected on raw read.\n");
-        }
-        delay_ms(1000);
-
-        int ret1 = sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, target_reg, data, 1);
-        if (ret1 == 0) {
-            sddf_printf("\n           \t ... is present on writeread!\n");
-        } else {
-            sddf_printf(" not detected on writeread.\n");
-        }
-        sddf_dprintf("read %u\n", data[0]);
-        sddf_printf("\nRescanning in 5 seconds...\n");
+        LOG_CLIENT("Measurement completed!\n");
+        LOG_CLIENT("\tBus voltage = %fV\n", voltage_human_readable);
+        LOG_CLIENT("\tCurrent = %u\n", current);
+        LOG_CLIENT("\tPower= %u\n", power);
         delay_ms(5000);
     }
 }

@@ -1,4 +1,4 @@
-# Copyright 2025, UNSW
+# Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 import os, sys
 import argparse
@@ -30,16 +30,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
     client_ina = ProtectionDomain("client_ina", "client_ina.elf", priority=1)
-
-    if board.name == "odroidc4":
-        # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
-        # direct access.
-        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
-        gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000)
-        sdf.add_mr(clk_mr)
-        sdf.add_mr(gpio_mr)
-        i2c_driver.add_map(Map(clk_mr, 0x30_000_000, "rw", cached=False))
-        i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, "rw", cached=False))
 
     i2c_node = dtb.node(board.i2c)
     assert i2c_node is not None
