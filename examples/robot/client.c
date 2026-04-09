@@ -110,47 +110,32 @@ void client_main(void) {
 
     while(true)
     {
-        // control_forward(1000);
-        // LOG_CLIENT("Client main\n");
+        // sensor a: right
+        // sensor b: forward
+        // sensor c: left
 
         uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
         uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
         uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
 
         // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
-        // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
         // LOG_CLIENT("dist sensor b: %lu\n", dist_sensor_b);
-        LOG_CLIENT("dist sensor c: %lu\n", dist_sensor_c);
+        // LOG_CLIENT("dist sensor c: %lu\n", dist_sensor_c);
         
-        // if (dist_sensor_a > 40) {
-        //     LOG_CLIENT("attempting drive\n");
-        //     control_forward();
-        //     LOG_CLIENT("returned from drive\n");
-        // }
-        // else {
-        //     control_stop();
-        // }
-
-        // NOTE: a is front, b is right, c is left
-        // if (dist_sensor_a < 5) {
-        //     control_stop(); 
-        //     // move left/right depending on where bot is located
-        //     if (dist_sensor_b > dist_sensor_a) {
-        //         control_right(1000);
-        //     }
-        //     else {
-        //         control_left(1000);
-        //     }
-        // }
-        // else if (dist_sensor_b < 5) {
-        //     control_left(1000);
-        // }
-        // else if (dist_sensor_c < 5) {
-        //     control_right(1000);
-        // }
-        // else {
-        //     control_forward(1000);
-        // }
+        if (dist_sensor_b > 40 && dist_sensor_a > 40 && dist_sensor_c > 40) {
+            LOG_CLIENT("attempting drive\n");
+            control_forward();
+            LOG_CLIENT("returned from drive\n");
+        }
+        else {
+            control_stop();
+            if (dist_sensor_a > dist_sensor_c) {
+                control_right();
+            }
+            else {
+                control_left();
+            }
+        }
     }
 }
 
