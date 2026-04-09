@@ -31,8 +31,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     set_shared_time_page(time);
 
     if (ch != config.virt_id) {
-        LOG_TIMER_DRIVER_ERR("Protected called from channel %u ... not virt (%u)!\n",
-                             ch, config.virt_id);
+        LOG_TIMER_DRIVER_ERR("Protected called from channel %u ... not virt (%u)!\n", ch, config.virt_id);
         return microkit_msginfo_new(0, 0);
     }
     switch (microkit_msginfo_get_label(msginfo)) {
@@ -56,8 +55,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        LOG_TIMER_DRIVER_ERR("bad request %lu to timer from channel %u\n",
-                     microkit_msginfo_get_label(msginfo), ch);
+        LOG_TIMER_DRIVER_ERR("bad request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
         break;
     }
 

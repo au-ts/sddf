@@ -148,8 +148,8 @@ void init(void)
     regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
-    regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |
-                (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
+    regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK)
+              | (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
 }

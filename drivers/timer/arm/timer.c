@@ -27,10 +27,10 @@ static uint64_t timer_freq;
 #define LOW_WORD(x) (x & 0xffffffffffffffff)
 #define HIGH_WORD(x) (x >> 64)
 
-#define COPROC_WRITE_WORD(R,W) asm volatile ("msr " R  ", %0" :: "r"(W))
-#define COPROC_READ_WORD(R,W)  asm volatile ("mrs %0, " R : "=r" (W))
-#define COPROC_WRITE_64(R,W)   COPROC_WRITE_WORD(R,W)
-#define COPROC_READ_64(R,W)    COPROC_READ_WORD(R,W)
+#define COPROC_WRITE_WORD(R, W) asm volatile ("msr " R  ", %0" :: "r"(W))
+#define COPROC_READ_WORD(R, W)  asm volatile ("mrs %0, " R : "=r" (W))
+#define COPROC_WRITE_64(R, W)   COPROC_WRITE_WORD(R,W)
+#define COPROC_READ_64(R, W)    COPROC_READ_WORD(R,W)
 
 /* control reigster for the el1 physical timer */
 #define CNTP_CTL "cntp_ctl_el0"
@@ -59,7 +59,7 @@ static inline uint32_t generic_timer_get_freq(void)
 {
     uintptr_t freq;
     COPROC_READ_WORD(CNTFRQ, freq);
-    return (uint32_t) freq;
+    return (uint32_t)freq;
 }
 
 static inline uint32_t generic_timer_read_ctrl(void)
@@ -116,7 +116,6 @@ static void process_timeouts(uint64_t curr_time)
     if (next_timeout != UINT64_MAX) {
         set_timeout(next_timeout);
     }
-
 }
 
 void init()

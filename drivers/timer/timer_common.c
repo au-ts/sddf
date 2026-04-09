@@ -12,15 +12,14 @@
 // all timer drivers. Omit this file and use your own time conversion in your driver
 // if you do not want the caching behaviour.
 
-ms_cache_entry_t tick_to_ns_cache = {0};
-ms_cache_entry_t ns_to_tick_cache = {0};
+ms_cache_entry_t tick_to_ns_cache = { 0 };
+ms_cache_entry_t ns_to_tick_cache = { 0 };
 
 /**
  *  Given two equivalent periods, do a frequency shift calculation.
  *  (equivalent = prescaler-equivalent frequency)
  */
-static inline uint64_t do_cached_period_freq_shift(uint64_t t_a, sddf_timer_freq_hz_t f_a,
-                                                   sddf_timer_freq_hz_t f_b,
+static inline uint64_t do_cached_period_freq_shift(uint64_t t_a, sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b,
                                                    ms_cache_entry_t *cache_entry)
 {
     uint64_t mult, shift = 0;
@@ -72,10 +71,9 @@ uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_h
  * @param uint64_t prescaler exponent - i.e. if scaling to 2^N give N.
  * @returns non-zero on failure.
  */
-uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq) {
+uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq)
+{
     sddf_timer_freq_hz_t true_freq = find_true_freq(base_freq, prescaler);
     uint64_t ticks = do_cached_period_freq_shift(ns, F_NANOSECOND, true_freq, &ns_to_tick_cache);
     return ticks;
 }
-
-

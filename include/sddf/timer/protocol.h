@@ -17,5 +17,3 @@
 // A larger frequency will break our common math, so we shouldn't
 // force such values into this type anyway.
 typedef uint32_t sddf_timer_freq_hz_t;
-
-

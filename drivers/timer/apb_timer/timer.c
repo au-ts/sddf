@@ -79,7 +79,6 @@ typedef struct apbtimer_timeout_conf {
     uint8_t prescaler;
 } apbtimer_timeout_conf_t;
 
-
 /**
  * Return number of ticks since driver startup using timekeeper timer.
  * NOTE: one round of timer @ 50MHz with prescaler of (1<<3)=4 lasts for 171.8

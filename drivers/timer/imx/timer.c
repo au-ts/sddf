@@ -44,7 +44,6 @@
 #define GPT_FREQ   (24*MEGA)
 #define GPT_PRESCALER (0)
 
-
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static volatile uint32_t *gpt;
@@ -115,14 +114,14 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
     switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = tick_to_ns_cached(get_ticks(), GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
+        uint64_t time_ns = tick_to_ns_cached(get_ticks(), GPT_PRESCALER, (sddf_timer_freq_hz_t)GPT_FREQ);
         // uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
         sddf_set_mr(0, time_ns);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
-        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), GPT_PRESCALER, (sddf_timer_freq_hz_t) GPT_FREQ);
+        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), GPT_PRESCALER, (sddf_timer_freq_hz_t)GPT_FREQ);
         // uint64_t offset_ticks = (sddf_get_mr(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
         timeouts[ch] = curr_time + offset_ticks;
         process_timeouts(curr_time);
@@ -158,17 +157,15 @@ void init(void)
     /* SWR will be 0 when the reset is done */
     while (gpt[CR] & (1 << 15));
 
-    uint32_t cr = (
-                      (1 << 9) | // Free run mode
-                      (1 << 6) | // Peripheral clocks
-                      (1) // Enable
-                  );
+    uint32_t cr = ((1 << 9) | // Free run mode
+                   (1 << 6) | // Peripheral clocks
+                   (1) // Enable
+    );
 
     gpt[CR] = cr;
 
-    gpt[IR] = (
-                  (1 << 5) // rollover interrupt
-              );
+    gpt[IR] = ((1 << 5) // rollover interrupt
+    );
 
     gpt[PR] = GPT_PRESCALER; // prescaler of 0 - use raw 24MHz clock.
 

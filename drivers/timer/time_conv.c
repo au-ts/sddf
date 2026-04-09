@@ -59,8 +59,9 @@ void find_mult_shift(sddf_timer_freq_hz_t f_a, sddf_timer_freq_hz_t f_b, uint64_
  *
  * Mult and shift collectively encode f_a and f_b.
  */
-uint64_t do_freq_shift(uint64_t t_a, uint64_t mult, uint64_t shift) {
+uint64_t do_freq_shift(uint64_t t_a, uint64_t mult, uint64_t shift)
+{
      // __uint128_t multiplicand = (__uint128_t)t_a * (__uint128_t)mult;
     uint64_t multiplicand = t_a * mult;
-    return (uint64_t) (multiplicand >> shift);
+    return (uint64_t)(multiplicand >> shift);
 }

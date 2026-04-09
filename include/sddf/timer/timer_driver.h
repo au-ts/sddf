@@ -41,4 +41,3 @@ sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64_t prescaler);
 // their most-recently-used cache.
 uint64_t tick_to_ns_cached(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
 uint64_t ns_to_tick_cached(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t base_freq);
-
