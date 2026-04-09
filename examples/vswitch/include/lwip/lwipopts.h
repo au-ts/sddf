@@ -223,3 +223,5 @@
  * for a few of these while the next benchmark runs.
  */
 #define MEMP_NUM_TCP_PCB 10
+
+#define LWIP_RAW 1

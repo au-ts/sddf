@@ -107,6 +107,11 @@ inline uint32_t sddf_lwip_ipaddr_aton(const char *cp)
     return ip4_addr_get_u32(&ret);
 }
 
+inline void sddf_lwip_print_set_gateway()
+{
+    sddf_printf_("Default gateway set to: %s\n", ip4addr_ntoa(netif_ip4_gw(&lwip_state.netif)));
+}
+
 inline bool sddf_lwip_pbuf_pool_empty(void)
 {
     return pbuf_pool.first_free == SIZE_MAX;
@@ -363,7 +368,6 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 
 net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
 {
-
     return lwip_err_to_sddf_err(lwip_eth_send(&lwip_state.netif, p));
 }
 

@@ -15,6 +15,7 @@
 
 typedef struct vswitch_client_config {
     uint8_t channel_id;
+    uint8_t my_id;
 } vswitch_client_config_t;
 
 int setup_udp_socket(void);

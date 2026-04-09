@@ -145,19 +145,21 @@ class BenchmarkConfig:
         )
 
 class ClientConfig:
-    def __init__(self, ch_id: int):
+    def __init__(self, ch_id: int, my_id: int):
         self.ch_id = ch_id
+        self.my_id = my_id
 
     """
         Matches struct definition:
         {
+            uint8_t;
             uint8_t;
         }
     """
 
     def serialise(self) -> bytes:
         return struct.pack(
-            "<c", self.ch_id.to_bytes(1, "little")
+            "<cc", self.ch_id.to_bytes(1, "little"), self.my_id.to_bytes(1, "little")
         )
 
 # Adds ".elf" to elf strings
@@ -474,8 +476,8 @@ def generate(
     sdf.add_channel(client1_to_vswitch)
 
     # Create Client PD configs
-    client0_config = ClientConfig(client0_to_vswitch.pd_a_id)
-    client1_config = ClientConfig(client1_to_vswitch.pd_a_id)
+    client0_config = ClientConfig(client0_to_vswitch.pd_a_id, 0)
+    client1_config = ClientConfig(client1_to_vswitch.pd_a_id, 1)
 
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
