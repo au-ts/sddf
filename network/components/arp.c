@@ -20,6 +20,11 @@
 #define LWIP_IANA_HWTYPE_ETHERNET 1
 #define NUM_ARP_CLIENTS (NUM_NETWORK_CLIENTS - 1)
 
+#define ETH_TYPE_ARP 0x0806U
+#define ETH_TYPE_IP 0x0800U
+#define ETHARP_OPCODE_REQUEST 1
+#define ETHARP_OPCODE_REPLY 2
+
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
