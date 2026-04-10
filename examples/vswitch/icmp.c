@@ -1,5 +1,6 @@
 #include "icmp.h"
 #include <sddf/network/lib_sddf_lwip.h>
+#include <sddf/network/config.h>
 #include "lwip/raw.h"
 #include "lwip/icmp.h"
 #include "lwip/inet_chksum.h"
@@ -7,14 +8,23 @@
 #include "lwip/prot/ip.h"
 
 static struct raw_pcb *ping_pcb;
-static uint16_t ping_seq_num; // TODO: for now single seq num - but need to have multiple...
+static icmp_context_t *contexts[SDDF_NET_MAX_CLIENTS];
 
-// TODO: should be unique?
-#define PING_ID        0xAFAF
+#define PING_ID_BASE        0xA100
 #define PING_DEBUG     LWIP_DBG_ON
 
+static inline uint8_t ping_id_to_client_id(uint16_t ping_id)
+{
+    return (uint8_t)(ping_id - PING_ID_BASE);
+}
+
+static inline uint16_t client_id_to_ping_id(uint8_t client_id)
+{
+    return (uint16_t)(client_id + PING_ID_BASE);
+}
+
 static void
-ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num)
+ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num, uint8_t client_id)
 {
     size_t i;
     size_t data_len = len - sizeof(struct icmp_echo_hdr);
@@ -22,7 +32,7 @@ ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num)
     ICMPH_TYPE_SET(iecho, ICMP_ECHO);
     ICMPH_CODE_SET(iecho, 0);
     iecho->chksum = 0;
-    iecho->id     = PING_ID;
+    iecho->id     = lwip_htons(client_id_to_ping_id(client_id));
     iecho->seqno  = lwip_htons(++(*seq_num));
 
     /* fill the additional data buffer with some data */
@@ -33,37 +43,62 @@ ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num)
     iecho->chksum = inet_chksum(iecho, len);
 }
 
-static u8_t
+static uint8_t
 ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
 {
-  struct icmp_echo_hdr *iecho;
-  LWIP_UNUSED_ARG(arg);
-  LWIP_UNUSED_ARG(pcb);
-  LWIP_UNUSED_ARG(addr);
-  LWIP_ASSERT("addr != NULL", addr != NULL);
-  LWIP_ASSERT("p != NULL", p != NULL);
+    icmp_context_t **contexts = (icmp_context_t **)arg;
+    const struct ip_hdr *iphdr;
+    const struct icmp_echo_hdr *iecho;
+    uint16_t ip_hlen;
+    uint16_t ping_id_host;
+    uint8_t client_id;
 
-    sddf_printf("ICMP LOG: Received the ICMP\n");
-  if ((p->tot_len >= (IP_HLEN + sizeof(struct icmp_echo_hdr))) &&
-      pbuf_remove_header(p, IP_HLEN) == 0) {
-    iecho = (struct icmp_echo_hdr *)p->payload;
+    LWIP_UNUSED_ARG(pcb);
+    LWIP_ASSERT("addr != NULL", addr != NULL);
+    LWIP_ASSERT("p != NULL", p != NULL);
 
-    if ((iecho->id == PING_ID) && (iecho->seqno == lwip_htons(ping_seq_num))) {
-      LWIP_DEBUGF( PING_DEBUG, ("ping: recv "));
-      ip_addr_debug_print(PING_DEBUG, addr);
-      //LWIP_DEBUGF( PING_DEBUG, (" %"U32_F" ms\n", (sys_now()-ping_time)));
+    sddf_printf("ICMP LOG: Received the ICMP from %s len=%u\n",
+                ipaddr_ntoa(addr), p->tot_len);
 
-      /* do some ping result processing */
-      //PING_RESULT(1);
-      // TODO: do something
-      pbuf_free(p);
-      return 1; /* eat the packet */
+    if (p->tot_len < sizeof(struct ip_hdr) + sizeof(struct icmp_echo_hdr)) {
+        return 0;
     }
-    /* not eaten, restore original packet */
-    pbuf_add_header(p, IP_HLEN);
-  }
 
-  return 0; /* don't eat the packet */
+    iphdr = (const struct ip_hdr_t *)p->payload;
+    ip_hlen = (uint16_t)(IPH_HL(iphdr) * 4);
+
+    if (p->tot_len < ip_hlen + sizeof(struct icmp_echo_hdr)) {
+        return 0;
+    }
+
+    iecho = (const struct icmp_echo_hdr *)((const uint8_t *)p->payload + ip_hlen);
+    /* Only replies count as success */
+    if (ICMPH_TYPE(iecho) != ICMP_ER) {
+        return 0;
+    }
+
+    ping_id_host = lwip_ntohs(iecho->id);
+    if (ping_id_host < PING_ID_BASE ||
+        ping_id_host >= PING_ID_BASE + SDDF_NET_MAX_CLIENTS) {
+        return 0;
+    }
+
+    client_id = ping_id_to_client_id(ping_id_host);
+
+    if (contexts[client_id] == NULL) {
+        return 0;
+    }
+
+    if (lwip_ntohs(iecho->seqno) != contexts[client_id]->seq_num) {
+        return 0;
+    }
+
+    sddf_printf("ICMP reply matched client_id=%u seq=%u from %s\n",
+                client_id, contexts[client_id]->seq_num, ipaddr_ntoa(addr));
+
+    contexts[client_id]->reply_received = true; // TODO: what to do with this knowledge?
+
+    return 0;
 }
 
 void icmp_init_raw()
@@ -71,21 +106,22 @@ void icmp_init_raw()
     ping_pcb = raw_new(IP_PROTO_ICMP);
     LWIP_ASSERT("ping_pcb != NULL", ping_pcb != NULL);
 
-    raw_recv(ping_pcb, ping_recv, NULL);
+    raw_recv(ping_pcb, ping_recv, contexts);
     raw_bind(ping_pcb, IP_ADDR_ANY);
 }
 
-bool send_icmp_request(icmp_context_t *ctx)
+bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id)
 {
     err_t err;
     struct pbuf *p;
     struct icmp_echo_hdr *iecho;
     size_t ping_size = sizeof(struct icmp_echo_hdr) + PING_DATA_SIZE;
     ip_addr_t addr;
-    ip_addr_set_ip4_u32(&addr, lwip_htonl(ctx->ip_addr));
+    ip_addr_set_ip4_u32(&addr, ctx->ip_addr);
+    contexts[client_id] = ctx;
     //ipaddr_aton("172.16.0.2", &addr); // TODO: this is for testing purposes - can see it in wireshark
 
-    sddf_printf("call the ICMP request\n");
+    sddf_printf("ICMP dst = %s raw=0x%08x\n", ipaddr_ntoa(&addr), ctx->ip_addr);
     p = pbuf_alloc(PBUF_IP, (u16_t)ping_size, PBUF_RAM);
     if (!p) {
         return false;
@@ -93,7 +129,7 @@ bool send_icmp_request(icmp_context_t *ctx)
     if ((p->len == p->tot_len) && (p->next == NULL)) {
         iecho = (struct icmp_echo_hdr *)p->payload;
 
-        ping_prepare_echo(iecho, (u16_t)ping_size, &ping_seq_num); // TODO: should be seq from ctx
+        ping_prepare_echo(iecho, (u16_t)ping_size, &ctx->seq_num, client_id);
 
         sddf_printf("Sending the ICMP\n");
         err = raw_sendto(ping_pcb, p, &addr);
