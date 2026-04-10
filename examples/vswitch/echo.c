@@ -41,33 +41,21 @@ net_queue_handle_t net_tx_handle;
 
 typedef struct neighbors {
     bool connected;
-    bool pinged;
     uint8_t id;
-    //bool ping_received;
     icmp_context_t icmp_ctx;
 } neighbors_t;
 static neighbors_t neighbors[SDDF_NET_MAX_CLIENTS];
 
 #define LWIP_TICK_MS 100
 
-//static void query_icmp_replies()
-//{
-//    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-//        if (!neighbors[i].connected || !neighbors[i].pinged || neighbors[i].ping_received)
-//            continue;
-//
-//        // TODO: cancel ping
-//    }
-//}
-
 static void ping_neighbors()
 {
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!neighbors[i].connected || neighbors[i].pinged || client_config.my_id == neighbors[i].id)//|| neighbors[i].ping_received) // TODO: later enable
+        if (!neighbors[i].connected || neighbors[i].icmp_ctx.pinged || client_config.my_id == neighbors[i].id)
             continue;
 
-        send_icmp_request(&neighbors[i].icmp_ctx);
-        neighbors[i].pinged = true;
+        send_icmp_request(&neighbors[i].icmp_ctx, neighbors[i].id);
+        neighbors[i].icmp_ctx.pinged = true;
     }
 }
 // Add PPC that fires just after the DHCP has finished
@@ -97,8 +85,7 @@ static void query_ips()
 void netif_status_callback(char *ip_addr)
 {
     sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
-    sddf_lwip_print_set_gateway();
-    // TODO: Here we PPC to vswitch, it then replies with the map of client_id and IPs that we can call into later
+    //sddf_lwip_print_set_gateway();
     uint32_t ip = sddf_lwip_ipaddr_aton(ip_addr);
     sddf_set_mr(0, ip);
     sddf_set_mr(1, client_config.my_id);

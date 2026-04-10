@@ -12,11 +12,12 @@
 
 #define PING_DATA_SIZE (32)
 
-// TODO: later construct the struct for sharing the state for replies
 typedef struct icmp_context {
     uint32_t ip_addr;
     uint16_t seq_num;
+    bool pinged;
+    bool reply_received;
 } icmp_context_t;
 
 void icmp_init_raw();
-bool send_icmp_request(icmp_context_t *ctx);
+bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id);
