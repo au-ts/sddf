@@ -48,6 +48,9 @@ static neighbors_t neighbors[SDDF_NET_MAX_CLIENTS];
 
 #define LWIP_TICK_MS 100
 
+/**
+ * Pings all other connected clients once.
+ */
 static void ping_neighbors()
 {
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
@@ -58,8 +61,10 @@ static void ping_neighbors()
         neighbors[i].icmp_ctx.pinged = true;
     }
 }
-// Add PPC that fires just after the DHCP has finished
-// Save that into an array of IPs from neighbors, then we can ping each other and ensure that vswitch works
+
+/**
+ * Queries vswitch via a PPC and stores returned client ID to IP address mappings.
+ */
 static void query_ips()
 {
     sddf_ppcall(client_config.channel_id, seL4_MessageInfo_new(VSWITCH_QUERY_IP_ADDR, 0, 0, 0));
@@ -77,8 +82,8 @@ static void query_ips()
 }
 
 /**
- * Netif status callback function that output's client's name and
- * obtained IP address.
+ * Netif status callback function that outputs client's name and the obtained IP address.
+ * Reports the IP address and this client's ID to vswitch.
  *
  * @param ip_addr ip address of the client.
  */
@@ -137,8 +142,6 @@ void notified(sddf_channel ch)
         cnt++;
         if (cnt == 100) {
             query_ips();
-            // also see if any pings got their replies
-            //query_icmp_replies(); // TODO: implement later
             ping_neighbors();
             cnt = 0;
         }
