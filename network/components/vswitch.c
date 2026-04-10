@@ -15,13 +15,6 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-<<<<<<< HEAD
-||||||| parent of 062f842e (vswitch: Add PPCs for the sddf vswitch demo)
-#define VSWITCH_VIRT_PORT (SDDF_NET_MAX_CLIENTS - 1)
-
-=======
-#define VSWITCH_VIRT_PORT (SDDF_NET_MAX_CLIENTS - 1)
-
 typedef struct client_info {
     uint32_t ip_addr;
     uint32_t id;
@@ -32,7 +25,6 @@ typedef struct clients {
     uint32_t num;
 } clients_t;
 
->>>>>>> 062f842e (vswitch: Add PPCs for the sddf vswitch demo)
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {

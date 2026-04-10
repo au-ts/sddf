@@ -7,7 +7,6 @@ from signal import SIGHUP
 import asyncio
 from asyncio.subprocess import PIPE, STDOUT
 from pathlib import Path
-import sys
 
 from .. import log
 from .base import HardwareBackend
