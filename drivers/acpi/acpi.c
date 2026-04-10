@@ -13,11 +13,6 @@
 #include "acpi.h"
 
 
-// A system could have up to 65536 PCI Segment Groups in theory, but 16 is
-// sufficient in our use cases.
-#define MAX_NUM_PCI_SEG_GROUP 16
-#define MAX_BYTES_DSDT 10000
-
 uintptr_t remaining_untypeds_vaddr;
 typedef struct {
     seL4_CNode untyped_cnode_cptr;
@@ -30,68 +25,6 @@ const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
 
 capDLBootInfo_t *capDLBootInfo;
 
-/* Root System Descriptor Pointer */
-typedef struct acpi_rsdp {
-    char         signature[8];
-    uint8_t      checksum;
-    char         oem_id[6];
-    uint8_t      revision;
-    uint32_t     rsdt_address;
-    uint32_t     length;
-    uint64_t     xsdt_address;
-    uint8_t      extended_checksum;
-    char         reserved[3];
-} __attribute__((packed)) acpi_rsdp_t;
-
-/* Generic System Descriptor Table Header */
-typedef struct acpi_header {
-    char         signature[4];
-    uint32_t     length;
-    uint8_t      revision;
-    uint8_t      checksum;
-    char         oem_id[6];
-    char         oem_table_id[8];
-    uint32_t     oem_revision;
-    char         creater_id[4];
-    uint32_t     creater_revision;
-} __attribute__((packed)) acpi_header_t;
-
-/* Root System Descriptor Table */
-typedef struct acpi_rsdt {
-    acpi_header_t  header;
-    uint32_t entry[1];
-} __attribute__((packed)) acpi_rsdt_t;
-
-typedef struct acpi_fadt {
-    acpi_header_t header;
-    uint32_t fw_ctrl;
-    uint32_t dsdt;
-} __attribute__((packed)) acpi_fadt_t;
-
-typedef struct pci_seg_group {
-    uint64_t base_addr;
-    uint16_t group_id;
-    uint8_t bus_start;
-    uint8_t bus_end;
-    uint8_t reserved[4];
-} __attribute__((packed)) pci_seg_group_t;
-
-typedef struct acpi_mcfg {
-    acpi_header_t header;
-    uint8_t reserved[8];
-    pci_seg_group_t pci_seg_group[MAX_NUM_PCI_SEG_GROUP];
-} __attribute__((packed)) acpi_mcfg_t;
-
-
-typedef struct acpi_dsdt {
-    acpi_header_t header;
-    uint8_t content[MAX_BYTES_DSDT];
-} __attribute__((packed)) acpi_dsdt_t;
-
-typedef struct bootinfo_rsdp {
-    seL4_BootInfoHeader header;
-    acpi_rsdp_t content;
-} __attribute__((packed)) bootinfo_rsdp_t;
 
 void print_64(seL4_Word w) {
     microkit_dbg_put32((seL4_Uint32) (w >> 32));
@@ -109,6 +42,7 @@ uintptr_t acpi_dsdt_addr = 0x0;
 
 #define MAX_NUM_RSDT_ENTRIES 2048
 uint32_t acpi_rsdt_entries[MAX_NUM_RSDT_ENTRIES];
+
 
 void map_pts(seL4_CPtr pt_untyped, seL4_CPtr cnode_cptr, seL4_CPtr free_slot) {
 
@@ -358,19 +292,10 @@ void init(void)
             acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)header;
             uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
             for (int j = 0; j < num_pci_seg_grps; j++) {
-                pci_seg_group_t *pci_seg_grp = &mcfg_table->pci_seg_group[j];
-                microkit_dbg_puts("PCI segment group: ");
-                microkit_dbg_put32(pci_seg_grp->group_id);
-                microkit_dbg_puts(", base address: ");
-                microkit_dbg_put32(pci_seg_grp->base_addr >> 32);
-                microkit_dbg_puts(" ");
-                microkit_dbg_put32(pci_seg_grp->base_addr & 0xFFFFFFFF);
-                microkit_dbg_puts(", bus[");
-                microkit_dbg_put32(pci_seg_grp->bus_start);
-                microkit_dbg_puts("-");
-                microkit_dbg_put32(pci_seg_grp->bus_end);
-                microkit_dbg_puts("]\n");
+                memcpy(&pci_resources.pci_seg_groups[pci_resources.num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
+                pci_resources.num_pci_groups++;
             }
+
         }
 
         error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58);
@@ -452,10 +377,16 @@ void init(void)
 
 
     error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58);
-    microkit_dbg_puts("seL4_CNode_Revoke Error: ");
-    microkit_dbg_put32(error);
-    microkit_dbg_puts("\n=====================\n");
+    sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error);
 
+    sddf_dprintf("\n======PCI resources summary:======\n");
+    for (int j = 0; j < pci_resources.num_pci_groups; j++) {
+        sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
+                     pci_resources.pci_seg_groups[j].group_id,
+                     pci_resources.pci_seg_groups[j].base_addr,
+                     pci_resources.pci_seg_groups[j].bus_start,
+                     pci_resources.pci_seg_groups[j].bus_end);
+    }
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used
 }
