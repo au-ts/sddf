@@ -365,20 +365,18 @@ void init(void)
     extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), path_name, 0);
     sddf_dprintf("DSDT has been parsed!\n");
 
-    /* uint8_t *str = (uint8_t *)header; */
-    /* for (int i = 0; i < acpi_dsdt_table->header.length; i++) { */
-    /*     if (i % 32 == 0) { */
-    /*         microkit_dbg_puts("\n"); */
-    /*     } */
-    /*     microkit_dbg_put8(str[i]); */
-    /*     microkit_dbg_puts(" "); */
-    /* } */
-    /* microkit_dbg_puts("\n"); */
-
-
     error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58);
     sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error);
 
+    // Map pages for PCI driver
+    for (int i = 0; i < pci_resources.num_pci_groups; i++) {
+        // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses
+        uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[j].bus_end - pci_resources.pci_seg_groups[j].bus_start) * (1 << 20);
+
+    }
+
+
+    // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
     for (int j = 0; j < pci_resources.num_pci_groups; j++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
@@ -387,6 +385,7 @@ void init(void)
                      pci_resources.pci_seg_groups[j].bus_start,
                      pci_resources.pci_seg_groups[j].bus_end);
     }
+
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used
 }
