@@ -11,6 +11,73 @@
 
 #define HEX_TO_CHAR(hex) ((hex) < 10) ? ((hex) + '0') : ((hex) - 10 + 'A')
 
+// A system could have up to 65536 PCI Segment Groups in theory, but 16 is
+// sufficient in our use cases.
+#define MAX_NUM_PCI_SEG_GROUP 16
+#define MAX_BYTES_DSDT 10000
+
+/* Root System Descriptor Pointer */
+typedef struct acpi_rsdp {
+    char         signature[8];
+    uint8_t      checksum;
+    char         oem_id[6];
+    uint8_t      revision;
+    uint32_t     rsdt_address;
+    uint32_t     length;
+    uint64_t     xsdt_address;
+    uint8_t      extended_checksum;
+    char         reserved[3];
+} __attribute__((packed)) acpi_rsdp_t;
+
+/* Generic System Descriptor Table Header */
+typedef struct acpi_header {
+    char         signature[4];
+    uint32_t     length;
+    uint8_t      revision;
+    uint8_t      checksum;
+    char         oem_id[6];
+    char         oem_table_id[8];
+    uint32_t     oem_revision;
+    char         creater_id[4];
+    uint32_t     creater_revision;
+} __attribute__((packed)) acpi_header_t;
+
+/* Root System Descriptor Table */
+typedef struct acpi_rsdt {
+    acpi_header_t  header;
+    uint32_t entry[1];
+} __attribute__((packed)) acpi_rsdt_t;
+
+typedef struct acpi_fadt {
+    acpi_header_t header;
+    uint32_t fw_ctrl;
+    uint32_t dsdt;
+} __attribute__((packed)) acpi_fadt_t;
+
+typedef struct pci_seg_group {
+    uint64_t base_addr;
+    uint16_t group_id;
+    uint8_t bus_start;
+    uint8_t bus_end;
+    uint8_t reserved[4];
+} __attribute__((packed)) pci_seg_group_t;
+
+typedef struct acpi_mcfg {
+    acpi_header_t header;
+    uint8_t reserved[8];
+    pci_seg_group_t pci_seg_group[MAX_NUM_PCI_SEG_GROUP];
+} __attribute__((packed)) acpi_mcfg_t;
+
+typedef struct acpi_dsdt {
+    acpi_header_t header;
+    uint8_t content[MAX_BYTES_DSDT];
+} __attribute__((packed)) acpi_dsdt_t;
+
+typedef struct bootinfo_rsdp {
+    seL4_BootInfoHeader header;
+    acpi_rsdp_t content;
+} __attribute__((packed)) bootinfo_rsdp_t;
+
 enum aml_encoding_value {
     ZERO_OP = 0x00,
     ONE_OP = 0x01,
@@ -64,6 +131,8 @@ typedef struct {
 } pci_bridge_t;
 
 typedef struct {
+    pci_seg_group_t pci_seg_groups[MAX_NUM_PCI_SEG_GROUP];
+    uint32_t num_pci_groups;
     pci_bridge_t bridges[10];
     uint32_t num_bridges;
 } pci_resources_t;
