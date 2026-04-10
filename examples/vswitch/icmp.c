@@ -80,7 +80,7 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
         return 0;
     }
 
-    iphdr = (const struct ip_hdr_t *)p->payload;
+    iphdr = (const struct ip_hdr *)p->payload;
     ip_hlen = (uint16_t)(IPH_HL(iphdr) * 4);
 
     if (p->tot_len < ip_hlen + sizeof(struct icmp_echo_hdr)) {
@@ -109,8 +109,8 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
         return 0;
     }
 
-    sddf_printf("ICMP reply matched client_id=%u seq=%u from %s\n",
-                client_id, contexts[client_id]->seq_num, ipaddr_ntoa(addr));
+    sddf_printf("ICMP reply matched on netif %s client_id=%u seq=%u from %s\n",
+                 sddf_get_pd_name(), client_id, contexts[client_id]->seq_num, ipaddr_ntoa(addr));
 
     contexts[client_id]->reply_received = true; // TODO: what to do with this knowledge?
 
@@ -138,7 +138,7 @@ void icmp_init_raw()
  */
 bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id)
 {
-    err_t err;
+    err_t err = ERR_OK;
     struct pbuf *p;
     struct icmp_echo_hdr *iecho;
     size_t ping_size = sizeof(struct icmp_echo_hdr) + PING_DATA_SIZE;
@@ -160,7 +160,7 @@ bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id)
         err = raw_sendto(ping_pcb, p, &addr);
         sddf_lwip_maybe_notify();
 
-        sddf_printf("Sent the ICMP success: %d\n", err == ERR_OK);
+        sddf_printf("Sent the ICMP for netif %s success: %d\n", sddf_get_pd_name(), err == ERR_OK);
     }
     pbuf_free(p);
     return err == ERR_OK;

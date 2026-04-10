@@ -161,6 +161,18 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "zcu102",
         ],
     },
+    "vswitch": {
+        "configs": ["debug", "release", "benchmark"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+        ],
+        "boards_test": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+        ],
+    },
 }
 
 if TYPE_CHECKING:
