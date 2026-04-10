@@ -21,7 +21,6 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
 
-
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254)
     client = ProtectionDomain("client", "client.elf", priority=1)
