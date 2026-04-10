@@ -110,12 +110,15 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         ],
     },
     "gpio": {
-        "configs": ["debug", "release", "benchmark"],
+        "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": [
+        "boards": [
             "maaxboard",
         ],
-        "boards_test": [],
+        "tests_exclude": [
+            # machine queue not setup for GPIO testing
+            {"board": "maaxboard"},
+        ],
     },
     "serial": {
         "configs": ["debug", "release"],
