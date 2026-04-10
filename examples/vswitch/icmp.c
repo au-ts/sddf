@@ -23,8 +23,15 @@ static inline uint16_t client_id_to_ping_id(uint8_t client_id)
     return (uint16_t)(client_id + PING_ID_BASE);
 }
 
-static void
-ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num, uint8_t client_id)
+/**
+ * Prepare the ICMP echo packet.
+ *
+ * @param iecho pointer to the ICMP echo header to fill in
+ * @param len length of the header
+ * @param seq_num pointer to the sequence number to increment and then pass in the header
+ * @param client_id ID of the client who is will be sending the packet
+ */
+static void ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num, uint8_t client_id)
 {
     size_t i;
     size_t data_len = len - sizeof(struct icmp_echo_hdr);
@@ -43,8 +50,17 @@ ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_t *seq_num, 
     iecho->chksum = inet_chksum(iecho, len);
 }
 
-static uint8_t
-ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
+/**
+ * ICMP receive callback. Called by the raw API when the packet is of ICMP type.
+ *
+ * @param arg Optional user passed argument
+ * @param pcb the raw_pcb which received data
+ * @param p the packet buffer that was received
+ * @param addr the remote IP address from which the packet was received
+ * @return 1 if the packet was 'eaten' (aka. deleted),
+ *         0 if the packet lives on
+ */
+static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
 {
     icmp_context_t **contexts = (icmp_context_t **)arg;
     const struct ip_hdr *iphdr;
@@ -101,6 +117,9 @@ ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
     return 0;
 }
 
+/**
+ * ICMP raw API initialization function. Binds the ICMP contexts to the receive callback.
+ */
 void icmp_init_raw()
 {
     ping_pcb = raw_new(IP_PROTO_ICMP);
@@ -110,6 +129,13 @@ void icmp_init_raw()
     raw_bind(ping_pcb, IP_ADDR_ANY);
 }
 
+/**
+ * Sends a single ICMP echo packet to a client using LWiPs raw API.
+ *
+ * @param ctx ICMP context per ping session
+ * @param client_id client's ID that will be pinged
+ * @return informs whether the sending was successful
+ */
 bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id)
 {
     err_t err;
@@ -131,9 +157,9 @@ bool send_icmp_request(icmp_context_t *ctx, uint8_t client_id)
 
         ping_prepare_echo(iecho, (u16_t)ping_size, &ctx->seq_num, client_id);
 
-        sddf_printf("Sending the ICMP\n");
         err = raw_sendto(ping_pcb, p, &addr);
         sddf_lwip_maybe_notify();
+
         sddf_printf("Sent the ICMP success: %d\n", err == ERR_OK);
     }
     pbuf_free(p);
