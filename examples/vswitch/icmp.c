@@ -73,8 +73,8 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
     LWIP_ASSERT("addr != NULL", addr != NULL);
     LWIP_ASSERT("p != NULL", p != NULL);
 
-    sddf_printf("ICMP LOG: Received the ICMP from %s len=%u\n",
-                ipaddr_ntoa(addr), p->tot_len);
+    //sddf_printf("ICMP LOG: Received the ICMP from %s len=%u\n",
+    //            ipaddr_ntoa(addr), p->tot_len);
 
     if (p->tot_len < sizeof(struct ip_hdr) + sizeof(struct icmp_echo_hdr)) {
         return 0;
@@ -109,7 +109,7 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
         return 0;
     }
 
-    sddf_printf("ICMP reply matched on netif %s client_id=%u seq=%u from %s\n",
+    sddf_printf("ICMP reply matched on netif %s peer=%u seq=%u from %s\n",
                  sddf_get_pd_name(), client_id, contexts[client_id]->seq_num, ipaddr_ntoa(addr));
 
     contexts[client_id]->reply_received = true; // TODO: what to do with this knowledge?

@@ -22,6 +22,16 @@
 
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
+typedef struct client_info {
+    uint32_t ip_addr;
+    uint32_t id;
+} client_info_t;
+
+typedef struct clients {
+    client_info_t info[SDDF_NET_MAX_CLIENTS - 1];
+    uint32_t num;
+} clients_t;
+
 typedef struct vswitch_state {
     /* Queues ranging from 0 to num_ports - 1 belong to vswitch clients,
      * where client n's Rx and Tx queues are given by rx_queues[n] and tx_queues[n] respectively.
@@ -35,6 +45,7 @@ typedef struct vswitch_state {
     net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
     bool virt_connected;
+    clients_t clients;
 } vswitch_state_t;
 
 static vswitch_state_t state;

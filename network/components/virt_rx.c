@@ -42,9 +42,6 @@ int get_mac_addr_match(ether_hdr_t *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_macs; i++) {
-            //sddf_printf_("VIRT RX MATCHING MAC from client: %d\n", client);
-            //sddf_printf_("SRC "PR_MAC802_ADDR"\n", PR_MAC802_SRC_ADDR_ARGS((struct ether_addr *)buffer));
-            //sddf_printf_("DST "PR_MAC802_ADDR"\n", PR_MAC802_DEST_ADDR_ARGS((struct ether_addr *)buffer));
             if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
                 return client;
             }
