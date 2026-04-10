@@ -167,6 +167,18 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             {"board": "kria_k26"},
         ],
     },
+    "vswitch": {
+        "configs": ["debug", "release", "benchmark"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+        ],
+        "boards_test": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+        ],
+    },
 }
 
 ## Type Hinting + Sanity Checks ##
