@@ -25,10 +25,10 @@ inline fun net_queue_empty(1 queue_ptr)
   /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
   /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
   /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_tail(gv.rx_free.net_tail) && valid_net_head(gv.rx_free.net_head) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) && valid_net_head(gv.rx_active.net_head) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) && valid_net_head(gv.tx_free.net_head) @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_tail(gv.tx_active.net_tail) && valid_net_head(gv.tx_active.net_head) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> 0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> 0 <= gv.rx_active.net_tail - gv.rx_active.net_head && gv.rx_active.net_tail - gv.rx_active.net_head <= 256 @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> 0 <= gv.tx_free.net_tail - gv.tx_free.net_head && gv.tx_free.net_tail - gv.tx_free.net_head <= 256 @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> 0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 @/
   /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
   /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
@@ -53,18 +53,18 @@ inline fun net_queue_full(1 queue_ptr, 1 capacity)
   /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
   /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
   /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_tail(gv.rx_free.net_tail) && valid_net_head(gv.rx_free.net_head) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) && valid_net_head(gv.rx_active.net_head) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) && valid_net_head(gv.tx_free.net_head) @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_tail(gv.tx_active.net_tail) && valid_net_head(gv.tx_active.net_head) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> 0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> 0 <= gv.rx_active.net_tail - gv.rx_active.net_head && gv.rx_active.net_tail - gv.rx_active.net_head <= 256 @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> 0 <= gv.tx_free.net_tail - gv.tx_free.net_head && gv.tx_free.net_tail - gv.tx_free.net_head <= 256 @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> 0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 @/
   /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
   /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
   /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == ((gv.rx_free.net_tail - gv.rx_free.net_head) % (MAX_INT16 + 1) == capacity) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == ((gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) == capacity) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == ((gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) == capacity) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == ((gv.tx_active.net_tail - gv.tx_active.net_head) % (MAX_INT16 + 1) == capacity) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == (gv.rx_free.net_tail - gv.rx_free.net_head == capacity) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == (gv.rx_active.net_tail - gv.rx_active.net_head == capacity) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == (gv.tx_free.net_tail - gv.tx_free.net_head == capacity) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == (gv.tx_active.net_tail - gv.tx_active.net_head == capacity) @/
 
   var tail = 0;
   var head = 0;
@@ -95,49 +95,39 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
   /@ requires queue_ptr == RX_ACTIVE_BASE ==>
        acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) &&
        acc(gv.rx_active.net_descr, 1/2) && acc(gv.rx_active.net_added) &&
-       acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_addr) &&
-       acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_len) @/
+       acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_addr) &&
+       acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_len) @/
   /@ requires queue_ptr == TX_FREE_BASE ==>
        acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_head, 1/2) &&
        acc(gv.tx_free.net_descr, 1/2) && acc(gv.tx_free.net_added) &&
-       acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_addr) &&
-       acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_len) @/
+       acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_addr) &&
+       acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_len) @/
   // non-full queue
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) != capacity @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) != capacity @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> gv.rx_active.net_tail - gv.rx_active.net_head != capacity @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> gv.tx_free.net_tail - gv.tx_free.net_head != capacity @/
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==>
        acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) &&
-       acc(gv.rx_active.net_descr, 1/2) && acc(gv.rx_active.net_added) &&
-       acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr) &&
-       acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len) @/
+       acc(gv.rx_active.net_descr, 1/2) && acc(gv.rx_active.net_added) @/
   /@ ensures queue_ptr == TX_FREE_BASE ==>
        acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_head, 1/2) &&
-       acc(gv.tx_free.net_descr, 1/2) && acc(gv.tx_free.net_added) &&
-       acc(slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr) &&
-       acc(slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> gv.rx_active.net_tail == (old(gv.rx_active.net_tail) + 1) % (MAX_INT16 + 1) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> gv.tx_free.net_tail == (old(gv.tx_free.net_tail) + 1) % (MAX_INT16 + 1) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr == io_addr @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len == len @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr == io_addr @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len == len @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> union_elem_seq(gv.rx_active.net_added, old(gv.rx_active.net_added), element2_seq(
-       slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr,
-       slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len)) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> union_elem_seq(gv.tx_free.net_added, old(gv.tx_free.net_added), element2_seq(
-       slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr,
-       slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len)) @/
+       acc(gv.tx_free.net_descr, 1/2) && acc(gv.tx_free.net_added) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> gv.rx_active.net_tail == old(gv.rx_active.net_tail) + 1 @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> gv.tx_free.net_tail == old(gv.tx_free.net_tail) + 1 @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> union_elem_seq(gv.rx_active.net_added, old(gv.rx_active.net_added), element2_seq(io_addr, len)) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> union_elem_seq(gv.tx_free.net_added, old(gv.tx_free.net_added), element2_seq(io_addr, len)) @/
 
   /* capacity must be a power of 2 */
   var tail = 0;
   !ld16 tail, queue_ptr + TAIL_OFFSET;
 
   var mod_tail = mod_capacity(tail, capacity);
+  /@ assert queue_ptr == RX_ACTIVE_BASE ==> gv.rx_active.net_tail % QUEUE_CAPACITY == mod_tail @/
+  /@ assert queue_ptr == TX_FREE_BASE ==> gv.tx_free.net_tail % QUEUE_CAPACITY == mod_tail @/
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_tail * NDESC_LEN;
+  /@ assert queue_ptr == RX_ACTIVE_BASE ==> acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_addr) &&
+              acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_len) @/
+  /@ assert queue_ptr == TX_FREE_BASE ==> acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_addr) &&
+              acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_len) @/
   !st32 buff_addr + NDESC_ADDR_OFF, io_addr;
   !st16 buff_addr + NDESC_LEN_OFF, len;
 
@@ -159,49 +149,44 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
   /@ requires queue_ptr == TX_ACTIVE_BASE ==>
        acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/2) &&
        acc(gv.tx_active.net_descr, 1/2) && acc(gv.tx_active.net_removed) &&
-       acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr, 1/2) &&
-       acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len, 1/2) &&
-       valid_net_addr(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr) &&
-       valid_net_len(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len) @/
+       acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr, 1/2) &&
+       acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len, 1/2) &&
+       valid_net_addr(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr) &&
+       valid_net_len(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len) @/
   /@ requires queue_ptr == RX_FREE_BASE ==>
        acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/2) &&
        acc(gv.rx_free.net_descr, 1/2) && acc(gv.rx_free.net_removed_addr) &&
-       acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr, 1/2) &&
-       acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_len, 1/2) &&
-       valid_net_addr(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr) &&
-       valid_net_len(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_len) @/
+       acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr, 1/2) &&
+       acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_len, 1/2) &&
+       valid_net_addr(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr) &&
+       valid_net_len(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_len) @/
   // non-empty queue
   /@ requires queue_ptr == TX_ACTIVE_BASE ==> gv.tx_active.net_tail != gv.tx_active.net_head @/
   /@ requires queue_ptr == RX_FREE_BASE ==> gv.rx_free.net_tail != gv.rx_free.net_head @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head % (MAX_INT16 + 1)) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head % (MAX_INT16 + 1)) @/
   // the retval contains the data in the buffer
   /@ ensures queue_ptr == TX_ACTIVE_BASE ==>
        acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/2) &&
        acc(gv.tx_active.net_descr, 1/2) && acc(gv.tx_active.net_removed) &&
-       acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_head % QUEUE_CAPACITY)).ndescr_addr, 1/2) &&
-       acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_head % QUEUE_CAPACITY)).ndescr_len, 1/2) &&
-       retval.0 == old(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr) &&
-       retval.1 == old(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len) @/
+       retval.0 == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr) &&
+       retval.1 == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len) @/
   /@ ensures queue_ptr == RX_FREE_BASE ==>
        acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/2) &&
        acc(gv.rx_free.net_descr, 1/2) && acc(gv.rx_free.net_removed_addr) &&
-       gv.rx_free.net_descr == old(gv.rx_free.net_descr) &&
-       acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head % QUEUE_CAPACITY)).ndescr_addr, 1/2) &&
-       acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head % QUEUE_CAPACITY)).ndescr_len, 1/2) &&
-       retval.0 == old(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr) &&
-       retval.1 == old(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_len) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head) &&
-       gv.tx_active.net_head == (old(gv.tx_active.net_head) + 1) % (MAX_INT16 + 1) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head) &&
-       gv.rx_free.net_head == (old(gv.rx_free.net_head) + 1) % (MAX_INT16 + 1) @/
+       retval.0 == old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr) &&
+       retval.1 == old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_len) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head % (MAX_INT16 + 1)) &&
+       gv.tx_active.net_head == old(gv.tx_active.net_head) + 1 @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head % (MAX_INT16 + 1)) &&
+       gv.rx_free.net_head == old(gv.rx_free.net_head) + 1 @/
   /@ ensures queue_ptr == RX_FREE_BASE ==>
        union_elem(gv.rx_free.net_removed_addr, old(gv.rx_free.net_removed_addr),
-         old(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr)) @/
+         old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr)) @/
   /@ ensures queue_ptr == TX_ACTIVE_BASE ==>
        union_elem_seq(gv.tx_active.net_removed, old(gv.tx_active.net_removed),
-         element2_seq(old(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr),
-		   old(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len))) @/
+         element2_seq(old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr),
+           old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len))) @/
   /@ ensures bounded32(retval.0) @/
   /@ ensures bounded16(retval.1) @/
 
@@ -210,11 +195,21 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
   !ld16 head, queue_ptr + HEAD_OFFSET;
 
   var mod_head = mod_capacity(head, capacity);
+  /@ assert queue_ptr == RX_FREE_BASE ==> gv.rx_free.net_head % QUEUE_CAPACITY == mod_head @/
+  /@ assert queue_ptr == TX_ACTIVE_BASE ==> gv.tx_active.net_head % QUEUE_CAPACITY == mod_head @/
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_head * NDESC_LEN;
   var io_addr = 0;
   var len = 0;
+  /@ assert queue_ptr == RX_FREE_BASE ==> acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr, 1/2) &&
+              acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_len, 1/2) @/
+  /@ assert queue_ptr == TX_ACTIVE_BASE ==> acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr, 1/2) &&
+              acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len, 1/2) @/
   !ld32 io_addr, buff_addr + NDESC_ADDR_OFF;
   !ld16 len, buff_addr + NDESC_LEN_OFF;
+  /@ assert queue_ptr == TX_ACTIVE_BASE ==> io_addr == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr) @/
+  /@ assert queue_ptr == TX_ACTIVE_BASE ==> len == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len) @/
+  /@ assert queue_ptr == RX_FREE_BASE ==> io_addr == old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr) @/
+  /@ assert queue_ptr == RX_FREE_BASE ==> len == old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_len) @/
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
   THREAD_MEMORY_RELEASE()

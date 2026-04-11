@@ -115,6 +115,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern function union_elem_seq(s: Set[Seq[Int]], t: Set[Seq[Int]], e: Seq[Int]): Bool @/
 /@ extern function empty_set(): Set[Int] @/
 /@ extern function element_set(e: Int): Set[Int] @/
+/@ extern function element_seq(e: Int): Seq[Int] @/
 /@ extern function element2_seq(e1: Int, e2: Int): Seq[Int] @/
 /@ extern function empty_seq(): Seq[Int] @/
 /@ extern function append_elem(s: Seq[Int], t: Seq[Int], e: Int): Bool @/
@@ -122,6 +123,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern function is_TXD_READY(value: Int): Bool @/
 /@ extern function is_WRAP(value: Int): Bool @/
 /@ extern function slot(arr: IArray, i: Int): Int @/
+/@ extern function slotq(arr: IArray, i: Int): Int @/
 /@ extern function is_valid_data_addr(value: Int): Bool @/
 /@ extern function is_valid_data_len(value: Int): Bool @/
 /@ extern function is_valid_rx_stat(value: Int): Bool @/
@@ -167,7 +169,7 @@ var 1 eth_reg = ETH_REG;
 #define RX_STAT_MASK     1544    // (1 << 3) | (1 << 9) | (1 << 10) == 1544
 #define TX_STAT_MASK     511     // bits 8-0 cleared
 
-/@ shared rw u16 rx_free_tail[RX_FREE_BASE+TAIL_OFFSET..RX_FREE_BASE+TAIL_OFFSET+2] @/
+/@ shared r u16 rx_free_tail[RX_FREE_BASE+TAIL_OFFSET..RX_FREE_BASE+TAIL_OFFSET+2] @/
 /@ shared rw u16 rx_free_head[RX_FREE_BASE+HEAD_OFFSET..RX_FREE_BASE+HEAD_OFFSET+2] @/
 /@ shared rw u32 rx_free_consumer_signalled[RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared r u32 rx_free_addr[RX_FREE_BASE+BUFFERS_OFFSET+NDESC_ADDR_OFF..RX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/

@@ -13,6 +13,7 @@ define f_valid_hardware_ring_rx_mdata_write(x, y) valid_hardware_ring_rx_mdata_w
 define f_valid_hardware_ring_tx_mdata_read(x, y) valid_hardware_ring_tx_mdata_read(x, y)
 define f_valid_hardware_ring_tx_mdata_write(x, y) valid_hardware_ring_tx_mdata_write(x, y)
 define f_slot(_, _, x, y) slot(x, y)
+define f_slotq(_, _, x, y) slotq(x, y)
 define f_is_RXD_EMPTY(_, _, x) is_RXD_EMPTY(x)
 define f_is_TXD_READY(_, _, x) is_TXD_READY(x)
 define f_is_WRAP(_, _, x) is_WRAP(x)
@@ -677,6 +678,11 @@ function f_empty_seq(heap: IArray, gv: Ref): Seq[Int]
 function f_element_set(heap: IArray, gv: Ref, e: Int): Set[Int]
 {
     Set(e)
+}
+
+function f_element_seq(heap: IArray, gv: Ref, e: Int): Seq[Int]
+{
+    Seq(e)
 }
 
 function f_element2_seq(heap: IArray, gv: Ref, e1: Int, e2: Int): Seq[Int]

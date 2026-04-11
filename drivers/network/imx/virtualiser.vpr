@@ -72,11 +72,9 @@ predicate valid_net_queue_produce(heap: IArray, virt: Ref, queue: Ref, capacity:
 {
   acc(queue.net_tail) && acc(queue.net_head, 3/4) && acc(queue.net_signal) &&
   acc(queue.net_descr) &&
-  (forall i : Int :: 0 <= i && i < QUEUE_CAPACITY &&
-    (queue.net_tail < queue.net_head
-      ? i >= queue.net_tail && i < queue.net_head
-      : i >= queue.net_tail || i < queue.net_head) ==>
-    acc(slot(queue.net_descr, i).ndescr_addr) && acc(slot(queue.net_descr, i).ndescr_len)) &&
+  0 <= queue.net_tail - queue.net_head && queue.net_tail - queue.net_head <= 256 &&
+  (forall i : Int :: queue.net_tail <= i && i < queue.net_head ==>
+    acc(slotq(queue.net_descr, i).ndescr_addr) && acc(slotq(queue.net_descr, i).ndescr_len)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
   valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head)
 }
@@ -85,11 +83,9 @@ predicate valid_net_queue_consume(heap: IArray, virt: Ref, queue: Ref, capacity:
 {
   acc(queue.net_tail, 3/4) && acc(queue.net_head) && acc(queue.net_signal) &&
   acc(queue.net_descr) &&
-  (forall i : Int :: 0 <= i && i < QUEUE_CAPACITY &&
-    (queue.net_head < queue.net_tail
-      ? i >= queue.net_head && i < queue.net_tail
-      : i >= queue.net_head || i < queue.net_tail) ==>
-    acc(slot(queue.net_descr, i).ndescr_addr, 3/4) && acc(slot(queue.net_descr, i).ndescr_len, 3/4)) &&
+  0 <= queue.net_tail - queue.net_head && queue.net_tail - queue.net_head <= 256 &&
+  (forall i : Int :: queue.net_head <= i && i < queue.net_tail ==>
+    acc(slotq(queue.net_descr, i).ndescr_addr, 3/4) && acc(slotq(queue.net_descr, i).ndescr_len, 3/4)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
   valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head)
 }
@@ -121,67 +117,65 @@ define queue_unchanged(queue_name, capacity)
 /////////////////////// RX_FREE queue
 method store_rx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail) && acc(gv.rx_free.net_added) && acc(gv.rx_free.net_descr, 1/4) &&
-    acc(slot(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_addr, 1/4) &&
-    acc(slot(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_len, 1/4)
+    acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_addr, 1/4) &&
+    acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_len, 1/4)
   requires address == RX_FREE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
   requires value == (gv.rx_free.net_tail + 1) % (MAX_INT16 + 1)
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail) && acc(gv.rx_free.net_added) && acc(gv.rx_free.net_descr, 1/4) &&
-    acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_addr, 1/4) &&
-    acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_len, 1/4)
+    acc(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_addr, 1/4) &&
+    acc(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_len, 1/4)
   ensures gv.rx_free.net_added == old(gv.rx_free.net_added) union Set(Seq(
-    slot(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_addr,
-    slot(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_len
+    slotq(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_addr,
+    slotq(gv.rx_free.net_descr, old(gv.rx_free.net_tail)).ndescr_len
   ))
-  ensures gv.rx_free.net_tail == value
+  ensures gv.rx_free.net_tail == old(gv.rx_free.net_tail) + 1
 {
   gv.rx_free.net_added := gv.rx_free.net_added union Set(Seq(
-    slot(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_addr,
-    slot(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_len
+    slotq(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_addr,
+    slotq(gv.rx_free.net_descr, gv.rx_free.net_tail).ndescr_len
   ))
-  gv.rx_free.net_tail := value
+  gv.rx_free.net_tail := gv.rx_free.net_tail + 1
   refute false
 }
 
 method store_rx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed_addr) &&
-    acc(gv.rx_free.net_descr, 1/4) && acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr, 1/4)
+    acc(gv.rx_free.net_descr, 1/4) && acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr, 1/4)
   requires address == RX_FREE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
   requires value == (gv.rx_free.net_head + 1) % (MAX_INT16 + 1)
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed_addr) &&
-    acc(gv.rx_free.net_descr, 1/4) && acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head) % QUEUE_CAPACITY).ndescr_addr, 1/4)
-  ensures gv.rx_free.net_removed_addr == old(gv.rx_free.net_removed_addr) union Set(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head) % QUEUE_CAPACITY).ndescr_addr)
-  ensures gv.rx_free.net_head == value
+    acc(gv.rx_free.net_descr, 1/4) && acc(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_head)).ndescr_addr, 1/4)
+  ensures gv.rx_free.net_removed_addr == old(gv.rx_free.net_removed_addr) union Set(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_head)).ndescr_addr)
+  ensures gv.rx_free.net_head == old(gv.rx_free.net_head) + 1
 {
-  gv.rx_free.net_removed_addr := gv.rx_free.net_removed_addr union Set(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr)
-  gv.rx_free.net_head := value
+  gv.rx_free.net_removed_addr := gv.rx_free.net_removed_addr union Set(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr)
+  gv.rx_free.net_head := gv.rx_free.net_head + 1
   refute false
 }
 
 method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail, 1/4)
-  requires valid_net_tail(gv.rx_free.net_tail)
   requires address == RX_FREE_BASE + TAIL_OFFSET
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail, 1/4)
-  ensures retval == gv.rx_free.net_tail
+  ensures retval == gv.rx_free.net_tail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
 {
-  retval := gv.rx_free.net_tail
+  retval := gv.rx_free.net_tail % (MAX_INT16 + 1)
   refute false
 }
 
 method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4)
-  requires valid_net_head(gv.rx_free.net_head)
   requires address == RX_FREE_BASE + HEAD_OFFSET
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4)
-  ensures retval == gv.rx_free.net_head
+  ensures retval == gv.rx_free.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
 {
-  retval := gv.rx_free.net_head
+  retval := gv.rx_free.net_head % (MAX_INT16 + 1)
   refute false
 }
 
@@ -245,26 +239,24 @@ method load_rx_free_len(heap: IArray, gv: Ref, address: Int)
 method load_rx_active_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
-  requires valid_net_tail(gv.rx_active.net_tail)
   requires address == RX_ACTIVE_BASE + TAIL_OFFSET
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
-  ensures retval == gv.rx_active.net_tail
+  ensures retval == gv.rx_active.net_tail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
 {
-  retval := gv.rx_active.net_tail
+  retval := gv.rx_active.net_tail % (MAX_INT16 + 1)
   refute false
 }
 
 method load_rx_active_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head, 1/4)
-  requires valid_net_head(gv.rx_active.net_head)
   requires address == RX_ACTIVE_BASE + HEAD_OFFSET
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head, 1/4)
-  ensures retval == gv.rx_active.net_head
+  ensures retval == gv.rx_active.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
 {
-  retval := gv.rx_active.net_head
+  retval := gv.rx_active.net_head % (MAX_INT16 + 1)
   refute false
 }
 
@@ -272,34 +264,35 @@ method store_rx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
   requires address == RX_ACTIVE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
+  requires value == (gv.rx_active.net_head + 1) % (MAX_INT16 + 1)
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
-  ensures gv.rx_active.net_head == value
+  ensures gv.rx_active.net_head == old(gv.rx_active.net_head) + 1
 {
-  gv.rx_active.net_head := value
+  gv.rx_active.net_head := gv.rx_active.net_head + 1
   refute false
 }
 
 method store_rx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_added) && acc(gv.rx_active.net_descr, 1/4) &&
-    acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_addr, 1/4) &&
+    acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_len, 1/4)
   requires address == RX_ACTIVE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
   requires value == (gv.rx_active.net_tail + 1) % (MAX_INT16 + 1)
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_added) && acc(gv.rx_active.net_descr, 1/4) &&
-    acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_addr, 1/4) &&
+    acc(slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_len, 1/4)
   ensures gv.rx_active.net_added == old(gv.rx_active.net_added) union Set(Seq(
-    slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.rx_active.net_descr, old(gv.rx_active.net_tail) % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_addr,
+    slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_len
   ))
-  ensures gv.rx_active.net_tail == value
+  ensures gv.rx_active.net_tail == old(gv.rx_active.net_tail) + 1
 {
   gv.rx_active.net_added := gv.rx_active.net_added union Set(Seq(
-    slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.rx_active.net_descr, gv.rx_active.net_tail % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_addr,
+    slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_len
   ))
-  gv.rx_active.net_tail := value
+  gv.rx_active.net_tail := gv.rx_active.net_tail + 1
   refute false
 }
 
@@ -358,75 +351,73 @@ method store_rx_active_len(heap: IArray, gv: Ref, address: Int, value: Int)
 /////////////////////// TX_ACTIVE queue
 method store_tx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail) && acc(gv.tx_active.net_added) && acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, gv.tx_active.net_tail % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, gv.tx_active.net_tail % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_tail).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_tail).ndescr_len, 1/4)
   requires address == TX_ACTIVE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
   requires value == (gv.tx_active.net_tail + 1) % (MAX_INT16 + 1)
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail) && acc(gv.tx_active.net_added) && acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_tail) % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_tail)).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_tail)).ndescr_len, 1/4)
   ensures gv.tx_active.net_added == old(gv.tx_active.net_added) union Set(Seq(
-    slot(gv.tx_active.net_descr, old(gv.tx_active.net_tail) % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.tx_active.net_descr, old(gv.tx_active.net_tail) % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.tx_active.net_descr, old(gv.tx_active.net_tail)).ndescr_addr,
+    slotq(gv.tx_active.net_descr, old(gv.tx_active.net_tail)).ndescr_len
   ))
-  ensures gv.tx_active.net_tail == value
+  ensures gv.tx_active.net_tail == old(gv.tx_active.net_tail) + 1
 {
   gv.tx_active.net_added := gv.tx_active.net_added union Set(Seq(
-    slot(gv.tx_active.net_descr, gv.tx_active.net_tail % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.tx_active.net_descr, gv.tx_active.net_tail % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.tx_active.net_descr, gv.tx_active.net_tail).ndescr_addr,
+    slotq(gv.tx_active.net_descr, gv.tx_active.net_tail).ndescr_len
   ))
-  gv.tx_active.net_tail := value
+  gv.tx_active.net_tail := gv.tx_active.net_tail + 1
   refute false
 }
 
 method store_tx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_removed) &&
     acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, gv.tx_active.net_head % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len, 1/4)
   requires address == TX_ACTIVE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
   requires value == (gv.tx_active.net_head + 1) % (MAX_INT16 + 1)
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_removed) &&
     acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len, 1/4)
   ensures gv.tx_active.net_removed == old(gv.tx_active.net_removed) union Set(Seq(
-            slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_addr,
-            slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_len))
-  ensures gv.tx_active.net_head == value
+            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr,
+            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len))
+  ensures gv.tx_active.net_head == old(gv.tx_active.net_head) + 1
 {
   gv.tx_active.net_removed := gv.tx_active.net_removed union Set(Seq(
-            slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_addr,
-            slot(gv.tx_active.net_descr, old(gv.tx_active.net_head) % QUEUE_CAPACITY).ndescr_len))
-  gv.tx_active.net_head := value
+            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr,
+            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len))
+  gv.tx_active.net_head := gv.tx_active.net_head + 1
   refute false
 }
 
 method load_tx_active_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4)
-  requires valid_net_tail(gv.tx_active.net_tail)
   requires address == TX_ACTIVE_BASE + TAIL_OFFSET
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4)
-  ensures retval == gv.tx_active.net_tail
+  ensures retval == gv.tx_active.net_tail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
 {
-  retval := gv.tx_active.net_tail
+  retval := gv.tx_active.net_tail % (MAX_INT16 + 1)
   refute false
 }
 
 method load_tx_active_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4)
-  requires valid_net_head(gv.tx_active.net_head)
   requires address == TX_ACTIVE_BASE + HEAD_OFFSET
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4)
-  ensures retval == gv.tx_active.net_head
+  ensures retval == gv.tx_active.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
 {
-  retval := gv.tx_active.net_head
+  retval := gv.tx_active.net_head % (MAX_INT16 + 1)
   refute false
 }
 
@@ -490,26 +481,24 @@ method load_tx_active_len(heap: IArray, gv: Ref, address: Int)
 method load_tx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
-  requires valid_net_tail(gv.tx_free.net_tail)
   requires address == TX_FREE_BASE + TAIL_OFFSET
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
-  ensures retval == gv.tx_free.net_tail
+  ensures retval == gv.tx_free.net_tail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
 {
-  retval := gv.tx_free.net_tail
+  retval := gv.tx_free.net_tail % (MAX_INT16 + 1)
   refute false
 }
 
 method load_tx_free_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head, 1/4)
-  requires valid_net_tail(gv.tx_free.net_head)
   requires address == TX_FREE_BASE + HEAD_OFFSET
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head, 1/4)
-  ensures retval == gv.tx_free.net_head
+  ensures retval == gv.tx_free.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
 {
-  retval := gv.tx_free.net_head
+  retval := gv.tx_free.net_head % (MAX_INT16 + 1)
   refute false
 }
 
@@ -517,34 +506,35 @@ method store_tx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head)
   requires address == TX_FREE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
+  requires value == (gv.tx_free.net_head + 1) % (MAX_INT16 + 1)
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head)
-  ensures gv.tx_free.net_head == value
+  ensures gv.tx_free.net_head == old(gv.tx_free.net_head) + 1
 {
-  gv.tx_free.net_head := value
+  gv.tx_free.net_head := gv.tx_free.net_head + 1
   refute false
 }
 
 method store_tx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_added) && acc(gv.tx_free.net_descr, 1/4) &&
-    acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_len, 1/4)
   requires address == TX_FREE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
   requires value == (gv.tx_free.net_tail + 1) % (MAX_INT16 + 1)
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_added) && acc(gv.tx_free.net_descr, 1/4) &&
-    acc(slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr, 1/4) &&
-    acc(slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len, 1/4)
+    acc(slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_addr, 1/4) &&
+    acc(slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_len, 1/4)
   ensures gv.tx_free.net_added == old(gv.tx_free.net_added) union Set(Seq(
-    slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.tx_free.net_descr, old(gv.tx_free.net_tail) % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_addr,
+    slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_len
   ))
-  ensures gv.tx_free.net_tail == value
+  ensures gv.tx_free.net_tail == old(gv.tx_free.net_tail) + 1
 {
   gv.tx_free.net_added := gv.tx_free.net_added union Set(Seq(
-    slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_addr,
-    slot(gv.tx_free.net_descr, gv.tx_free.net_tail % QUEUE_CAPACITY).ndescr_len
+    slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_addr,
+    slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_len
   ))
-  gv.tx_free.net_tail := value
+  gv.tx_free.net_tail := gv.tx_free.net_tail + 1
   refute false
 }
 
