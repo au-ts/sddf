@@ -20,7 +20,15 @@
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
-    /* Rx/Tx swapped for the virtualizer in the system file */
+    /* Queues ranging from 0 to VSWITCH_VIRT_PORT - 1 belong to vswitch clients,
+     * where client n's Rx and Tx queues are given by rx_queues[n] and tx_queues[n] respectively.
+     * Note that only queues up to config.num_ports correspond to valid clients.  // TODO: this is not true right now
+     * The queues at index VSWITCH_VIRT_PORT are the queues the vswitch shares with the virtualiser.
+     * Note that rx_queues[VSWITCH_VIRT_PORT] is the Tx virtualiser queue, and tx_queues[VSWITCH_VIRT_PORT] is the Rx virtualiser queue
+     * - this allows the vswitch to handle virtualiser communication similarly to client communication.
+     * When a packet is received from the Rx virtualiser, this is handled as if the Rx virtualiser
+     * is transmitting a packet to the other network clients. Similarly when a client transmits a packet,
+     * this is handled as if the Tx virtualiser is receiving a packet from the client. */
     net_queue_handle_t rx_queues[SDDF_NET_MAX_CLIENTS];
     net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
@@ -36,7 +44,8 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
 
     d_buffer.len = src_buf->len;
     d_buffer.io_or_offset = src_buf->io_or_offset;
-    /* tag the owner of this buffer so we know which reference slot increment */
+    /* Add a tag for the owner of this buffer so vswitch knows which reference slot to increment
+     * Also, the copier will use this tag to know which buffer to address */
     d_buffer.oid = src->id;
 
     /* Drop if the dest queue is full */
@@ -46,7 +55,7 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
         return false;
     }
 
-    /* mark that this buffer has been passed once */
+    /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
     buffer_refs[src->id * config.buffers_per_client + ref_index]++;
 
@@ -56,7 +65,7 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
         return true;
     }
 
-    /* failed to enqueue, decrement the ref */
+    /* Failed to enqueue, decrement the ref */
     buffer_refs[src->id * config.buffers_per_client + ref_index]--;
     return false;
 }
@@ -69,7 +78,7 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
 int mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
-    /* try matching each MAC in the list (skip VSWITCH_VIRT_PORT) - virts */
+    /* Try matching each MAC in the list (skip VSWITCH_VIRT_PORT) - virts */
     for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
@@ -87,7 +96,6 @@ static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffe
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (config.ports[i].connected && i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
             success |= forward_frame(src, &config.ports[i], buffer);
-            sddf_dprintf("VSWITCH Success of bcast id: %d is %d\n", i, success);
         }
     }
     return success;
@@ -99,7 +107,7 @@ static bool try_send(net_vswitch_port_config_t *src, const mac_addr_t *dest_maca
     int dst_id = mac_addr_find(dest_macaddr);
 
     if (vswitch_can_send_to(src->id, dst_id)) {
-        /* at least one of them succeeded */
+        /* At least one of them succeeded */
         success = forward_frame(src, &config.ports[dst_id], buffer);
     }
     return success;
@@ -128,13 +136,12 @@ static void rx_return(net_vswitch_port_config_t *port)
                 continue;
             }
 
-            /* return the buffer to its owner */
+            /* Return the buffer to its owner */
             dst = &state.tx_queues[buffer.oid];
             err = net_enqueue_free(dst, buffer);
             assert(!err);
 
             signal_tx = true;
-            //net_request_signal_free(dst); TODO: is this necessary?
             if (signal_tx && net_require_signal_free(dst)) {
                 net_cancel_signal_free(dst);
                 sddf_notify(config.ports[buffer.oid].tx.id);
