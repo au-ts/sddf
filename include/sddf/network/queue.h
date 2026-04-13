@@ -18,7 +18,13 @@ typedef struct net_buff_desc {
     uint64_t io_or_offset;
     /* length of data inside buffer */
     uint16_t len;
-    /* id of the owning PD */
+    /* id of the PD which owns this buffer, and thus which memory region the buffer belongs to.
+     * Used for extracting virtual/physical addresses and for returning buffers to the correct PD.
+     * This field is required in cases where a queue holds buffers belonging to multiple memory regions,
+     * and the memory region source cannot be identified otherwise.
+     * This scenario arises in systems containing a vswitch - in particular in queues shared between the copiers and vswitch,
+     * as well as the vswitch and Tx virtualiser.
+     * The field is ignored by the Rx virtualiser and Ethernet drivers, and should be set to 0 by net clients */
     uint8_t oid : 6;
 } net_buff_desc_t;
 
