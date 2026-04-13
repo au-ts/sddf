@@ -46,7 +46,6 @@ void rx_return(void)
 
                 memcpy(cli_addr, virt_addr, virt_buffer.len);
                 cli_buffer.len = virt_buffer.len;
-                cli_buffer.oid = virt_buffer.oid;
                 virt_buffer.len = 0;
 
                 err = net_enqueue_active(&rx_queue_cli, cli_buffer);
