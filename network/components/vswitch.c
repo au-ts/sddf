@@ -15,16 +15,13 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define VSWITCH_VIRT_PORT (SDDF_NET_MAX_CLIENTS - 1)
-
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
-    /* Queues ranging from 0 to VSWITCH_VIRT_PORT - 1 belong to vswitch clients,
+    /* Queues ranging from 0 to num_ports - 1 belong to vswitch clients,
      * where client n's Rx and Tx queues are given by rx_queues[n] and tx_queues[n] respectively.
-     * Note that only queues up to config.num_ports correspond to valid clients.  // TODO: this is not true right now
-     * The queues at index VSWITCH_VIRT_PORT are the queues the vswitch shares with the virtualiser.
-     * Note that rx_queues[VSWITCH_VIRT_PORT] is the Tx virtualiser queue, and tx_queues[VSWITCH_VIRT_PORT] is the Rx virtualiser queue
+     * The queues at index num_ports are the queues the vswitch shares with the virtualiser.
+     * Note that rx_queues[num_ports] is the Tx virtualiser queue, and tx_queues[num_ports] is the Rx virtualiser queue
      * - this allows the vswitch to handle virtualiser communication similarly to client communication.
      * When a packet is received from the Rx virtualiser, this is handled as if the Rx virtualiser
      * is transmitting a packet to the other network clients. Similarly when a client transmits a packet,
@@ -38,7 +35,7 @@ static vswitch_state_t state;
 
 uint8_t *buffer_refs;
 
-static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
+static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
 {
     net_buff_desc_t d_buffer;
 
@@ -46,31 +43,31 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     d_buffer.io_or_offset = src_buf->io_or_offset;
     /* Add a tag for the owner of this buffer so vswitch knows which reference slot to increment
      * Also, the copier will use this tag to know which buffer to address */
-    d_buffer.oid = src->id;
+    d_buffer.oid = src_id;
 
     /* Drop if the dest queue is full */
-    if (!net_queue_full_active(&state.rx_queues[dst->id])) {
-        net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
+    if (!net_queue_full_active(&state.rx_queues[dst_id])) {
+        net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
     } else {
         return false;
     }
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs[src->id * config.buffers_per_client + ref_index]++;
+    buffer_refs[src_id * config.buffers_per_client + ref_index]++;
 
-    if (net_require_signal_active(&state.rx_queues[dst->id])) {
-        net_cancel_signal_active(&state.rx_queues[dst->id]);
-        sddf_notify(dst->rx.id);
+    if (net_require_signal_active(&state.rx_queues[dst_id])) { // TODO: is that not a failure?
+        net_cancel_signal_active(&state.rx_queues[dst_id]);
+        sddf_notify(config.ports[dst_id].rx.id);
         return true;
     }
 
     /* Failed to enqueue, decrement the ref */
-    buffer_refs[src->id * config.buffers_per_client + ref_index]--;
+    buffer_refs[src_id * config.buffers_per_client + ref_index]--;
     return false;
 }
 
-static bool vswitch_can_send_to(int src_id, int dst_id)
+static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
 {
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
@@ -79,45 +76,45 @@ int mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
     /* Try matching each MAC in the list (skip VSWITCH_VIRT_PORT) - virts */
-    for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
+    for (uint8_t i = 0; i < config.num_ports; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
             return i; // this is the ID of the client we matched
         }
     }
     /* I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port */
-    return VSWITCH_VIRT_PORT;
+    return config.num_ports;
 }
 
-static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
+static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
 {
     bool success = false;
     /* Only broadcast to allowed, exclude the source */
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (config.ports[i].connected && i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
-            success |= forward_frame(src, &config.ports[i], buffer);
+    for (uint8_t i = 0; i <= config.num_ports; i++) {
+        if (i != src_id && vswitch_can_send_to(src_id, i)) {
+            success |= forward_frame(src_id, i, buffer);
         }
     }
     return success;
 }
 
-static bool try_send(net_vswitch_port_config_t *src, const mac_addr_t *dest_macaddr, net_buff_desc_t *buffer)
+static bool try_send(uint8_t src_id, const mac_addr_t *dest_macaddr, net_buff_desc_t *buffer)
 {
     bool success = false;
-    int dst_id = mac_addr_find(dest_macaddr);
+    uint8_t dst_id = mac_addr_find(dest_macaddr);
 
-    if (vswitch_can_send_to(src->id, dst_id)) {
+    if (vswitch_can_send_to(src_id, dst_id)) {
         /* At least one of them succeeded */
-        success = forward_frame(src, &config.ports[dst_id], buffer);
+        success = forward_frame(src_id, dst_id, buffer);
     }
     return success;
 }
 
 /* Read free buffers from RX, see if the refcount is 0, and then return them to TX and notify the TX clients */
-static void rx_return(net_vswitch_port_config_t *port)
+static void rx_return(uint8_t port_id)
 {
     bool signal_tx = false;
-    net_queue_handle_t *src = &state.rx_queues[port->id];
+    net_queue_handle_t *src = &state.rx_queues[port_id];
     net_queue_handle_t *dst;
 
     bool reprocess = true;
@@ -158,10 +155,10 @@ static void rx_return(net_vswitch_port_config_t *port)
     }
 }
 
-static void forward_traffic_from(net_vswitch_port_config_t *port)
+static void forward_traffic_from(uint8_t port_id)
 {
     /* Read from TX and fill in the corresponding RX (switched for virtualizer but we handle that in SDF) */
-    net_queue_handle_t *src = &state.tx_queues[port->id];
+    net_queue_handle_t *src = &state.tx_queues[port_id];
 
     bool reprocess = true;
     while (reprocess) {
@@ -170,14 +167,14 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             int err = net_dequeue_active(src, &buffer);
             assert(!err);
 
-            const char *frame_data = port->tx_data.region.vaddr + buffer.io_or_offset;
+            const char *frame_data = config.ports[port_id].tx_data.region.vaddr + buffer.io_or_offset;
             const ether_hdr_t *macaddr = (ether_hdr_t *)frame_data;
             bool transmitted = false;
 
             if (mac802_addr_is_bcast(macaddr->dest.addr)) {
-                transmitted = try_broadcast(port, &buffer);
+                transmitted = try_broadcast(port_id, &buffer);
             } else {
-                transmitted = try_send(port, &macaddr->dest, &buffer);
+                transmitted = try_send(port_id, &macaddr->dest, &buffer);
             }
 
             if (!transmitted) {
@@ -198,14 +195,12 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
 
 void notified(sddf_channel ch)
 {
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!config.ports[i].connected)
-            continue;
+    for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (ch == config.ports[i].tx.id) {
-            forward_traffic_from(&config.ports[i]);
+            forward_traffic_from(i);
             break;
         } else if (ch == config.ports[i].rx.id) {
-            rx_return(&config.ports[i]);
+            rx_return(i);
             break;
         }
     }
@@ -218,9 +213,7 @@ void init(void)
     buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues and buffers for copying? */
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (!config.ports[i].connected)
-            continue;
+    for (uint8_t i = 0; i <= config.num_ports; i++) {
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
