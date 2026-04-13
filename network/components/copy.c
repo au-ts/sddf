@@ -42,7 +42,7 @@ void rx_return(void)
                 assert(!err);
 
                 void *cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
-                void *virt_addr = config.out_data[virt_buffer.oid].vaddr + virt_buffer.io_or_offset;
+                void *virt_addr = config.rx_data[virt_buffer.oid].vaddr + virt_buffer.io_or_offset;
 
                 memcpy(cli_addr, virt_addr, virt_buffer.len);
                 cli_buffer.len = virt_buffer.len;
@@ -83,7 +83,7 @@ void rx_return(void)
 
     if (virt_enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        sddf_deferred_notify(config.virt_rx.id);
+        sddf_deferred_notify(config.rx.id);
     }
 }
 
@@ -98,8 +98,8 @@ void init(void)
     /* Set up the queues */
     net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr,
                    config.client.num_buffers);
-    net_queue_init(&rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
+    net_queue_init(&rx_queue_virt, config.rx.free_queue.vaddr, config.rx.active_queue.vaddr,
+                   config.rx.num_buffers);
 
     net_buffers_init(&rx_queue_cli, 0);
 }

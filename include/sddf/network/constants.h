@@ -8,8 +8,6 @@
 #include <os/sddf.h>
 #include <stdint.h>
 
-#define ETH_HWADDR_LEN 6
-
 #define NET_BUFFER_SIZE 2048
 
 /*
