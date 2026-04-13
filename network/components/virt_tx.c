@@ -19,20 +19,21 @@ typedef struct state {
 
 state_t state;
 
-int extract_offset(uintptr_t *phys, int *oid)
+bool extract_offset(uintptr_t *phys, uint8_t *client, uint8_t *oid)
 {
-    for (int client = 0; client < config.num_clients; client++) {
-        for (int i = 0; i < config.clients[client].num_regions; i++) {
-            if (*phys >= config.clients[client].data[i].io_addr
-                && *phys < config.clients[client].data[i].io_addr
-                               + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-                *phys = *phys - config.clients[client].data[i].io_addr;
+    for (uint8_t c = 0; c < config.num_clients; c++) {
+        for (uint8_t i = 0; i < config.clients[c].num_regions; i++) {
+            if (*phys >= config.clients[c].data[i].io_addr
+                && *phys < config.clients[c].data[i].io_addr
+                               + state.tx_queue_clients[c].capacity * NET_BUFFER_SIZE) {
+                *phys = *phys - config.clients[c].data[i].io_addr;
+                *client = c;
                 *oid= i;
-                return client;
+                return true;
             }
         }
     }
-    return -1;
+    return false;
 }
 
 void tx_provide(void)
@@ -91,10 +92,10 @@ void tx_return(void)
             int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
             assert(!err);
 
-            int oid = 0;
-            int client = extract_offset(&buffer.io_or_offset, &oid);
+            uint8_t oid = 0, client = 0;
+            bool success = extract_offset(&buffer.io_or_offset, &client, &oid);
+            assert(success);
             buffer.oid = oid;
-            assert(client >= 0);
 
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
             assert(!err);

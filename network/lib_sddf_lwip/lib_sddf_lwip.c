@@ -35,7 +35,7 @@ typedef struct lwip_state {
     /* IP address of client as a string */
     char ip_string[SDDF_LWIP_IPV4_ADDR_STRLEN];
     /* MAC address of client. */
-    uint8_t mac[ETH_HWADDR_LEN];
+    uint8_t mac[MAC802_BYTES];
     /* Output function used to print error messages. */
     sddf_lwip_err_output_fn err_output;
     /* Callback function to be invoked when ip address is obtained. */
@@ -413,9 +413,9 @@ net_sddf_err_t sddf_lwip_input_pbuf(struct pbuf *p)
  */
 static err_t ethernet_init(struct netif *netif)
 {
-    memcpy(netif->hwaddr, lwip_state.mac, ETH_HWADDR_LEN);
+    memcpy(netif->hwaddr, lwip_state.mac, MAC802_BYTES);
     netif->mtu = SDDF_LWIP_ETHER_MTU;
-    netif->hwaddr_len = ETHARP_HWADDR_LEN;
+    netif->hwaddr_len = MAC802_BYTES;
     netif->output = etharp_output;
     netif->linkoutput = lwip_eth_send;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP | NETIF_FLAG_IGMP;
@@ -476,7 +476,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     } else {
         strcpy(lwip_state.ip_string, "0.0.0.0");
     }
-    memcpy(lwip_state.mac, net_config->mac_addr, ETH_HWADDR_LEN);
+    memcpy(lwip_state.mac, net_config->mac_addr, MAC802_BYTES);
     lwip_state.err_output = (err_output == NULL) ? sddf_printf_ : err_output;
     lwip_state.netif_callback = (netif_callback == NULL) ? netif_status_callback_default : netif_callback;
     lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default

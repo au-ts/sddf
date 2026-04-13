@@ -28,7 +28,7 @@ typedef struct vswitch_state {
 
 static vswitch_state_t state;
 
-uint32_t *buffer_refs;
+uint8_t *buffer_refs;
 
 static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
 {
@@ -69,7 +69,7 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
 int mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
-    /* try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts */
+    /* try matching each MAC in the list (skip VSWITCH_VIRT_PORT) - virts */
     for (int i = 0; i < VSWITCH_VIRT_PORT; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
@@ -82,13 +82,12 @@ int mac_addr_find(const mac_addr_t *dest_macaddr)
 
 static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
 {
-    // just need one success to not drop?
     bool success = false;
-    /* Only broadcast to allowed, exclude myself */
+    /* Only broadcast to allowed, exclude the source */
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (config.ports[i].connected && i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
-            success = forward_frame(src, &config.ports[i], buffer);
-            sddf_printf_("VSWITCH Success of bcast id: %d is %d\n", i, success);
+            success |= forward_frame(src, &config.ports[i], buffer);
+            sddf_dprintf("VSWITCH Success of bcast id: %d is %d\n", i, success);
         }
     }
     return success;
@@ -101,8 +100,7 @@ static bool try_send(net_vswitch_port_config_t *src, const mac_addr_t *dest_maca
 
     if (vswitch_can_send_to(src->id, dst_id)) {
         /* at least one of them succeeded */
-        if (forward_frame(src, &config.ports[dst_id], buffer))
-            success = true;
+        success = forward_frame(src, &config.ports[dst_id], buffer);
     }
     return success;
 }
@@ -139,7 +137,7 @@ static void rx_return(net_vswitch_port_config_t *port)
             //net_request_signal_free(dst); TODO: is this necessary?
             if (signal_tx && net_require_signal_free(dst)) {
                 net_cancel_signal_free(dst);
-                sddf_deferred_notify(config.ports[buffer.oid].tx.id); // TODO: deferred?
+                sddf_notify(config.ports[buffer.oid].tx.id);
             }
         }
 
@@ -166,7 +164,7 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             assert(!err);
 
             const char *frame_data = port->tx_data.region.vaddr + buffer.io_or_offset;
-            const struct ether_addr *macaddr = (void *)frame_data;
+            const ether_hdr_t *macaddr = (ether_hdr_t *)frame_data;
             bool transmitted = false;
 
             if (mac802_addr_is_bcast(macaddr->dest.addr)) {
