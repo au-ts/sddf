@@ -43,28 +43,31 @@ typedef struct net_virt_tx_config {
     uint8_t num_clients;
 } net_virt_tx_config_t;
 
-typedef struct net_virt_rx_config_connection {
+typedef struct net_virt_rx_client_config {
     net_connection_resource_t conn;
     mac_addr_t mac_addrs[SDDF_NET_MAX_CLIENTS];
     uint8_t num_macs;
-} net_virt_rx_config_connection_t;
+} net_virt_rx_client_config_t;
 
 typedef struct net_virt_rx_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     device_region_resource_t data;
-    // The system designer must allocate a buffer metadata region for internal
-    // use by the RX virtualiser. The size of this region must be at least
-    // sizeof(int*)*drv_queue_capacity. It must be mapped R-W and zero-initialised.
+    // The Rx virtualiser uses a reference count system to keep track of buffer ownership.
+    // This is particularly important when a buffer is broadcast to multiple clients,
+    // as the buffer can only be safely returned to the driver for re-use once it has been freed by all clients.
+    // These reference counts are stored in the buffer_metadata region,
+    // thus the region must be large enough to store a count for each Rx DMA buffer in the system
+    // (i.e. >= sizeof(uint8_t) * drv_queue_capacity bytes). It must also be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
-    net_virt_rx_config_connection_t clients[SDDF_NET_MAX_CLIENTS];
+    net_virt_rx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
 } net_virt_rx_config_t;
 
 typedef struct net_copy_config {
     char magic[SDDF_NET_MAGIC_LEN];
-    net_connection_resource_t virt_rx;
-    region_resource_t out_data[SDDF_NET_MAX_CLIENTS];
+    net_connection_resource_t rx;
+    region_resource_t rx_data[SDDF_NET_MAX_CLIENTS];
 
     net_connection_resource_t client;
     region_resource_t client_data;
@@ -78,7 +81,7 @@ typedef struct net_client_config {
     net_connection_resource_t tx;
     region_resource_t tx_data;
 
-    uint8_t mac_addr[MAC802_BYTES];
+    mac_addr_t mac_addr;
 } net_client_config_t;
 
 typedef struct net_vswitch_port_config {

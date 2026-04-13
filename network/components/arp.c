@@ -11,6 +11,12 @@
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
 
+#define ETH_TYPE_ARP 0x0806U
+#define ETH_TYPE_IP 0x0800U
+#define ETHARP_OPCODE_REQUEST 1
+#define ETHARP_OPCODE_REPLY 2
+#define ETH_HWADDR_LEN 6
+
 #define RX_CH 0
 #define TX_CH 1
 #define CLIENT_CH 2

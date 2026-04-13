@@ -24,7 +24,7 @@ __attribute__((__section__(".net_virt_rx_config"))) net_virt_rx_config_t config;
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t *buffer_refs;
+uint8_t *buffer_refs;
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
@@ -38,7 +38,7 @@ static bool notify_drv;
 
 /* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
   is a broadcast address, return -1 if we have not found the match. */
-int get_mac_addr_match(struct ether_addr *buffer)
+int get_mac_addr_match(ether_hdr_t *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
         for (int i = 0; i < config.clients[client].num_macs; i++) {
@@ -81,7 +81,7 @@ void rx_return(void)
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
-            int client = get_mac_addr_match((struct ether_addr *) buffer_vaddr);
+            int client = get_mac_addr_match((ether_hdr_t *) buffer_vaddr);
 
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;

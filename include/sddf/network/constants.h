@@ -8,12 +8,6 @@
 #include <os/sddf.h>
 #include <stdint.h>
 
-#define ETH_TYPE_ARP 0x0806U
-#define ETH_TYPE_IP 0x0800U
-#define ETH_HWADDR_LEN 6
-#define ETHARP_OPCODE_REQUEST 1
-#define ETHARP_OPCODE_REPLY 2
-
 #define NET_BUFFER_SIZE 2048
 
 /*
