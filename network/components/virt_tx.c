@@ -48,9 +48,17 @@ void tx_provide(void)
                 assert(!err);
 
                 if (buffer.io_or_offset % NET_BUFFER_SIZE
-                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * config.clients[client].num_buffers) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
                                  buffer.io_or_offset);
+                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
+                    assert(!err);
+                    continue;
+                }
+
+                if (buffer.oid >= config.clients[client].num_regions) {
+                    sddf_dprintf("VIRT_TX|LOG: Client provided buffer with id %d which is not from within the mapped memory\n",
+                                 buffer.oid);
                     err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
                     assert(!err);
                     continue;

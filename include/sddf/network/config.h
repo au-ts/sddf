@@ -34,6 +34,7 @@ typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
     device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
     uint8_t num_regions;
+    uint64_t num_buffers;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
