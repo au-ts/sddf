@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <os/sddf.h>
+#include <sddf/util/tsc.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/lib_sddf_lwip.h>
@@ -119,7 +120,7 @@ pbuf_custom_offset_t *sddf_lwip_pbuf_pool_alloc(void)
 net_sddf_err_t sddf_lwip_pbuf_pool_free(pbuf_custom_offset_t *pbuf)
 {
     if (pbuf == NULL || pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs
-        || pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
+        || pbuf >= (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
         || (((uintptr_t)pbuf - (uintptr_t)pbuf_pool.pbufs) % sizeof(pbuf_custom_offset_t))) {
         return SDDF_LWIP_ERR_INVALID_PBUF;
     }
@@ -235,17 +236,41 @@ static inline net_sddf_err_t tx_handle_intercept_default(struct pbuf *p)
     return SDDF_LWIP_ERR_UNHANDLED;
 }
 
+static uint32_t cached_time_ms;
+static uint64_t cached_cnt;
+static uint64_t cnt_freq;
 /**
  * Returns current time from the timer.
  */
 inline uint32_t sys_now(void)
 {
-    return sddf_timer_time_now(sddf_state.timer_ch) / NS_IN_MS;
+
+    uint64_t now = read_counter();
+    uint64_t passed = now - cached_cnt;
+    if (cnt_freq == 0) {
+        return cached_time_ms;
+    }
+
+    return cached_time_ms + (uint32_t)((passed * MS_IN_S) / cnt_freq);
+}
+
+static void refresh_time(void)
+{
+    cached_time_ms = sddf_timer_time_now(sddf_state.timer_ch) / NS_IN_MS;
+    cached_cnt = read_counter();
+}
+
+static void rearm_timeout(void)
+{
+    uint32_t sleep_ms = sys_timeouts_sleeptime();
+    sddf_timer_set_timeout(sddf_state.timer_ch, (uint64_t)sleep_ms * NS_IN_MS);
 }
 
 void sddf_lwip_process_timeout(void)
 {
+    refresh_time();
     sys_check_timeouts();
+    rearm_timeout();
 }
 
 /**
@@ -367,6 +392,7 @@ void sddf_lwip_process_rx(void)
         return;
     }
 
+    refresh_time();
     bool reprocess = true;
     while (reprocess) {
         while (!net_queue_empty_active(&sddf_state.rx_queue) && !sddf_lwip_pbuf_pool_empty()) {
@@ -507,6 +533,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     netif_set_status_callback(&(lwip_state.netif), netif_status_callback);
     netif_set_up(&(lwip_state.netif));
 
+    cnt_freq = read_freq();
     if (!ip_string) {
         if (dhcp_start(&(lwip_state.netif))) {
             lwip_state.err_output("LWIP|ERROR: failed to start DHCP negotiation\n");
@@ -537,4 +564,5 @@ void sddf_lwip_maybe_notify(void)
             sddf_notify(sddf_state.tx_ch);
         }
     }
+    refresh_time();
 }
