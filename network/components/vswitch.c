@@ -33,6 +33,9 @@ typedef struct vswitch_state {
 
 static vswitch_state_t state;
 
+bool need_rx_signal[SDDF_NET_MAX_CLIENTS];
+bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
+
 uint8_t *buffer_refs;
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
@@ -57,8 +60,7 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
     buffer_refs[src_id * config.buffers_per_client + ref_index]++;
 
     if (net_require_signal_active(&state.rx_queues[dst_id])) { // TODO: is that not a failure?
-        net_cancel_signal_active(&state.rx_queues[dst_id]);
-        sddf_notify(config.ports[dst_id].rx.id);
+        need_rx_signal[dst_id] = true;
         return true;
     }
 
@@ -113,7 +115,6 @@ static bool try_send(uint8_t src_id, const mac_addr_t *dest_macaddr, net_buff_de
 /* Read free buffers from RX, see if the refcount is 0, and then return them to TX and notify the TX clients */
 static void rx_return(uint8_t port_id)
 {
-    bool signal_tx = false;
     net_queue_handle_t *src = &state.rx_queues[port_id];
     net_queue_handle_t *dst;
 
@@ -138,11 +139,7 @@ static void rx_return(uint8_t port_id)
             err = net_enqueue_free(dst, buffer);
             assert(!err);
 
-            signal_tx = true;
-            if (signal_tx && net_require_signal_free(dst)) {
-                net_cancel_signal_free(dst);
-                sddf_notify(config.ports[buffer.oid].tx.id);
-            }
+            need_tx_signal[buffer.oid] = true;
         }
 
         net_request_signal_free(src);
@@ -179,7 +176,6 @@ static void forward_traffic_from(uint8_t port_id)
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
-                net_request_signal_free(src);
             }
         }
 
@@ -196,12 +192,28 @@ static void forward_traffic_from(uint8_t port_id)
 void notified(sddf_channel ch)
 {
     for (uint8_t i = 0; i <= config.num_ports; i++) {
+        need_rx_signal[i] = false;
+        need_tx_signal[i] = false;
+    }
+
+    for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (ch == config.ports[i].tx.id) {
             forward_traffic_from(i);
             break;
         } else if (ch == config.ports[i].rx.id) {
             rx_return(i);
             break;
+        }
+    }
+
+    for (uint8_t i = 0; i <= config.num_ports; i++) {
+        if (need_rx_signal[i] && net_require_signal_active(&state.rx_queues[i])) {
+            net_cancel_signal_active(&state.rx_queues[i]);
+            sddf_notify(config.ports[i].rx.id);
+        }
+        if (need_tx_signal[i] && net_require_signal_free(&state.tx_queues[i])) {
+            net_cancel_signal_free(&state.tx_queues[i]);
+            sddf_notify(config.ports[i].tx.id);
         }
     }
 }
