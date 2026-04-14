@@ -81,7 +81,7 @@ int mac_addr_find(const mac_addr_t *dest_macaddr)
     for (uint8_t i = 0; i < config.num_ports; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
-            return i; // this is the ID of the client we matched
+            return i;
         }
     }
     /* I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port */
@@ -164,6 +164,23 @@ static void forward_traffic_from(uint8_t port_id)
             int err = net_dequeue_active(src, &buffer);
             assert(!err);
 
+            if (buffer.io_or_offset % NET_BUFFER_SIZE
+                || buffer.io_or_offset >= NET_BUFFER_SIZE * config.buffers_per_client * config.num_ports) { // TODO: not sure that this is not too optimistic
+                sddf_dprintf("VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
+                             buffer.io_or_offset);
+                err = net_enqueue_free(src, buffer);
+                assert(!err);
+                continue;
+            }
+
+            if (buffer.oid > config.num_ports) {
+                sddf_dprintf("VSWITCH|LOG: Port provided buffer with id %d which is not from within the mapped memory\n",
+                             buffer.oid);
+                err = net_enqueue_free(src, buffer);
+                assert(!err);
+                continue;
+            }
+
             const char *frame_data = config.ports[port_id].tx_data.region.vaddr + buffer.io_or_offset;
             const ether_hdr_t *macaddr = (ether_hdr_t *)frame_data;
             bool transmitted = false;
@@ -235,5 +252,9 @@ void init(void)
         // for now quick hack, send all to all
         state.allow_list[i] = UINT64_MAX; // TODO: later construct properly
     }
+    //state.allow_list[0] = 13;
+    //state.allow_list[1] = 15;
+    //state.allow_list[2] = 15;
+    //state.allow_list[3] = 15;
     //state.allow_list[0] = ((uint64_t)0x1 << 63 | (uint64_t)0x1 << 2); // Client 0 can send only to out and to client 2
 }
