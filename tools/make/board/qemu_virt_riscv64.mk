@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
+PLATFORM ?= riscv
 BLK_DRIV_DIR ?= virtio/mmio
 GPU_DRIV_DIR ?= virtio
 NET_DRIV_DIR ?= virtio/mmio
