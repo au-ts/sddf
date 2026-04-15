@@ -38,6 +38,7 @@ bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
 
 uint8_t *buffer_refs;
 uint8_t *buffer_refs_start[SDDF_NET_MAX_CLIENTS];
+uint64_t num_forwarded_bufs[SDDF_NET_MAX_CLIENTS];
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
 {
@@ -49,13 +50,14 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
      * Also, the copier will use this tag to know which buffer to address */
     d_buffer.oid = src_id;
 
-    /* Drop if the dest queue is full */
-    if (net_queue_full_active(&state.rx_queues[dst_id])) {
+    /* Don't forward more than the queue's capacity before some packets are returned */
+    if (num_forwarded_bufs[dst_id] >= config.ports[dst_id].rx.num_buffers) {
         return false;
     }
 
     net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
     need_rx_signal[dst_id] = true;
+    num_forwarded_bufs[dst_id]++;
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
@@ -123,6 +125,7 @@ static void rx_return(uint8_t port_id)
             assert(buffer_refs_start[buffer.oid][ref_index] != 0);
 
             buffer_refs_start[buffer.oid][ref_index]--;
+            num_forwarded_bufs[port_id]--;
 
             if (buffer_refs_start[buffer.oid][ref_index] != 0) {
                 continue;
