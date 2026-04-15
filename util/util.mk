@@ -15,7 +15,7 @@ ifeq ($(strip $(ARCH)),)
 $(error ARCH must be specified)
 endif
 
-OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o
+OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o tsc.o
 
 ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
 	CFLAGS += -I${SDDF}/include/sddf/util/custom_libc
