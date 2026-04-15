@@ -97,13 +97,15 @@ typedef struct net_vswitch_port_config {
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
 
-    /* Rx/Tx swapped for the virtualizer */
+    /* The first num_ports entries in this array are the vswitch's clients.
+     * The next port after the last client, index num_ports contains the vswitch's connection with the virtualisers.
+     * However, the rx field is the connection with Tx virtualiser, and the tx field is the connection with the Rx virtualiser.
+     * This allows the vswitch to treat the virtualiser the same way as it's other clients. */
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
-    // Reference counting buffers; interfaced as array[MAX_NUM_CLIENTS][buffers_per_client]
-    // The system designer must allocate a buffer big enough to contain reference counters for buffers.
-    // The size of this region must be at least (MAX_NUM_CLIENTS) * buffers_per_client * sizeof(int*).
+    // Reference counting buffers; The system designer must allocate a buffer big enough to contain reference counters for buffers.
+    // The size of this region must be equal to at least num_ports * number_of_buffers_per_port * sizeof(uint8_t).
     // It must be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
     uint16_t buffers_per_client;
