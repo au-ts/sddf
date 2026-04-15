@@ -30,11 +30,15 @@ typedef struct net_driver_config {
     net_connection_resource_t virt_tx;
 } net_driver_config_t;
 
+typedef struct net_virt_tx_data_region {
+    device_region_resource_t data;
+    uint32_t num_buffers;
+} net_virt_tx_data_region_t;
+
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
-    device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
+    net_virt_tx_data_region_t regions[SDDF_NET_MAX_CLIENTS];
     uint8_t num_regions;
-    uint64_t num_buffers;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
@@ -108,7 +112,6 @@ typedef struct net_vswitch_config {
     // The size of this region must be equal to at least num_ports * number_of_buffers_per_port * sizeof(uint8_t).
     // It must be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
-    uint16_t buffers_per_client;
 } net_vswitch_config_t;
 
 static inline bool net_config_check_magic(void *config)
