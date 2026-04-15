@@ -10,6 +10,8 @@
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/mac802.h>
+#include <sddf/network/ip.h>
+#include <sddf/network/udp.h>
 #include <sddf/network/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
@@ -42,12 +44,17 @@ typedef struct vswitch_state {
     clients_t clients;
 } vswitch_state_t;
 
+typedef struct buffer_ref {
+    uint8_t count: 7;
+    uint8_t tx_to_virt: 1; // whether this buffer ultimately needs to be sent to virt
+} buffer_ref_t;
+
 static vswitch_state_t state;
 
 bool need_rx_signal[SDDF_NET_MAX_CLIENTS];
 bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
 
-uint8_t *buffer_refs;
+buffer_ref_t *buffer_refs;
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
 {
@@ -55,9 +62,23 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
 
     d_buffer.len = src_buf->len;
     d_buffer.io_or_offset = src_buf->io_or_offset;
+
     /* Add a tag for the owner of this buffer so vswitch knows which reference slot to increment
      * Also, the copier will use this tag to know which buffer to address */
     d_buffer.oid = src_id;
+
+    /* clear ethernet checksum if the dest is a virtio, we already know other clients handled it */
+    if (dst_id == config.num_ports) {
+        sddf_printf_("VSWICH SPECIAL CASE virt handling\n");
+        const char *frame_data = config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset;
+        ipv4_hdr_t *ip_header = (ipv4_hdr_t *)(frame_data + sizeof(ether_hdr_t));
+        if (ip_header->protocol == IPV4_PROTO_UDP) {
+            sddf_printf_("VSWICH SPECIAL CASE virt handling ZEROING the CSUM\n");
+            udp_hdr_t *udp_header = (udp_hdr_t *)(frame_data + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
+            udp_header->check = 0x0;
+            sddf_printf_("VSWICH sending the buffer to virts len: %d oid: %d checksum: %d\n", d_buffer.len, d_buffer.oid, udp_header->check);
+        }
+    }
 
     /* Drop if the dest queue is full */
     if (!net_queue_full_active(&state.rx_queues[dst_id])) {
@@ -68,15 +89,15 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs[src_id * config.buffers_per_client + ref_index]++;
+    buffer_refs[src_id * config.buffers_per_client + ref_index].count++;
 
     if (net_require_signal_active(&state.rx_queues[dst_id])) { // TODO: is that not a failure?
         need_rx_signal[dst_id] = true;
         return true;
     }
 
-    /* Failed to enqueue, decrement the ref */
-    buffer_refs[src_id * config.buffers_per_client + ref_index]--;
+    /* failed to enqueue, decrement the ref */
+    buffer_refs[src_id * config.buffers_per_client + ref_index].count--;
     return false;
 }
 
@@ -105,6 +126,18 @@ static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
     /* Only broadcast to allowed, exclude the source */
     for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (i != src_id && vswitch_can_send_to(src_id, i)) {
+            success |= forward_frame(src_id, i, buffer);
+
+            /* when we are broadcasting, we need to clear checksums for the virt so it is sent the packet
+             * only after all other ports have received it */
+            if (i == config.num_ports) {
+                sddf_printf_("VSWICH SPECIAL CASE skipping virtio for now\n");
+                int ref_index = buffer->io_or_offset / NET_BUFFER_SIZE;
+                buffer_refs[src_id * config.buffers_per_client + ref_index].tx_to_virt = 1;
+                success = true;
+                continue;
+            }
+
             success |= forward_frame(src_id, i, buffer);
         }
     }
@@ -137,11 +170,21 @@ static void rx_return(uint8_t port_id)
             assert(!err);
 
             int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-            assert(buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0);
 
-            buffer_refs[buffer.oid * config.buffers_per_client + ref_index]--;
+            assert(buffer_refs[buffer.oid * config.buffers_per_client + ref_index].count != 0);
 
-            if (buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0) {
+            buffer_refs[buffer.oid * config.buffers_per_client + ref_index].count--;
+
+            if (buffer_refs[buffer.oid * config.buffers_per_client + ref_index].count != 0) {
+                continue;
+            }
+
+            /* all clients have already returned, can finally transmit to virt */
+            if (buffer_refs[buffer.oid * config.buffers_per_client + ref_index].tx_to_virt) {
+                sddf_printf_("VSWICH SPECIAL CASE finally sending to virt\n");
+                buffer_refs[buffer.oid * config.buffers_per_client + ref_index].tx_to_virt = 0;
+                sddf_printf_("buffer.oid: %d buffer.len: %d\n", buffer.oid, buffer.len);
+                forward_frame(buffer.oid, config.num_ports, &buffer);
                 continue;
             }
 
@@ -250,7 +293,7 @@ void init(void)
 {
     assert(net_config_check_magic(&config));
 
-    buffer_refs = config.buffer_metadata.vaddr;
+    buffer_refs = (buffer_ref_t *)config.buffer_metadata.vaddr;
 
     /* Set up client queues and buffers for copying? */
     for (uint8_t i = 0; i <= config.num_ports; i++) {

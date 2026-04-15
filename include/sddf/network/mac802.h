@@ -33,6 +33,8 @@ typedef struct ether_hdr {
     mac_addr_t dest;
     mac_addr_t src;
     uint8_t etype[2]; // Ethertype
+    uint8_t payload[46];
+    uint8_t crc[4];
 } __attribute__((__packed__)) ether_hdr_t;
 
 static inline bool mac802_addr_eq_num(const uint8_t *addr0, const uint8_t *addr1, unsigned int num)
