@@ -37,6 +37,7 @@ bool need_rx_signal[SDDF_NET_MAX_CLIENTS];
 bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
 
 uint8_t *buffer_refs;
+uint8_t *buffer_refs_start[SDDF_NET_MAX_CLIENTS];
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
 {
@@ -58,7 +59,7 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs[src_id * config.buffers_per_client + ref_index]++;
+    buffer_refs_start[src_id][ref_index]++;
 
     return true;
 }
@@ -119,11 +120,11 @@ static void rx_return(uint8_t port_id)
             assert(!err);
 
             int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-            assert(buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0);
+            assert(buffer_refs_start[buffer.oid][ref_index] != 0);
 
-            buffer_refs[buffer.oid * config.buffers_per_client + ref_index]--;
+            buffer_refs_start[buffer.oid][ref_index]--;
 
-            if (buffer_refs[buffer.oid * config.buffers_per_client + ref_index] != 0) {
+            if (buffer_refs_start[buffer.oid][ref_index] != 0) {
                 continue;
             }
 
@@ -223,6 +224,7 @@ void init(void)
     assert(net_config_check_magic(&config));
 
     buffer_refs = config.buffer_metadata.vaddr;
+    buffer_refs_start[0] = buffer_refs;
 
     /* Set up client queues and buffers for copying? */
     for (uint8_t i = 0; i <= config.num_ports; i++) {
@@ -233,10 +235,10 @@ void init(void)
 
         /* Seed the allow_list based on predefined settings */
         state.allow_list[i] = config.ports[i].acl;
+
+        /* Pre-calculate the buffer start indexing for faster reference */
+        if (i > 0) {
+            buffer_refs_start[i] = buffer_refs_start[i - 1] + config.ports[i - 1].tx.num_buffers;
+        }
     }
-    //state.allow_list[0] = 13;
-    //state.allow_list[1] = 15;
-    //state.allow_list[2] = 15;
-    //state.allow_list[3] = 15;
-    //state.allow_list[0] = ((uint64_t)0x1 << 63 | (uint64_t)0x1 << 2); // Client 0 can send only to out and to client 2
 }
