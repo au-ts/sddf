@@ -15,6 +15,8 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+#define VSWITCH_WRONG_PORT 0xFF
+
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
@@ -29,6 +31,7 @@ typedef struct vswitch_state {
     net_queue_handle_t rx_queues[SDDF_NET_MAX_CLIENTS];
     net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
+    bool virt_connected;
 } vswitch_state_t;
 
 static vswitch_state_t state;
@@ -71,7 +74,7 @@ static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
-int mac_addr_find(const mac_addr_t *dest_macaddr)
+uint8_t mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
     /* Try matching each MAC in the list (skip the virt port, config.num_ports) */
@@ -81,6 +84,12 @@ int mac_addr_find(const mac_addr_t *dest_macaddr)
             return i;
         }
     }
+
+    /* Drop if no virt connected and did not match against any port */
+    if (!state.virt_connected) {
+        return VSWITCH_WRONG_PORT;
+    }
+
     /* I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port */
     return config.num_ports;
 }
@@ -102,7 +111,7 @@ static bool try_send(uint8_t src_id, const mac_addr_t *dest_macaddr, net_buff_de
     bool success = false;
     uint8_t dst_id = mac_addr_find(dest_macaddr);
 
-    if (vswitch_can_send_to(src_id, dst_id)) {
+    if (dst_id != VSWITCH_WRONG_PORT && vswitch_can_send_to(src_id, dst_id)) {
         success = forward_frame(src_id, dst_id, buffer);
     }
     return success;
@@ -228,6 +237,9 @@ void init(void)
 
     buffer_refs = config.buffer_metadata.vaddr;
     buffer_refs_start[0] = buffer_refs;
+
+    /* If no RX DMA buffers are present for the last port it means there is no virtualiser connected */
+    state.virt_connected = config.ports[config.num_ports].tx.num_buffers != 0;
 
     /* Set up client queues and buffers for copying? */
     for (uint8_t i = 0; i <= config.num_ports; i++) {
