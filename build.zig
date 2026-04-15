@@ -99,6 +99,7 @@ const util_src_riscv64 = [_][]const u8{
 };
 
 const util_src_x86_64 = [_][]const u8{
+    "util/arch_counter.c",
     "util/custom_libc/x86_64/memcmp.c",
     "util/custom_libc/x86_64/memcpy.S",
     "util/custom_libc/x86_64/memmove.c",
