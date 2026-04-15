@@ -91,6 +91,7 @@ typedef struct net_vswitch_port_config {
     device_region_resource_t tx_data;
     /* unused for the virts */
     mac_addr_t mac_addr;
+    uint64_t acl;
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {

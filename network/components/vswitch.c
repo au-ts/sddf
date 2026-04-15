@@ -249,8 +249,7 @@ void init(void)
                        config.ports[i].tx.num_buffers);
 
         /* Seed the allow_list based on predefined settings */
-        // for now quick hack, send all to all
-        state.allow_list[i] = UINT64_MAX; // TODO: later construct properly
+        state.allow_list[i] = config.ports[i].acl;
     }
     //state.allow_list[0] = 13;
     //state.allow_list[1] = 15;
