@@ -49,24 +49,18 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
     d_buffer.oid = src_id;
 
     /* Drop if the dest queue is full */
-    if (!net_queue_full_active(&state.rx_queues[dst_id])) {
-        net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
-    } else {
+    if (net_queue_full_active(&state.rx_queues[dst_id])) {
         return false;
     }
+
+    net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
+    need_rx_signal[dst_id] = true;
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
     buffer_refs[src_id * config.buffers_per_client + ref_index]++;
 
-    if (net_require_signal_active(&state.rx_queues[dst_id])) { // TODO: is that not a failure?
-        need_rx_signal[dst_id] = true;
-        return true;
-    }
-
-    /* Failed to enqueue, decrement the ref */
-    buffer_refs[src_id * config.buffers_per_client + ref_index]--;
-    return false;
+    return true;
 }
 
 static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
@@ -77,7 +71,7 @@ static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
 int mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
-    /* Try matching each MAC in the list (skip VSWITCH_VIRT_PORT) - virts */
+    /* Try matching each MAC in the list (skip the virt port, config.num_ports) */
     for (uint8_t i = 0; i < config.num_ports; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
@@ -106,7 +100,6 @@ static bool try_send(uint8_t src_id, const mac_addr_t *dest_macaddr, net_buff_de
     uint8_t dst_id = mac_addr_find(dest_macaddr);
 
     if (vswitch_can_send_to(src_id, dst_id)) {
-        /* At least one of them succeeded */
         success = forward_frame(src_id, dst_id, buffer);
     }
     return success;
@@ -165,17 +158,9 @@ static void forward_traffic_from(uint8_t port_id)
             assert(!err);
 
             if (buffer.io_or_offset % NET_BUFFER_SIZE
-                || buffer.io_or_offset >= NET_BUFFER_SIZE * config.buffers_per_client * config.num_ports) { // TODO: not sure that this is not too optimistic
+                || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.num_buffers) {
                 sddf_dprintf("VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
                              buffer.io_or_offset);
-                err = net_enqueue_free(src, buffer);
-                assert(!err);
-                continue;
-            }
-
-            if (buffer.oid > config.num_ports) {
-                sddf_dprintf("VSWITCH|LOG: Port provided buffer with id %d which is not from within the mapped memory\n",
-                             buffer.oid);
                 err = net_enqueue_free(src, buffer);
                 assert(!err);
                 continue;
@@ -193,6 +178,7 @@ static void forward_traffic_from(uint8_t port_id)
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
+                need_tx_signal[port_id] = true;
             }
         }
 
@@ -209,11 +195,6 @@ static void forward_traffic_from(uint8_t port_id)
 void notified(sddf_channel ch)
 {
     for (uint8_t i = 0; i <= config.num_ports; i++) {
-        need_rx_signal[i] = false;
-        need_tx_signal[i] = false;
-    }
-
-    for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (ch == config.ports[i].tx.id) {
             forward_traffic_from(i);
             break;
@@ -226,10 +207,12 @@ void notified(sddf_channel ch)
     for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (need_rx_signal[i] && net_require_signal_active(&state.rx_queues[i])) {
             net_cancel_signal_active(&state.rx_queues[i]);
+            need_rx_signal[i] = false;
             sddf_notify(config.ports[i].rx.id);
         }
         if (need_tx_signal[i] && net_require_signal_free(&state.tx_queues[i])) {
             net_cancel_signal_free(&state.tx_queues[i]);
+            need_tx_signal[i] = false;
             sddf_notify(config.ports[i].tx.id);
         }
     }

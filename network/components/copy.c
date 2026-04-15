@@ -47,12 +47,12 @@ void rx_return(void)
 
                 memcpy(cli_addr, virt_addr, virt_buffer.len);
                 cli_buffer.len = virt_buffer.len;
-                /* In case the copy component receives packets from the vswitch,
-                 * we preserve the packet's length field as it may be reused. */
 
                 err = net_enqueue_active(&rx_queue_cli, cli_buffer);
                 assert(!err);
 
+                /* In case the copy component receives packets from the vswitch,
+                 * we preserve the packet's length field as it may be reused. */
                 err = net_enqueue_free(&rx_queue_virt, virt_buffer);
                 assert(!err);
 
@@ -99,8 +99,7 @@ void init(void)
     /* Set up the queues */
     net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr,
                    config.client.num_buffers);
-    net_queue_init(&rx_queue_virt, config.rx.free_queue.vaddr, config.rx.active_queue.vaddr,
-                   config.rx.num_buffers);
+    net_queue_init(&rx_queue_virt, config.rx.free_queue.vaddr, config.rx.active_queue.vaddr, config.rx.num_buffers);
 
     net_buffers_init(&rx_queue_cli, 0);
 }
