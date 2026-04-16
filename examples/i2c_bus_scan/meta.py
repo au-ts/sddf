@@ -5,14 +5,11 @@ import argparse
 from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
-from importlib.metadata import version
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
 from board import BOARDS
-
-assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion

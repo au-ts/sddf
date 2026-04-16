@@ -8,14 +8,11 @@ import subprocess
 import shutil
 from typing import List, Tuple, Callable, Optional
 from sdfgen import SystemDescription, Sddf, DeviceTree
-from importlib.metadata import version
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
 from board import BOARDS, add_x86_hpet
-
-assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
