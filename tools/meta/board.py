@@ -3,8 +3,13 @@
 from dataclasses import dataclass
 from typing import List, Optional
 from sdfgen import SystemDescription
+from importlib.metadata import version
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+
+# This file is imported by most of our meta.py scripts, so add this check
+# here so that we can catch this error consistently.
+assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 
 def add_x86_hpet(sdf: SystemDescription, timer_driver: ProtectionDomain):

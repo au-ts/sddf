@@ -5,7 +5,6 @@ import sys
 import argparse
 from sdfgen import SystemDescription, Sddf, DeviceTree
 import importlib
-from importlib.metadata import version
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
@@ -14,8 +13,6 @@ sys.path.append(
 # Use importlib to dynamically load. Using `from` import below other code is bad style.
 board_module = importlib.import_module("board")
 BOARDS = board_module.BOARDS
-
-assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
