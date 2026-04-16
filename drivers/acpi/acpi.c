@@ -24,7 +24,11 @@ const char acpi_str_fadt[] = {'F', 'A', 'C', 'P', 0};
 const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
 
 capDLBootInfo_t *capDLBootInfo;
-
+uintptr_t aml_object_pool_start;
+scanner_t scanner;
+aml_object_pool_t object_pool;
+aml_object_t object_root;
+pci_resources_t pci_resources;
 
 void print_64(seL4_Word w) {
     microkit_dbg_put32((seL4_Uint32) (w >> 32));
@@ -360,31 +364,45 @@ void init(void)
     }
 
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
-    /* aml_path_seg_t path; */
-    char path_name[AML_MAX_PATH_STR] = { '\0' };
-    extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), path_name, 0);
-    sddf_dprintf("DSDT has been parsed!\n");
+    /* /\* aml_path_seg_t path; *\/ */
+    /* char path_name[AML_MAX_PATH_STR] = { '\0' }; */
+    /* extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), path_name, 0); */
+    /* sddf_dprintf("DSDT has been parsed!\n"); */
 
-    error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58);
-    sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error);
+    /* error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58); */
+    /* sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error); */
 
-    // Map pages for PCI driver
-    for (int i = 0; i < pci_resources.num_pci_groups; i++) {
-        // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses
-        uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[j].bus_end - pci_resources.pci_seg_groups[j].bus_start) * (1 << 20);
+    /* // Map pages for PCI driver */
+    /* for (int i = 0; i < pci_resources.num_pci_groups; i++) { */
+    /*     // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses */
+    /*     uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20); */
+    /*     sddf_dprintf("base addr: 0x%lx, size: 0x%x\n", pci_resources.pci_seg_groups[i].base_addr, ecam_size); */
+    /* } */
 
-    }
 
+    /* // Print summary */
+    /* sddf_dprintf("\n======PCI resources summary:======\n"); */
+    /* for (int j = 0; j < pci_resources.num_pci_groups; j++) { */
+    /*     sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n", */
+    /*                  pci_resources.pci_seg_groups[j].group_id, */
+    /*                  pci_resources.pci_seg_groups[j].base_addr, */
+    /*                  pci_resources.pci_seg_groups[j].bus_start, */
+    /*                  pci_resources.pci_seg_groups[j].bus_end); */
+    /* } */
+    sddf_dprintf("===============Scanning DSDT===============\n");
 
-    // Print summary
-    sddf_dprintf("\n======PCI resources summary:======\n");
-    for (int j = 0; j < pci_resources.num_pci_groups; j++) {
-        sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
-                     pci_resources.pci_seg_groups[j].group_id,
-                     pci_resources.pci_seg_groups[j].base_addr,
-                     pci_resources.pci_seg_groups[j].bus_start,
-                     pci_resources.pci_seg_groups[j].bus_end);
-    }
+    scanner.start = (uint8_t *)&acpi_dsdt_table->content[0];
+    scanner.current = scanner.start;
+    object_pool.next = (aml_object_t *)aml_object_pool_start;
+    object_pool.end = (aml_object_t *)(aml_object_pool_start + 0x2000);
+    sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.start);
+
+    uint8_t *dsdt_end = scanner.start + header->length - sizeof(acpi_header_t);
+    object_root.start = scanner.start;
+    object_root.op_code = NULL_OP;
+    object_root.name[0] = '\\';
+    scan_objects(&object_root, dsdt_end);
+    print_object_tree(&object_root, 0);
 
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used

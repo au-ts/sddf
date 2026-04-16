@@ -31,10 +31,11 @@ TOP := ${SDDF}/examples/pci
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
 ACPI_DRIVER := $(SDDF)/drivers/acpi/acpi.mk
+ACPI_DRIVER := $(SDDF)/drivers/pci/pci.mk
 SYSTEM_FILE := pci.system
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := acpi_driver.elf
+IMAGES := acpi_driver.elf pci_driver.elf
 
 CFLAGS += \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
@@ -48,6 +49,7 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 all: $(IMAGE_FILE)
 
 include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pci/pci_driver.mk
 include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a
