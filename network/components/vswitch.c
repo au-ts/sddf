@@ -10,8 +10,9 @@
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/mac802.h>
+#include <sddf/network/ip.h>
+#include <sddf/network/udp.h>
 #include <sddf/network/util.h>
-#include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
@@ -39,8 +40,14 @@ static vswitch_state_t state;
 bool need_rx_signal[SDDF_NET_MAX_CLIENTS];
 bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
 
-uint8_t *buffer_refs;
-uint8_t *buffer_refs_start[SDDF_NET_MAX_CLIENTS];
+typedef struct buffer_ref {
+    uint8_t count : 6; // need just 6 bits for 63 MAX_ClIENTS
+    uint8_t reserved : 1;
+    uint8_t tx_to_virt : 1; // whether this buffer ultimately needs to be sent to virt
+} buffer_ref_t;
+
+buffer_ref_t *buffer_refs;
+buffer_ref_t *buffer_refs_start[SDDF_NET_MAX_CLIENTS];
 uint64_t num_forwarded_bufs[SDDF_NET_MAX_CLIENTS];
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
@@ -58,13 +65,23 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
         return false;
     }
 
+    /* Clear ethernet checksum if the dest is a virtualiser, we already know other clients handled it */
+    if (dst_id == config.num_ports) {
+        const char *frame_data = config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset;
+        ipv4_hdr_t *ip_header = (ipv4_hdr_t *)(frame_data + sizeof(ether_hdr_t));
+        if (ip_header->protocol == IPV4_PROTO_UDP) {
+            udp_hdr_t *udp_header = (udp_hdr_t *)(frame_data + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
+            udp_header->check = 0x0;
+        }
+    }
+
     net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
     need_rx_signal[dst_id] = true;
     num_forwarded_bufs[dst_id]++;
 
     /* Mark that this buffer has been passed once */
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs_start[src_id][ref_index]++;
+    buffer_refs_start[src_id][ref_index].count++;
 
     return true;
 }
@@ -100,6 +117,14 @@ static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
     /* Only broadcast to allowed, exclude the source */
     for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (i != src_id && vswitch_can_send_to(src_id, i)) {
+            /* When we are broadcasting, we need to clear checksums for the virt so it is sent the packet
+             * only after all other ports have received it */
+            if (i == config.num_ports) {
+                int ref_index = buffer->io_or_offset / NET_BUFFER_SIZE;
+                buffer_refs_start[src_id][ref_index].tx_to_virt = 1;
+                success = true;
+                continue;
+            }
             success |= forward_frame(src_id, i, buffer);
         }
     }
@@ -131,12 +156,18 @@ static void rx_return(uint8_t port_id)
             assert(!err);
 
             int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-            assert(buffer_refs_start[buffer.oid][ref_index] != 0);
+            assert(buffer_refs_start[buffer.oid][ref_index].count != 0);
 
-            buffer_refs_start[buffer.oid][ref_index]--;
+            buffer_refs_start[buffer.oid][ref_index].count--;
             num_forwarded_bufs[port_id]--;
 
-            if (buffer_refs_start[buffer.oid][ref_index] != 0) {
+             if (buffer_refs_start[buffer.oid][ref_index].count != 0) {
+                continue;
+            }
+
+            if (buffer_refs_start[buffer.oid][ref_index].tx_to_virt) {
+                buffer_refs_start[buffer.oid][ref_index].tx_to_virt = 0;
+                forward_frame(buffer.oid, config.num_ports, &buffer);
                 continue;
             }
 
@@ -236,7 +267,7 @@ void init(void)
 {
     assert(net_config_check_magic(&config));
 
-    buffer_refs = config.buffer_metadata.vaddr;
+    buffer_refs = (buffer_ref_t *)config.buffer_metadata.vaddr;
     buffer_refs_start[0] = buffer_refs;
 
     /* If no RX DMA buffers are present for the last port it means there is no virtualiser connected */
