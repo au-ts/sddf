@@ -476,7 +476,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     } else {
         strcpy(lwip_state.ip_string, "0.0.0.0");
     }
-    memcpy(lwip_state.mac, net_config->mac_addr, MAC802_BYTES);
+    memcpy(lwip_state.mac, net_config->mac_addr.addr, MAC802_BYTES);
     lwip_state.err_output = (err_output == NULL) ? sddf_printf_ : err_output;
     lwip_state.netif_callback = (netif_callback == NULL) ? netif_status_callback_default : netif_callback;
     lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default

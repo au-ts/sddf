@@ -161,7 +161,7 @@ static void rx_return(uint8_t port_id)
             buffer_refs_start[buffer.oid][ref_index].count--;
             num_forwarded_bufs[port_id]--;
 
-             if (buffer_refs_start[buffer.oid][ref_index].count != 0) {
+            if (buffer_refs_start[buffer.oid][ref_index].count != 0) {
                 continue;
             }
 
