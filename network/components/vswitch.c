@@ -172,8 +172,9 @@ static void forward_traffic_from(uint8_t port_id)
 
             if (buffer.io_or_offset % NET_BUFFER_SIZE
                 || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.num_buffers) {
-                sddf_dprintf("VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
-                             buffer.io_or_offset);
+                sddf_dprintf(
+                    "VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
+                    buffer.io_or_offset);
                 err = net_enqueue_free(src, buffer);
                 assert(!err);
                 continue;
