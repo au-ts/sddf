@@ -12,8 +12,6 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
-
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
@@ -21,9 +19,8 @@ Map = SystemDescription.Map
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199
     )
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
