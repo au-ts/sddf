@@ -40,4 +40,4 @@ CFLAGS += \
 	${CFLAGS_ARCH} \
 	${OPTIMISATION} \
 	-Wall \
-	-I ${BOARD_DIR}/include
+	-I ${BOARD_DIR}/include/pancake-c-interop

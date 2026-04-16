@@ -261,49 +261,49 @@ void init(void)
     microkit_notify(benchmark_config.init_ch);
 }
 
-seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
-{
-    sddf_printf("BENCH|LOG: Faulting PD %s (%d)\n", child_name(id), id);
+// seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
+// {
+//     sddf_printf("BENCH|LOG: Faulting PD %s (%d)\n", child_name(id), id);
 
-    seL4_UserContext regs;
-    seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
-#if defined(CONFIG_ARCH_ARM)
-    sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
-                regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
-#elif defined(CONFIG_ARCH_RISCV)
-    sddf_printf("Registers: \npc : %lx\nra : %lx\nsp : %lx\ngp : %lx\ns0 : %lx\ns1 : %lx\ns2 : %lx\ns3 : %lx\ns4 : "
-                "%lx\ns5 : %lx\n",
-                regs.pc, regs.ra, regs.sp, regs.gp, regs.s0, regs.s1, regs.s2, regs.s3, regs.s4, regs.s5);
-#else
-    sddf_printf("Register reading not implemented for current ARCH.\n");
-#endif
+//     seL4_UserContext regs;
+//     seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
+// #if defined(CONFIG_ARCH_ARM)
+//     sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
+//                 regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
+// #elif defined(CONFIG_ARCH_RISCV)
+//     sddf_printf("Registers: \npc : %lx\nra : %lx\nsp : %lx\ngp : %lx\ns0 : %lx\ns1 : %lx\ns2 : %lx\ns3 : %lx\ns4 : "
+//                 "%lx\ns5 : %lx\n",
+//                 regs.pc, regs.ra, regs.sp, regs.gp, regs.s0, regs.s1, regs.s2, regs.s3, regs.s4, regs.s5);
+// #else
+//     sddf_printf("Register reading not implemented for current ARCH.\n");
+// #endif
 
-    switch (microkit_msginfo_get_label(msginfo)) {
-    case seL4_Fault_CapFault: {
-        uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
-        uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
-        uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
-        sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr,
-                    (in_recv_phase == 0 ? "false" : "true"));
-        break;
-    }
-    case seL4_Fault_UserException: {
-        sddf_printf("UserException\n");
-        break;
-    }
-    case seL4_Fault_VMFault: {
-        uint64_t ip = seL4_GetMR(seL4_VMFault_IP);
-        uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
-        uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
-        uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
-        sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr,
-                    (is_instruction ? "(instruction fault)" : "(data fault)"));
-        break;
-    }
-    default:
-        sddf_printf("Unknown fault\n");
-        break;
-    }
+//     switch (microkit_msginfo_get_label(msginfo)) {
+//     case seL4_Fault_CapFault: {
+//         uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
+//         uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
+//         uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
+//         sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr,
+//                     (in_recv_phase == 0 ? "false" : "true"));
+//         break;
+//     }
+//     case seL4_Fault_UserException: {
+//         sddf_printf("UserException\n");
+//         break;
+//     }
+//     case seL4_Fault_VMFault: {
+//         uint64_t ip = seL4_GetMR(seL4_VMFault_IP);
+//         uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
+//         uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
+//         uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
+//         sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr,
+//                     (is_instruction ? "(instruction fault)" : "(data fault)"));
+//         break;
+//     }
+//     default:
+//         sddf_printf("Unknown fault\n");
+//         break;
+//     }
 
-    return seL4_False;
-}
+//     return seL4_False;
+// }

@@ -15,8 +15,8 @@ ${BENCH_OBJS} ${IDLE_OBJS}: ${CHECK_FLAGS_BOARD_MD5} |benchmark $(SDDF_LIBC_INCL
 benchmark:
 	mkdir -p benchmark
 
-benchmark.elf: $(BENCH_OBJS) ${LIBUTIL}
+benchmark.elf: $(BENCH_OBJS) $(CROSSSTAGE4) ${LIBUTIL}
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-idle.elf: $(IDLE_OBJS) ${LIBUTIL_DBG}
+idle.elf: $(IDLE_OBJS) $(CROSSSTAGE4) ${LIBUTIL_DBG}
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

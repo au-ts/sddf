@@ -12,8 +12,8 @@
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-timer_driver.elf: timer/timer.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+timer_driver.elf: timer/timer.o $(CROSSSTAGE4)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -o $@ -c $<

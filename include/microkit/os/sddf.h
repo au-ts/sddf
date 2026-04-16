@@ -38,14 +38,14 @@ static inline void sddf_deferred_notify(sddf_channel ch)
     microkit_deferred_notify(ch);
 }
 
-static inline unsigned int sddf_deferred_notify_curr()
-{
-    if (!microkit_have_signal) {
-        return -1;
-    }
+// static inline unsigned int sddf_deferred_notify_curr()
+// {
+//     if (!microkit_have_signal) {
+//         return -1;
+//     }
 
-    return microkit_signal_cap - BASE_OUTPUT_NOTIFICATION_CAP;
-}
+//     return microkit_signal_cap - BASE_OUTPUT_NOTIFICATION_CAP;
+// }
 
 static inline microkit_msginfo sddf_ppcall(sddf_channel ch, microkit_msginfo msginfo)
 {

@@ -42,8 +42,8 @@ network/components/network_copy.o: ${SDDF}/network/components/copy.c
 network/components/network_arp.o: ${SDDF}/network/components/arp.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-%.elf: network/components/%.o
-	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
+%.elf: network/components/%.o $(CROSSSTAGE4)
+	${LD} ${LDFLAGS} -o $@ $^ ${LIBS}
 
 clean::
 	${RM} -f network_virt_[rt]x.[od] network_copy.[od] network_arp.[od]

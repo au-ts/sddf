@@ -1,0 +1,20 @@
+fun uep_init() {
+    @c_init(0, 0, 0, 0);
+    return 0;
+}
+
+fun uep_notified(microkit_channel ch) {
+    @c_notified(0, 0, 0, ch);
+    return 0;
+}
+
+fun microkit_fault_reply_option uep_fault(microkit_child child, microkit_msginfo msginfo) {
+    @microkit_report_debug(0, 0, 0, 4);
+    return microkit_fault_reply_nothing;
+}
+
+fun microkit_msginfo uep_protected(microkit_channel ch, microkit_msginfo msginfo) {
+    @c_protected(0, ch, @base, msginfo);
+    var microkit_msginfo ret = lds 1 @base;
+    return ret;
+}

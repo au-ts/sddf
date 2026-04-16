@@ -519,22 +519,24 @@ void sddf_lwip_maybe_notify(void)
     if (sddf_state.rx_queue.capacity && sddf_state.notify_rx && net_require_signal_free(&sddf_state.rx_queue)) {
         net_cancel_signal_free(&sddf_state.rx_queue);
         sddf_state.notify_rx = false;
-        sddf_channel curr = sddf_deferred_notify_curr();
-        if (curr == -1) {
-            sddf_deferred_notify(sddf_state.rx_ch);
-        } else if (curr != sddf_state.rx_ch) {
-            sddf_notify(sddf_state.rx_ch);
-        }
+        // sddf_channel curr = sddf_deferred_notify_curr();
+        // if (curr == -1) {
+        //     sddf_deferred_notify(sddf_state.rx_ch);
+        // } else if (curr != sddf_state.rx_ch) {
+        //     sddf_notify(sddf_state.rx_ch);
+        // }
+        sddf_notify(sddf_state.rx_ch);
     }
 
     if (sddf_state.tx_queue.capacity && sddf_state.notify_tx && net_require_signal_active(&sddf_state.tx_queue)) {
         net_cancel_signal_active(&sddf_state.tx_queue);
         sddf_state.notify_tx = false;
-        sddf_channel curr = sddf_deferred_notify_curr();
-        if (curr == -1) {
-            sddf_deferred_notify(sddf_state.tx_ch);
-        } else if (curr != sddf_state.tx_ch) {
-            sddf_notify(sddf_state.tx_ch);
-        }
+        // sddf_channel curr = sddf_deferred_notify_curr();
+        // if (curr == -1) {
+        //     sddf_deferred_notify(sddf_state.tx_ch);
+        // } else if (curr != sddf_state.tx_ch) {
+        //     sddf_notify(sddf_state.tx_ch);
+        // }
+        sddf_notify(sddf_state.tx_ch);
     }
 }

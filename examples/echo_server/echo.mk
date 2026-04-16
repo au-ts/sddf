@@ -46,7 +46,7 @@ NETWORK_COMPONENTS := $(SDDF)/network/components
 
 SDDF_CUSTOM_LIBC := 1
 
-vpath %.c ${SDDF} ${ECHO_SERVER}
+vpath %.c %.pnk ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
@@ -55,7 +55,7 @@ IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 
 CFLAGS += \
 	  -Wno-unused-function \
-	  -I$(BOARD_DIR)/include \
+	  -I$(BOARD_DIR)/include/pancake-c-interop \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
@@ -69,7 +69,7 @@ CFLAGS += \
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
+LIBS := --start-group -lmicrokitpnk -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
 ECHO_OBJS := echo.o utilization_socket.o \
@@ -77,9 +77,53 @@ ECHO_OBJS := echo.o utilization_socket.o \
 
 DEPS := $(ECHO_OBJS:.o=.d)
 
+# pancake zone!
+CPP := $(TRIPLE)-cpp
+
+CROSSSTAGE1 := $(BUILD_DIR)/stage1_concat.pnk
+CROSSSTAGE2 := $(BUILD_DIR)/stage2_processed.pnk
+CROSSSTAGE3 := $(BUILD_DIR)/stage3_assembly.S
+CROSSSTAGE4 := $(BUILD_DIR)/stage4_object.o
+
+IMAGE   := $(BUILD_DIR)/loader.img
+REPORT  := $(BUILD_DIR)/report.txt
+
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+echo.pnk: 
+	cat ../echo.pnk > $@
+
+# Stage1: concat the Pancake files together
+$(CROSSSTAGE1): echo.pnk | $(BUILD_DIR)
+	@cat $(BOARD_DIR)/include/pansel4/pansel4.pnk > $@
+	@cat $(BOARD_DIR)/include/panmicrokit/api.pnk >> $@
+	@cat $(BOARD_DIR)/include/panmicrokit/main.pnk >> $@
+	@cat echo.pnk >> $@
+
+# Stage2: run C preprocessor on Stage1
+$(CROSSSTAGE2): $(CROSSSTAGE1) | $(BUILD_DIR)
+	$(CPP) -P $< > $@
+
+# Stage3: compile all Pancake code into asm / machine code
+$(CROSSSTAGE3): $(CROSSSTAGE2) | $(BUILD_DIR)
+	cat $< | cake --target=riscv --pancake --main_return=true > $@
+
+# Stage4: create object file from Stage3 asm
+$(CROSSSTAGE4): $(CROSSSTAGE3) | $(BUILD_DIR)
+	$(CC) -c -x assembler-with-cpp $(CFLAGS) $< -o $@
+# end of pancake zone!
+
+
 all: loader.img
 
-echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
+echo.elf: $(ECHO_OBJS) $(CROSSSTAGE4) libsddf_util.a lib_sddf_lwip_echo.a
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault udp_echo_socket.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault utilization_socket.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault tcp_echo_socket.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault lib_sddf_lwip_echo.a
+
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS

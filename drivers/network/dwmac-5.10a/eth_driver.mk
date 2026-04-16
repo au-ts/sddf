@@ -18,11 +18,13 @@ ${CHECK_DWMAC_FLAGS_MD5}:
 	-rm -f .DWMAC_cflags-*
 	touch $@
 
-eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o $(CROSSSTAGE4)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 network/dwmac-5.10a/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p network/dwmac-5.10a
+	echo "!!!!!!!!!!!!!!!!"
+	echo $(CFLAGS)
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
 -include dwmac-5.10a/ethernet.d

@@ -6,6 +6,14 @@
 #include <stdbool.h>
 #include <sddf/util/printf.h>
 
+__attribute__((weak)) microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    microkit_dbg_puts(microkit_name);
+    microkit_dbg_puts(" is missing the 'protected' entry point\n");
+    microkit_internal_crash(0);
+    return seL4_MessageInfo_new(0, 0, 0, 0);
+}
+
 /** Our dprintf() functions will sometimes go through our standard printf()
  *  machinery, which includes assert() statements itself. In the case that
  *  the machinery is failing, this would lead to infinite recursion and an

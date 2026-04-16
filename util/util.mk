@@ -34,11 +34,14 @@ BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
 ${ALL_OBJS_LIBUTIL}: |util util/custom_libc
 
 libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault util/assert.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault util/sddf_printf.o
 	${RM} $@
 	${AR} crv $@ $^
 	${RANLIB} $@
 
 libsddf_util.a: ${BASE_OBJS_LIBUTIL} util/putchar_serial.o
+	$(OBJCOPY) --localize-symbol=ffic_init --localize-symbol=ffic_notified --localize-symbol=ffic_protected --localize-symbol=fault util/putchar_serial.o
 	${RM} $@
 	${AR} crv $@ $^
 	${RANLIB} $@
