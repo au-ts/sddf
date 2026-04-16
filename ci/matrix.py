@@ -85,6 +85,12 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "boards": ["serengeti"],
         "tests_exclude": [],
     },
+    "ina219": {
+        "configs": ["debug", "release"],
+        "build_systems": ["make"],
+        "boards": ["serengeti"],
+        "tests_exclude": [],
+    },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],

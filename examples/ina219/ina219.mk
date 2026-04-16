@@ -1,5 +1,5 @@
 #
-# Copyright 2025, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -19,7 +19,6 @@ PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
 
 SUPPORTED_BOARDS := \
-		odroidc4 \
 		serengeti
 
 include ${SDDF}/tools/make/board/common.mk
