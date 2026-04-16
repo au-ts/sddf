@@ -626,7 +626,7 @@ typedef struct aml_object {
     struct aml_object *parent;  // parent
     struct aml_object *child;   // first child object
     struct aml_object *next;    // siblings
-    char name[4];    // Name Segment
+    char name[5];    // Name Segment
     enum aml_encoding_value op_code;
 } aml_object_t;
 

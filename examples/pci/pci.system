@@ -6,7 +6,7 @@
 -->
 <system>
     <memory_region name="remaining_untypeds" size="0x2000" receive_all_untypeds="true"/>
-    <memory_region name="aml_object_pool" size="0x2000"/>
+    <memory_region name="aml_object_pool" size="0x10000"/>
 
     <protection_domain name="acpi_driver" stack_size="0x50000">
         <program_image path="acpi_driver.elf" />
