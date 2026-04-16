@@ -12,11 +12,11 @@
 
 ACPI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-acpi_driver.elf: acpi/acpi.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+acpi_driver.elf: acpi/acpi.o acpi/interpreter.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-acpi/acpi.o: ${ACPI_DIR}/acpi.c ${CHECK_FLAGS_BOARD_MD5} |acpi $(SDDF_LIBC_INCLUDE)
-	${CC} ${CFLAGS} -o $@ -c $<
+acpi/%.o: ${ACPI_DIR}/%.c ${ACPI_DIR}/interpreter.o ${CHECK_FLAGS_BOARD_MD5} |acpi $(SDDF_LIBC_INCLUDE)
+	${CC} ${CFLAGS} -o $@ -c $^
 
 acpi:
 	mkdir -p acpi
