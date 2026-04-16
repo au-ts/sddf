@@ -52,6 +52,7 @@ Files:
     docs/i2c/i2cdriver.drawio.png
     docs/network/imgs/metadata.svg
     docs/network/imgs/network_arch.png
+    docs/network/imgs/vswitch*.svg
 Copyright: UNSW
 License: CC-BY-SA-4.0
 
