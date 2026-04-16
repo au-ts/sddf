@@ -8,14 +8,14 @@
 
 #include "include/client/client.h"
 
-#define DEBUG_CLIENT
 
-#ifdef DEBUG_CLIENT
+#ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
+#define LOG_CLIENT_ERR(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define STACK_SIZE (4096)
 
@@ -92,6 +92,7 @@ void set_timeout(uint64_t microseconds) {
     sddf_timer_set_timeout(timer_channel, microseconds*NS_IN_US);
 }
 
+
 uint64_t get_time_now() {
     return sddf_timer_time_now(timer_channel);
 }
@@ -118,24 +119,26 @@ void client_main(void) {
         uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
         uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
 
+        sddf_printf("sending");
+
         // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
         // LOG_CLIENT("dist sensor b: %lu\n", dist_sensor_b);
         // LOG_CLIENT("dist sensor c: %lu\n", dist_sensor_c);
         
-        if (dist_sensor_b > 40 && dist_sensor_a > 40 && dist_sensor_c > 40) {
-            LOG_CLIENT("attempting drive\n");
-            control_forward();
-            LOG_CLIENT("returned from drive\n");
-        }
-        else {
-            control_stop();
-            if (dist_sensor_a > dist_sensor_c) {
-                control_right();
-            }
-            else {
-                control_left();
-            }
-        }
+        // if (dist_sensor_b > 40 && dist_sensor_a > 40 && dist_sensor_c > 40) {
+        //     LOG_CLIENT("attempting drive\n");
+        //     control_forward();
+        //     LOG_CLIENT("returned from drive\n");
+        // }
+        // else {
+        //     control_stop();
+        //     if (dist_sensor_a > dist_sensor_c) {
+        //         control_right();
+        //     }
+        //     else {
+        //         control_left();
+        //     }
+        // }
     }
 }
 

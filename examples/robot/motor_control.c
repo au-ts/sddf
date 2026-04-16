@@ -10,17 +10,15 @@
 #include "include/client/client.h"
 #include "include/gpio_common/gpio_common.h"
 
-#define DEBUG_CLIENT
 
-#ifdef DEBUG_CLIENT
+#ifdef DEBUG_LOG
 // #define  LOG_CONTROL(...) do{}while(0)
 #define LOG_CONTROL(...) do{ sddf_printf("CONTROL|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
-#else
-#define  LOG_CONTROL(...) do{}while(0)
-#endif
-
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
-
+#else
+#define LOG_CONTROL(...) do{}while(0)
+#define LOG_CONTROL_ERR(...) do{}while(0)
+#endif
 // Channels
 
 // Motors A and B channels

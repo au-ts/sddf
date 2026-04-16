@@ -1,7 +1,13 @@
 #include "include/gpio_common/gpio_common.h"
 
+
+#ifdef DEBUG_LOG
 #define LOG_GPIO(...) do{ sddf_printf("GPIO COMMON|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #define LOG_GPIO_ERR(...) do{ sddf_printf("GPIO COMMON|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#else
+#define LOG_GPIO(...) do{}while(0)
+#define LOG_GPIO_ERR(...) do{}while(0)
+#endif
 
 void gpio_init(int gpio_ch, int direction) {
     sddf_printf("GPIO INIT called\n");

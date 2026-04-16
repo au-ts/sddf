@@ -28,7 +28,7 @@ void heapify_up(PriorityQueue* pq, int index)
 void enqueue(PriorityQueue* pq, uint64_t value, int id)
 {
     if (pq->size == MAX_SIZE) {
-        sddf_printf("Priority queue is full\n");
+        // sddf_printf("Priority queue is full\n");
         return;
     }
 
@@ -62,7 +62,7 @@ void heapify_down(PriorityQueue* pq, int index)
 int dequeue(PriorityQueue* pq)
 {
     if (!pq->size) {
-        sddf_printf("Priority queue is empty\n");
+        // sddf_printf("Priority queue is empty\n");
         return -1;
     }
 
@@ -78,7 +78,7 @@ int dequeue(PriorityQueue* pq)
 int peek(PriorityQueue* pq)
 {
     if (!pq->size) {
-        sddf_printf("Priority queue is empty\n");
+        // sddf_printf("Priority queue is empty\n");
         return 0;
     }
     return pq->vals[0];

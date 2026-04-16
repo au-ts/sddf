@@ -10,16 +10,15 @@
 #include "include/ultrasonic/ultrasonic_sensor.h"
 #include "include/gpio_common/gpio_common.h"
 
-#define DEBUG_CLIENT
-
-#ifdef DEBUG_CLIENT
+#ifdef DEBUG_LOG
 // #define  LOG_SENSOR(...) do{}while(0)
 #define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_SENSOR(...) do{}while(0)
+#define LOG_SENSOR_ERR(...) do{}while(0)
 #endif
 
-#define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 // Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value)
