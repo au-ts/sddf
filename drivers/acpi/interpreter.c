@@ -169,15 +169,16 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
         return NULL;
     }
 
-    while (name_segment_cnt--) {
+    while (--name_segment_cnt) {
         parent = make_object_if_not_exist(parent, NULL_OP);
     }
 
-    return parent;
+    return make_object_if_not_exist(parent, op_code);
 }
 
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
 {
+    scanner.start = scanner.current;
     uint8_t *next_obj_start = next_parent_start;
     uint16_t ext_op_prefix = 0;
 

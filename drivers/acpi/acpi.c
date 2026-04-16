@@ -389,16 +389,16 @@ void init(void)
     /*                  pci_resources.pci_seg_groups[j].bus_start, */
     /*                  pci_resources.pci_seg_groups[j].bus_end); */
     /* } */
+
     sddf_dprintf("===============Scanning DSDT===============\n");
 
-    scanner.start = (uint8_t *)&acpi_dsdt_table->content[0];
-    scanner.current = scanner.start;
+    scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     object_pool.next = (aml_object_t *)aml_object_pool_start;
     object_pool.end = (aml_object_t *)(aml_object_pool_start + 0x10000);
-    sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.start);
+    sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current);
 
-    uint8_t *dsdt_end = scanner.start + header->length - sizeof(acpi_header_t);
-    object_root.start = scanner.start;
+    uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t);
+    object_root.start = scanner.current;
     object_root.op_code = NULL_OP;
     object_root.name[0] = '\\';
     scan_objects(&object_root, dsdt_end);
