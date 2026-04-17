@@ -482,6 +482,18 @@ aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_se
     return NULL;
 }
 
+aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment)
+{
+    aml_object_t *parent = node->parent;
+    while (parent) {
+        aml_object_t *target = query_child_object_by_name(parent, name_segment);
+        if (target) {
+            return target;
+        }
+    }
+    return NULL;
+}
+
 void print_object_tree(aml_object_t *node, uint8_t depth)
 {
     for (uint8_t i = 0; i < depth; i++) sddf_dprintf("    ");

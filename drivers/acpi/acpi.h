@@ -649,6 +649,7 @@ void extract_pcie_crs(aml_object_t *node);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
+aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);
 
 extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
