@@ -106,6 +106,26 @@ aml_object_t *insert_child_object(aml_object_t *parent, const char *name_segment
     return new_object;
 }
 
+void skip_name_string()
+{
+    uint8_t name_type = advance();
+
+    if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
+        // Name Segment
+        scanner.current += 3;
+    } else if (name_type == '\\') {
+        // Root Path
+        skip_name_string();
+    } else if (name_type == 0x2E) {
+        // Dual Name Segment
+        scanner.current += 8;
+    } else if (name_type == 0x2F) {
+        // Multiple Name Segment
+        uint8_t seg_cnt = advance();
+        scanner.current += (4 * seg_cnt);
+    }
+}
+
 void read_name_segment(char *name_segment)
 {
     name_segment[0] = (char)advance();
@@ -255,9 +275,11 @@ uint32_t get_integer_data()
 
 // Parse the compressed EISA ID to readable characters
 // see 19.3.4 ASL Macros, EISAID
-void read_eisa_id(uint8_t *object_start, char *eisa_id_str)
+void read_eisa_id(aml_object_t *node, char *eisa_id_str)
 {
-    scanner.current = object_start + 5;
+    scanner.current = node->start + 1; // First byte for NAME_OP
+    skip_name_string();
+
     uint8_t eisa_type = advance();
 
     if (eisa_type == DATA_OBJ_DWORD) {
@@ -291,10 +313,11 @@ void read_eisa_id(uint8_t *object_start, char *eisa_id_str)
 }
 
 // Section 6.4
-void extract_pcie_crs(uint8_t *object_start)
+void extract_pcie_crs(aml_object_t *node)
 {
-    sddf_dprintf("position: 0x%lx\n", (uintptr_t)object_start);
-    scanner.current = object_start + 5;
+    scanner.current = node->start + 1; // First byte for NAME_OP
+    skip_name_string();
+
     uint8_t *data_end = get_data_end();
     uint8_t *buffer_start = scanner.current;
     uint32_t buffer_size = get_integer_data();
@@ -370,6 +393,17 @@ void extract_pcie_crs(uint8_t *object_start)
     }
 }
 
+void extract_pcie_prt(aml_object_t *node)
+{
+    scanner.current = node->start + 1;
+    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
+    get_pkt_end();
+    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
+    skip_name_string();
+    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
+
+    /* uint8_t method_flags = advance(); */
+}
 
 // Look for objects with matched name, returns number of matched results
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment)
