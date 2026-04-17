@@ -132,6 +132,7 @@ void read_name_segment(char *name_segment)
     name_segment[1] = (char)advance();
     name_segment[2] = (char)advance();
     name_segment[3] = (char)advance();
+    name_segment[4] = '\0';
 }
 
 // Make a child object and connect it to parent, returns NULL if failed
@@ -153,7 +154,6 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
     if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
         scanner.current--;
         char name_segment[5];
-        name_segment[4] = '\0';
         read_name_segment(name_segment);
         aml_object_t *existing_object = object_exists(parent, name_segment);
         if (existing_object) {
@@ -188,25 +188,18 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
     uint16_t ext_op_prefix = 0;
 
     while (scanner.start < next_parent_start) {
-        sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
-        sddf_dprintf("byte: 0x%02x\n", *(scanner.current));
         uint16_t op_code = advance() | ext_op_prefix;
-        sddf_dprintf("read op_code: 0x%02x\n", op_code);
         if (op_code == EXT_OP_PREFIX) {
             ext_op_prefix = EXT_OP_PREFIX << 8;
             continue;
         }
         ext_op_prefix = 0;
 
-        sddf_dprintf("op_code: 0x%02X\n", op_code);
         switch (op_code) {
             case SCOPE_OP: {
                 next_obj_start = get_pkt_end(); // By reading pktLen
-                sddf_dprintf("next obj start: 0x%lx\n", (uintptr_t)next_obj_start);
                 aml_object_t *node = make_object_if_not_exist(parent, SCOPE_OP);
-                sddf_dprintf("byte: 0x%02x\n", *(scanner.current));
 
-                sddf_dprintf("byte after name string: 0x%lx\n", (uintptr_t)scanner.current);
                 scan_objects(node, next_obj_start);
                 break;
             }
@@ -214,15 +207,12 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
                 next_obj_start = get_pkt_end(); // By reading pktLen
                 make_object_if_not_exist(parent, METHOD_OP);
 
-                /* scan_objects(node, next_obj_start); */
                 break;
             }
             case NAME_OP: {
                 make_object_if_not_exist(parent, NAME_OP);
 
-                // TODO: different logic to get length
                 next_obj_start = get_data_end();
-                sddf_dprintf("next_obj_start: 0x%lx\n", (uintptr_t)next_obj_start);
                 break;
             }
             case DEVICE_OP: {
@@ -393,16 +383,77 @@ void extract_pcie_crs(aml_object_t *node)
     }
 }
 
-void extract_pcie_prt(aml_object_t *node)
+bool get_term_list_return(aml_object_t *node, uint8_t *pkt_end, char *package_name)
 {
-    scanner.current = node->start + 1;
-    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
-    get_pkt_end();
-    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
-    skip_name_string();
-    sddf_dprintf("location: 0x%lx\n", (uintptr_t)scanner.current);
+    return false;
+}
 
-    /* uint8_t method_flags = advance(); */
+// DefMethod := MethodOp PkgLength NameString MethodFlags TermList
+bool extract_pcie_prt(aml_object_t *node, char *package_name)
+{
+    scanner.current = node->start + 1; // Skip MethodOp
+    uint8_t *pkt_end = get_pkt_end(); // PktLength
+    skip_name_string(); // Skip NameString
+
+    advance(); // Get MethodFlags
+    if (scanner.current < pkt_end) {
+        // TermList := Nothing | <termobj termlist>
+        // TermObj := Object | StatementOpcode | ExpressionOpcode
+        // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
+        // DefElse := Nothing | <elseop pkglength termlist>
+        // DefLEqual := LequalOp Operand Operand
+        // Operand := TermArg => Integer
+        // DefReturn := ReturnOp ArgObject
+        // ArgObject := TermArg => DataRefObject
+        //
+        // Example:
+        //   0xA0  IfOp
+        //   0x0C  PktLength = 0x0C
+        //   0x93  LEqualOp
+        //   0x50  'P' (Operand 1)
+        //   0x49  'I'
+        //   0x43  'C'
+        //   0x46  'F'
+        //   0x00  Zero (Operand 2)
+        //   0xA4  ReturnOp
+        //   0x50  'P'
+        //   0x52  'R'
+        //   0x54  'T'
+        //   0x50  'P'
+        //   0xA1  ElseOp
+        //   0x06  PkeLength = 0x06
+        //   0xA4  ReturnOp
+        //   0x50  'P'
+        //   0x52  'I'
+        //   0x54  'C'
+        //   0x41  'A'
+
+        while (scanner.current < pkt_end) {
+            uint8_t op_code = advance();
+            switch (op_code) {
+            case IF_OP: {
+                // DefIfElse := IfOp PkgLength Predicate TermList DefElse
+                // @terryb: we assume IF is for legacy PIC mode, so just skip it
+                //   but this is not the case on makatea
+                scanner.current = get_pkt_end();
+                break;
+            }
+            case ELSE_OP: {
+                get_pkt_end();
+                break;
+            }
+            case RETURN_OP: {
+                read_name_segment(package_name);
+                return true;
+            }
+            default: {
+                sddf_dprintf("OpCode %u is not implemented\n", op_code);
+            }
+            }
+        }
+
+    }
+    return false;
 }
 
 // Look for objects with matched name, returns number of matched results

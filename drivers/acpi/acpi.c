@@ -433,7 +433,12 @@ void init(void)
                 sddf_dprintf("_PRT node is not found\n");
                 return;
             }
-            extract_pcie_prt(prt_node);
+            char package_name[5];
+            if (extract_pcie_prt(prt_node, package_name)) {
+                sddf_dprintf("Routing table package \'%s'\n", package_name);
+            } else {
+                sddf_dprintf("Failed to parse the package name for routing tables\n");
+            }
         }
     }
 
