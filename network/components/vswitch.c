@@ -4,13 +4,15 @@
  */
 
 #include "os/sddf.h"
-#include "sddf/network/config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/mac802.h>
+#include <sddf/network/config.h>
 #include <sddf/network/ip.h>
+#include <sddf/network/icmp.h>
+#include <sddf/network/tcp.h>
 #include <sddf/network/udp.h>
 #include <sddf/network/util.h>
 #include <sddf/util/util.h>
@@ -48,7 +50,41 @@ typedef struct buffer_ref {
 
 buffer_ref_t *buffer_refs;
 buffer_ref_t *buffer_refs_start[SDDF_NET_MAX_CLIENTS];
-uint64_t num_forwarded_bufs[SDDF_NET_MAX_CLIENTS];
+uint32_t num_forwarded_bufs[SDDF_NET_MAX_CLIENTS];
+
+#ifdef NETWORK_HW_HAS_CHECKSUM
+static void clear_checksums(ether_hdr_t *eth_frame)
+{
+    if ((uint16_t)*eth_frame->etype != HTONS(ETH_TYPE_IP)) {
+        return;
+    }
+
+    ipv4_hdr_t *ip_header = (ipv4_hdr_t *)((void *)eth_frame + sizeof(ether_hdr_t));
+    if (ip_header->protocol == IPV4_PROTO_UDP) {
+        switch (ip_header->protocol) {
+        case IPV4_PROTO_UDP: {
+            udp_hdr_t *udp_header = (udp_hdr_t *)((void *)eth_frame + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
+            udp_header->check = 0x0;
+            break;
+        }
+        case IPV4_PROTO_TCP: {
+            tcp_hdr_t *tcp_header = (tcp_hdr_t *)((void *)eth_frame + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
+            tcp_header->check = 0x0;
+            break;
+        }
+        case IPV4_PROTO_ICMP: {
+            icmp_hdr_t *icmp_header = (icmp_hdr_t *)((void *)eth_frame + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
+            icmp_header->check = 0x0;
+            break;
+        }
+        default: {
+            sddf_dprintf("VSWITCH|ERR: Wrong ip protocol received\n");
+            break;
+        }
+        }
+    }
+}
+#endif
 
 static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_buf)
 {
@@ -65,15 +101,12 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
         return false;
     }
 
+#ifdef NETWORK_HW_HAS_CHECKSUM
     /* Clear ethernet checksum if the dest is a virtualiser, we already know other clients handled it */
     if (dst_id == config.num_ports) {
-        const char *frame_data = config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset;
-        ipv4_hdr_t *ip_header = (ipv4_hdr_t *)(frame_data + sizeof(ether_hdr_t));
-        if (ip_header->protocol == IPV4_PROTO_UDP) {
-            udp_hdr_t *udp_header = (udp_hdr_t *)(frame_data + sizeof(ether_hdr_t) + sizeof(ipv4_hdr_t));
-            udp_header->check = 0x0;
-        }
+        clear_checksums((ether_hdr_t *)(config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset));
     }
+#endif
 
     net_enqueue_active(&state.rx_queues[dst_id], d_buffer);
     need_rx_signal[dst_id] = true;
@@ -117,14 +150,21 @@ static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
     /* Only broadcast to allowed, exclude the source */
     for (uint8_t i = 0; i <= config.num_ports; i++) {
         if (i != src_id && vswitch_can_send_to(src_id, i)) {
-            /* When we are broadcasting, we need to clear checksums for the virt so it is sent the packet
-             * only after all other ports have received it */
-            if (i == config.num_ports) {
+#ifdef NETWORK_HW_HAS_CHECKSUM
+            /* To ensure that vswitch clients transmit packets with the correct checksums to their peers,
+             * we enforce that all vswitch clients must generate their own checksums in software.
+             * However, our NICs are generally configured to add checksums in hardware during transmission.
+             * Thus when vswitch clients broadcast packets, we first transmit the packet with checksums to the other vswitch clients,
+             * then once all clients have freed the packet we zero out the checksums before passing to the virtualiser.
+             * There is a corner case where a client can only transmit to the virtualiser yet still broadcasts.
+             * In this case the packet will need to be forwarded immediately. */
+            if (success && i == config.num_ports) {
                 int ref_index = buffer->io_or_offset / NET_BUFFER_SIZE;
                 buffer_refs_start[src_id][ref_index].tx_to_virt = 1;
                 success = true;
                 continue;
             }
+#endif
             success |= forward_frame(src_id, i, buffer);
         }
     }
@@ -165,11 +205,13 @@ static void rx_return(uint8_t port_id)
                 continue;
             }
 
+#ifdef NETWORK_HW_HAS_CHECKSUM
             if (buffer_refs_start[buffer.oid][ref_index].tx_to_virt) {
                 buffer_refs_start[buffer.oid][ref_index].tx_to_virt = 0;
                 forward_frame(buffer.oid, config.num_ports, &buffer);
                 continue;
             }
+#endif
 
             /* Return the buffer to its owner */
             dst = &state.tx_queues[buffer.oid];
