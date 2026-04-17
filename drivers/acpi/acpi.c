@@ -436,6 +436,12 @@ void init(void)
             char package_name[5];
             if (extract_pcie_prt(prt_node, package_name)) {
                 sddf_dprintf("Routing table package \'%s'\n", package_name);
+                aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name);
+                if (prt_package) {
+                    sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start);
+                } else {
+                    sddf_dprintf("PRT package is not found\n");
+                }
             } else {
                 sddf_dprintf("Failed to parse the package name for routing tables\n");
             }
