@@ -95,10 +95,10 @@ var 1 eth_reg = ETH_REG;
 /@ extern predicate valid_hardware_ring_rx_read @/
 /@ extern predicate valid_hardware_ring_tx_write @/
 /@ extern predicate valid_hardware_ring_tx_read @/
-/@ extern predicate valid_hardware_ring_rx_mdata_write @/
-/@ extern predicate valid_hardware_ring_tx_mdata_write @/
-/@ extern predicate valid_hardware_ring_rx_mdata_read @/
-/@ extern predicate valid_hardware_ring_tx_mdata_read @/
+/@ extern function valid_hardware_ring_rx_mdata_write(): Bool @/
+/@ extern function valid_hardware_ring_tx_mdata_write(): Bool @/
+/@ extern function valid_hardware_ring_tx_mdata_read(): Bool @/
+/@ extern function valid_hardware_ring_rx_mdata_read(): Bool @/
 /@ extern predicate valid_net_queue_produce @/
 /@ extern predicate valid_net_queue_consume @/
 /@ extern field hardware_ring_tx: IArray @/
