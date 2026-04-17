@@ -439,6 +439,7 @@ void init(void)
                 aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name);
                 if (prt_package) {
                     sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start);
+                    extract_prt_package(prt_package);
                 } else {
                     sddf_dprintf("PRT package is not found\n");
                 }

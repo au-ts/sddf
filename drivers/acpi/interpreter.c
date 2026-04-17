@@ -308,11 +308,10 @@ void extract_pcie_crs(aml_object_t *node)
     scanner.current = node->start + 1; // First byte for NAME_OP
     skip_name_string();
 
-    uint8_t *data_end = get_data_end();
+    get_data_end();
     uint8_t *buffer_start = scanner.current;
     uint32_t buffer_size = get_integer_data();
     uint8_t *buffer_end = buffer_start + buffer_size;
-    sddf_dprintf("data_end: 0x%lx, buffer_size: %u, buffer_end: 0x%lx\n", (uintptr_t)data_end, buffer_size, (uintptr_t)buffer_end);
 
     while (scanner.current < buffer_end) {
         uint32_t descriptor_type = scanner.current[0];
@@ -382,6 +381,51 @@ void extract_pcie_crs(aml_object_t *node)
         scanner.current += descriptor_len;
     }
 }
+
+void extract_prt_package(aml_object_t *node)
+{
+    scanner.current = node->start;
+    if (advance() != NAME_OP) {
+        return;
+    }
+
+    skip_name_string();
+
+    // DefPackage := PackageOp PkgLength NumElements PackageElementList
+    if (advance() != PACKAGE_OP) {
+        // Not a PackageObject
+        return;
+    }
+
+    uint8_t *pkt_end = get_pkt_end();
+    uint8_t num_elements = advance();
+    sddf_dprintf("num_elements: %u\n", num_elements);
+
+    while (scanner.current < pkt_end) {
+        // Check if element is also Package Object
+        if (advance() != PACKAGE_OP) return;
+
+        get_pkt_end();
+        uint32_t element_num_elements = advance();
+
+        // Check if num of elements is 4
+        if (element_num_elements != 4) return;
+
+        // Parse address, i.e. PCI slot
+        uint32_t element_1 = get_integer_data();
+        // Parse PIN
+        uint32_t element_2 = get_integer_data();
+        // Parse Source, i.e. GSI number
+        // @terryb: we assume this is a 4-bytes name segment
+        char name_str[5];
+        read_name_segment(name_str);
+
+        // Parse Source Index, i.e. index in I/O APIC
+        uint32_t element_4 = get_integer_data();
+        sddf_dprintf("{ 0x%X, 0x%x, %s, 0x%x}\n", element_1, element_2, name_str, element_4);
+    }
+}
+
 
 bool get_term_list_return(aml_object_t *node, uint8_t *pkt_end, char *package_name)
 {
