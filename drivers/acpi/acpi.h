@@ -94,6 +94,8 @@ enum aml_encoding_value {
     DEVICE_OP = 0x5B82,
     // Something more
     IF_OP = 0xA0,
+    ELSE_OP = 0xA1,
+    RETURN_OP = 0xA4,
     NULL_OP = 0xFFFF,
 };
 
@@ -644,7 +646,7 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
 void read_eisa_id(aml_object_t *node, char *eisa_id_str);
 void extract_pcie_crs(aml_object_t *node);
-void extract_pcie_prt(aml_object_t *node);
+bool extract_pcie_prt(aml_object_t *node, char *package_name);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 
