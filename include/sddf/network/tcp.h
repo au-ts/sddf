@@ -10,8 +10,7 @@
 
 /* ----------------- TCP Protocol Definitions ---------------------------*/
 
-typedef struct __attribute__((__packed__)) tcp_hdr
-  {
+typedef struct __attribute__((__packed__)) tcp_hdr {
     /* source port */
     uint16_t src_port;
     /* destination port */
