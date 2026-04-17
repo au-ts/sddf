@@ -369,35 +369,10 @@ void init(void)
                           seL4_X86_Default_VMAttributes);
     }
 
-    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
-    /* /\* aml_path_seg_t path; *\/ */
-    /* char path_name[AML_MAX_PATH_STR] = { '\0' }; */
-    /* extract_device_resources(&acpi_dsdt_table->content[0], header->length - sizeof(acpi_header_t), path_name, 0); */
-    /* sddf_dprintf("DSDT has been parsed!\n"); */
-
-    /* error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58); */
-    /* sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error); */
-
-    /* // Map pages for PCI driver */
-    /* for (int i = 0; i < pci_resources.num_pci_groups; i++) { */
-    /*     // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses */
-    /*     uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20); */
-    /*     sddf_dprintf("base addr: 0x%lx, size: 0x%x\n", pci_resources.pci_seg_groups[i].base_addr, ecam_size); */
-    /* } */
-
-
-    /* // Print summary */
-    /* sddf_dprintf("\n======PCI resources summary:======\n"); */
-    /* for (int j = 0; j < pci_resources.num_pci_groups; j++) { */
-    /*     sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n", */
-    /*                  pci_resources.pci_seg_groups[j].group_id, */
-    /*                  pci_resources.pci_seg_groups[j].base_addr, */
-    /*                  pci_resources.pci_seg_groups[j].bus_start, */
-    /*                  pci_resources.pci_seg_groups[j].bus_end); */
-    /* } */
 
     sddf_dprintf("===============Scanning DSDT===============\n");
 
+    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     object_pool.next = aml_object_pool_start;
     object_pool.end = aml_object_pool_start + 0x10000;
@@ -449,6 +424,28 @@ void init(void)
             }
         }
     }
+
+    /* error = seL4_CNode_Revoke(capDLBootInfo->untyped_cnode_cptr, acpi_ut_idx, 58); */
+    /* sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error); */
+
+    /* // Map pages for PCI driver */
+    /* for (int i = 0; i < pci_resources.num_pci_groups; i++) { */
+    /*     // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses */
+    /*     uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20); */
+    /*     sddf_dprintf("base addr: 0x%lx, size: 0x%x\n", pci_resources.pci_seg_groups[i].base_addr, ecam_size); */
+    /* } */
+
+
+    // Print summary
+    sddf_dprintf("\n======PCI resources summary:======\n");
+    for (int j = 0; j < pci_resources.num_pci_groups; j++) {
+        sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
+                     pci_resources.pci_seg_groups[j].group_id,
+                     pci_resources.pci_seg_groups[j].base_addr,
+                     pci_resources.pci_seg_groups[j].bus_start,
+                     pci_resources.pci_seg_groups[j].bus_end);
+    }
+
 
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used
