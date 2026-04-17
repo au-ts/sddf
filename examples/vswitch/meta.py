@@ -480,6 +480,14 @@ def generate(
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
+
+    # ACLs
+    # 0 -> 1, V
+    # 1 -> 0, V
+    net_system.add_acl_rule(client0, client1, vswitch)
+    net_system.add_acl_rule(client0, net_virt_tx, vswitch)
+    net_system.add_acl_rule(client1, net_virt_tx, vswitch)
+
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
