@@ -317,6 +317,11 @@ void extract_pcie_crs(aml_object_t *node)
         uint32_t descriptor_type = scanner.current[0];
         uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
         switch (descriptor_type) {
+            case EXTENDED_IRQ_DESCRIPTOR: {
+                acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)scanner.current;
+                sddf_dprintf("  IRQ number: %u\n", ext_irq->irq_num);
+                break;
+            }
             case WORD_AS_DESCRIPTOR: {
                 acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)scanner.current;
                 sddf_dprintf("  =========\n");
@@ -417,12 +422,24 @@ void extract_prt_package(aml_object_t *node)
         uint32_t element_2 = get_integer_data();
         // Parse Source, i.e. GSI number
         // @terryb: we assume this is a 4-bytes name segment
-        char name_str[5];
-        read_name_segment(name_str);
+        //   but it's an integer on makatea
+        char irq_node_name[5];
+        read_name_segment(irq_node_name);
+        aml_object_t *irq_node = query_same_domain_object_by_name(node, irq_node_name);
+        if (irq_node == NULL) {
+            sddf_dprintf("IRQ Name Object \'%s\' is not found\n", irq_node_name);
+        }
+        aml_object_t *irq_crs = query_child_object_by_name(irq_node, acpi_str_crs);
+        if (irq_crs == NULL) {
+            sddf_dprintf("_CRS of IRQ Name Object \'%s\' is not found\n", irq_node_name);
+        }
+        uint8_t *saved_current = scanner.current;
+        extract_pcie_crs(irq_crs);
+        scanner.current = saved_current;
 
         // Parse Source Index, i.e. index in I/O APIC
         uint32_t element_4 = get_integer_data();
-        sddf_dprintf("{ 0x%X, 0x%x, %s, 0x%x}\n", element_1, element_2, name_str, element_4);
+        sddf_dprintf("{ 0x%X, 0x%x, %s, 0x%x}\n", element_1, element_2, irq_node_name, element_4);
     }
 }
 
@@ -534,6 +551,7 @@ aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *n
         if (target) {
             return target;
         }
+        parent = parent->parent;
     }
     return NULL;
 }
