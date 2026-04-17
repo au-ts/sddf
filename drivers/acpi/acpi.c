@@ -417,7 +417,7 @@ void init(void)
         aml_object_t *node = lookup_results[i];
         sddf_dprintf("i: %u, OpCode: 0x%02X, Name: %s, Location: 0x%lx\n", i, node->op_code, node->name, (uintptr_t)node->start);
         char eisa_id[10];
-        read_eisa_id(node->start, eisa_id);
+        read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
             sddf_dprintf("Found PCIe Bus\n");
 
@@ -426,13 +426,14 @@ void init(void)
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
-            extract_pcie_crs(crs_node->start);
+            extract_pcie_crs(crs_node);
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {
                 sddf_dprintf("_PRT node is not found\n");
                 return;
             }
+            extract_pcie_prt(prt_node);
         }
     }
 
