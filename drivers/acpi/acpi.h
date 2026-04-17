@@ -203,6 +203,12 @@ typedef struct {
     uint8_t  address_length; // Number of ports used
 } __attribute__((packed)) acpi_io_port_t;
 
+typedef struct acpi_crs_list {
+    enum aml_data_resource_type resource_type;
+    uintptr_t data_addr;
+    struct acpi_crs_list *next;
+} __attribute__((packed)) acpi_crs_list_t;
+
 /* uint32_t get_pkt_len(uint8_t *pktlen_encoding) */
 /* { */
 /*     uint8_t byte_data_cnt = pktlen_encoding[0] >> 6; */
@@ -643,8 +649,8 @@ typedef struct aml_object {
 } aml_object_t;
 
 typedef struct aml_object_pool {
-    aml_object_t *next;
-    aml_object_t *end;
+    uintptr_t next;
+    uintptr_t end;
 } aml_object_pool_t;
 
 typedef struct object_lookup_list {
@@ -655,7 +661,7 @@ typedef struct object_lookup_list {
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
 void read_eisa_id(aml_object_t *node, char *eisa_id_str);
-void extract_pcie_crs(aml_object_t *node);
+acpi_crs_list_t *extract_pcie_crs(aml_object_t *node);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
 void extract_prt_package(aml_object_t *node);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
