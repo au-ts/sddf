@@ -23,6 +23,7 @@
 #define PR_MAC802_SRC_ADDR_ARGS(a) PR_MAC802_ADDR_ARGS(a, src)
 
 #define MAC802_BYTES 6
+#define ETH_TYPE_IP 0x0800U
 
 typedef struct mac_addr {
     uint8_t addr[MAC802_BYTES];
