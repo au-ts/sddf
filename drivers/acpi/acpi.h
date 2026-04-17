@@ -89,6 +89,7 @@ enum aml_encoding_value {
     STRING_PREFIX = 0x0D,
     QWORD_PREFIX = 0x0E,
     SCOPE_OP = 0x10,
+    PACKAGE_OP = 0x12,
     METHOD_OP = 0x14,
     EXT_OP_PREFIX = 0x5B,
     DEVICE_OP = 0x5B82,
@@ -647,6 +648,7 @@ void print_object_tree(aml_object_t *node, uint8_t depth);
 void read_eisa_id(aml_object_t *node, char *eisa_id_str);
 void extract_pcie_crs(aml_object_t *node);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
+void extract_prt_package(aml_object_t *node);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);
