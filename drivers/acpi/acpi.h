@@ -112,6 +112,7 @@ enum aml_data_object_type {
 };
 
 enum aml_data_resource_type {
+    EXTENDED_IRQ_DESCRIPTOR = 0x89,
     IO_PORT_DESCRIPTOR = 0x47,
     DWORD_AS_DESCRIPTOR = 0x87,
     WORD_AS_DESCRIPTOR = 0x88,
@@ -142,6 +143,14 @@ typedef struct {
     uint32_t num_bridges;
 } pci_resources_t;
 
+typedef struct {
+    uint8_t  tag;            // 0x89
+    uint16_t length;         // Length of data (usually 13 bytes)
+    uint8_t  vector_flags;   //
+    uint8_t  table_len;      //
+    uint8_t  irq_num;        //
+    // Optional 'Resource Source' string could follow here
+} __attribute__((packed)) acpi_ext_irq_t;
 
 typedef struct {
     uint8_t  tag;            // 0x88
@@ -660,3 +669,10 @@ extern aml_object_t object_root;
 extern pci_resources_t pci_resources;
 extern aml_object_t *lookup_results[50];
 extern uint32_t lookup_cnt;
+
+extern const char acpi_str_fadt[];
+extern const char acpi_str_mcfg[];
+extern const char acpi_str_hid[];
+extern const char acpi_str_crs[];
+extern const char acpi_str_prt[];
+extern const char eisaid_str_pcie[];
