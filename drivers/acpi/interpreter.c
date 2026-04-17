@@ -6,23 +6,26 @@
 
 #include "acpi.h"
 
-aml_object_t *alloc_object()
+uintptr_t alloc_mem(uint32_t mem_size)
 {
-    sddf_dprintf("next: 0x%lx, end: 0x%lx\n", (uintptr_t)object_pool.next, (uintptr_t)object_pool.end);
-    if (object_pool.next + 1 >= object_pool.end) {
+    if ((uintptr_t)object_pool.next + mem_size >= (uintptr_t)object_pool.end) {
         // Error: Out of memory for AML objects
-        return NULL;
+        return 0;
     }
 
-    aml_object_t *allocated_object = object_pool.next;
-    object_pool.next++;
+    uintptr_t reserved_mem = object_pool.next;
+    object_pool.next = object_pool.next + mem_size;
+    return reserved_mem;
+}
 
-    return allocated_object;
+aml_object_t *alloc_object()
+{
+    return (aml_object_t *)alloc_mem(sizeof(aml_object_t));
 }
 
 uint8_t advance() {
-  scanner.current++;
-  return scanner.current[-1];
+    scanner.current++;
+    return scanner.current[-1];
 }
 
 // scanner.current should be at start of pktLength when invoked
@@ -303,7 +306,7 @@ void read_eisa_id(aml_object_t *node, char *eisa_id_str)
 }
 
 // Section 6.4
-void extract_pcie_crs(aml_object_t *node)
+acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
 {
     scanner.current = node->start + 1; // First byte for NAME_OP
     skip_name_string();
@@ -312,6 +315,7 @@ void extract_pcie_crs(aml_object_t *node)
     uint8_t *buffer_start = scanner.current;
     uint32_t buffer_size = get_integer_data();
     uint8_t *buffer_end = buffer_start + buffer_size;
+    acpi_crs_list_t *crs_list = NULL;
 
     while (scanner.current < buffer_end) {
         uint32_t descriptor_type = scanner.current[0];
@@ -320,6 +324,11 @@ void extract_pcie_crs(aml_object_t *node)
             case EXTENDED_IRQ_DESCRIPTOR: {
                 acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)scanner.current;
                 sddf_dprintf("  IRQ number: %u\n", ext_irq->irq_num);
+                acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
+                new_entry->resource_type = descriptor_type;
+                new_entry->data_addr = (uintptr_t)ext_irq;
+                new_entry->next = crs_list;
+                crs_list = new_entry;
                 break;
             }
             case WORD_AS_DESCRIPTOR: {
@@ -385,6 +394,8 @@ void extract_pcie_crs(aml_object_t *node)
         }
         scanner.current += descriptor_len;
     }
+
+    return crs_list;
 }
 
 void extract_prt_package(aml_object_t *node)
@@ -434,12 +445,19 @@ void extract_prt_package(aml_object_t *node)
             sddf_dprintf("_CRS of IRQ Name Object \'%s\' is not found\n", irq_node_name);
         }
         uint8_t *saved_current = scanner.current;
-        extract_pcie_crs(irq_crs);
+        acpi_crs_list_t *crs_list = extract_pcie_crs(irq_crs);
         scanner.current = saved_current;
+        if (crs_list && crs_list->resource_type != EXTENDED_IRQ_DESCRIPTOR) {
+            sddf_dprintf("No IRQ is extracted\n");
+            return;
+        }
+
+        acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
 
         // Parse Source Index, i.e. index in I/O APIC
         uint32_t element_4 = get_integer_data();
-        sddf_dprintf("{ 0x%X, 0x%x, %s, 0x%x}\n", element_1, element_2, irq_node_name, element_4);
+
+        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4);
     }
 }
 
