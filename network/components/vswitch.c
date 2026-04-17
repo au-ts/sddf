@@ -22,6 +22,16 @@
 
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
+typedef struct client_info {
+    uint32_t ip_addr;
+    uint32_t id;
+} client_info_t;
+
+typedef struct clients {
+    client_info_t info[SDDF_NET_MAX_CLIENTS - 1];
+    uint32_t num;
+} clients_t;
+
 typedef struct vswitch_state {
     /* Queues ranging from 0 to num_ports - 1 belong to vswitch clients,
      * where client n's Rx and Tx queues are given by rx_queues[n] and tx_queues[n] respectively.
@@ -35,6 +45,7 @@ typedef struct vswitch_state {
     net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
     bool virt_connected;
+    clients_t clients;
 } vswitch_state_t;
 
 static vswitch_state_t state;
@@ -330,4 +341,37 @@ void init(void)
             buffer_refs_start[i] = buffer_refs_start[i - 1] + config.ports[i - 1].tx.num_buffers;
         }
     }
+}
+
+seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+{
+    size_t label = microkit_msginfo_get_label(msginfo);
+    switch (label) {
+    case VSWITCH_REPORT_IP_ADDR: {
+        uint32_t ip_addr = microkit_mr_get(0);
+        uint32_t client_id = microkit_mr_get(1);
+        state.clients.info[state.clients.num].ip_addr = ip_addr;
+        state.clients.info[state.clients.num].id = client_id;
+        state.clients.num += 1;
+        sddf_dprintf("VSWITCH: PPC received REPORT PPC with label: %zu from ch: %u client_id: %d ip_addr: %d num_clients: %d\n", label, ch, client_id, ip_addr, state.clients.num);
+        break;
+    }
+    case VSWITCH_QUERY_IP_ADDR: {
+        sddf_dprintf("VSWITCH: PPC received QUERY PPC with label: %zu from ch: %u num_clients: %d\n", label, ch, state.clients.num);
+        sddf_set_mr(0, state.clients.num);
+        sddf_dprintf("VSWITCH: PPC reg: 0 val: %d\n", state.clients.num * 2 + 1);
+        for (int i = 0; i < state.clients.num; i++) {
+            sddf_set_mr(i * 2 + 1, state.clients.info[i].id);
+            sddf_set_mr(i * 2 + 2, state.clients.info[i].ip_addr);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 1, state.clients.info[i].id);
+            sddf_dprintf("VSWITCH: PPC reg: %d val: %d\n", i * 2 + 2, state.clients.info[i].ip_addr);
+        }
+        return seL4_MessageInfo_new(0, 0, 0, state.clients.num * 2 + 1);
+    }
+    default: {
+        sddf_printf_("VSWITCH: PPC - Wrong label passed\n");
+        break;
+    }
+    }
+    return seL4_MessageInfo_new(0, 0, 0, 0);
 }
