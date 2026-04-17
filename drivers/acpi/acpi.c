@@ -426,7 +426,8 @@ void init(void)
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
-            extract_pcie_crs(crs_node);
+            acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
+            print_crs_list(crs_list);
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {

@@ -662,6 +662,7 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
 void read_eisa_id(aml_object_t *node, char *eisa_id_str);
 acpi_crs_list_t *extract_pcie_crs(aml_object_t *node);
+void print_crs_list(acpi_crs_list_t *crs_list);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
 void extract_prt_package(aml_object_t *node);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
