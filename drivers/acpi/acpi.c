@@ -22,6 +22,10 @@ typedef struct {
 
 const char acpi_str_fadt[] = {'F', 'A', 'C', 'P', 0};
 const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
+const char acpi_str_hid[] = {'_', 'H', 'I', 'D', 0};  // Hardware ID
+const char acpi_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
+const char acpi_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
+const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI Express Bus
 
 capDLBootInfo_t *capDLBootInfo;
 uintptr_t aml_object_pool_start;
@@ -29,6 +33,8 @@ scanner_t scanner;
 aml_object_pool_t object_pool;
 aml_object_t object_root;
 pci_resources_t pci_resources;
+aml_object_t *lookup_results[50];
+uint32_t lookup_cnt;
 
 void print_64(seL4_Word w) {
     microkit_dbg_put32((seL4_Uint32) (w >> 32));
@@ -403,6 +409,32 @@ void init(void)
     object_root.name[0] = '\\';
     scan_objects(&object_root, dsdt_end);
     print_object_tree(&object_root, 0);
+
+    sddf_dprintf("===========Lookup Results=========\n");
+    lookup_cnt = 0;
+    query_all_objects_by_name(&object_root, acpi_str_hid);
+    for (uint32_t i = 0; i < lookup_cnt; i++) {
+        aml_object_t *node = lookup_results[i];
+        sddf_dprintf("i: %u, OpCode: 0x%02X, Name: %s, Location: 0x%lx\n", i, node->op_code, node->name, (uintptr_t)node->start);
+        char eisa_id[10];
+        read_eisa_id(node->start, eisa_id);
+        if (!strcmp(eisa_id, eisaid_str_pcie)) {
+            sddf_dprintf("Found PCIe Bus\n");
+
+            aml_object_t *crs_node = query_child_object_by_name(node->parent, acpi_str_crs);
+            if (crs_node == NULL) {
+                sddf_dprintf("_CRS node is not found\n");
+                return;
+            }
+            extract_pcie_crs(crs_node->start);
+
+            aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
+            if (prt_node == NULL) {
+                sddf_dprintf("_PRT node is not found\n");
+                return;
+            }
+        }
+    }
 
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used

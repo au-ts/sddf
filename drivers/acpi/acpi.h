@@ -622,7 +622,7 @@ typedef struct {
 } scanner_t;
 
 typedef struct aml_object {
-    const uint8_t *start;
+    uint8_t *start;
     struct aml_object *parent;  // parent
     struct aml_object *child;   // first child object
     struct aml_object *next;    // siblings
@@ -635,11 +635,22 @@ typedef struct aml_object_pool {
     aml_object_t *end;
 } aml_object_pool_t;
 
+typedef struct object_lookup_list {
+    aml_object_t *node;
+    aml_object_t *next;
+} object_lookup_list_t;
+
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
+void read_eisa_id(uint8_t *object_start, char *eisa_id_str);
+void extract_pcie_crs(uint8_t *object_start);
+void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
+aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 
 extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
 extern aml_object_pool_t object_pool;
 extern aml_object_t object_root;
 extern pci_resources_t pci_resources;
+extern aml_object_t *lookup_results[50];
+extern uint32_t lookup_cnt;
