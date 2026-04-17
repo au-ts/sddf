@@ -305,31 +305,15 @@ void read_eisa_id(aml_object_t *node, char *eisa_id_str)
     }
 }
 
-// Section 6.4
-acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
+void print_crs_list(acpi_crs_list_t *crs_list)
 {
-    scanner.current = node->start + 1; // First byte for NAME_OP
-    skip_name_string();
-
-    get_data_end();
-    uint8_t *buffer_start = scanner.current;
-    uint32_t buffer_size = get_integer_data();
-    uint8_t *buffer_end = buffer_start + buffer_size;
-    acpi_crs_list_t *crs_list = NULL;
-
-    while (scanner.current < buffer_end) {
-        uint32_t descriptor_type = scanner.current[0];
-        uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
-        switch (descriptor_type) {
+    while (crs_list) {
+        switch (crs_list->resource_type) {
             case EXTENDED_IRQ_DESCRIPTOR: {
-                acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)scanner.current;
+                acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
+                sddf_dprintf("  =========\n");
                 sddf_dprintf("  IRQ number: %u\n", ext_irq->irq_num);
-                acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
-                new_entry->resource_type = descriptor_type;
-                new_entry->data_addr = (uintptr_t)ext_irq;
-                new_entry->next = crs_list;
-                crs_list = new_entry;
-                break;
+                 break;
             }
             case WORD_AS_DESCRIPTOR: {
                 acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)scanner.current;
@@ -389,9 +373,36 @@ acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
                 break;
             }
             default: {
-                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", descriptor_type);
+                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type);
             }
         }
+
+        crs_list = crs_list->next;
+    }
+}
+
+// Section 6.4
+acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
+{
+    scanner.current = node->start + 1; // First byte for NAME_OP
+    skip_name_string();
+
+    get_data_end();
+    uint8_t *buffer_start = scanner.current;
+    uint32_t buffer_size = get_integer_data();
+    uint8_t *buffer_end = buffer_start + buffer_size;
+    acpi_crs_list_t *crs_list = NULL;
+
+    while (scanner.current < buffer_end) {
+        uint32_t descriptor_type = scanner.current[0];
+        uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
+
+        acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
+        new_entry->resource_type = descriptor_type;
+        new_entry->data_addr = (uintptr_t)scanner.current;
+        new_entry->next = crs_list;
+        crs_list = new_entry;
+
         scanner.current += descriptor_len;
     }
 
