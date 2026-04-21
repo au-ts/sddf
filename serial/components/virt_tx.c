@@ -196,6 +196,7 @@ void init(void)
 #endif
     }
 
+    sddf_dprintf("VIRT_TX|LOG: To switch currently focused client: CTRL + \\, <client number>, \\r\n");
     if (config.enable_colour) {
         for (uint64_t i = 0; i < config.num_clients; i++) {
             sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], config.clients[i].name, i,
