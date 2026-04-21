@@ -170,6 +170,10 @@ if __name__ == "__main__":
         output_link.unlink()
         output_link.symlink_to(file)
 
+    print("Running benchmarks for:")
+    print("    throughputs: {}".format(", ".join(str(t) for t in args.throughputs)))
+    print("    packet sizes: {}".format(", ".join(str(sz) for sz in packet_sizes)))
+
     heading = "Requested_Throughput,Receive_Throughput,Send_Throughput,Packet_Size,Minimum_RTT,Average_RTT,Maximum_RTT,Stdev_RTT,Median_RTT,Bad_Packets,Idle_Cycles,Total_Cycles\n"
 
     data = ""

@@ -190,6 +190,9 @@ static void benchmark_stop(void)
     return;
 #endif
 
+    sddf_printf("BENCHMARK: begin output\n");
+    sddf_printf("---\n");
+
 #if ENABLE_PMU_EVENTS
     sel4bench_get_counters(benchmark_bf, &counter_values[0]);
     sel4bench_stop_counters(benchmark_bf);
@@ -216,6 +219,9 @@ static void benchmark_stop(void)
     sddf_printf("KernelEntries:  %lu\n", entries);
     dump_log_summary(entries);
 #endif
+
+    sddf_printf("---\n");
+    sddf_printf("BENCHMARK: end output\n");
 
     /* Notify benchmark PD running on next core */
     if (!benchmark_config.last_core) {
