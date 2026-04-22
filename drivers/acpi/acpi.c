@@ -29,6 +29,8 @@ const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI E
 
 capDLBootInfo_t *capDLBootInfo;
 uintptr_t aml_object_pool_start;
+uintptr_t pci_resource;
+
 scanner_t scanner;
 aml_object_pool_t object_pool;
 aml_object_t object_root;
@@ -388,9 +390,9 @@ void init(void)
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
     query_all_objects_by_name(&object_root, acpi_str_hid);
+    // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
         aml_object_t *node = lookup_results[i];
-        sddf_dprintf("i: %u, OpCode: 0x%02X, Name: %s, Location: 0x%lx\n", i, node->op_code, node->name, (uintptr_t)node->start);
         char eisa_id[10];
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
