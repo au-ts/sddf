@@ -176,7 +176,7 @@ static inline void clear_card_state(void)
     };
 }
 
-static inline void usdhc_debug(void)
+__attribute__ ((unused)) static inline void usdhc_debug(void) 
 {
     LOG_DRIVER("PRES_STATE: %u, PROT_CTRL: %u, SYS_CTRL: %u, MIX_CTRL: %u\n", usdhc_regs->pres_state, usdhc_regs->prot_ctrl,
                usdhc_regs->sys_ctrl, usdhc_regs->mix_ctrl);
