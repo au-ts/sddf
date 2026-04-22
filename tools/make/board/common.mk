@@ -24,11 +24,20 @@ endif
 ifeq ($(wildcard ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk),)
   $(error No Make snippet in ${SDDF}/tools/make/board for ${MICROKIT_BOARD})
 endif
+TOOLCHAIN ?= clang
 
 include ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk
 include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+
+# For submakes
+export SUPPORTED_BOARDS
+export MICROKIT_BOARD
+export MICROKIT_CONFIG
+export BOARD_DIR
+export MICROKIT_SDK
+export TOOLCHAIN
 
 ifneq ($(ARCH),x86_64)
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
@@ -56,11 +65,18 @@ eth_driver.elf: ${ETH_DRIV}
 
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.
-CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} ${SMP_CONFIG} | shasum | sed 's/ *-//g')
+COMMON_CONFIG +=  ${TOOLCHAIN} \
+	${CFLAGS} \
+	${MICROKIT_SDK} \
+	${MICROKIT_BOARD} \
+	${MICROKIT_CONFIG} \
+	${SMP_CONFIG}
+
+CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${COMMON_CONFIG} | \
+	 shasum | sed 's/ *-//g')
 
 ${CHECK_FLAGS_BOARD_HASH}:
 	-rm -f .board_cflags-*
 	touch $@
 
-REBUILD_CANDIDATE_OBJECTS := $(shell find . -name '*.o')
-${REBUILD_CANDIDATE_OBJECTS): .EXTRA_PREREQS = ${CHECK_FLAGS_BOARD_HASH}
+.EXTRA_PREREQS = ${CHECK_FLAGS_BOARD_HASH}
