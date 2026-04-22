@@ -7,14 +7,17 @@
 <system>
     <memory_region name="remaining_untypeds" size="0x2000" receive_all_untypeds="true"/>
     <memory_region name="aml_object_pool" size="0x10000"/>
+    <memory_region name="pci_resource" size="0x10000"/>
 
     <protection_domain name="acpi_driver" stack_size="0x50000">
         <program_image path="acpi_driver.elf" />
         <map mr="remaining_untypeds" vaddr="0x20_000_000" setvar_vaddr="remaining_untypeds_vaddr" />
         <map mr="aml_object_pool" vaddr="0x30_000_000" setvar_vaddr="aml_object_pool_start" />
+        <map mr="pci_resource" vaddr="0x60_000_000" setvar_vaddr="pci_resource" />
     </protection_domain>
 
     <protection_domain name="pci_driver">
         <program_image path="pci_driver.elf" />
+        <map mr="pci_resource" vaddr="0x80_000_000" setvar_vaddr="pci_resource" />
     </protection_domain>
 </system>

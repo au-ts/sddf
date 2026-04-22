@@ -70,8 +70,12 @@ client.elf: client.o
 $(SYSTEM_FILE): $(TOP)/$(SYSTEM_FILE) $(IMAGES)
 	cp $< $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+SPEC = capdl_spec.json
+$(BUILD_DIR):
+	mkdir -p $@
+
+$(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE) $(BUILD_DIR)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE) --capdl-json ${SPEC}
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
