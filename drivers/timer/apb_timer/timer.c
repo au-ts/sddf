@@ -21,8 +21,8 @@
 
 #define LOG_APBTIMER_ERR(...) do{ sddf_dprintf("APBTIMER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define NUM_TIMERS 2 // Adjust if synthesised with more timers.                                                                       \
-                        // Minimum = 2 due to a bug in the HDL, assumed for rest of this driver.
+#define NUM_TIMERS 2 // Adjust if synthesised with more timers.                 
+                     // Minimum = 2 due to a bug in the HDL, assumed for rest of this driver.
 #define APBTIMER_MAX_TICKS (UINT32_MAX)
 #define APBTIMER_CLK_FREQ ((uint64_t)50000000) // 50MHz
 #define NANO_INVERSE NS_IN_S
