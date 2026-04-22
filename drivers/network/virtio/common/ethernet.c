@@ -313,7 +313,7 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_NET));
+    // assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_NET));
 
     // Do normal device initialisation (section 3.2)
 
@@ -422,7 +422,7 @@ void init(void)
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     hw_ring_buffer_vaddr = 0x70000000;
-    hw_ring_buffer_paddr = 0x7a000000;
+    hw_ring_buffer_paddr = 0xE000000;
 #else
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;

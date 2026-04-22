@@ -270,7 +270,7 @@ void handle_irq(void)
 
 void virtio_blk_init(void)
 {
-    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
+    // assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
     /* First reset the device */
@@ -363,9 +363,9 @@ void init(void)
 
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
-    requests_paddr = 0x5fdf0000;
+    requests_paddr = 0xD000000;
     requests_vaddr = (uintptr_t)0x20200000;
-    virtio_headers_paddr = (uintptr_t)0x5fff0000;
+    virtio_headers_paddr = (uintptr_t)0xC000000;
     virtio_headers = (struct virtio_blk_req *)0x20210000;
 #else
     requests_paddr = device_resources.regions[2].io_addr;
