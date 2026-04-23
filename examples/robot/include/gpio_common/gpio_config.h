@@ -13,23 +13,26 @@ IMX:
 - For irqs write a value > 0 because irq lines are shared.
 */
 
-// Motor Pins
-#define PIN_1 (16) // IMX gpio3_16 // IMX physical 7
-#define PIN_2 (17) // IMX gpio3_17 // IMX physical 11
 
 // Ultrasonic Pins (A)
-#define PIN_3 (8) // IMX gpio3_8 // IMX physical 13
-#define PIN_4 (9) // IMX gpio3_9 // IMX physical 15
+#define PIN_1 (8) // IMX gpio3_8 // IMX physical 13
+#define PIN_2 (9) // IMX gpio3_9 // IMX physical 15
 
 // Ultrasonic Pins (B)
-#define PIN_5 (10) // IMX gpio3_10 // IMX physical 31
-#define PIN_6 (11) // IMX gpio3_11 // IMX physical 37
+#define PIN_3 (10) // IMX gpio3_10 // IMX physical 31
+#define PIN_4 (11) // IMX gpio3_11 // IMX physical 37
 
 // Ultrasonic Pins (C)
-#define PIN_7 (15) // IMX gpio3_15 // IMX physical 22
-#define PIN_8 (2) // IMX gpio3_2 // IMX physical 26
+#define PIN_5 (15) // IMX gpio3_15 // IMX physical 22
+#define PIN_6 (2) // IMX gpio3_2 // IMX physical 26
+
+// Motor A Encoders
+#define PIN_7 (16) // IMX gpio3_16 // IMX physical 7
+#define PIN_8 (17) // IMX gpio3_17 // IMX physical 11
 
 #define IRQ_1 (1)
+#define IRQ_2 (2)
+
 
 #define NUM_DRIVER_CHANNELS 62
 
@@ -44,7 +47,6 @@ typedef struct {
 } GPIO_driver_channel_t;
 
 
-
 // ideally this whole setup should probably be in the meta.py file
 static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANNELS] = {
     [0] = { PIN_1, IRQ_UNUSED }, // need to claim these channels in meta.py
@@ -53,8 +55,8 @@ static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANN
     [3] = { PIN_4, IRQ_UNUSED },
     [4] = { PIN_5, IRQ_UNUSED },
     [5] = { PIN_6, IRQ_UNUSED },
-    [6] = { PIN_7, IRQ_UNUSED },
-    [7] = { PIN_8, IRQ_UNUSED },
+    [6] = { PIN_7, IRQ_1 },
+    [7] = { PIN_8, IRQ_2 },
     UNUSED_CH(8),
     UNUSED_CH(9),
     UNUSED_CH(10),

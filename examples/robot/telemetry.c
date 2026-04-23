@@ -25,6 +25,6 @@ void init(void) {
 
     while (true) {
         unsigned long hash = generate_hash(magic);
-        sddf_printf("%lu\n", hash);
+        // sddf_printf("%lu\n", hash);
     }
 }

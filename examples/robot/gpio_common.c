@@ -1,5 +1,6 @@
 #include "include/gpio_common/gpio_common.h"
 
+#define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_GPIO(...) do{ sddf_printf("GPIO COMMON|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -9,8 +10,8 @@
 #define LOG_GPIO_ERR(...) do{}while(0)
 #endif
 
-void gpio_init(int gpio_ch, int direction) {
-    sddf_printf("GPIO INIT called\n");
+void gpio_init(int gpio_ch, int direction, int irq) {
+    sddf_printf("GPIO INIT called\n");    
     int ret = 0;
 
     if (direction == GPIO_DIRECTION_OUTPUT) {
@@ -24,10 +25,27 @@ void gpio_init(int gpio_ch, int direction) {
     }
     else if (direction == GPIO_DIRECTION_INPUT) {
         ret = sddf_gpio_direction_input(gpio_ch);
+        LOG_GPIO("Setting direction of %d to input\n", gpio_ch);
+
         if (ret < 0) {
             LOG_GPIO_ERR("Failed to set direction to input. Error code : %d!\n", ret);
             assert(false);
         }
+    }
+
+    if (irq != SDDF_IRQ_TYPE_NONE) {
+        ret = sddf_gpio_irq_set_type(gpio_ch, irq);
+        if (ret < 0) {
+            LOG_GPIO_ERR("Failed to set IRQ type. Error code : %d!\n", ret);
+            assert(false);
+        }
+
+        ret = sddf_gpio_irq_enable(gpio_ch);
+        if (ret < 0) {
+            LOG_GPIO_ERR("Failed to enable IRQ. Error code : %d!\n", ret);
+            assert(false);
+        }
+        LOG_GPIO("Enabling IRQ");
     }
 }
 

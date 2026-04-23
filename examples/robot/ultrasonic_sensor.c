@@ -70,8 +70,8 @@ void sensor_init(int echo_ch, int trigger_ch)
     // sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
 
     LOG_SENSOR("init\n");
-    gpio_init(echo_ch, GPIO_DIRECTION_INPUT);
-    gpio_init(trigger_ch, GPIO_DIRECTION_OUTPUT);
+    gpio_init(echo_ch, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_NONE);
+    gpio_init(trigger_ch, GPIO_DIRECTION_OUTPUT, SDDF_IRQ_TYPE_NONE);
 }
 
 // TODO: might want to buffer over multiple reads

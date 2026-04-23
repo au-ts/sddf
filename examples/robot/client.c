@@ -8,6 +8,7 @@
 
 #include "include/client/client.h"
 
+#define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -51,6 +52,9 @@ sddf_channel gpio_channel_trigger_c = 0;
 // Motor GPIO channels
 sddf_channel gpio_channel_motor_a = 0;
 sddf_channel gpio_channel_motor_b = 0;
+
+sddf_channel gpio_channel_encoder_a_1 = 0;
+sddf_channel gpio_channel_encoder_a_2 = 0;
 
 bool delay_microseconds(size_t microseconds, int timeout_id)
 {
@@ -108,18 +112,19 @@ void client_main(void) {
 
     // control_forward();
 
-
     while(true)
     {
+        control_forward();
+        LOG_CLIENT("testing...\n");
         // sensor a: right
         // sensor b: forward
         // sensor c: left
 
-        uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
-        uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
-        uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
+        // uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
+        // uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
+        // uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
 
-        sddf_printf("sending");
+        // sddf_printf("sending");
 
         // LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
         // LOG_CLIENT("dist sensor b: %lu\n", dist_sensor_b);
@@ -152,14 +157,25 @@ void notified(sddf_channel ch) {
         // LOG_CLIENT("timeout now\n");
         // LOG_CLIENT("timeout id: %d\n", timeout_id);
 
-        // TODO: horrible style, refactor this and how timeouts are handled (especially for motors)
         if (timeout_id == SENSOR_TIMEOUT_ID) {
-            // LOG_CLIENT("sensor timeout\n");
+            // LOG_CLIENT("sensor timeout\n");  
             co_switch(t_main);
         }
         else if (timeout_id == CLIENT_TIMEOUT_ID) {
             // LOG_CLIENT("client timeout\n");
             co_switch(t_main);
+        }
+    }
+    // TODO: change this to actual motor encoder gpio channel
+    else if (ch == gpio_channel_encoder_a_1) {
+        while (1) {
+            LOG_CLIENT("Rising edge from encoder A1\n");
+        }
+
+    }
+    else if (ch == gpio_channel_encoder_a_2) {
+        while (1) {
+            LOG_CLIENT("Rising edge from encoder A2\n");
         }
     }
     else {
@@ -170,27 +186,30 @@ void notified(sddf_channel ch) {
 void init(void) {
     timer_channel = timer_config.driver_id;
 
-    // TODO: these arent used anymore as we now have a PWM driver, remove these
-    // Motor GPIO channels
-    gpio_channel_motor_a = gpio_config.driver_channel_ids[0];
-    gpio_channel_motor_b = gpio_config.driver_channel_ids[1];
-
     // Ultrasonic channels
-    gpio_channel_echo_a = gpio_config.driver_channel_ids[2];
-    gpio_channel_trigger_a = gpio_config.driver_channel_ids[3];
+    gpio_channel_echo_a = gpio_config.driver_channel_ids[0];
+    gpio_channel_trigger_a = gpio_config.driver_channel_ids[1];
 
     LOG_CLIENT("echo: %d\n", gpio_channel_echo_a);
     LOG_CLIENT("trigger: %d\n", gpio_channel_trigger_a);
 
-    gpio_channel_echo_b = gpio_config.driver_channel_ids[4];
-    gpio_channel_trigger_b = gpio_config.driver_channel_ids[5];
+    gpio_channel_echo_b = gpio_config.driver_channel_ids[2];
+    gpio_channel_trigger_b = gpio_config.driver_channel_ids[3];
 
-    gpio_channel_echo_c = gpio_config.driver_channel_ids[6];
-    gpio_channel_trigger_c = gpio_config.driver_channel_ids[7];
+    gpio_channel_echo_c = gpio_config.driver_channel_ids[4];
+    gpio_channel_trigger_c = gpio_config.driver_channel_ids[5];
 
+    gpio_channel_encoder_a_1 = gpio_config.driver_channel_ids[6];
+    gpio_channel_encoder_a_2 = gpio_config.driver_channel_ids[7];
+
+    // ultrasonics
     sensor_init(gpio_channel_echo_a, gpio_channel_trigger_a);
     sensor_init(gpio_channel_echo_b, gpio_channel_trigger_b);
     sensor_init(gpio_channel_echo_c, gpio_channel_trigger_c);
+
+    // motor encoders
+    gpio_init(gpio_channel_encoder_a_1, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_EDGE_RISING);
+    gpio_init(gpio_channel_encoder_a_2, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_EDGE_RISING);
 
 
     // client_main();

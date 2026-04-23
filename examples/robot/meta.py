@@ -44,6 +44,7 @@ assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 IrqConventional = SystemDescription.IrqConventional
+Irq = SystemDescription.Irq
 Channel = SystemDescription.Channel
 Map = SystemDescription.Map
 

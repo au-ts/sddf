@@ -18,6 +18,6 @@
 #define GPIO_DIRECTION_INPUT (0)
 #define GPIO_DIRECTION_OUTPUT (1)
 
-void gpio_init(int gpio_ch, int direction);
+void gpio_init(int gpio_ch, int direction, int irq);
 void digital_write(int gpio_ch, int value);
 int digital_read(int gpio_ch);

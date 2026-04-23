@@ -13,8 +13,8 @@ IMX:
 - For irqs write a value > 0 because irq lines are shared.
 */
 
-#define PIN_1 (15) // IMX gpio1_15 // IMX physical 32
-#define PIN_2 (13) // IMX gpio1_13 // IMX physical 33
+#define PIN_1 (16) // IMX gpio1_15 // IMX physical 32
+#define PIN_2 (17) // IMX gpio1_13 // IMX physical 33
 
 #define IRQ_1 (1)
 
