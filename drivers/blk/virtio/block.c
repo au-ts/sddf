@@ -400,6 +400,9 @@ void notified(sddf_channel ch)
 #else
     if (ch == device_resources.irqs[0].id) {
 #endif
+        // 
+        microkit_notify(50);
+
         handle_irq();
         sddf_deferred_irq_ack(ch);
         /*
