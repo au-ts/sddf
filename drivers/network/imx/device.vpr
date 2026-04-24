@@ -156,6 +156,15 @@ field tx_handled: Set[Seq[Int]]
 //     )
 // }
 
+define valid_rx_read_slot(x) (
+    acc(x.hw_addr, 3/4) &&
+    is_valid_data_addr(x.hw_addr) &&
+    is_valid_rx_stat(x.hw_stat) &&
+    acc(x.hw_len, 3/4) &&
+    is_valid_data_len(x.hw_len)
+)
+
+// TODO can I use this define below?
 predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_rx, 3/4) &&
@@ -214,12 +223,12 @@ predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
     acc(gv.hardware_ring_rx, write) &&
     forall i: Int ::
         (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
+            acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
             bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
             (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_rx, i).hw_addr, write) &&
                 is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/4) &&
+                acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
                 is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat) &&
                 acc(slot(gv.hardware_ring_rx, i).hw_len, write) &&
                 is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len))
@@ -247,12 +256,20 @@ function valid_hardware_ring_rx_mdata_write(heap: IArray, gv: Ref): Bool
                 i == j)
 }
 
+define valid_tx_read_slot(x) (
+    acc(x.hw_addr, 3/4) &&
+    is_valid_data_addr(x.hw_addr) &&
+    is_valid_tx_stat(x.hw_stat) &&
+    acc(x.hw_len, 3/4) &&
+    is_valid_data_len(x.hw_len)
+)
+
 predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, 3/4) &&
     forall i: Int :: { slot(gv.hardware_ring_tx, i) }
         (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
+            acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
             bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
             (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
@@ -288,12 +305,12 @@ predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
     acc(gv.hardware_ring_tx, write) &&
     forall i: Int ::
         (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
+            acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
             bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
             (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_tx, i).hw_addr, write) &&
                 is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/4) &&
+                acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
                 is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat) &&
                 acc(slot(gv.hardware_ring_tx, i).hw_len, write) &&
                 is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len))
@@ -418,14 +435,52 @@ method load_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int)
     requires acc(gv.hardware_ring_rx, 1/2) &&
         acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
     requires bounded16(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
+    requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4)
+    requires forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_rx_addr) / hw_descriptor_size ==>
+            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
+    requires forall s: Seq[Int] :: s in gv.rx_active.net_added ==> |s| == 2
+    requires !is_RXD_EMPTY(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) ==>
+        is_valid_rx_stat(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
+    ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_rx_addr) / hw_descriptor_size ==>
+            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
     ensures retval == slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat
-    ensures is_valid_rx_stat(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) ==> is_valid_rx_stat(retval)
     ensures bounded16(retval)
+    ensures !is_RXD_EMPTY(old(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)) ==>
+        !is_RXD_EMPTY(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
+    ensures let stat == (slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) in
+        !is_RXD_EMPTY(stat) ==> is_valid_rx_stat(stat)
+    ensures let r == (slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size)) in
+        is_RXD_EMPTY(old(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)) &&
+            !is_RXD_EMPTY(r.hw_stat) ==>
+                valid_rx_read_slot(r) &&
+                (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) &&
+                    slot(gv.hardware_ring_rx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size) &&
+                (forall s: Seq[Int] :: s in gv.rx_active.net_added ==> |s| == 2 && s[0] != r.hw_addr)
 {
-    retval := slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat
+    var r: Ref := slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size)
+    if (is_RXD_EMPTY(r.hw_stat)) {
+        // must not be in the device-owned part of the ring
+        // i.e. between hw_rx_head and hw_rx_tail
+        exhale acc(r.hw_stat, 1/2)
+        inhale acc(r.hw_stat, 1/2)
+        inhale bounded16(r.hw_stat)
+        if (!is_RXD_EMPTY(r.hw_stat)) {
+            inhale valid_rx_read_slot(r)
+            // injectivity property of ring
+            inhale forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) &&
+                slot(gv.hardware_ring_rx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size
+            // ghost state property
+            inhale forall s: Seq[Int] :: s in gv.rx_active.net_added ==> s[0] != r.hw_addr
+        }
+    }
+    retval := r.hw_stat
     refute false
 }
+
 
 method store_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     requires (address - 2) >= hw_ring_tx_addr && (address - 2) < (hw_ring_tx_addr + hw_ring_tx_size)
@@ -463,12 +518,49 @@ method load_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int)
     requires acc(gv.hardware_ring_tx, 1/2) &&
         acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
     requires bounded16(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
+    requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4)
+    requires forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_tx_addr) / hw_descriptor_size ==>
+            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
+            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
+    requires forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2
+    requires !is_TXD_READY(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) ==>
+        is_valid_tx_stat(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
+    ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_tx_addr) / hw_descriptor_size ==>
+            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
+            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
     ensures retval == slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat
-    ensures is_valid_tx_stat(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) ==> is_valid_tx_stat(retval)
     ensures bounded16(retval)
+    ensures !is_TXD_READY(old(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)) ==>
+        !is_TXD_READY(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
+    ensures let stat == (slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) in
+        !is_TXD_READY(stat) ==> is_valid_tx_stat(stat)
+    ensures let r == (slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size)) in
+        is_TXD_READY(old(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)) &&
+            !is_TXD_READY(r.hw_stat) ==>
+                valid_tx_read_slot(r) &&
+                (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
+                    slot(gv.hardware_ring_tx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size) &&
+                (forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2 && s[0] != r.hw_addr)
 {
-    retval := slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat
+    var r: Ref := slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size)
+    if (is_TXD_READY(r.hw_stat)) {
+        // must not be in the device-owned part of the ring
+        // i.e. between hw_tx_head and hw_tx_tail
+        exhale acc(r.hw_stat, 1/2)
+        inhale acc(r.hw_stat, 1/2)
+        inhale bounded16(r.hw_stat)
+        if (!is_TXD_READY(r.hw_stat)) {
+            inhale valid_tx_read_slot(r)
+            // injectivity property of ring
+            inhale forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
+                slot(gv.hardware_ring_tx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size
+            // ghost state property
+            inhale forall s: Seq[Int] :: s in gv.tx_free.net_added ==> s[0] != r.hw_addr
+        }
+    }
+    retval := r.hw_stat
     refute false
 }
 
