@@ -128,6 +128,8 @@ var 1 eth_reg = ETH_REG;
 /@ extern function is_valid_data_len(value: Int): Bool @/
 /@ extern function is_valid_rx_stat(value: Int): Bool @/
 /@ extern function is_valid_tx_stat(value: Int): Bool @/
+/@ extern function setminus_seqint(s: Set[Seq[Int]], t: Set[Seq[Int]]): Set[Seq[Int]] @/
+/@ extern function ring_head_incr_lemma(a: Int, b: Int, i: Int): Bool @/
 
 #define HW_RING_BASE         35651584
 #define HW_ETH_BASE   33554432
