@@ -434,15 +434,9 @@ inline fun and_RXD_EMPTY(1 x)
 
 // i is between x and y in a ring
 /@ function ring_between(i: Word, x: Word, y: Word): Bool {
-    // the first and second condition are the same when x is indexed before y
-    // otherwise, the first condition is x -> QUEUE_CAPACITY, and second is 0 -> y
-    ( // upper half bound
-      x % QUEUE_CAPACITY <= i && // always above x
-      i < (x % QUEUE_CAPACITY <= y % QUEUE_CAPACITY ? y % QUEUE_CAPACITY : QUEUE_CAPACITY) // below y if y is indexed above x, otherwise to the top
-    ) || ( // lower half bound
-      (x % QUEUE_CAPACITY <= y % QUEUE_CAPACITY ? x % QUEUE_CAPACITY : 0) <= i && // above 0 if y is indexed below x, otherwise same as above
-      i < y % QUEUE_CAPACITY // always below y
-    )
+    (x % 256 < y % 256 || y == x) ?
+      i >= x % 256 && i < y % 256 :
+      i >= x % 256 || i < y % 256
 } @/
 
 /@
@@ -520,7 +514,7 @@ fun rx_return()
                   s[1] == slot(gv.hardware_ring_rx, i).hw_len @/
   // anything that head passes over from the device is added to rx_active
   /@ ensures unfolding valid_hardware_ring_rx_read() in
-               forall i: Int :: ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
+               forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
                    !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
                    element2_seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len) in gv.rx_active.net_added @/
 
@@ -570,7 +564,7 @@ fun rx_return()
                       s[1] == slot(gv.hardware_ring_rx, i).hw_len @/
     // anything that head passes over from the device is added to rx_active
     /@ invariant unfolding valid_hardware_ring_rx_read() in
-                   forall i: Int :: ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
+                   forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
                        !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
                        element2_seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len) in gv.rx_active.net_added @/
 
@@ -862,7 +856,7 @@ fun tx_return()
                      s[1] == 0 @/
   // anything that head passes over from the device is added to tx_free
   /@ ensures unfolding valid_hardware_ring_tx_read() in
-               forall i: Int :: ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
+               forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
                  !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
                  element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
 
@@ -910,7 +904,7 @@ fun tx_return()
                          s[0] == slot(gv.hardware_ring_tx, i).hw_addr &&
                          s[1] == 0 @/
     /@ invariant unfolding valid_hardware_ring_tx_read() in
-                   forall i: Int :: ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
+                   forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
                      !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
                      element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
 
