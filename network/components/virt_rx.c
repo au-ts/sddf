@@ -6,13 +6,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <os/sddf.h>
+#include <sddf/network/config.h>
 #include <sddf/network/constants.h>
+#include <sddf/network/mac802.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
-#include <sddf/network/config.h>
-#include <sddf/util/util.h>
-#include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
+#include <sddf/util/printf.h>
+#include <sddf/util/util.h>
 
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
@@ -23,7 +24,7 @@ __attribute__((__section__(".net_virt_rx_config"))) net_virt_rx_config_t config;
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t *buffer_refs;
+uint8_t *buffer_refs;
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
@@ -36,28 +37,18 @@ state_t state;
 static bool notify_drv;
 
 /* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
-  is a broadcast address. */
-int get_mac_addr_match(struct ethernet_header *buffer)
+  is a broadcast address, return -1 if we have not found the match. */
+int get_mac_addr_match(ether_hdr_t *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        bool match = true;
-        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
-            if (buffer->dest.addr[i] != config.clients[client].mac_addr[i]) {
-                match = false;
+        for (int i = 0; i < config.clients[client].num_macs; i++) {
+            if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
+                return client;
             }
-        }
-        if (match) {
-            return client;
         }
     }
 
-    bool broadcast_match = true;
-    for (int i = 0; (i < ETH_HWADDR_LEN) && broadcast_match; i++) {
-        if (buffer->dest.addr[i] != 0xFF) {
-            broadcast_match = false;
-        }
-    }
-    if (broadcast_match) {
+    if (mac802_addr_is_bcast(buffer->dest.addr)) {
         return BROADCAST_ID;
     }
 
@@ -87,7 +78,8 @@ void rx_return(void)
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
-            int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
+            int client = get_mac_addr_match((ether_hdr_t *)buffer_vaddr);
+
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
@@ -144,7 +136,7 @@ void rx_provide(void)
                 int err = net_dequeue_free(&state.rx_queue_clients[client], &buffer);
                 assert(!err);
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE)
-                       && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].capacity));
+                       && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_drv.capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] != 0);
