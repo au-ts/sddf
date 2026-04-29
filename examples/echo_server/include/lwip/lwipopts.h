@@ -131,7 +131,7 @@
  * TCP sender buffer space (bytes). To achieve good performance, this
  * should be at least 2 * TCP_MSS.
  */
-#define TCP_SND_BUF TCP_WND
+#define TCP_SND_BUF 2 * TCP_WND
 
 /**
  * TCP writable space (bytes). This must be less than TCP_SND_BUF. It is

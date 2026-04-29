@@ -302,7 +302,7 @@ def generate(
         cpu=get_core("net_virt_tx"),
     )
     net_virt_rx = ProtectionDomain(
-        "net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_core("net_virt_rx")
+        "net_virt_rx", "network_virt_rx.elf", priority=99, budget=20000, cpu=get_core("net_virt_rx")
     )
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
@@ -323,7 +323,7 @@ def generate(
     client1 = ProtectionDomain(
         "client1", client1_elf, priority=97, budget=20000, cpu=get_core("client1")
     )
-    client1_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
+    client1_net_copier_elf = copy_elf("network_copy", "network_copy", 1)
     client1_net_copier = ProtectionDomain(
         "client1_net_copier",
         client1_net_copier_elf,
