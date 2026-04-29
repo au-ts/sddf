@@ -9,6 +9,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
@@ -29,6 +30,10 @@
 #define TIMEOUT_TIMEBASE_10_US  0b01
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
+
+// We hard code 1us timebase. 1us^-1 = 1MHz.
+// Change this if the timebase changes!
+#define MESON_TIMER_CLK_FREQ ((sddf_timer_freq_hz_t) 1*MEGA)
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -109,14 +114,15 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
     switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_ticks() * NS_IN_US;
+        uint64_t time_ns = tick_to_ns_cached(get_ticks(), 0, MESON_TIMER_CLK_FREQ);
         sddf_set_mr(0, time_ns);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
-        uint64_t offset_us = sddf_get_mr(0) / NS_IN_US;
-        timeouts[ch] = curr_time + offset_us;
+        // Ticks are 1us on this clock
+        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), 0, MESON_TIMER_CLK_FREQ);
+        timeouts[ch] = curr_time + offset_ticks;
         process_timeouts(curr_time);
         break;
     }
@@ -142,8 +148,8 @@ void init(void)
     regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
-    regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |
-                (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
+    regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK)
+              | (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
 }
