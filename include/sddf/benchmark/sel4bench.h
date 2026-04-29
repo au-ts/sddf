@@ -115,6 +115,14 @@ static FASTFN void sel4bench_private_write_pmcnt(uint32_t val)
 static FASTFN void sel4bench_private_write_pmnxsel(uint32_t val)
 {
     PMU_WRITE(PMSELR, val);
+
+    /**
+     * Ensures that the effect of previous PMU counter selection
+     * is visible to the later PMU counter interactions.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
+     */
+    asm volatile("isb sy" ::: "memory");
 }
 
 static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
@@ -133,6 +141,14 @@ static FASTFN void sel4bench_init()
 {
     // ensure all counters are in the stopped state
     sel4bench_private_write_cntenc(-1);
+
+    /**
+     * Generates a context synchronisation event so that the following PMU configuration writes
+     * can rely on the effects of disabling the counters.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
+     */
+    asm volatile("isb sy" ::: "memory");
 
     // clear div 64 flag
     MODIFY_PMCR(&, ~SEL4BENCH_ARMV8A_PMCR_DIV64);
@@ -188,6 +204,19 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
     // stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
     sel4bench_private_write_cntenc(enable_word);
 
+    /**
+     * Synchronises later PMU counter reads with the previous write that stops running counters.
+     *
+     * The manual says:
+     *     Where a direct write to a Performance Monitors control register disables a counter,
+     *     and is followed by a Context Synchronization event, ...
+     *     Any subsequent direct read of the counter or counter overflow status flags
+     *     will return the value at the point the counter was disabled.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D13-The-Performance-Monitors-Extension/-D13-2-Accuracy-of-the-Performance-Monitors/-D13-2-2-A-reasonable-degree-of-inaccuracy
+     */
+    asm volatile("isb sy" ::: "memory");
+
     unsigned int counter = 0;
     for (; mask != 0; mask >>= 1, counter++) {
         if (mask & 1) {
@@ -228,6 +257,15 @@ static FASTFN void sel4bench_set_count_event(counter_t counter, event_id_t event
  */
 static FASTFN void sel4bench_start_counters(counter_bitfield_t mask)
 {
+    /**
+     * Generates a context synchronisation event so that the following PMU counter write
+     * that enables counting can rely on the effects of PMU configuration appearing
+     * in program order before the write.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
+     */
+    asm volatile("isb sy" ::: "memory");
+
     return sel4bench_private_write_cntens(mask);
 }
 
