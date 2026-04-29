@@ -44,7 +44,7 @@
           };
 
           llvm = pkgs.llvmPackages_18;
-          zig = zig-overlay.packages.${system}."0.15.1";
+          zig = zig-overlay.packages.${system}."0.16.0";
 
           pysdfgen = sdfgen.packages.${system}.pysdfgen.override {
             zig = zig;
