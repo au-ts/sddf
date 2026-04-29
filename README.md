@@ -39,7 +39,7 @@ website [here](https://trustworthy.systems/projects/drivers/).
 
 sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org)
 build system is also available. If you are intending on using Zig instead of
-Make, please see https://ziglang.org/download/.
+Make, please see https://ziglang.org/download/. The version to use is 0.16.0.
 
 See the instructions below for installing the rest of the dependencies based on
 your machine:

@@ -34,7 +34,7 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
     }
 
     std.log.err("Board '{}' is not supported\n", .{board});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
 const ConfigOptions = enum { debug, release, benchmark };
@@ -57,7 +57,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const default_python = "python3";
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
@@ -126,16 +126,16 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    client_pn532.addCSourceFiles(.{
+    client_pn532.root_module.addCSourceFiles(.{
         .files = &.{"client_pn532.c"},
         .flags = &.{"-DLIBI2C_RAW"},
     });
-    client_pn532.addIncludePath(sddf_dep.path("include"));
-    client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
-    client_pn532.linkLibrary(sddf_dep.artifact("util"));
-    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
-    client_pn532.linkLibrary(pn532_driver);
-    client_pn532.linkLibrary(sddf_dep.artifact("libi2c_raw"));
+    client_pn532.root_module.addIncludePath(sddf_dep.path("include"));
+    client_pn532.root_module.addIncludePath(sddf_dep.path("include/microkit"));
+    client_pn532.root_module.linkLibrary(sddf_dep.artifact("util"));
+    client_pn532.root_module.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
+    client_pn532.root_module.linkLibrary(pn532_driver);
+    client_pn532.root_module.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
@@ -146,31 +146,31 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    client_ds3231.addCSourceFiles(.{
+    client_ds3231.root_module.addCSourceFiles(.{
         .files = &.{"client_ds3231.c"},
         .flags = &.{"-DLIBI2C_RAW"},
     });
-    client_ds3231.addIncludePath(sddf_dep.path("include"));
-    client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
-    client_ds3231.linkLibrary(sddf_dep.artifact("util"));
-    client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
-    client_ds3231.linkLibrary(ds3231_driver);
-    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c_raw"));
+    client_ds3231.root_module.addIncludePath(sddf_dep.path("include"));
+    client_ds3231.root_module.addIncludePath(sddf_dep.path("include/microkit"));
+    client_ds3231.root_module.linkLibrary(sddf_dep.artifact("util"));
+    client_ds3231.root_module.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
+    client_ds3231.root_module.linkLibrary(ds3231_driver);
+    client_ds3231.root_module.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
-    client_pn532.addIncludePath(sddf_dep.path("libco"));
-    client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    client_pn532.root_module.addIncludePath(sddf_dep.path("libco"));
+    client_pn532.root_module.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client_pn532.addIncludePath(libmicrokit_include);
-    client_pn532.addObjectFile(libmicrokit);
+    client_pn532.root_module.addIncludePath(libmicrokit_include);
+    client_pn532.root_module.addObjectFile(libmicrokit);
     client_pn532.setLinkerScript(libmicrokit_linker_script);
 
-    client_ds3231.addIncludePath(sddf_dep.path("libco"));
-    client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    client_ds3231.root_module.addIncludePath(sddf_dep.path("libco"));
+    client_ds3231.root_module.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client_ds3231.addIncludePath(libmicrokit_include);
-    client_ds3231.addObjectFile(libmicrokit);
+    client_ds3231.root_module.addIncludePath(libmicrokit_include);
+    client_ds3231.root_module.addObjectFile(libmicrokit);
     client_ds3231.setLinkerScript(libmicrokit_linker_script);
 
     b.installArtifact(client_pn532);
@@ -183,7 +183,7 @@ pub fn build(b: *std.Build) !void {
     const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
-    const dtb = dtc_cmd.captureStdOut();
+    const dtb = dtc_cmd.captureStdOut(.{});
 
     // Run the metaprogram to get sDDF configuration binary files and the SDF file.
     const metaprogram = b.path("meta.py");
