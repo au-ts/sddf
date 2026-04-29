@@ -13,7 +13,13 @@
 /* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
 https://github.com/seL4/seL4_libs
 
-The definitions are specific to ARMv8 - different definitions will need to used for different architectures. */
+The definitions are specific to ARMv8 - different definitions will need to used for different architectures.
+
+This library assumes that the seL4 kernel has enabled and started the cycle counter during CPU initialisation,
+and after initialisation, seL4 will not change either the cycle counter or the event counters.
+This library configures, resets and starts event counters. It also reconfigures the cycle counter, and
+it may temporarily disable the cycle counter.
+*/
 
 /* seL4 tracked benchmarking events. */
 #define SEL4BENCH_EVENT_CACHE_L1I_MISS              0x01
@@ -30,6 +36,8 @@ The definitions are specific to ARMv8 - different definitions will need to used 
 #define SEL4BENCH_ARMV8A_PMCR_RESET_ALL  BIT(1)
 #define SEL4BENCH_ARMV8A_PMCR_RESET_CCNT BIT(2)
 #define SEL4BENCH_ARMV8A_PMCR_DIV64      BIT(3)
+#define SEL4BENCH_ARMV8A_PMCR_LONG_CCNT  BIT(6)
+#define SEL4BENCH_ARMV8A_PMCCFILTR_EL2   BIT(27)
 
 /* A counter is an index to a performance counter on a platform.
  * The max counter index is sizeof(seL4_Word). */
@@ -133,14 +141,11 @@ static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
 /**
  * Initialise the sel4bench library.  Nothing else is guaranteed to work, and
  * may produce strange failures, if you don't do this first.
- *
- * Starts the cycle counter, which is guaranteed to run until
- * `sel4bench_destroy()` is called.
  */
 static FASTFN void sel4bench_init()
 {
-    // ensure all counters are in the stopped state
-    sel4bench_private_write_cntenc(-1);
+    // ensure all event counters are in the stopped state
+    sel4bench_private_write_cntenc(~((uint32_t) BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT)));
 
     /**
      * Generates a context synchronisation event so that the following PMU configuration writes
@@ -153,19 +158,17 @@ static FASTFN void sel4bench_init()
     // clear div 64 flag
     MODIFY_PMCR(&, ~SEL4BENCH_ARMV8A_PMCR_DIV64);
 
-    // reset all counters
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL | SEL4BENCH_ARMV8A_PMCR_RESET_CCNT);
+    // reset all event counters
+    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 
-    // enable counters globally.
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_ENABLE);
+    // enable long cycle counter
+    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_LONG_CCNT);
 
 #ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
-    // select instruction count incl. PL2 by default */
-    sel4bench_private_write_pmnxsel(0x1f);
-    sel4bench_private_write_evtsel(BIT(27));
+    // count EL2 cycles
+    sel4bench_private_write_pmnxsel(SEL4BENCH_ARMV8A_COUNTER_CCNT);
+    sel4bench_private_write_evtsel(SEL4BENCH_ARMV8A_PMCCFILTR_EL2);
 #endif
-    // start CCNT
-    sel4bench_private_write_cntens(BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT));
 }
 
 /**
