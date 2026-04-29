@@ -236,8 +236,8 @@ predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
 }
 
 function valid_hardware_ring_rx_mdata_write(heap: IArray, gv: Ref): Bool
-    requires valid_hardware_ring_rx_write(heap, gv)
     requires acc(gv.hw_rx_tail, wildcard) && acc(gv.hw_rx_head, wildcard) && acc(gv.hw_rx_capacity, wildcard)
+    requires valid_hardware_ring_rx_write(heap, gv)
 {
     bounded16(gv.hw_rx_head) &&
     0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
