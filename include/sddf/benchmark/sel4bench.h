@@ -39,7 +39,7 @@ it may temporarily disable the cycle counter.
 #define SEL4BENCH_ARMV8A_PMCR_LONG_CCNT  BIT(6)
 #define SEL4BENCH_ARMV8A_PMCCFILTR_EL2   BIT(27)
 
-/* A counter is an index to a performance counter on a platform.
+/* A counter is an index to an event counter or a cycle counter on a platform.
  * The max counter index is sizeof(seL4_Word). */
 typedef seL4_Word counter_t;
 
@@ -144,22 +144,8 @@ static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
  */
 static FASTFN void sel4bench_init()
 {
-    // ensure all event counters are in the stopped state
-    sel4bench_private_write_cntenc(~((uint32_t) BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT)));
-
-    /**
-     * Generates a context synchronisation event so that the following PMU configuration writes
-     * can rely on the effects of disabling the counters.
-     *
-     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
-     */
-    asm volatile("isb sy" ::: "memory");
-
     // clear div 64 flag
     MODIFY_PMCR(&, ~SEL4BENCH_ARMV8A_PMCR_DIV64);
-
-    // reset all event counters
-    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 
     // enable long cycle counter
     MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_LONG_CCNT);
@@ -172,7 +158,7 @@ static FASTFN void sel4bench_init()
 }
 
 /**
- * Query how many performance counters are supported on this CPU, excluding the
+ * Query how many event counters are supported on this CPU, excluding the
  * cycle counter.
  *
  * Note that the return value is of type `seL4_Word`; consequently, this library
@@ -245,6 +231,8 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
  */
 static FASTFN void sel4bench_set_count_event(counter_t counter, event_id_t event)
 {
+    // should not assign the cycle counter
+    assert(counter != SEL4BENCH_ARMV8A_COUNTER_CCNT);
     // select counter
     sel4bench_private_write_pmnxsel(counter);
     // reset it
@@ -254,7 +242,7 @@ static FASTFN void sel4bench_set_count_event(counter_t counter, event_id_t event
 }
 
 /**
- * Start counting events on a set of performance counters.
+ * Start counting events on a set of event counters.
  *
  * @param counters bitfield indicating which counter(s) to start
  */
@@ -273,7 +261,7 @@ static FASTFN void sel4bench_start_counters(counter_bitfield_t mask)
 }
 
 /**
- * Stop counting events on a set of performance counters.
+ * Stop counting events on a set of event counters.
  *
  * Note: Some processors may not support this operation.
  *
@@ -285,11 +273,11 @@ static FASTFN void sel4bench_stop_counters(counter_bitfield_t mask)
 }
 
 /**
- * Reset all performance counters to zero.  Note that the cycle counter is not a
- * performance counter, and is not reset.
+ * Reset all event counters to zero.  Note that the cycle counter is not an
+ * event counter, and is not reset.
  *
  */
 static FASTFN void sel4bench_reset_counters(void)
 {
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
+    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 }
