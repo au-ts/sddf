@@ -13,7 +13,13 @@
 /* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
 https://github.com/seL4/seL4_libs
 
-The definitions are specific to ARMv8 - different definitions will need to used for different architectures. */
+The definitions are specific to ARMv8 - different definitions will need to used for different architectures.
+
+This library assumes that the seL4 kernel has enabled and started the cycle counter during CPU initialisation,
+and after initialisation, seL4 will not change either the cycle counter or the event counters.
+This library configures, resets and starts event counters. It also reconfigures the cycle counter, and
+it may temporarily disable the cycle counter.
+*/
 
 /* seL4 tracked benchmarking events. */
 #define SEL4BENCH_EVENT_CACHE_L1I_MISS              0x01
@@ -30,8 +36,10 @@ The definitions are specific to ARMv8 - different definitions will need to used 
 #define SEL4BENCH_ARMV8A_PMCR_RESET_ALL  BIT(1)
 #define SEL4BENCH_ARMV8A_PMCR_RESET_CCNT BIT(2)
 #define SEL4BENCH_ARMV8A_PMCR_DIV64      BIT(3)
+#define SEL4BENCH_ARMV8A_PMCR_LONG_CCNT  BIT(6)
+#define SEL4BENCH_ARMV8A_PMCCFILTR_EL2   BIT(27)
 
-/* A counter is an index to a performance counter on a platform.
+/* A counter is an index to an event counter or a cycle counter on a platform.
  * The max counter index is sizeof(seL4_Word). */
 typedef seL4_Word counter_t;
 
@@ -115,6 +123,14 @@ static FASTFN void sel4bench_private_write_pmcnt(uint32_t val)
 static FASTFN void sel4bench_private_write_pmnxsel(uint32_t val)
 {
     PMU_WRITE(PMSELR, val);
+
+    /**
+     * Ensures that the effect of previous PMU counter selection
+     * is visible to the later PMU counter interactions.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
+     */
+    asm volatile("isb sy" ::: "memory");
 }
 
 static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
@@ -125,35 +141,24 @@ static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
 /**
  * Initialise the sel4bench library.  Nothing else is guaranteed to work, and
  * may produce strange failures, if you don't do this first.
- *
- * Starts the cycle counter, which is guaranteed to run until
- * `sel4bench_destroy()` is called.
  */
 static FASTFN void sel4bench_init()
 {
-    // ensure all counters are in the stopped state
-    sel4bench_private_write_cntenc(-1);
-
     // clear div 64 flag
     MODIFY_PMCR(&, ~SEL4BENCH_ARMV8A_PMCR_DIV64);
 
-    // reset all counters
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL | SEL4BENCH_ARMV8A_PMCR_RESET_CCNT);
-
-    // enable counters globally.
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_ENABLE);
+    // enable long cycle counter
+    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_LONG_CCNT);
 
 #ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
-    // select instruction count incl. PL2 by default */
-    sel4bench_private_write_pmnxsel(0x1f);
-    sel4bench_private_write_evtsel(BIT(27));
+    // count EL2 cycles
+    sel4bench_private_write_pmnxsel(SEL4BENCH_ARMV8A_COUNTER_CCNT);
+    sel4bench_private_write_evtsel(SEL4BENCH_ARMV8A_PMCCFILTR_EL2);
 #endif
-    // start CCNT
-    sel4bench_private_write_cntens(BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT));
 }
 
 /**
- * Query how many performance counters are supported on this CPU, excluding the
+ * Query how many event counters are supported on this CPU, excluding the
  * cycle counter.
  *
  * Note that the return value is of type `seL4_Word`; consequently, this library
@@ -188,6 +193,19 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
     // stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
     sel4bench_private_write_cntenc(enable_word);
 
+    /**
+     * Synchronises later PMU counter reads with the previous write that stops running counters.
+     *
+     * The manual says:
+     *     Where a direct write to a Performance Monitors control register disables a counter,
+     *     and is followed by a Context Synchronization event, ...
+     *     Any subsequent direct read of the counter or counter overflow status flags
+     *     will return the value at the point the counter was disabled.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D13-The-Performance-Monitors-Extension/-D13-2-Accuracy-of-the-Performance-Monitors/-D13-2-2-A-reasonable-degree-of-inaccuracy
+     */
+    asm volatile("isb sy" ::: "memory");
+
     unsigned int counter = 0;
     for (; mask != 0; mask >>= 1, counter++) {
         if (mask & 1) {
@@ -213,6 +231,8 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
  */
 static FASTFN void sel4bench_set_count_event(counter_t counter, event_id_t event)
 {
+    // should not assign the cycle counter
+    assert(counter != SEL4BENCH_ARMV8A_COUNTER_CCNT);
     // select counter
     sel4bench_private_write_pmnxsel(counter);
     // reset it
@@ -222,17 +242,26 @@ static FASTFN void sel4bench_set_count_event(counter_t counter, event_id_t event
 }
 
 /**
- * Start counting events on a set of performance counters.
+ * Start counting events on a set of event counters.
  *
  * @param counters bitfield indicating which counter(s) to start
  */
 static FASTFN void sel4bench_start_counters(counter_bitfield_t mask)
 {
+    /**
+     * Generates a context synchronisation event so that the following PMU counter write
+     * that enables counting can rely on the effects of PMU configuration appearing
+     * in program order before the write.
+     *
+     * [1] https://developer.arm.com/documentation/ddi0487/mb/-Part-D-The-AArch64-System-Level-Architecture/-Chapter-D24-AArch64-System-Register-Descriptions/-D24-1-About-the-AArch64-System-registers/-D24-1-2-General-behavior-of-accesses-to-the-AArch64-System-registers
+     */
+    asm volatile("isb sy" ::: "memory");
+
     return sel4bench_private_write_cntens(mask);
 }
 
 /**
- * Stop counting events on a set of performance counters.
+ * Stop counting events on a set of event counters.
  *
  * Note: Some processors may not support this operation.
  *
@@ -244,11 +273,11 @@ static FASTFN void sel4bench_stop_counters(counter_bitfield_t mask)
 }
 
 /**
- * Reset all performance counters to zero.  Note that the cycle counter is not a
- * performance counter, and is not reset.
+ * Reset all event counters to zero.  Note that the cycle counter is not an
+ * event counter, and is not reset.
  *
  */
 static FASTFN void sel4bench_reset_counters(void)
 {
-    MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
+    MODIFY_PMCR(|, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 }
