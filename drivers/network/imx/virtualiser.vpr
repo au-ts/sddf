@@ -76,7 +76,11 @@ predicate valid_net_queue_produce(heap: IArray, virt: Ref, queue: Ref, capacity:
   (forall i : Int :: queue.net_tail <= i && i < queue.net_head ==>
     acc(slotq(queue.net_descr, i).ndescr_addr) && acc(slotq(queue.net_descr, i).ndescr_len)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
-  valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head)
+  valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head) &&
+  (forall i: Int, j: Int :: queue.net_tail <= i && i < queue.net_head &&
+    queue.net_tail <= j && j < queue.net_head &&
+    slotq(queue.net_descr, i).ndescr_addr == slotq(queue.net_descr, j).ndescr_addr ==>
+      i == j)
 }
 
 predicate valid_net_queue_consume(heap: IArray, virt: Ref, queue: Ref, capacity: Int)
@@ -87,7 +91,11 @@ predicate valid_net_queue_consume(heap: IArray, virt: Ref, queue: Ref, capacity:
   (forall i : Int :: queue.net_head <= i && i < queue.net_tail ==>
     acc(slotq(queue.net_descr, i).ndescr_addr, 3/4) && acc(slotq(queue.net_descr, i).ndescr_len, 3/4)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
-  valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head)
+  valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head) &&
+  (forall i: Int, j: Int :: queue.net_head <= i && i < queue.net_tail &&
+    queue.net_head <= j && j < queue.net_tail &&
+    slotq(queue.net_descr, i).ndescr_addr == slotq(queue.net_descr, j).ndescr_addr ==>
+      i == j)
 }
 
 define valid_net_tail(x)
