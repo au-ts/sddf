@@ -72,9 +72,30 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
     uint64_t number_schedules = buffer[BENCHMARK_TCB_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
+#ifdef CONFIG_ARCH_AARCH64
+    uint64_t events[6];
+    for (int i = 0; i < 6; i++) {
+        events[i] = buffer[BENCHMARK_TCB_PMU_EVENTS_START + i];
+    }
+    sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
+                "%lu\nTotalUtilisation: %lu\n",
+                child_name(id), id, kernel, entries, number_schedules, total);
+    for (int i = 0; i < 6; i++) {
+        if (i % 2 == 0 && ((benchmarking_events[i + 1] & 0xFFFF) == 0x001E)) {
+            uint64_t event = (events[i + 1] << 32) + events[i];
+            sddf_printf("%s: %lu\n", counter_names[i], event);
+            i++;
+        }
+        else {
+            sddf_printf("%s: %lu\n", counter_names[i], events[i]);
+        }
+    }
+    sddf_printf("}\n");
+#else
     sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
                 "%lu\nTotalUtilisation: %lu\n}\n",
                 child_name(id), id, kernel, entries, number_schedules, total);
+#endif
 }
 
 #endif
@@ -195,8 +216,15 @@ static void benchmark_stop(void)
     sel4bench_stop_counters(benchmark_bf);
 
     sddf_printf("{CORE %u: \n", benchmark_config.core);
-    for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-        sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+    for (int i = 0; i < 6; i++) {
+        if (i % 2 == 0 && ((benchmarking_events[i + 1] & 0xFFFF) == 0x001E)) {
+            uint64_t event = (counter_values[i + 1] << 32) + counter_values[i];
+            sddf_printf("%s: %lu\n", counter_names[i], event);
+            i++;
+        }
+        else {
+            sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+        }
     }
     sddf_printf("}\n");
 #endif
