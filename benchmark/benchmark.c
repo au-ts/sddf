@@ -79,8 +79,25 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
     uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
     sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
-                "%lu\nTotalUtilisation: %lu\n}\n",
+                "%lu\nTotalUtilisation: %lu\n",
                 child_name(id), id, kernel, entries, number_schedules, total);
+#ifdef CONFIG_ARCH_AARCH64
+    uint64_t events[6];
+    for (int i = 0; i < 6; i++) {
+        events[i] = buffer[BENCHMARK_TCB_PMU_EVENTS_START + i];
+    }
+    for (int i = 0; i < 6; i++) {
+        if (i % 2 == 0 && (pmu_event_table[benchmark_config.pmu_events[i + 1]].sel4bench_id & 0xFFFF) == SEL4BENCH_EVENT_CHAIN) {
+            uint64_t event = (events[i + 1] << 32) + events[i];
+            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name, event);
+            i++;
+        }
+        else {
+            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name, events[i]);
+        }
+    }    
+#endif
+    sddf_printf("}\n");
 }
 
 #endif
