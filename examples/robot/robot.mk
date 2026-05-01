@@ -73,7 +73,8 @@ CLIENT_OBJS := client.o
 MOTOR_CONTROL_OBJS := motor_control.o
 ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
 TELEMETRY_OBJS := telemetry.o
-TIMER_QUEUE_OBJS = timer_queue.o
+TIMER_QUEUE_OBJS := timer_queue.o
+ENCODER_OBJS := encoder.o
 
 VPATH := ${ROBOT_TOP}
 
@@ -93,10 +94,13 @@ motor_control.o: ${ROBOT_TOP}/motor_control.c
 ultrasonic_sensor.o: ${ROBOT_TOP}/ultrasonic_sensor.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
+encoder.o: ${ROBOT_TOP}/encoder.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
 telemetry.o: ${ROBOT_TOP}/telemetry.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-telemetry.elf: $(TELEMETRY_OBJS) libco.a
+telemetry.elf: $(TELEMETRY_OBJS) ${ENCODER_OBJS} ${GPIO_COMMON_OBJS} libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Client build
@@ -123,6 +127,7 @@ endif
 	$(OBJCOPY) --update-section .serial_virt_tx_config=${SDFGEN_OUT}/serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=${SDFGEN_OUT}/serial_client_client.data client.elf
 
+	$(OBJCOPY) --update-section .gpio_telemetry_config=${SDFGEN_OUT}/gpio_client_telemetry.data telemetry.elf
 	touch $@
 
 # Final image generation

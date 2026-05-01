@@ -8,6 +8,7 @@
 
 #include "include/motor/encoder.h"
 
+
 #ifdef DEBUG_LOG
 // #define  LOG_SENSOR(...) do{}while(0)
 #define LOG_ENCODER(...) do{ sddf_printf("ENCODER|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -45,10 +46,7 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
 
 void encoder_init(int gpio_ch_a, int gpio_ch_b)
 {
-    // TODO: hopefully commeting this out does not break anything
-    // sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
-
-    LOG_SENSOR("init\n");
+    LOG_ENCODER("init\n");
     gpio_init(gpio_ch_a, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_NONE);
     gpio_init(gpio_ch_b, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_NONE);
 }

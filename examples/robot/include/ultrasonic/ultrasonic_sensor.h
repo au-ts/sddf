@@ -9,10 +9,6 @@
 #include <stdint.h>
 #include "include/gpio_common/gpio_common.h"
 
-/* Ultrasonic GPIO Channels */
-#define GPIO_CHANNEL_ECHO (3)
-#define GPIO_CHANNEL_TRIG (4)
-
 /* Timer States for TRIG pin */ 
 #define TRIG_UNSET (0)
 #define TRIG_HIGH (1)

@@ -19,10 +19,13 @@
         <map mr="timer@302d0000/drivers/timer/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
         <irq irq="87" id="0" trigger="level" />
     </protection_domain>
-    <protection_domain name="client" priority="2">
+    <protection_domain name="client" priority="2" budget="1500000" period="2000000">
         <program_image path="client.elf" />
         <map mr="serial@30860000/serial/queue/serial_virt_tx/client" vaddr="0x20000000" perms="rw" />
         <map mr="serial@30860000/serial/data/serial_virt_tx/client" vaddr="0x20001000" perms="rw" />
+    </protection_domain>
+    <protection_domain name="telemetry" priority="1" budget="2000" period="8000">
+        <program_image path="telemetry.elf" />
     </protection_domain>
     <protection_domain name="gpio_driver" priority="253" passive="true">
         <program_image path="gpio_driver.elf" />
@@ -102,14 +105,14 @@
     </channel>
     <channel>
         <end pd="gpio_driver" id="6" />
-        <end pd="client" id="8" notify="false" pp="true" />
+        <end pd="telemetry" id="0" notify="false" pp="true" />
     </channel>
     <channel>
         <end pd="gpio_driver" id="7" />
-        <end pd="client" id="9" notify="false" pp="true" />
+        <end pd="telemetry" id="1" notify="false" pp="true" />
     </channel>
     <channel>
         <end pd="timer" id="1" />
-        <end pd="client" id="10" notify="false" pp="true" />
+        <end pd="client" id="8" notify="false" pp="true" />
     </channel>
 </system>

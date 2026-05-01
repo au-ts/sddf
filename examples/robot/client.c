@@ -53,9 +53,6 @@ sddf_channel gpio_channel_trigger_c = 0;
 sddf_channel gpio_channel_motor_a = 0;
 sddf_channel gpio_channel_motor_b = 0;
 
-sddf_channel gpio_channel_encoder_a_1 = 0;
-sddf_channel gpio_channel_encoder_a_2 = 0;
-
 bool delay_microseconds(size_t microseconds, int timeout_id)
 {
     size_t time_ns = microseconds * NS_IN_US;
@@ -166,18 +163,6 @@ void notified(sddf_channel ch) {
             co_switch(t_main);
         }
     }
-    // TODO: change this to actual motor encoder gpio channel
-    else if (ch == gpio_channel_encoder_a_1) {
-        while (1) {
-            LOG_CLIENT("Rising edge from encoder A1\n");
-        }
-
-    }
-    else if (ch == gpio_channel_encoder_a_2) {
-        while (1) {
-            LOG_CLIENT("Rising edge from encoder A2\n");
-        }
-    }
     else {
         LOG_CLIENT("Unexpected channel call\n");
     }
@@ -199,18 +184,10 @@ void init(void) {
     gpio_channel_echo_c = gpio_config.driver_channel_ids[4];
     gpio_channel_trigger_c = gpio_config.driver_channel_ids[5];
 
-    gpio_channel_encoder_a_1 = gpio_config.driver_channel_ids[6];
-    gpio_channel_encoder_a_2 = gpio_config.driver_channel_ids[7];
-
     // ultrasonics
     sensor_init(gpio_channel_echo_a, gpio_channel_trigger_a);
     sensor_init(gpio_channel_echo_b, gpio_channel_trigger_b);
     sensor_init(gpio_channel_echo_c, gpio_channel_trigger_c);
-
-    // motor encoders
-    gpio_init(gpio_channel_encoder_a_1, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_EDGE_RISING);
-    gpio_init(gpio_channel_encoder_a_2, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_EDGE_RISING);
-
 
     // client_main();
     LOG_CLIENT("Init\n");
