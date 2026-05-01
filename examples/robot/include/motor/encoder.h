@@ -13,14 +13,6 @@
 #define GPIO_CHANNEL_ECHO (3)
 #define GPIO_CHANNEL_TRIG (4)
 
-/* Timer States for TRIG pin */ 
-#define TRIG_UNSET (0)
-#define TRIG_HIGH (1)
-#define TRIG_LOW (2)
-
-/* Time (ms) Timeout for Sensor Read */
-#define SENSOR_TIMEOUT (38)
-
 /* Client-side Ultrasonic Functions */
-uint64_t get_ultrasonic_reading(int echo_ch, int trigger_ch);
-void sensor_init(int echo_ch, int trigger_ch);
+uint64_t get_encoder_reading(int gpio_ch_a, int gpio_ch_b);
+void encoder_init(int gpio_ch_a, int gpio_ch_b);

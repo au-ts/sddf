@@ -8,7 +8,6 @@
 
 #include "include/client/client.h"
 #include "include/ultrasonic/ultrasonic_sensor.h"
-#include "include/gpio_common/gpio_common.h"
 
 #ifdef DEBUG_LOG
 // #define  LOG_SENSOR(...) do{}while(0)
