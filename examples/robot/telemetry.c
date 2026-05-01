@@ -22,9 +22,6 @@ void notified(sddf_channel ch) {
 
 void init(void) {
     char magic[] = "SCaTRyBCliglbggGhQoDk6UfEn";
-
-    while (true) {
-        unsigned long hash = generate_hash(magic);
-        // sddf_printf("%lu\n", hash);
-    }
+    
+    detect_encoder_rising_edge();
 }

@@ -74,9 +74,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=253, passive=True)
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=253, passive=True)
-    # telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
-    # client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
-    client = ProtectionDomain("client", "client.elf", priority=2)
+    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
+    client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
+    # client = ProtectionDomain("client", "client.elf", priority=2)
 
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
@@ -133,7 +133,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
     driver_channel_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+
+
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
+    gpio_system.add_client(telemetry, driver_channel_ids=driver_channel_ids)
 
     # clients
     chan = Channel(pwm_driver, client, pp_b=True, notify_a=False, notify_b=False)
@@ -146,7 +149,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     pds = [
         timer_driver, 
-        client, 
+        client,
+        telemetry,
         gpio_driver,
         serial_driver,
         serial_virt_tx,
