@@ -313,10 +313,10 @@ void print_crs_list(acpi_crs_list_t *crs_list)
                 acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
                 sddf_dprintf("  =========\n");
                 sddf_dprintf("  IRQ number: %u\n", ext_irq->irq_num);
-                 break;
+                break;
             }
             case WORD_AS_DESCRIPTOR: {
-                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)scanner.current;
+                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr;
                 sddf_dprintf("  =========\n");
                 switch (word_as->resource_type) {
                     case 0: { sddf_dprintf("  type: Word Memory\n"); break; }
@@ -341,7 +341,7 @@ void print_crs_list(acpi_crs_list_t *crs_list)
                 break;
             }
             case DWORD_AS_DESCRIPTOR: {
-                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)scanner.current;
+                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr;
                 sddf_dprintf("  =========\n");
                 switch (dword_as->resource_type) {
                     case 0: { sddf_dprintf("  type: DWord Memory\n"); break; }
@@ -357,7 +357,7 @@ void print_crs_list(acpi_crs_list_t *crs_list)
                 break;
             }
             case QWORD_AS_DESCRIPTOR: {
-                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)scanner.current;
+                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr;
                 sddf_dprintf("  =========\n");
                 switch (qword_as->resource_type) {
                     case 0: { sddf_dprintf("  type: QWord Memory\n"); break; }
