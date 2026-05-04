@@ -128,7 +128,7 @@ TEST_CASES = matrix.generate_example_test_cases(
             # dwmac-5.10a driver
             "star64",
             # genet driver
-            "rpi4b_1gb"
+            "rpi4b_1gb",
             # imx driver
             "maaxboard",
             # meson driver
