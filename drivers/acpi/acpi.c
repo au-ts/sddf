@@ -15,7 +15,7 @@
 
 uintptr_t remaining_untypeds_vaddr;
 typedef struct {
-    seL4_CNode untyped_cnode_cptr;
+    /* seL4_CNode untyped_cnode_cptr; */
     seL4_SlotRegion untypeds;
     seL4_UntypedDesc untypedList[CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS];
 } capDLBootInfo_t;
