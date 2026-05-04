@@ -264,7 +264,7 @@ fun rx_provide()
                 acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
                 valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
                 valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
-  /@ requires net_queue_injective(gv.rx_free) @/
+  /@ requires net_queue_injective_consume(gv.rx_free) @/
   /@ requires acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
               acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
               acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
@@ -276,6 +276,12 @@ fun rx_provide()
   /@ requires forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
   /@ requires forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
                 s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+  /@ requires forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
+  /@ requires forall s: Seq[Int] :: s in gv.rx_handled ==>
+                |s| == 2 && forall i: Int ::
+                  gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                    s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
   /@ ensures acc(gv.net_rx_free, 2/3) && acc(gv.rx_free, 2/3) &&
              acc(gv.rx_free.net_head) &&
              acc(gv.rx_free.net_tail, 2/3) &&
@@ -288,7 +294,7 @@ fun rx_provide()
                acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
                valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
                valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
-  /@ ensures net_queue_injective(gv.rx_free) @/
+  /@ ensures net_queue_injective_consume(gv.rx_free) @/
   /@ ensures acc(gv.hw_rx_ptr, 1/2) &&
              acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) &&
              acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) @/
@@ -303,6 +309,12 @@ fun rx_provide()
   /@ ensures forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
   /@ ensures forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
                s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+  /@ ensures forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
+  /@ ensures forall s: Seq[Int] :: s in gv.rx_handled ==>
+                |s| == 2 && forall i: Int ::
+                  gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                    s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
 
   var reprocess = true;
 
@@ -320,7 +332,7 @@ fun rx_provide()
                    acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
                    valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
                    valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
-    /@ invariant net_queue_injective(gv.rx_free) @/
+    /@ invariant net_queue_injective_consume(gv.rx_free) @/
     /@ invariant acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
                  acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
                  acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
@@ -336,6 +348,12 @@ fun rx_provide()
     /@ invariant reprocess == false ==>
                    ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity ||
                      gv.rx_free.net_tail == gv.rx_free.net_head) @/
+    /@ invariant forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                   !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
+    /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==>
+                  |s| == 2 && forall i: Int ::
+                    gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                      s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
 
     /@ label l_rpc @/
 
@@ -355,7 +373,7 @@ fun rx_provide()
                      acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
                      valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
                      valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
-      /@ invariant net_queue_injective(gv.rx_free) @/
+      /@ invariant net_queue_injective_consume(gv.rx_free) @/
       /@ invariant acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
                    acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
                    acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
@@ -369,6 +387,13 @@ fun rx_provide()
       /@ invariant forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
       /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
                      s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+      /@ invariant forall i: Int ::
+                    gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                      !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
+      /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==>
+                    |s| == 2 && forall i: Int ::
+                      gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                        s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
 
       /@ unfold valid_hardware_ring_rx_write() @/
       /@ label l_it @/
@@ -475,7 +500,7 @@ fun rx_return()
                 acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
                 valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
                 valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
-  /@ requires net_queue_injective(gv.rx_active) @/
+  /@ requires net_queue_injective_produce(gv.rx_active) @/
   /@ requires acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) &&
               acc(gv.hw_rx_tail, 2/3) && bounded16(gv.hw_rx_tail) &&
               acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
@@ -495,7 +520,7 @@ fun rx_return()
                acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
                valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
                valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
-  /@ ensures net_queue_injective(gv.rx_active) @/
+  /@ ensures net_queue_injective_produce(gv.rx_active) @/
   /@ ensures acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) && acc(gv.hw_rx_tail, 2/3) &&
              acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 && acc(gv.hw_rx_descr, 1/2) @/
   /@ ensures acc(gv.rx_ch, 1/4) @/
@@ -543,7 +568,7 @@ fun rx_return()
                    acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
                    valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
                    valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
-    /@ invariant net_queue_injective(gv.rx_active) @/
+    /@ invariant net_queue_injective_produce(gv.rx_active) @/
     /@ invariant acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) &&
                  acc(gv.hw_rx_tail, 2/3) && bounded16(gv.hw_rx_tail) &&
                  acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
@@ -641,7 +666,7 @@ fun tx_provide()
                 acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
                 valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
                 valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
-  /@ requires net_queue_injective(gv.tx_active) @/
+  /@ requires net_queue_injective_consume(gv.tx_active) @/
   /@ requires acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
               acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
               acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
@@ -652,6 +677,12 @@ fun tx_provide()
   /@ requires valid_hardware_ring_tx_write() && valid_hardware_ring_tx_mdata_write() @/
   /@ requires gv.tx_active.net_removed == gv.tx_handled @/
   /@ requires forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
+  /@ requires forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                   in gv.tx_active.net_removed) @/
+  /@ requires forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                   in gv.tx_handled) @/
   /@ ensures acc(gv.net_tx_active, 2/3) && acc(gv.tx_active, 2/3) &&
              acc(gv.tx_active.net_head) &&
              acc(gv.tx_active.net_tail, 2/3) && acc(gv.net_tx_capacity, 2/3) &&
@@ -664,7 +695,7 @@ fun tx_provide()
                acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
                valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
                valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
-  /@ ensures net_queue_injective(gv.tx_active) @/
+  /@ ensures net_queue_injective_consume(gv.tx_active) @/
   /@ ensures acc(gv.hw_tx_ptr, 1/2) &&
              acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && acc(gv.hw_tx_descr, 2/3) &&
              acc(gv.hw_tx_head, 2/3) @/
@@ -677,6 +708,12 @@ fun tx_provide()
                (gv.tx_active.net_tail == gv.tx_active.net_head) @/
   // anything that was in the net queue and no longer is, is now in the hw queue and v/v
   /@ ensures gv.tx_active.net_removed == gv.tx_handled @/
+  /@ ensures forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+               !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                 in gv.tx_active.net_removed) @/
+  /@ ensures forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+               !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                 in gv.tx_handled) @/
 
   var reprocess = true;
 
@@ -695,7 +732,7 @@ fun tx_provide()
                    acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
                    valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
                    valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
-    /@ invariant net_queue_injective(gv.tx_active) @/
+    /@ invariant net_queue_injective_consume(gv.tx_active) @/
     /@ invariant acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
                  acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
                  acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
@@ -708,6 +745,12 @@ fun tx_provide()
     /@ invariant reprocess == false ==>
                    ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity ||
                      gv.tx_active.net_tail == gv.tx_active.net_head) @/
+    /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                   !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                     in gv.tx_active.net_removed) @/
+    /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                   !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                     in gv.tx_handled) @/
 
     /@ label l_rpc @/
     
@@ -729,7 +772,7 @@ fun tx_provide()
                      acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
                      valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
                      valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
-      /@ invariant net_queue_injective(gv.tx_active) @/
+      /@ invariant net_queue_injective_consume(gv.tx_active) @/
       /@ invariant acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
                    acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
                    acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
@@ -742,6 +785,12 @@ fun tx_provide()
       /@ invariant empty == (gv.tx_active.net_tail == gv.tx_active.net_head) @/
       /@ invariant forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
       /@ invariant forall x: Seq[Int] :: x in gv.tx_handled ==> x in gv.tx_active.net_removed @/
+      /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                     !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                       in gv.tx_active.net_removed) @/
+      /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                     !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
+                       in gv.tx_handled) @/
 
       /@ unfold valid_hardware_ring_tx_write() @/
       /@ label l_it @/
@@ -832,7 +881,7 @@ fun tx_return()
                 acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
                 valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
                 valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
-  /@ requires net_queue_injective(gv.tx_free) @/
+  /@ requires net_queue_injective_produce(gv.tx_free) @/
   /@ requires acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
               acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
               acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
@@ -851,7 +900,7 @@ fun tx_return()
                acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
                valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
                valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
-  /@ ensures net_queue_injective(gv.tx_free) @/
+  /@ ensures net_queue_injective_produce(gv.tx_free) @/
   /@ ensures acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
              acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
              acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 && acc(gv.hw_tx_descr, 1/2) @/
@@ -899,7 +948,7 @@ fun tx_return()
                    acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
                    valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
                    valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
-    /@ invariant net_queue_injective(gv.tx_free) @/
+    /@ invariant net_queue_injective_produce(gv.tx_free) @/
     /@ invariant acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
                  acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
                  acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
