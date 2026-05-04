@@ -250,6 +250,17 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat) {
   return 0;
 }
 
+#define disjoint_net_queue_removed_handled(queue, handled) ( \
+  (forall i: Int :: queue.net_head <= i && i < queue.net_tail ==> \
+    !(slotq(queue.net_descr, i).ndescr_addr in queue.net_removed_addr)) && \
+  (forall s: Seq[Int] :: s in handled ==> \
+    |s| == 2 && forall j: Int :: \
+      queue.net_head <= j && j < queue.net_tail ==> \
+         s[0] != slotq(queue.net_descr, j).ndescr_addr) \
+)
+
+#define disjoint_net_queue_removed_handled_rx() disjoint_net_queue_removed_handled(gv.rx_free, gv.rx_handled)
+
 fun rx_provide()
 {
   /@ requires acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
@@ -276,12 +287,7 @@ fun rx_provide()
   /@ requires forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
   /@ requires forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
                 s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
-  /@ requires forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
-  /@ requires forall s: Seq[Int] :: s in gv.rx_handled ==>
-                |s| == 2 && forall i: Int ::
-                  gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                    s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
+  /@ requires disjoint_net_queue_removed_handled_rx() @/
   /@ ensures acc(gv.net_rx_free, 2/3) && acc(gv.rx_free, 2/3) &&
              acc(gv.rx_free.net_head) &&
              acc(gv.rx_free.net_tail, 2/3) &&
@@ -315,6 +321,7 @@ fun rx_provide()
                 |s| == 2 && forall i: Int ::
                   gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
                     s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
+  /@ ensures disjoint_net_queue_removed_handled_rx() @/
 
   var reprocess = true;
 
@@ -348,12 +355,7 @@ fun rx_provide()
     /@ invariant reprocess == false ==>
                    ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity ||
                      gv.rx_free.net_tail == gv.rx_free.net_head) @/
-    /@ invariant forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                   !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
-    /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==>
-                  |s| == 2 && forall i: Int ::
-                    gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                      s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
+    /@ invariant disjoint_net_queue_removed_handled_rx() @/
 
     /@ label l_rpc @/
 
@@ -387,13 +389,7 @@ fun rx_provide()
       /@ invariant forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
       /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
                      s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
-      /@ invariant forall i: Int ::
-                    gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                      !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr) @/
-      /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==>
-                    |s| == 2 && forall i: Int ::
-                      gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
-                        s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr @/
+      /@ invariant disjoint_net_queue_removed_handled_rx() @/
 
       /@ unfold valid_hardware_ring_rx_write() @/
       /@ label l_it @/
@@ -652,6 +648,8 @@ fun rx_return()
   return 0;
 }
 
+#define disjoint_net_queue_removed_handled_tx() disjoint_net_queue_removed_handled(gv.tx_active, gv.tx_handled)
+
 fun tx_provide()
 {
   /@ requires acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
@@ -683,6 +681,7 @@ fun tx_provide()
   /@ requires forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
                 !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
                    in gv.tx_handled) @/
+  /@ requires disjoint_net_queue_removed_handled_tx() @/
   /@ ensures acc(gv.net_tx_active, 2/3) && acc(gv.tx_active, 2/3) &&
              acc(gv.tx_active.net_head) &&
              acc(gv.tx_active.net_tail, 2/3) && acc(gv.net_tx_capacity, 2/3) &&
@@ -708,12 +707,7 @@ fun tx_provide()
                (gv.tx_active.net_tail == gv.tx_active.net_head) @/
   // anything that was in the net queue and no longer is, is now in the hw queue and v/v
   /@ ensures gv.tx_active.net_removed == gv.tx_handled @/
-  /@ ensures forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-               !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                 in gv.tx_active.net_removed) @/
-  /@ ensures forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-               !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                 in gv.tx_handled) @/
+  /@ ensures disjoint_net_queue_removed_handled_tx() @/
 
   var reprocess = true;
 
@@ -745,12 +739,7 @@ fun tx_provide()
     /@ invariant reprocess == false ==>
                    ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity ||
                      gv.tx_active.net_tail == gv.tx_active.net_head) @/
-    /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-                   !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                     in gv.tx_active.net_removed) @/
-    /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-                   !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                     in gv.tx_handled) @/
+    /@ invariant disjoint_net_queue_removed_handled_tx() @/
 
     /@ label l_rpc @/
     
@@ -785,12 +774,7 @@ fun tx_provide()
       /@ invariant empty == (gv.tx_active.net_tail == gv.tx_active.net_head) @/
       /@ invariant forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
       /@ invariant forall x: Seq[Int] :: x in gv.tx_handled ==> x in gv.tx_active.net_removed @/
-      /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-                     !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                       in gv.tx_active.net_removed) @/
-      /@ invariant forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
-                     !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len)
-                       in gv.tx_handled) @/
+      /@ invariant disjoint_net_queue_removed_handled_tx() @/
 
       /@ unfold valid_hardware_ring_tx_write() @/
       /@ label l_it @/
