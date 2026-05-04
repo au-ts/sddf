@@ -8,7 +8,7 @@
 
 #include "include/client/client.h"
 
-#define DEBUG_LOG
+// #define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -111,8 +111,8 @@ void client_main(void) {
 
     while(true)
     {
+        LOG_CLIENT("Client PD\n");
         control_forward();
-        LOG_CLIENT("testing...\n");
         // sensor a: right
         // sensor b: forward
         // sensor c: left
@@ -141,6 +141,10 @@ void client_main(void) {
         //         control_left();
         //     }
         // }
+
+        // TODO: update this?
+        // small delay to not reconfig PWM driver every time
+        for (volatile int i = 0; i < 100000000; i++) {}
     }
 }
 

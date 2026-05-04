@@ -128,6 +128,7 @@ endif
 	$(OBJCOPY) --update-section .serial_client_config=${SDFGEN_OUT}/serial_client_client.data client.elf
 
 	$(OBJCOPY) --update-section .gpio_telemetry_config=${SDFGEN_OUT}/gpio_client_telemetry.data telemetry.elf
+	$(OBJCOPY) --update-section .timer_telemetry_config=${SDFGEN_OUT}/timer_client_telemetry.data telemetry.elf
 	touch $@
 
 # Final image generation

@@ -74,8 +74,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=253, passive=True)
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=253, passive=True)
-    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
-    client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
+
+    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=2, budget=2000, period=8000)
+    client = ProtectionDomain("client", "client.elf", priority=1, budget=1500000, period=2000000)
+
     # client = ProtectionDomain("client", "client.elf", priority=2)
 
     serial_node = dtb.node(board.serial)
@@ -130,6 +132,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
+    timer_system.add_client(telemetry)
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
 
