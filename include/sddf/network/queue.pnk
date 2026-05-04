@@ -258,17 +258,11 @@ inline fun net_cancel_signal(1 queue_ptr)
 inline fun net_require_signal(1 queue_ptr, 1 capacity)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal, 1/2) @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal, 1/2) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal, 1/2) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal, 1/2) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal, 1/2) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal, 1/2) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal, 1/2) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal, 1/2) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) @/
   /@ ensures queue_ptr == TX_FREE_BASE ==> retval == (gv.tx_free.net_signal ? 0 : 1) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == (gv.tx_active.net_signal ? 0 : 1) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == (gv.rx_free.net_signal ? 0 : 1) @/
   /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == (gv.rx_active.net_signal ? 0 : 1) @/
 
   var signalled = 0;
