@@ -8,7 +8,7 @@
 
 #include "include/client/client.h"
 
-// #define DEBUG_LOG
+#define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -108,10 +108,10 @@ void client_main(void) {
     // digital_write(gpio_channel_echo_a, GPIO_LOW);
 
     // control_forward();
+    delay_microseconds(1000, SENSOR_TIMEOUT_ID);
 
     while(true)
     {
-        LOG_CLIENT("Client PD\n");
         control_forward();
         // sensor a: right
         // sensor b: forward
@@ -155,6 +155,7 @@ void notified(sddf_channel ch) {
 
     if (ch == timer_channel) {
         int timeout_id = dequeue(&timeout_queue);
+        LOG_CLIENT("TIMEOUT\n");
         // LOG_CLIENT("timeout now\n");
         // LOG_CLIENT("timeout id: %d\n", timeout_id);
 

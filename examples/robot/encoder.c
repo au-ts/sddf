@@ -33,7 +33,8 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
     while (true) {
         if (prev_a_state == GPIO_LOW && curr_a_state == GPIO_HIGH) {
             prev_a_state = GPIO_HIGH;
-
+            LOG_ENCODER("RISING A\n");
+            
             if (curr_b_state) {
                 encoder_count++;
             }
@@ -42,6 +43,7 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
             }
         } else if (prev_b_state == GPIO_LOW && curr_b_state == GPIO_HIGH) {
             prev_b_state = GPIO_HIGH;
+            LOG_ENCODER("RISING B\n");
 
             if (curr_a_state) {
                 encoder_count++;
