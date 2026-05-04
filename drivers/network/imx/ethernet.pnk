@@ -635,7 +635,6 @@ fun rx_return()
     microkit_notify(rx_ch);
   }
 
-  /@ refute false @/
   return 0;
 }
 
