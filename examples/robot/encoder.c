@@ -20,45 +20,65 @@
 
 int encoder_count = 0;
 
-// polling approach since driver IRQs might be cooked
-// TODO: update this with an IRQ later
-// code: https://forum.arduino.cc/t/controlling-motor-speed-in-rpm-using-an-encoder/1276093/5
+// void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
+//     int prev_a_state = GPIO_LOW; 
+//     int prev_b_state = GPIO_LOW;
+
+//     while (true) {
+//         if (prev_a_state == GPIO_LOW && digital_read(gpio_ch_a) == GPIO_HIGH) {
+//             prev_a_state = GPIO_HIGH;
+//             LOG_ENCODER("rising edge in A\n");
+//         } 
+//         else if (digital_read(gpio_ch_b) == GPIO_LOW) {
+//             prev_a_state = GPIO_LOW;
+//         }
+
+//         if (prev_b_state == GPIO_LOW && digital_read(gpio_ch_b) == GPIO_HIGH) {
+//             prev_b_state = GPIO_HIGH;
+//             LOG_ENCODER("rising edge in B\n");
+//         }
+//         else if (digital_read(gpio_ch_b) == GPIO_LOW) {
+//             prev_b_state = GPIO_LOW;
+//         }
+//     }
+// }
+
+// Quadrature encoder polling using state transitions
+// Detects rising edges on each pin and checks the other pin to determine direction
 void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
     int prev_a_state = GPIO_LOW; 
     int prev_b_state = GPIO_LOW;
 
-    int curr_a_state = digital_read(gpio_ch_a);
-    int curr_b_state = digital_read(gpio_ch_b);
-
     while (true) {
+        int curr_a_state = digital_read(gpio_ch_a);
+        int curr_b_state = digital_read(gpio_ch_b);
+
+        // detect rising edge on pin A
         if (prev_a_state == GPIO_LOW && curr_a_state == GPIO_HIGH) {
-            prev_a_state = GPIO_HIGH;
-            LOG_ENCODER("RISING A\n");
-            
-            if (curr_b_state) {
+            // check Pin B for direction
+            if (curr_b_state == GPIO_LOW) {
                 encoder_count++;
-            }
-            else {
+                LOG_ENCODER("A rising, B low\n");
+            } else {
                 encoder_count--;
-            }
-        } else if (prev_b_state == GPIO_LOW && curr_b_state == GPIO_HIGH) {
-            prev_b_state = GPIO_HIGH;
-            LOG_ENCODER("RISING B\n");
-
-            if (curr_a_state) {
-                encoder_count++;
-            }
-            else {
-                encoder_count--;
+                LOG_ENCODER("A rising, B high\n");
             }
         }
 
-        if (curr_a_state == GPIO_LOW) {
-            prev_a_state = GPIO_LOW;
+        // detect rising edge on pin B
+        if (prev_b_state == GPIO_LOW && curr_b_state == GPIO_HIGH) {
+            // check Pin A for direction
+            if (curr_a_state == GPIO_LOW) {
+                encoder_count--;
+                LOG_ENCODER("B rising, A low\n");
+            } else {
+                encoder_count++;
+                LOG_ENCODER("B rising, A high\n");
+            }
         }
-        if (curr_b_state == GPIO_LOW) {
-            prev_b_state = GPIO_LOW;
-        }
+
+        prev_a_state = curr_a_state;
+        prev_b_state = curr_b_state;
     }
 }
 

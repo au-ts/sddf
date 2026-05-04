@@ -37,34 +37,37 @@ void notified(sddf_channel ch) {
         encoder_count = 0;
         
         LOG_TELEM("%f\n", rps);
-        sddf_timer_set_timeout(timer_channel, 10*NS_IN_US);
-        co_switch(t_main);
+        sddf_timer_set_timeout(timer_channel, NS_IN_S);
+        // co_switch(t_main);
     }
-}
-
-void telemetry_main(void) {
-    LOG_TELEM("main\n");
-
-    // start timer to calculate wheel speeds every second
-    sddf_timer_set_timeout(timer_channel, 10*NS_IN_US);
-    detect_encoder_rising_edge(gpio_channel_encoder_a, gpio_channel_encoder_b);
 }
 
 void init(void) {
     timer_channel = timer_config.driver_id;
 
+    LOG_TELEM("%d\n", timer_channel);
+
     gpio_channel_encoder_a = gpio_config.driver_channel_ids[6];
     gpio_channel_encoder_b = gpio_config.driver_channel_ids[7];
 
     encoder_init(gpio_channel_encoder_a, gpio_channel_encoder_b);
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
 
-    LOG_TELEM("Init\n");
+    while (true) {
+        for (volatile int i = 0; i < 1000000; i++) {}
+        LOG_TELEM("TESTING\n");
+    }
 
-    /* Define the event loop/notified thread as the active co-routine */
-    t_event = co_active();
+    // detect_encoder_rising_edge(gpio_channel_encoder_a, gpio_channel_encoder_b);
 
-    /* derive main entry point */
-    t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, telemetry_main);
+
+    // LOG_TELEM("Init\n");
+
+    // /* Define the event loop/notified thread as the active co-routine */
+    // t_event = co_active();
+
+    // /* derive main entry point */
+    // t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, telemetry_main);
     
-    co_switch(t_main);
+    // co_switch(t_main);
 }
