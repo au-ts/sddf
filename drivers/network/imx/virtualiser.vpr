@@ -1,3 +1,5 @@
+define f_net_queue_injective(_, _, x) net_queue_injective(x)
+
 define RX_FREE_BASE 		1234567
 define RX_ACTIVE_BASE 		1244667
 define TX_FREE_BASE 		1254767
@@ -68,11 +70,25 @@ field net_removed_addr: Set[Int]
 field net_removed: Set[Seq[Int]]
 field net_added: Set[Seq[Int]]
 
+function net_queue_injective(queue: Ref): Bool
+  requires acc(queue.net_tail, wildcard)
+  requires acc(queue.net_head, wildcard)
+  requires acc(queue.net_descr, wildcard)
+  requires 0 <= queue.net_tail - queue.net_head <= 256
+  requires forall i: Int :: queue.net_tail <= i && i < queue.net_head ==>
+    acc(slotq(queue.net_descr, i).ndescr_addr, wildcard)
+{
+  forall i: Int, j: Int :: queue.net_tail <= i && i < queue.net_head &&
+    queue.net_tail <= j && j < queue.net_head &&
+    slotq(queue.net_descr, i).ndescr_addr == slotq(queue.net_descr, j).ndescr_addr ==>
+      i == j
+}
+
 predicate valid_net_queue_produce(heap: IArray, virt: Ref, queue: Ref, capacity: Int)
 {
   acc(queue.net_tail) && acc(queue.net_head, 3/4) && acc(queue.net_signal) &&
   acc(queue.net_descr) &&
-  0 <= queue.net_tail - queue.net_head && queue.net_tail - queue.net_head <= 256 &&
+  0 <= queue.net_tail - queue.net_head <= 256 &&
   (forall i : Int :: queue.net_tail <= i && i < queue.net_head ==>
     acc(slotq(queue.net_descr, i).ndescr_addr) && acc(slotq(queue.net_descr, i).ndescr_len)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
@@ -87,7 +103,7 @@ predicate valid_net_queue_consume(heap: IArray, virt: Ref, queue: Ref, capacity:
 {
   acc(queue.net_tail, 3/4) && acc(queue.net_head) && acc(queue.net_signal) &&
   acc(queue.net_descr) &&
-  0 <= queue.net_tail - queue.net_head && queue.net_tail - queue.net_head <= 256 &&
+  0 <= queue.net_tail - queue.net_head <= 256 &&
   (forall i : Int :: queue.net_head <= i && i < queue.net_tail ==>
     acc(slotq(queue.net_descr, i).ndescr_addr, 3/4) && acc(slotq(queue.net_descr, i).ndescr_len, 3/4)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
