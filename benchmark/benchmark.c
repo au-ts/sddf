@@ -168,6 +168,9 @@ static void benchmark_start(void)
 
 #if ENABLE_PMU_EVENTS
     sel4bench_reset_counters();
+    /* Reset the overflow status flag register so we can check for overflows to
+    32-bit counters during the benchmark */
+    PMU_WRITE(PMOVSCLR, 0);
     sel4bench_start_counters(benchmark_bf);
 #endif
 
@@ -202,18 +205,26 @@ static void benchmark_stop(void)
 #if ENABLE_PMU_EVENTS
     sel4bench_get_counters(benchmark_bf, &counter_values[0]);
     sel4bench_stop_counters(benchmark_bf);
+    /* Check the overflow status flag register so we can discard any 32-bit
+    counts which have overflowed */
+    uint64_t overflow_status;
+    PMU_READ(PMOVSCLR, overflow_status);
 
     sddf_printf("{CORE %u: \n", benchmark_config.core);
     uint8_t i = 0;
     while (i < benchmark_config.num_pmu_events) {
-        /* Only even numbered counters can be chained (CHAIN counter must be odd) */
-        if (i + 1 < benchmark_config.num_pmu_events && !(i % 2) && benchmark_config.pmu_events[i + 1] == CHAIN) {
+        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
             sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
                         counter_values[i] + (counter_values[i+1] << 32));
             i += 2;
         } else {
-            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
-                        counter_values[i]);
+            if (overflow_status & 1 << i) {
+                sddf_printf("%s: Overflow occurred during benchmark, event count is invalid!\n",
+                    pmu_event_table[benchmark_config.pmu_events[i]].event_name);
+            } else {
+                sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
+                            counter_values[i]);
+            }
             i += 1;
         }
     }
@@ -271,8 +282,7 @@ void init(void)
     sddf_printf("BENCH|LOG: ENABLE_PMU_EVENTS defined. Tracking PMU events:\n");
     uint8_t event = 0, i = 0;
     while (i < benchmark_config.num_pmu_events) {
-        /* Only even numbered counters can be chained (CHAIN counter must be odd) */
-        if (i + 1 < benchmark_config.num_pmu_events && !(i % 2) && benchmark_config.pmu_events[i + 1] == CHAIN) {
+        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
             sddf_printf("%u. %s (64-bit counter)\n", event, pmu_event_table[benchmark_config.pmu_events[i]].event_name);
             i += 2;
         } else {

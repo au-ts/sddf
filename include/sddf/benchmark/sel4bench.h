@@ -61,6 +61,7 @@ typedef uint64_t ccnt_t;
 #define PMSELR      "PMSELR_EL0"
 #define PMXEVTYPER  "PMXEVTYPER_EL0"
 #define PMCCNTR     "PMCCNTR_EL0"
+#define PMOVSCLR    "PMOVSCLR_EL0"
 
 #define PMU_WRITE(reg, v)                      \
     do {                                       \
