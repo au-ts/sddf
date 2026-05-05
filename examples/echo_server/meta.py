@@ -85,6 +85,7 @@ class BenchmarkConfig:
         core: int,
         last_core: bool,
         children: List[Tuple[int, str]],
+        pmu_events: List[int],
     ):
         self.ch_rx_start = ch_rx_start
         self.ch_tx_start = ch_tx_start
@@ -94,6 +95,7 @@ class BenchmarkConfig:
         self.core = core
         self.last_core = last_core
         self.children = children
+        self.pmu_events = pmu_events
 
     """
         Matches struct definition:
@@ -110,12 +112,14 @@ class BenchmarkConfig:
                 char [64];
                 uint8_t;
             } [64];
+            uint8_t [6];
+            uint8_t;
         }
     """
 
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
-        pack_str = "<BBBBBB?B" + child_config_format * 64
+        pack_str = "<BBBBBB?B" + child_config_format * 64 + "BBBBBBB"
         child_bytes = bytearray()
         for child in self.children:
             c_name = child[1].encode("utf-8")
@@ -128,6 +132,10 @@ class BenchmarkConfig:
 
         child_bytes_list = [x.to_bytes(1, "little") for x in child_bytes]
 
+        num_pmu_events = len(self.pmu_events)
+        assert num_pmu_events <= 6
+        self.pmu_events.extend(0 for i in range(6 - num_pmu_events))
+
         return struct.pack(
             pack_str,
             self.ch_rx_start,
@@ -139,6 +147,8 @@ class BenchmarkConfig:
             self.last_core,
             len(self.children),
             *child_bytes_list,
+            *self.pmu_events,
+            num_pmu_events
         )
 
 
@@ -179,6 +189,7 @@ def generate(
     output_dir: str,
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
+    pmu_event_ids: List[int],
 ):
     uart_node = None
     ethernet_node = None
@@ -450,6 +461,7 @@ def generate(
                 core_objs[i - 1]["core"],
                 False,
                 core_objs[i - 1]["children"],
+                pmu_event_ids,
             )
 
     # Finally create the last benchmark PD config
@@ -462,6 +474,7 @@ def generate(
         core_objs[num_cores - 1]["core"],
         True,
         core_objs[num_cores - 1]["children"],
+        pmu_event_ids,
     )
 
     assert serial_system.connect()
@@ -510,6 +523,23 @@ def generate(
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
 
+# ARM PMU event identifier dictionary:
+# The value of each PMU event string is a pair whose first entry is the PMU
+# event's enum value (defined in bench.h), and second entry is a list of boards
+# that DO NOT support tracking of the event.
+# PMU events can be configured by setting the make flag `BENCH_PMU_EVENTS` to a
+# comma separated list of events
+bench_pmu_events = {
+    "CACHE_L1I_MISS": (0, []),
+    "CACHE_L1D_MISS": (1, []),
+    "TLB_L1I_MISS": (2, []),
+    "TLB_L1D_MISS": (3, []),
+    "EXECUTE_INSTRUCTION": (4, []),
+    "BRANCH_MISPREDICT": (5, []),
+    "CPU_CYCLES": (6, []),
+    "MEM_ACCESS": (7, []),
+    "CHAIN": (8, []),
+}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -520,6 +550,7 @@ if __name__ == "__main__":
     parser.add_argument("--sdf", required=True)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
+    parser.add_argument("--bench_pmu_events", required=False)
 
     args = parser.parse_args()
 
@@ -540,4 +571,22 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, get_core)
+    if args.bench_pmu_events:
+        pmu_events = args.bench_pmu_events.split(",")
+    else:
+        # If benchmarking PMU events are not provided, we use these default events
+        pmu_events = ["EXECUTE_INSTRUCTION", "CHAIN", "MEM_ACCESS", "CHAIN", "CACHE_L1D_MISS", "CHAIN"]
+
+    assert len(pmu_events) <= 6, "Supplied more than 6 benchmarking PMU events to track!"
+    pmu_event_ids = []
+    for i in range(len(pmu_events)):
+        if not i % 2:
+            assert pmu_events[i] != "CHAIN", f"Chaining (overflow counting) can only be used by odd counters (selected counter {i})!"
+
+        assert pmu_events[i] in bench_pmu_events, f"Selected PMU event {i} ({pmu_events[i]}) is not supported!"
+
+        assert args.board not in bench_pmu_events[pmu_events[i]][1], f"Selected PMU event {i} ({pmu_events[i]}) is not supported by board {args.board}!"
+
+        pmu_event_ids.append(bench_pmu_events[pmu_events[i]][0])
+
+    generate(args.sdf, args.output, dtb, get_core, pmu_event_ids)

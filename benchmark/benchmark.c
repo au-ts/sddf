@@ -26,22 +26,28 @@ counter_bitfield_t benchmark_bf;
 
 serial_queue_handle_t serial_tx_queue_handle;
 
-char *counter_names[] = {
-    "L1 i-cache misses",
-    "L1 d-cache misses",
-    "L1 i-tlb misses",
-    "L1 d-tlb misses",
-    "Instructions",
-    "Branch mispredictions",
-};
+/**
+ * PMU event information fields.
+ */
+typedef struct {
+    const char *event_name; /* Description of the PMU event for result reporting. */
+    uint64_t sel4bench_id; /* PMU event identifier - platform specific, but we limit our PMU usage to ARM */
+} bench_pmu_event_info_t;
 
-event_id_t benchmarking_events[] = {
-    SEL4BENCH_EVENT_CACHE_L1I_MISS,
-    SEL4BENCH_EVENT_CACHE_L1D_MISS,
-    SEL4BENCH_EVENT_TLB_L1I_MISS,
-    SEL4BENCH_EVENT_TLB_L1D_MISS,
-    SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
-    SEL4BENCH_EVENT_BRANCH_MISPREDICT,
+/**
+ * PMU event lookup table. Entry i corresponds to bench_pmu_events_t enum value
+ * i, see bench.h
+ */
+bench_pmu_event_info_t pmu_event_table[] = {
+    {"L1 i-cache misses", SEL4BENCH_EVENT_CACHE_L1I_MISS },
+    {"L1 d-cache misses", SEL4BENCH_EVENT_CACHE_L1D_MISS },
+    {"L1 i-tlb misses", SEL4BENCH_EVENT_TLB_L1I_MISS },
+    {"L1 d-tlb misses", SEL4BENCH_EVENT_TLB_L1D_MISS },
+    {"Instructions", SEL4BENCH_EVENT_EXECUTE_INSTRUCTION },
+    {"Branch mispredictions", SEL4BENCH_EVENT_BRANCH_MISPREDICT },
+    {"CPU cycles", SEL4BENCH_EVENT_CCNT },
+    {"Data memory access", SEL4BENCH_EVENT_MEMORY_ACCESS },
+    {"Overflow counter", SEL4BENCH_EVENT_CHAIN},
 };
 
 static char *child_name(uint8_t child_id)
@@ -134,8 +140,8 @@ static void benchmark_init(void)
 #if ENABLE_PMU_EVENTS
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
-    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
-        sel4bench_set_count_event(counter, benchmarking_events[counter]);
+    for (seL4_Word counter = 0; counter < MIN(n_counters, benchmark_config.num_pmu_events); counter++) {
+        sel4bench_set_count_event(counter, pmu_event_table[benchmark_config.pmu_events[counter]].sel4bench_id);
         benchmark_bf |= BIT(counter);
     }
 
@@ -198,8 +204,18 @@ static void benchmark_stop(void)
     sel4bench_stop_counters(benchmark_bf);
 
     sddf_printf("{CORE %u: \n", benchmark_config.core);
-    for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-        sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+    uint8_t i = 0;
+    while (i < benchmark_config.num_pmu_events) {
+        /* Only even numbered counters can be chained (CHAIN counter must be odd) */
+        if (i + 1 < benchmark_config.num_pmu_events && !(i % 2) && benchmark_config.pmu_events[i + 1] == CHAIN) {
+            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
+                        counter_values[i] + (counter_values[i+1] << 32));
+            i += 2;
+        } else {
+            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
+                        counter_values[i]);
+            i += 1;
+        }
     }
     sddf_printf("}\n");
 #endif
@@ -252,7 +268,19 @@ void init(void)
     sddf_printf("BENCH|LOG: ENABLE_BENCHMARKING defined\n");
 #endif
 #if ENABLE_PMU_EVENTS
-    sddf_printf("BENCH|LOG: ENABLE_PMU_EVENTS defined\n");
+    sddf_printf("BENCH|LOG: ENABLE_PMU_EVENTS defined. Tracking PMU events:\n");
+    uint8_t event = 0, i = 0;
+    while (i < benchmark_config.num_pmu_events) {
+        /* Only even numbered counters can be chained (CHAIN counter must be odd) */
+        if (i + 1 < benchmark_config.num_pmu_events && !(i % 2) && benchmark_config.pmu_events[i + 1] == CHAIN) {
+            sddf_printf("%u. %s (64-bit counter)\n", event, pmu_event_table[benchmark_config.pmu_events[i]].event_name);
+            i += 2;
+        } else {
+            sddf_printf("%u. %s (32-bit counter)\n", event, pmu_event_table[benchmark_config.pmu_events[i]].event_name);
+            i += 1;
+        }
+        event++;
+    }
 #endif
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_UTILISATION defined\n");
