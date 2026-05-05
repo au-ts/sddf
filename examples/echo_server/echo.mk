@@ -17,6 +17,7 @@ SUPPORTED_BOARDS := \
 			imx8mq_evk \
 		    imx8mp_iotgate \
 			kria_k26 \
+			zcu102 \
 			maaxboard \
 			odroidc2 \
 			odroidc4 \
