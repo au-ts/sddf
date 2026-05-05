@@ -67,51 +67,7 @@ net_queue_handle_t tx_queue;
 
 #define MAX_PACKET_SIZE     1536
 
-volatile struct enet_regs *eth;
-
-static inline void set_reg(uintptr_t reg, uint32_t val)
-{
-    volatile uint32_t *ptr = (volatile uint32_t *)reg;
-    *ptr = val;
-}
-
-static inline uint32_t get_reg(uintptr_t reg)
-{
-    volatile uint32_t *ptr = (volatile uint32_t *)reg;
-    return *ptr;
-}
-
-static inline void set_flags(uintptr_t reg, uint32_t flags)
-{
-    set_reg(reg, get_reg(reg) | flags);
-}
-
-static inline void clear_flags(uintptr_t reg, uint32_t flags)
-{
-    set_reg(reg, get_reg(reg) & ~flags);
-}
-
-static inline void set_reg16(uintptr_t reg, uint16_t val)
-{
-    volatile uint16_t *ptr = (volatile uint16_t *)reg;
-    *ptr = val;
-}
-
-static inline uint16_t get_reg16(uintptr_t reg)
-{
-    volatile uint16_t *ptr = (volatile uint16_t *)reg;
-    return *ptr;
-}
-
-static inline void set_flags16(uintptr_t reg, uint16_t flags)
-{
-    set_reg16(reg, get_reg16(reg) | flags);
-}
-
-static inline void clear_flags16(uintptr_t reg, uint16_t flags)
-{
-    set_reg16(reg, get_reg16(reg) & ~flags);
-}
+volatile eth_regs_t *eth_regs;
 
 static inline bool hw_tx_ring_empty(void)
 {
@@ -135,41 +91,35 @@ static inline bool hw_rx_ring_full(void)
 
 void clear_interrupts(void)
 {
-    set_reg(EIMC, IXGBE_IRQ_CLEAR_MASK);
-    /* get_reg(EICR); */
+    eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
 }
 
 void disable_interrupts(void)
 {
-    set_reg(EIMC, 0);
+    eth_regs->eimc = 0;
     clear_interrupts();
 }
 
 void enable_interrupts(void)
 {
     // @jade: we don't enable TX IRQ, just do TX complete on RX event
-    set_reg(IVAR(0), RX_IRQ | BIT(7));
+    // TODO: why?
+    eth_regs->ivar[0] = RX_IRQ | BIT(7);
 
-    set_reg(EIAC, 0);
+    eth_regs->eiac = 0;
     // @jade: enable auto clear (actually, what is it?)
-    // set_reg(EIAC, BIT(0));
-    set_reg(EITR(0), IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL);
-    // set_reg(EITR(0), 0x028);
+    eth_regs->eitr[0] = IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL;
     clear_interrupts();
-    // uint32_t mask = get_reg(EIMS);
-    // mask |= ~BIT(31);
 
     // bit 15:0 for Receive/Transmit Queue Interrupts. We only enable those IRQs
     // because the driver doesn't know how to handle IRQs caused by other reasons.
-    // set_reg(EIMS, ~BIT(31));
-    // set_reg(EIMS, BIT(1));
-    set_reg(EIMS, 0xff);
+    eth_regs->eims = 0xFF;
 }
 
 void get_mac_addr(uint8_t mac[6])
 {
-    uint64_t low = get_reg(RAL(0));
-    uint64_t high = get_reg(RAH(0));
+    uint64_t low = eth_regs->rx_addr[0].lo;
+    uint64_t high = eth_regs->rx_addr[0].hi;
 
     mac[0] = low & 0xff;
     mac[1] = low >> 8 & 0xff;
@@ -181,7 +131,8 @@ void get_mac_addr(uint8_t mac[6])
 
 uint64_t get_link_speed(void)
 {
-    uint64_t speed = get_reg(LINKS);
+    // TODO: why 64bits?
+    uint64_t speed = eth_regs->links;
     if ((speed & IXGBE_LINKS_UP) == 0) {
         return 0;
     }
@@ -209,15 +160,11 @@ void tx_provide(void)
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
-            /* bench->eth_pcount_tx++; */
-
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
             desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
                                     | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
             desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
-
-            /* THREAD_MEMORY_RELEASE(); */
 
             device.tx_descr_mdata[device.tx_tail] = buffer;
 
@@ -226,9 +173,9 @@ void tx_provide(void)
         }
         // @jade: should I move this to the outer block?
         if (provided) {
-            /* THREAD_MEMORY_RELEASE(); */
-            set_reg(TDT(0), device.tx_tail);
-            get_reg(TDT(0));
+            /* set_reg(TDT(0), device.tx_tail); */
+            eth_regs->tx_dma[0].tdt = device.tx_tail;
+            eth_regs->tx_dma[0].tdt;
         }
 
         net_request_signal_active(&tx_queue);
@@ -292,7 +239,7 @@ void rx_provide(void)
 
         if (provided) {
             THREAD_MEMORY_RELEASE();
-            set_reg(RDT(0), device.rx_tail);
+            eth_regs->rx_dma[0].rdt = device.rx_tail;
         }
 
         /* Only request a notification from multiplexer if HW ring is empty */
@@ -334,14 +281,14 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        /* bench->eth_rx_notify++; */
         microkit_notify(config.virt_rx.id);
     }
 }
 
 void init(void)
 {
-    // Enable MSI. see PCI Express Technology 3.0 Chapter 17 for more details.
+    // see PCI Express Technology 3.0 Chapter 17 for more details.
+    // =====Uncomment the below code snippet to use MSI interrupts========
     /* set_flags16(PCI_COMMAND_16, BIT(10)); */
     /* set_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(0)); */
     /* clear_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(4) | BIT(5) | BIT(6)); */
@@ -350,8 +297,9 @@ void init(void)
     /* set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31); */
     /* clear_flags16(PCI_MSI_MASK, BIT(0)); */
 
-    // Enable MSI-X, see PCI Express Technology 3.0 Chapter 17 for more details.
-    /* // Disable legacy interrupts. TODO: this should be done by PCI driver. */
+    // see PCI Express Technology 3.0 Chapter 17 for more details.
+    // =====Uncomment the below code snippet to use MSI-X interrupts======
+    /* // Disable legacy interrupts. */
     /* set_flags16(PCI_COMMAND_16, BIT(10)); */
     /* // Set vector message address to Local APIC of CPU0 */
     /* set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20); */
@@ -360,7 +308,7 @@ void init(void)
     /* set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32); */
     /* // Unmask vector 0 to enable interrupts through it */
     /* set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE); */
-    /* // Enable MSI-X. TODO: this should be set by PCI driver. */
+    /* // Enable MSI-X. */
     /* set_flags(PCI_MSIX_CTRL, BIT(31)); */
 
     device.rx_ring = (void *)hw_rx_ring_vaddr;
@@ -375,12 +323,12 @@ void init(void)
     disable_interrupts();
 
     // Master disable prior to link reset, see Section 4.2.1.7
-    set_reg(CTRL, IXGBE_CTRL_PCIE_MASTER_DISABLE);
-    while (get_reg(STATUS) & IXGBE_STATUS_PCIE_MASTER_STATUS);
+    eth_regs->ctrl = IXGBE_CTRL_PCIE_MASTER_DISABLE;
+    while (eth_regs->status & IXGBE_STATUS_PCIE_MASTER_STATUS);
 
     // Global Reset and General Configuration, see Section 4.6.3.2
-    set_reg(CTRL, get_reg(CTRL) | IXGBE_CTRL_RST);
-    while ((get_reg(CTRL) & IXGBE_CTRL_RST_MASK) != 0);
+    eth_regs->ctrl |= IXGBE_CTRL_RST;
+    while ((eth_regs->ctrl & IXGBE_CTRL_RST_MASK) != 0);
 
     // Wait at least 10ms
     sddf_timer_set_timeout(timer_config.driver_id, 100 * NS_IN_MS);
@@ -397,10 +345,10 @@ void init_1(void)
     get_mac_addr(mac);
 
     // section 4.6.3 - wait for EEPROM auto read completion
-    while ((get_reg(EEC) & IXGBE_EEC_ARD) != IXGBE_EEC_ARD);
+    while((eth_regs->eec & IXGBE_EEC_ARD) != IXGBE_EEC_ARD);
 
     // section 4.6.3 - wait for dma initialization done
-    while ((get_reg(RDRXCTL) & IXGBE_RDRXCTL_DMAIDONE) != IXGBE_RDRXCTL_DMAIDONE);
+    while ((eth_regs->rdrxctl & IXGBE_RDRXCTL_DMAIDONE) != IXGBE_RDRXCTL_DMAIDONE);
 
     // section 4.6.4 - initialize link (auto negotiation)
     // link auto-configuration register should already be set correctly
@@ -410,101 +358,89 @@ void init_1(void)
 
     // section 4.6.5 - statistical counters
     // Initialise the Rx statistic registers.
-    set_reg(RQSMR(0), 0);
+
+    // section 4.6.5 - statistical counters
+    // Initialise the Rx statistic registers.
+    eth_regs->rqsmr[0] = 0;
     // reset-on-read registers, just read them once
-    get_reg(GPRC);
-    get_reg(GPTC);
-    get_reg(GORCL);
-    get_reg(GORCH);
-    get_reg(GOTCL);
-    get_reg(GOTCH);
+    eth_regs->gprc;
+    eth_regs->gptc;
+    eth_regs->gorcl;
+    eth_regs->gorch;
+    eth_regs->gotcl;
+    eth_regs->gotch;
 
     // section 4.6.7 - init rx
     {
         // disable rx while re-configuring it
-        clear_flags(RXCTRL, IXGBE_RXCTRL_RXEN);
+        eth_regs->rxctrl &= (~IXGBE_RXCTRL_RXEN);
 
-        set_reg(RXPBSIZE(0), IXGBE_RXPBSIZE_128KB);
+        // TODO: No DCB, No RSS: Queue 0 is used for all packets.
+        // eth_regs->mrqc = 0;
+
+        // TODO: why?
+        eth_regs->rxpbsize[0] = IXGBE_RXPBSIZE_128KB;
         for (int i = 1; i < 8; i++) {
-            set_reg(RXPBSIZE(i), 0);
+            eth_regs->rxpbsize[i] = 0;
         }
 
-        set_flags(HLREG0, IXGBE_HLREG0_RXCRCSTRP);
-        set_flags(RDRXCTL, IXGBE_RDRXCTL_CRCSTRIP);
+        eth_regs->hlreg0 |= IXGBE_HLREG0_RXCRCSTRP;
+        eth_regs->rdrxctl |= IXGBE_RDRXCTL_CRCSTRIP;
 
         // accept broadcast packets, promiscuous
-        set_reg(FCTRL, IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE);
+        eth_regs->fctrl = IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE;
 
-        // only use queue 0
-        for (int i = 0; i < 1; i++) {
-            set_reg(SRRCTL(i), (get_reg(SRRCTL(i)) & ~IXGBE_SRRCTL_DESCTYPE_MASK) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF);
-            set_reg(SRRCTL(i), get_reg(SRRCTL(i)) | IXGBE_SRRCTL_DROP_EN);
+        // use only queue 0
+        eth_regs->rx_dma[0].srrctl &= ~IXGBE_SRRCTL_DESCTYPE_MASK;
+        eth_regs->rx_dma[0].srrctl |= IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF | IXGBE_SRRCTL_DROP_EN;
+        eth_regs->rx_dma[0].rdbal = hw_rx_ring_paddr & 0xFFFFFFFFull;
+        eth_regs->rx_dma[0].rdbah = hw_rx_ring_paddr >> 32;
+        eth_regs->rx_dma[0].rdlen = NUM_RX_DESCS * sizeof(ixgbe_adv_rx_desc_t);
+        eth_regs->rx_dma[0].rdh = 0;
+        eth_regs->rx_dma[0].rdt = 0;
 
-            set_reg(RDBAL(i), hw_rx_ring_paddr & 0xFFFFFFFFull);
-            set_reg(RDBAH(i), hw_rx_ring_paddr >> 32);
-            set_reg(RDLEN(i), NUM_RX_DESCS * sizeof(ixgbe_adv_rx_desc_t));
-            set_reg(RDH(0), 0);
-            set_reg(RDT(0), 0);
-        }
-
-        set_reg(CTRL_EXT, IXGBE_CTRL_EXT_NS_DIS);
-
-        set_flags(RXCTRL, IXGBE_RXCTRL_RXEN);
-        set_reg(RXDCTL(0), IXGBE_RXDCTL_ENABLE);
-        while ((get_reg(RXDCTL(0)) & IXGBE_RXDCTL_ENABLE) == 0);
+        eth_regs->ctrl_ext = IXGBE_CTRL_EXT_NS_DIS;
+        eth_regs->rxctrl |= IXGBE_RXCTRL_RXEN;
+        eth_regs->rx_dma[0].rxdctl = IXGBE_RXDCTL_ENABLE;
+        while ((eth_regs->rx_dma[0].rxdctl & IXGBE_RXDCTL_ENABLE) == 0);
     }
 
     // section 4.6.8 - init tx
     {
-        // crc offload and small packet padding
-        // *HLREG0 |= IXGBE_HLREG0_TXCRCEN | IXGBE_HLREG0_TXPADEN;
-
-        // required when not using DCB/VTd
-        /* *DTXMXSZRQ = 0xFFFF; */
-        /* *RTTDCS &= ~IXGBE_RTTDCS_ARBDIS; */
-
-        // section 7.1.9 - setup descriptor ring
-
-        // configure a single transmit queue/ring
-        const uint64_t i = 0;
-
-        // section 4.6.11.3.4 - set default buffer size allocations
-        set_reg(TXPBSIZE(0), IXGBE_TXPBSIZE_40KB);
-        for (uint64_t j = 1; j < 8; j++) {
-            set_reg(TXPBSIZE(j), 0);
+        // TODO: disable DCB
+        eth_regs->txpbsize[0] = IXGBE_TXPBSIZE_40KB;
+        for (int i = 1; i < 8; i++) {
+            eth_regs->txpbsize[i] = 0;
         }
 
-        set_reg(TXPBTHRESH(0), 0xA0);
-        for (uint64_t j = 1; j < 8; j++) {
-            set_reg(TXPBTHRESH(j), 0);
+        // TODO: why?
+        eth_regs->txpbthresh[0] = 0xA0;
+        for (int i = 1; i < 8; i++) {
+            eth_regs->txpbthresh[i] = 0;
         }
 
-        set_reg(TDBAL(i), hw_tx_ring_paddr & 0xFFFFFFFFull);
-        set_reg(TDBAH(i), hw_tx_ring_paddr >> 32);
-        set_reg(TDH(0), 0);
-        set_reg(TDT(0), 0);
+        eth_regs->tx_dma[0].tdbal = hw_tx_ring_paddr & 0xFFFFFFFFull;
+        eth_regs->tx_dma[0].tdbal = hw_tx_ring_paddr >> 32;
+        eth_regs->tx_dma[0].tdh = 0;
+        eth_regs->tx_dma[0].tdt = 0;
 
-        set_reg(TDLEN(i), NUM_TX_DESCS * sizeof(ixgbe_adv_tx_desc_t));
+        eth_regs->tx_dma[0].tdlen = NUM_TX_DESCS * sizeof(ixgbe_adv_tx_desc_t);
 
         // descriptor writeback magic values, important to get good performance and low PCIe overhead
         // see 7.2.3.4.1 and 7.2.3.5 for an explanation of these values and how to find good ones
         // we just use the defaults from DPDK here, but this is a potentially interesting point for optimizations
-        //let mut txdctl = self.read_reg_idx(IxgbeArrayRegs::Txdctl, i);
+        // let mut txdctl = self.read_reg_idx(IxgbeArrayRegs::Txdctl, i);
         // there are no defines for this in ixgbe.rs for some reason
         // pthresh: 6:0, hthresh: 14:8, wthresh: 22:16
-        //txdctl &= !(0x3F | (0x3F << 8) | (0x3F << 16));
-        //txdctl |= 36 | (8 << 8) | (4 << 16);
 
-        uint32_t txdctl = get_reg(TXDCTL(i));
-        // pthresh: 6:0, hthresh: 14:8, wthresh: 22:16
-        txdctl &= ~(0x7F | (0x7F << 8) | (0x7F << 16)); // clear bits
-        txdctl |= (36 | (8 << 8) | (4 << 16)); // from DPDK
-        set_reg(TXDCTL(i), txdctl);
+        // TODO: look at this
+        eth_regs->tx_dma[0].txdctl &= ~(0x7F | (0x7F << 8) | (0x7F << 16)); // clear bits
+        eth_regs->tx_dma[0].txdctl |= (36 | (8 << 8) | (4 << 16)); // from DPDK
 
         // final step: enable DMA
-        set_reg(DMATXCTL, IXGBE_DMATXCTL_TE);
-        set_reg(TXDCTL(0), IXGBE_TXDCTL_ENABLE);
-        while ((get_reg(TXDCTL(0)) & IXGBE_TXDCTL_ENABLE) == 0);
+        eth_regs->dmatxctl = IXGBE_DMATXCTL_TE;
+        eth_regs->tx_dma[0].txdctl = IXGBE_TXDCTL_ENABLE;
+        while ((eth_regs->tx_dma[0].txdctl & IXGBE_TXDCTL_ENABLE) == 0);
     }
 
     // wait some time for the link to come up
@@ -550,8 +486,8 @@ void notified(microkit_channel ch)
         }
     } else if (ch == device_resources.irqs[0].id) {
         // write/read-to-clear, no need for auto clear
-        uint32_t cause = get_reg(EICR);
-        clear_flags(EICR, cause);
+        uint32_t cause = eth_regs->eicr;
+        eth_regs->eicr &= ~cause;
         tx_return();
         tx_provide();
         rx_return();
@@ -571,3 +507,4 @@ void notified(microkit_channel ch)
         }
     }
 }
+
