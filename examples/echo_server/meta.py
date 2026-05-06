@@ -524,11 +524,20 @@ def generate(
         f.write(sdf.render())
 
 # ARM PMU event identifier dictionary:
-# The value of each PMU event string is a pair whose first entry is the PMU
-# event's enum value (defined in bench.h), and second entry is a list of boards
-# that DO NOT support tracking of the event.
-# PMU events can be configured by setting the make flag `BENCH_PMU_EVENTS` to a
-# comma separated list of events
+#
+# The bench_pmu_events_t enum type (defined in bench.h) lists the set of PMU
+# events the system can be configured to track during a benchmark run. The
+# python dictionary bench_pmu_events encodes this enum. For each enum event x:
+#
+# bench_pmu_events[x][0] = the enum value of x
+# bench_pmu_events[x][1] = any ARM boards listed in BOARDS that DO NOT support
+# benchmark tracking of event x
+#
+# Which PMU events are tracked can be configured by setting the make flag
+# BENCH_PMU_EVENTS to a comma separated list of events.
+#
+# See the echo server README.md for more information, in particular if you wish
+# to track a PMU event which is not currently listed.
 bench_pmu_events = {
     "CACHE_L1I_MISS": (0, []),
     "CACHE_L1D_MISS": (1, []),
