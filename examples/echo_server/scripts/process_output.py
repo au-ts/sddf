@@ -217,12 +217,17 @@ with open(file, "r") as f:
                 continue
 
             # Capture PMU details
-            match = re.match(r"([\d\w -]+): ([0-9A-F]+).*", line)
-            if not match:
+            match = re.match(r"([\d\w -]+): ([0-9]+).*", line)
+            match_overflow = re.match(r"([\d\w -]+): Overflow occurred during benchmark, event count is invalid!", line)
+            if match:
+                pmu_key = match.group(1)
+                pmu_value = int(match.group(2))
+            elif match_overflow:
+                pmu_key = match_overflow.group(1)
+                pmu_value = "overflow"
+            else:
                 continue
 
-            pmu_key = match.group(1)
-            pmu_value = match.group(2)
             if (
                 "psci" not in pmu_key
                 and "Model" not in pmu_key
@@ -231,11 +236,14 @@ with open(file, "r") as f:
 
                 # Create PMU entry per test
                 if pmu_key not in pmu_data:
-                    pmu_data[pmu_key] = [int(pmu_value)]
+                    pmu_data[pmu_key] = [pmu_value]
                 elif len(pmu_data[pmu_key]) == (test["test"] - 1):
-                    pmu_data[pmu_key].append(int(pmu_value))
+                    pmu_data[pmu_key].append(pmu_value)
+                elif pmu_data[pmu_key][test["test"] - 1] == "overflow" or pmu_value == "overflow":
+                    # An overflow occurred, count is invalid
+                    pmu_data[pmu_key][test["test"] - 1] = "overflow"
                 else:
-                    pmu_data[pmu_key][test["test"] - 1] += int(pmu_value)
+                    pmu_data[pmu_key][test["test"] - 1] += pmu_value
 
 # Output results from final test
 if test["test"]:
