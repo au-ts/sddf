@@ -9,9 +9,10 @@
 #include <microkit.h>
 //#include <types.h>
 #include <sel4/bootinfo_types.h>
+#include <sel4/sel4_arch/mapping.h>
+#include <sel4/sel4_arch/constants.h>
 
 #include "acpi.h"
-
 
 uintptr_t remaining_untypeds_vaddr;
 typedef struct {
@@ -31,8 +32,9 @@ capDLBootInfo_t *capDLBootInfo;
 uintptr_t aml_object_pool_start;
 uintptr_t pci_resource;
 
-seL4_CPtr cnode_cptr_remaining_untypeds;
 seL4_CPtr vspace_cptr_pci_driver;
+seL4_CPtr cnode_cptr_remaining_untypeds;
+seL4_CPtr cnode_cptr_pci_resources;
 uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
 
@@ -71,6 +73,7 @@ seL4_Error retype_at_offset(seL4_CPtr parent_untyped,
                             seL4_Word parent_paddr,
                             seL4_CPtr cnode_cptr,
                             seL4_Word target_paddr,
+                            seL4_Word page_object,
                             seL4_CPtr *free_slots)
 {
     seL4_Error error;
@@ -100,11 +103,10 @@ seL4_Error retype_at_offset(seL4_CPtr parent_untyped,
         }
     }
 
-    sddf_dprintf("retype\n");
     // 2. Now the parent Untyped's internal pointer is at target_paddr
     // Retype the actual Frame
     error = seL4_Untyped_Retype(parent_untyped,
-                                seL4_X86_4K, // Or seL4_ARM_SmallPageObject
+                                page_object,
                                 0,
                                 cnode_cptr, 0, 0,
                                 *free_slots, 1);
@@ -129,6 +131,46 @@ uint32_t find_untyped_id_by_paddr(uintptr_t paddr)
     return capDLBootInfo->untypeds.end;
 }
 
+seL4_Error map_frame(seL4_CPtr obj_ut_cap, seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL4_CapRights_t rights, seL4_CPtr cnode_cptr, seL4_CPtr *free_slots)
+{
+    seL4_Error err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+
+    for (int i = 0; i < 4 && err == seL4_FailedLookup; i++) {
+        seL4_Word failed = seL4_MappingFailedLookupLevel();
+
+        switch (failed) {
+        case SEL4_MAPPING_LOOKUP_NO_PT:
+            err = seL4_Untyped_Retype(obj_ut_cap, seL4_X86_PageTableObject, 0, cnode_cptr, 0, 0, *free_slots, 1);
+            if (err) {
+                return err;
+            }
+            err = seL4_X86_PageTable_Map(cnode_cptr + *free_slots, vspace, vaddr, seL4_X86_Default_VMAttributes);
+            break;
+        case SEL4_MAPPING_LOOKUP_NO_PD:
+            err = seL4_Untyped_Retype(obj_ut_cap, seL4_X86_PageDirectoryObject, 0, cnode_cptr, 0, 0, *free_slots, 1);
+            if (err) {
+                return err;
+            }
+            err = seL4_X86_PageDirectory_Map(cnode_cptr + *free_slots, vspace, vaddr, seL4_X86_Default_VMAttributes);
+            break;
+        case SEL4_MAPPING_LOOKUP_NO_PDPT:
+            err = seL4_Untyped_Retype(obj_ut_cap, seL4_X86_PDPTObject, 0, cnode_cptr, 0, 0, *free_slots, 1);
+            if (err) {
+                return err;
+            }
+            err = seL4_X86_PDPT_Map(cnode_cptr + *free_slots, vspace, vaddr, seL4_X86_Default_VMAttributes);
+            break;
+        }
+
+        if (!err) {
+            free_slots++;
+            err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+        }
+    }
+
+    return err;
+}
+
 void init(void)
 {
     // TODO: probably should use Bill's patch for prefilling memory regions
@@ -144,24 +186,22 @@ void init(void)
     sddf_dprintf("untyped_cnode_cptr: 0x%lx\n", cnode_cptr_remaining_untypeds);
 
     uint32_t ut_pt_idx = 0;
-    bool second_non_dev_mem = false;
+    uint32_t non_dev_mem_id = 0;
 
     sddf_dprintf("untypeds start: %lu, end: %lu\n", capDLBootInfo->untypeds.start, capDLBootInfo->untypeds.end);
 
-    /* for (uint32_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) { */
-    for (uint32_t i = 0; i < capDLBootInfo->untypeds.end; i++) {
+    for (uint32_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
         sddf_dprintf("i: %d, paddr: 0x%lx, sizeBits: %d, isDevice: %d\n", i, capDLBootInfo->untypedList[i].paddr, capDLBootInfo->untypedList[i].sizeBits, capDLBootInfo->untypedList[i].isDevice);
         if (!capDLBootInfo->untypedList[i].isDevice) {
             // TODO: find a proper untyped for PT objects, not the first one is used by capDL initialiser
-            if (second_non_dev_mem) {
+            if (non_dev_mem_id == 5) {
                 ut_pt_idx = i;
                 break;
             }
-            second_non_dev_mem = true;
+            non_dev_mem_id++;
         }
     }
     sddf_dprintf("untyped pt idx: 0x%x, paddr: 0x%lx\n", ut_pt_idx, capDLBootInfo->untypedList[ut_pt_idx].paddr);
-
 
     sddf_dprintf("rsdt_addr: 0x%lx\n", rsdt_addr);
     uint32_t acpi_ut_idx = find_untyped_id_by_paddr(rsdt_addr);
@@ -175,7 +215,7 @@ void init(void)
     retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                      capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                      cnode_cptr_remaining_untypeds,
-                     rsdt_addr, &free_slot);
+                     rsdt_addr, seL4_X86_4K, &free_slot);
 
     seL4_Error error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                               seL4_CanRead,
@@ -211,7 +251,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + following_acpi_ut_idx,
                          acpi_ut_paddr,
                          cnode_cptr_remaining_untypeds,
-                         rsdt_addr + i * 4096, &free_slot);
+                         rsdt_addr + i * 4096, seL4_X86_4K, &free_slot);
 
         seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot,
                           seL4_CapInitThreadVSpace,
@@ -239,7 +279,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                          capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                          cnode_cptr_remaining_untypeds,
-                         acpi_rsdt_entries[i], &free_slot);
+                         acpi_rsdt_entries[i], seL4_X86_4K, &free_slot);
 
         error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                               seL4_CanRead,
@@ -283,7 +323,7 @@ void init(void)
     retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                      capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                      cnode_cptr_remaining_untypeds,
-                     acpi_dsdt_addr, &free_slot);
+                     acpi_dsdt_addr, seL4_X86_4K, &free_slot);
 
     error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                           seL4_CanRead,
@@ -314,7 +354,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + following_acpi_ut_idx,
                          acpi_ut_paddr,
                          cnode_cptr_remaining_untypeds,
-                         acpi_dsdt_addr + i * 4096, &free_slot);
+                         acpi_dsdt_addr + i * 4096, seL4_X86_4K, &free_slot);
 
         seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot,
                           seL4_CapInitThreadVSpace,
@@ -381,25 +421,72 @@ void init(void)
 
     /* error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, acpi_ut_idx, 58); */
     /* sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error); */
+    free_slot++;
 
-    /* // Map pages for PCI driver */
-    /* for (int i = 0; i < pci_resources.num_pci_groups; i++) { */
-    /*     // Each PCI bus needs 1M on ECAM, and each segment group has up to 256 buses */
-    /*     uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20); */
-    /*     sddf_dprintf("base addr: 0x%lx, size: 0x%x\n", pci_resources.pci_seg_groups[i].base_addr, ecam_size); */
-    /* } */
+    // TODO: pass PCI resource information here so pages mapped in ACPI driver can be revoked simplpy
+
+
 
 
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
-    for (int j = 0; j < pci_resources.num_pci_groups; j++) {
+    for (int i = 0; i < pci_resources.num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
-                     pci_resources.pci_seg_groups[j].group_id,
-                     pci_resources.pci_seg_groups[j].base_addr,
-                     pci_resources.pci_seg_groups[j].bus_start,
-                     pci_resources.pci_seg_groups[j].bus_end);
-    }
+                     pci_resources.pci_seg_groups[i].group_id,
+                     pci_resources.pci_seg_groups[i].base_addr,
+                     pci_resources.pci_seg_groups[i].bus_start,
+                     pci_resources.pci_seg_groups[i].bus_end);
+        uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20);
+        uintptr_t end_paddr = pci_resources.pci_seg_groups[i].base_addr + ecam_size;
+        uintptr_t cur_paddr = pci_resources.pci_seg_groups[i].base_addr;
+        uintptr_t cur_vaddr = 0x5000000;
+        while (cur_paddr < end_paddr) {
+            uint32_t ut_idx = find_untyped_id_by_paddr(cur_paddr);
+            uintptr_t ut_end_paddr = capDLBootInfo->untypedList[ut_idx].paddr + (1 << capDLBootInfo->untypedList[ut_idx].sizeBits);
+            sddf_dprintf("Found ut paddr: 0x%lx-0x%lx, cur_paddr: 0x%lx\n", capDLBootInfo->untypedList[ut_idx].paddr, ut_end_paddr, cur_paddr);
+            retype_at_offset(cnode_cptr_remaining_untypeds + ut_idx,
+                             capDLBootInfo->untypedList[ut_idx].paddr,
+                             cnode_cptr_remaining_untypeds,
+                             cur_paddr,
+                             seL4_X86_LargePageObject,
+                             &free_slot);
 
+            sddf_dprintf("try mapping\n");
+
+            free_slot++;
+            error = map_frame(cnode_cptr_remaining_untypeds + ut_pt_idx, cnode_cptr_remaining_untypeds + free_slot - 1, vspace_cptr_pci_driver, cur_vaddr, seL4_CanRead, cnode_cptr_remaining_untypeds, &free_slot);
+            if (error) {
+                sddf_dprintf("map_frame error - %d\n", error);
+                return;
+            }
+            sddf_dprintf("largePage: 0x%x\n", 1 << seL4_LargePageBits);
+
+            free_slot++;
+            cur_paddr += (1 << seL4_LargePageBits);
+            cur_vaddr += (1 << seL4_LargePageBits);
+
+            while (cur_paddr < end_paddr && cur_paddr < ut_end_paddr) {
+                error = seL4_Untyped_Retype(cnode_cptr_remaining_untypeds + ut_idx,
+                                            seL4_X86_LargePageObject,
+                                            0,
+                                            cnode_cptr_remaining_untypeds, 0, 0,
+                                            free_slot, 1);
+                free_slot++;
+
+                map_frame(cnode_cptr_remaining_untypeds + ut_pt_idx, cnode_cptr_remaining_untypeds + free_slot - 1, vspace_cptr_pci_driver, cur_vaddr, seL4_CanRead, cnode_cptr_remaining_untypeds, &free_slot);
+                if (error) {
+                    sddf_dprintf("map_frame error - %d\n", error);
+                    return;
+                }
+
+                cur_paddr += (1 << seL4_LargePageBits);
+                cur_vaddr += (1 << seL4_LargePageBits);
+            }
+        }
+    }
+    sddf_dprintf("Finished ECAM mapping!\n");
+
+    sddf_deferred_notify(0);
 
     // TODO: unmap all the pages/frames
     // TODO: revoke all the untypeds used
