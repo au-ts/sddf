@@ -232,20 +232,11 @@ three mechanisms for measuring its performance which can be used simultaneously:
    PD. A choice between utilisation or kernel entries must be made as each
    requires a different benchmarking mode of the kernel.
 2. Per-core system utilisation based on cycle counts measured by an idle thread.
-3. PMU data, see below from the [benchmark PD](/benchmark/benchmark.c):
+3. On AArch64 boards, PMU event counters can also be utilised. Details on how to
+   select which PMU events are tracked can be found in the [PMU benchmarking
+   data](#pmu-benchmarking-data) section.
 
-```c
-char *counter_names[] = {
-    "L1 i-cache misses",
-    "L1 d-cache misses",
-    "L1 i-tlb misses",
-    "L1 d-tlb misses",
-    "Instructions",
-    "Branch mispredictions",
-};
-```
-
-PMU and kernel tracked statistics are managed by the [benchmark
+PMU and kernel tracked statistics are managed and reported by the [benchmark
 PD](/benchmark/benchmark.c), while total and idle cycle counts are maintained by
 the [idle thread](/benchmark/idle.c). The idle thread has only one function
 which is to maintain a count of total and idle core cycles which resides in
@@ -258,8 +249,100 @@ idle thread enters an infinite loop of the following:
    those cycles are categorised as *idle* and added to the idle count.
  * Update the total cycle count.
 
-Thus the idle thread maintains a page of shared memory that is used to calculate
-system utilisation.
+The idle thread maintains a page of memory with these counts which the
+benchmarking client uses to calculate system utilisation.
+
+#### PMU benchmarking data
+
+On AArch64 boards, the [benchmark PD](/benchmark/benchmark.c) has access to 6
+32-bit PMU event counters which can be configured to track custom PMU events.
+The events can be set at build time using the `BENCH_PMU_EVENTS` make flag:
+
+```sh
+make BENCH_PMU_EVENTS=EXECUTE_INSTRUCTION,MEM_ACCESS,CACHE_L1D_MISS
+```
+
+Alternatively the events can be set by modifying the `pmu_events` variable in
+[metaprogram](/examples/echo_server/meta.py):
+
+```py
+pmu_events = [
+    "EXECUTE_INSTRUCTION",
+    "MEM_ACCESS",
+    "CACHE_L1D_MISS",
+]
+```
+
+Since each counter is only 32-bits, it is possible for them overflow depending
+on the event they are tracking. We have implemented two solutions to this:
+
+1. Using the `CHAIN` PMU event: The chain event can be used to track the number
+   of times the preceding counter has overflowed, essentially allowing us to
+   repurpose two 32-bit counters into a 64-bit counter. For example, if we set
+   the PMU event flag as follows:
+
+```sh
+BENCH_PMU_EVENTS=EXECUTE_INSTRUCTION,CHAIN
+```
+
+ Then the total count of instructions executed will be given by:
+
+ ```c
+ counter[0] + counter[1] << 32
+ ```
+
+> [!NOTE]
+> Only *odd* counters can be used for chaining. The metaprogram will not allow
+> an even counter to be set to `CHAIN`.
+
+2. Checking for overflows using the overflow status flag register:
+
+  For any counters *not* utilising chaining, we also check the overflow status
+  flag register `PMOVSCLR` after each benchmark to check whether an overflow
+  occurred. Since this register only encodes whether *one or more* overflows
+  occurred, we cannot infer the correct count. Thus, if an overflow occurs the
+  benchmark PD will not report the 32-bit count, and instead will output:
+
+```sh
+Instructions: Overflow occurred during benchmark, event count is invalid!
+```
+
+If the `BENCH_PMU_EVENTS` flag is not set, the echo server will default to
+tracking the following events:
+
+```py
+pmu_events = [
+    "EXECUTE_INSTRUCTION",
+    "CHAIN",
+    "MEM_ACCESS",
+    "CHAIN",
+    "CACHE_L1D_MISS",
+    "CHAIN",
+]
+```
+
+#### Available PMU events
+
+For a list of the PMU events that are currently available to select, check the
+`bench_pmu_events_t` enum in [bench.h](/include/sddf/benchmark/bench.h), or
+alternatively the `bench_pmu_events` dictionary in the
+[metaprogram](/examples/echo_server/meta.py). It is important that these two
+data structures *always match*, as this is how the build system transfers the
+user selected events to the benchmark PD.
+
+Adding support for an unlisted PMU event is simple:
+1. Create a new `bench_pmu_events_t` enum member for the event in
+   [bench.h](/include/sddf/benchmark/bench.h). The value of this enum is now the
+   event's identifier.
+2. Add an entry to the `bench_pmu_events` dictionary in the
+   [metaprogram](/examples/echo_server/meta.py) recording the event's
+   identifier.
+3. [Optional] List any boards that don't support tracking of the event in the
+   dictionary entry. This enables build-time failure in the error case.
+4. Add an entry to the `pmu_event_table` in
+   [benchmark.c](/benchmark/benchmark.c) at the index of the event's identifier.
+   This table is used for results reporting, so requires a brief description of
+   the event, as well as the event's seL4bench identifier.
 
 #### Benchmarking timeline
 
