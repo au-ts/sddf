@@ -60,7 +60,7 @@ typedef struct benchmark_config {
     /* PDs requiring cycle counts sharing a core with this benchmark PD. */
     benchmark_child_config_t children[BENCHMARK_MAX_CHILDREN];
     /* PMU events to track */
-    bench_pmu_events_t pmu_events[BENCHMARK_MAX_PMU_EVENTS];
+    uint8_t pmu_events[BENCHMARK_MAX_PMU_EVENTS];
     /* Number of PMU events to track */
     uint8_t num_pmu_events;
 } benchmark_config_t;
