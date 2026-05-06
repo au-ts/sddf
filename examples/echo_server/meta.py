@@ -148,7 +148,7 @@ class BenchmarkConfig:
             len(self.children),
             *child_bytes_list,
             *self.pmu_events,
-            num_pmu_events
+            num_pmu_events,
         )
 
 
@@ -523,6 +523,7 @@ def generate(
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
 
+
 # ARM PMU event identifier dictionary:
 #
 # The bench_pmu_events_t enum type (defined in bench.h) lists the set of PMU
@@ -584,17 +585,32 @@ if __name__ == "__main__":
         pmu_events = args.bench_pmu_events.split(",")
     else:
         # If benchmarking PMU events are not provided, we use these default events
-        pmu_events = ["EXECUTE_INSTRUCTION", "CHAIN", "MEM_ACCESS", "CHAIN", "CACHE_L1D_MISS", "CHAIN"]
+        pmu_events = [
+            "EXECUTE_INSTRUCTION",
+            "CHAIN",
+            "MEM_ACCESS",
+            "CHAIN",
+            "CACHE_L1D_MISS",
+            "CHAIN",
+        ]
 
-    assert len(pmu_events) <= 6, "Supplied more than 6 benchmarking PMU events to track!"
+    assert (
+        len(pmu_events) <= 6
+    ), "Supplied more than 6 benchmarking PMU events to track!"
     pmu_event_ids = []
     for i in range(len(pmu_events)):
         if not i % 2:
-            assert pmu_events[i] != "CHAIN", f"Chaining (overflow counting) can only be used by odd counters (selected counter {i})!"
+            assert (
+                pmu_events[i] != "CHAIN"
+            ), f"Chaining (overflow counting) can only be used by odd counters (selected counter {i})!"
 
-        assert pmu_events[i] in bench_pmu_events, f"Selected PMU event {i} ({pmu_events[i]}) is not supported!"
+        assert (
+            pmu_events[i] in bench_pmu_events
+        ), f"Selected PMU event {i} ({pmu_events[i]}) is not supported!"
 
-        assert args.board not in bench_pmu_events[pmu_events[i]][1], f"Selected PMU event {i} ({pmu_events[i]}) is not supported by board {args.board}!"
+        assert (
+            args.board not in bench_pmu_events[pmu_events[i]][1]
+        ), f"Selected PMU event {i} ({pmu_events[i]}) is not supported by board {args.board}!"
 
         pmu_event_ids.append(bench_pmu_events[pmu_events[i]][0])
 

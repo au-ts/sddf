@@ -218,7 +218,10 @@ with open(file, "r") as f:
 
             # Capture PMU details
             match = re.match(r"([\d\w -]+): ([0-9]+).*", line)
-            match_overflow = re.match(r"([\d\w -]+): Overflow occurred during benchmark, event count is invalid!", line)
+            match_overflow = re.match(
+                r"([\d\w -]+): Overflow occurred during benchmark, event count is invalid!",
+                line,
+            )
             if match:
                 pmu_key = match.group(1)
                 pmu_value = int(match.group(2))
@@ -239,7 +242,10 @@ with open(file, "r") as f:
                     pmu_data[pmu_key] = [pmu_value]
                 elif len(pmu_data[pmu_key]) == (test["test"] - 1):
                     pmu_data[pmu_key].append(pmu_value)
-                elif pmu_data[pmu_key][test["test"] - 1] == "overflow" or pmu_value == "overflow":
+                elif (
+                    pmu_data[pmu_key][test["test"] - 1] == "overflow"
+                    or pmu_value == "overflow"
+                ):
                     # An overflow occurred, count is invalid
                     pmu_data[pmu_key][test["test"] - 1] = "overflow"
                 else:
