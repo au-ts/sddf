@@ -170,7 +170,7 @@ static void benchmark_start(void)
     sel4bench_reset_counters();
     /* Reset the overflow status flag register so we can check for overflows to
     32-bit counters during the benchmark */
-    PMU_WRITE(PMOVSCLR, 0);
+    PMU_WRITE(PMOVSCLR, 0b111111);
     sel4bench_start_counters(benchmark_bf);
 #endif
 
