@@ -76,8 +76,8 @@ All the `...DRIV_DIR` variables give the name relative to
 
 
 `common.mk` also generates a file that is named by the hash of toolchain, board,
-and `MICROKIT_SDK`, and adds its name to the `.EXTRA_PREREQS` variable.  This
-means that if any of these things change, everything will be rebuilt.
+and `MICROKIT_SDK`, and adds it as a dependency to all target object files.
+This means that if any of these things change, everything will be rebuilt.
 
 ### Set by the Toolchain make snippet ###
 
