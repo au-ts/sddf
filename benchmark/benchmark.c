@@ -39,15 +39,15 @@ typedef struct {
  * i, see bench.h
  */
 bench_pmu_event_info_t pmu_event_table[] = {
-    {"L1 i-cache misses", SEL4BENCH_EVENT_CACHE_L1I_MISS },
-    {"L1 d-cache misses", SEL4BENCH_EVENT_CACHE_L1D_MISS },
-    {"L1 i-tlb misses", SEL4BENCH_EVENT_TLB_L1I_MISS },
-    {"L1 d-tlb misses", SEL4BENCH_EVENT_TLB_L1D_MISS },
-    {"Instructions", SEL4BENCH_EVENT_EXECUTE_INSTRUCTION },
-    {"Branch mispredictions", SEL4BENCH_EVENT_BRANCH_MISPREDICT },
-    {"CPU cycles", SEL4BENCH_EVENT_CCNT },
-    {"Data memory access", SEL4BENCH_EVENT_MEMORY_ACCESS },
-    {"Overflow counter", SEL4BENCH_EVENT_CHAIN},
+    { "L1 i-cache misses", SEL4BENCH_EVENT_CACHE_L1I_MISS },
+    { "L1 d-cache misses", SEL4BENCH_EVENT_CACHE_L1D_MISS },
+    { "L1 i-tlb misses", SEL4BENCH_EVENT_TLB_L1I_MISS },
+    { "L1 d-tlb misses", SEL4BENCH_EVENT_TLB_L1D_MISS },
+    { "Instructions", SEL4BENCH_EVENT_EXECUTE_INSTRUCTION },
+    { "Branch mispredictions", SEL4BENCH_EVENT_BRANCH_MISPREDICT },
+    { "CPU cycles", SEL4BENCH_EVENT_CCNT },
+    { "Data memory access", SEL4BENCH_EVENT_MEMORY_ACCESS },
+    { "Overflow counter", SEL4BENCH_EVENT_CHAIN },
 };
 
 static char *child_name(uint8_t child_id)
@@ -215,15 +215,14 @@ static void benchmark_stop(void)
     while (i < benchmark_config.num_pmu_events) {
         if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
             sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
-                        counter_values[i] + (counter_values[i+1] << 32));
+                        counter_values[i] + (counter_values[i + 1] << 32));
             i += 2;
         } else {
             if (overflow_status & 1 << i) {
                 sddf_printf("%s: Overflow occurred during benchmark, event count is invalid!\n",
-                    pmu_event_table[benchmark_config.pmu_events[i]].event_name);
+                            pmu_event_table[benchmark_config.pmu_events[i]].event_name);
             } else {
-                sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
-                            counter_values[i]);
+                sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name, counter_values[i]);
             }
             i += 1;
         }
