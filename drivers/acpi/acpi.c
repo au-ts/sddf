@@ -97,6 +97,7 @@ seL4_Error untyped_retype(uint32_t ut_idx,
     cap_list[cap_list_end].base_addr = cap_list[ut_idx].base_addr;
     cap_list[cap_list_end].end_addr = cap_list[ut_idx].base_addr + (1ULL << size_bits);
     cap_list[cap_list_end].object_type = object_type;
+    cap_list[cap_list_end].parent = ut_idx;
     cap_list[ut_idx].base_addr = cap_list[cap_list_end].end_addr;
 
     if (cap_list[ut_idx].child == 0) {
@@ -177,6 +178,83 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
     // Retype the target object
     sddf_dprintf("Retype object type: %lu\n", object_type);
     return untyped_retype(ut_idx, object_type, size_bits, retyped_cptr);
+}
+
+void clear_cap_list_entry(uint32_t ut_idx)
+{
+    cap_list[ut_idx].base_addr = 0;
+    cap_list[ut_idx].end_addr = 0;
+    cap_list[ut_idx].is_device = 0;
+    cap_list[ut_idx].object_type = 0;
+    cap_list[ut_idx].parent = 0;
+    cap_list[ut_idx].child = 0;
+}
+
+bool update_cap_list_after_revoke(uint32_t ut_idx)
+{
+    if (cap_list[ut_idx].child) {
+        uint32_t child_ut_idx = cap_list[ut_idx].child;
+        uintptr_t base_addr = 0;
+        uintptr_t end_addr = 0;
+        while (child_ut_idx != 0) {
+            bool success = update_cap_list_after_revoke(child_ut_idx);
+            if (!success) {
+                return success;
+            }
+            if (base_addr == end_addr) {
+                base_addr = cap_list[child_ut_idx].base_addr;
+                end_addr = cap_list[child_ut_idx].end_addr;
+                clear_cap_list_entry(child_ut_idx);
+            } else if (end_addr == cap_list[child_ut_idx].base_addr) {
+                end_addr = cap_list[child_ut_idx].end_addr;
+                clear_cap_list_entry(child_ut_idx);
+            } else {
+                sddf_dprintf("Error: something wrong during re-collecting untypeds\n");
+                return false;
+            }
+
+            child_ut_idx = cap_list[child_ut_idx].next;
+            cap_list[child_ut_idx].next = 0;
+        }
+
+        if (end_addr != cap_list[ut_idx].base_addr) {
+            sddf_dprintf("Error: something wrong during re-collecting untypeds\n");
+            return false;
+        }
+        cap_list[ut_idx].base_addr = base_addr;
+    }
+    return true;
+}
+
+seL4_Error untypeds_revoke()
+{
+    for (uint32_t i = cap_list_end - 1; i >= cap_list_start; i--) {
+        uint32_t parent_ut_idx = i;
+        while (cap_list[parent_ut_idx].parent) {
+            parent_ut_idx = cap_list[parent_ut_idx].parent;
+        }
+
+        // Revoke if this cap has been divided into small ones
+        if (parent_ut_idx != i) {
+            // TODO: proper way to calculate `depth`
+            seL4_Error error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, parent_ut_idx, 58);
+            if (error != seL4_NoError) {
+                return error;
+            }
+            sddf_dprintf("Found a parent untyped and revoked it, ut_idx: %u\n", parent_ut_idx);
+
+            bool success = update_cap_list_after_revoke(parent_ut_idx);
+            if (!success) {
+                return seL4_IllegalOperation;
+            }
+        }
+
+        if (cap_list[i].end_addr == 0) {
+            cap_list_end = i;
+        }
+    }
+
+    return seL4_NoError;
 }
 
 /* seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr) */
@@ -379,13 +457,13 @@ void init(void)
         seL4_CPtr retyped_cptr;
         seL4_Error error = retype_at_paddr(ROUND_DOWN(rsdt_cur_paddr, 1UL << seL4_PageBits), seL4_X86_4K, 0, &retyped_cptr);
         if (error != seL4_NoError) {
-            sddf_dprintf("Failed to retype at paddr 0x%lx\n", rsdt_cur_paddr);
+            sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", rsdt_cur_paddr);
             return;
         }
 
-        error = map_frame(retyped_cptr, seL4_CapInitThreadVSpace, acpi_vaddr, seL4_CanRead);
+        error = map_frame(retyped_cptr, seL4_CapInitThreadVSpace, acpi_vaddr + rsdt_cur_paddr - rsdt_addr, seL4_CanRead);
         if (error != seL4_NoError) {
-            sddf_dprintf("Failed to map frame at vaddr: 0x%lx, err - %u\n", acpi_vaddr, error);
+            sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", acpi_vaddr, error);
         }
 
         if (rsdt_len == 1) {
@@ -397,23 +475,20 @@ void init(void)
                          acpi_rsdt->header.signature[3]);
             rsdt_len = acpi_rsdt->header.length;
         }
-
-        acpi_vaddr += (1UL << seL4_PageBits);
     }
 
     // TODO: XSDT has different struct size
     uint32_t entries = (acpi_rsdt->header.length - sizeof(acpi_rsdt->header)) / sizeof(uint32_t);
-    sddf_dprintf("entries: %d, rsdt_offset: 0x%x, length: %d\n", entries, rsdt_offset, acpi_rsdt->header.length);
-
     for (int i = 0; i < entries; i++) {
         acpi_rsdt_entries[i] = acpi_rsdt->entry[i];
     }
+    sddf_dprintf("entries: %d, rsdt_offset: 0x%x, length: %d\n", entries, rsdt_offset, acpi_rsdt->header.length);
+
+    untypeds_revoke();
 
     /* // depth = guard_size(50) + size_bits(8) */
     /* error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, acpi_ut_idx, 58); */
     /* sddf_dprintf("Error: %d\n", error); */
-
-    /* free_slot = capDLBootInfo->untypeds.end + frame + 1; */
 
     /* for (int i = 0; i < entries; i++) { */
     /*     acpi_ut_idx = find_untyped_id_by_paddr(acpi_rsdt_entries[i]); */
