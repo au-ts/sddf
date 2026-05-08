@@ -66,17 +66,6 @@ uint32_t cap_list_start;
 uint32_t cap_list_end;
 uint32_t kernel_objects_ut_idx;
 
-void map_pts(seL4_CPtr pt_untyped, seL4_CPtr cnode_cptr, seL4_CPtr free_slot) {
-
-    seL4_Untyped_Retype(pt_untyped, seL4_X86_PDPTObject, 0, cnode_cptr, 0, 0, free_slot + pdpt, 1);
-    seL4_Untyped_Retype(pt_untyped, seL4_X86_PageDirectoryObject, 0, cnode_cptr, 0, 0, free_slot + pd, 1);
-    seL4_Untyped_Retype(pt_untyped, seL4_X86_PageTableObject, 0, cnode_cptr, 0, 0, free_slot + pt, 1);
-
-    seL4_X86_PDPT_Map(cnode_cptr + free_slot + pdpt, seL4_CapInitThreadVSpace, acpi_vaddr, seL4_X86_Default_VMAttributes);
-    seL4_X86_PageDirectory_Map(cnode_cptr + free_slot + pd, seL4_CapInitThreadVSpace, acpi_vaddr, seL4_X86_Default_VMAttributes);
-    seL4_X86_PageTable_Map(cnode_cptr + free_slot + pt, seL4_CapInitThreadVSpace, acpi_vaddr, seL4_X86_Default_VMAttributes);
-}
-
 seL4_Error untyped_retype(uint32_t ut_idx,
                           seL4_Word object_type,
                           seL4_Word size_bits,
@@ -92,18 +81,21 @@ seL4_Error untyped_retype(uint32_t ut_idx,
         return error;
     }
 
-    sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cap_list[ut_idx].base_addr);
+    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cap_list[ut_idx].base_addr); */
 
     cap_list[cap_list_end].base_addr = cap_list[ut_idx].base_addr;
     cap_list[cap_list_end].end_addr = cap_list[ut_idx].base_addr + (1ULL << size_bits);
     cap_list[cap_list_end].object_type = object_type;
     cap_list[cap_list_end].parent = ut_idx;
+    cap_list[cap_list_end].child = 0;
+    cap_list[cap_list_end].next = 0;
     cap_list[ut_idx].base_addr = cap_list[cap_list_end].end_addr;
 
     if (cap_list[ut_idx].child == 0) {
         cap_list[ut_idx].child = cap_list_end;
     } else {
         uint32_t child_ut_idx = cap_list[ut_idx].child;
+
         while (cap_list[child_ut_idx].next != 0) {
             child_ut_idx = cap_list[child_ut_idx].next;
         }
@@ -143,7 +135,7 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
         sddf_dprintf("Error: Untyped containing physical address 0x%lx is not found\n", target_paddr);
         return seL4_InvalidArgument;
     }
-    sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr);
+    /* sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr); */
 
     seL4_Word avai_mem_size = cap_list[ut_idx].end_addr - target_paddr;
     seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
@@ -171,12 +163,13 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
                              cap_list[ut_idx].base_addr,
                              cap_list[ut_idx].end_addr,
                              bits);
+                return error;
             }
         }
     }
 
     // Retype the target object
-    sddf_dprintf("Retype object type: %lu\n", object_type);
+    /* sddf_dprintf("Retype object type: %lu\n", object_type); */
     return untyped_retype(ut_idx, object_type, size_bits, retyped_cptr);
 }
 
@@ -213,8 +206,9 @@ bool update_cap_list_after_revoke(uint32_t ut_idx)
                 return false;
             }
 
+            uint32_t child_cleared_idx = child_ut_idx;
             child_ut_idx = cap_list[child_ut_idx].next;
-            cap_list[child_ut_idx].next = 0;
+            cap_list[child_cleared_idx].next = 0;
         }
 
         if (end_addr != cap_list[ut_idx].base_addr) {
@@ -222,6 +216,7 @@ bool update_cap_list_after_revoke(uint32_t ut_idx)
             return false;
         }
         cap_list[ut_idx].base_addr = base_addr;
+        cap_list[ut_idx].child = 0;
     }
     return true;
 }
@@ -241,7 +236,6 @@ seL4_Error untypeds_revoke()
             if (error != seL4_NoError) {
                 return error;
             }
-            sddf_dprintf("Found a parent untyped and revoked it, ut_idx: %u\n", parent_ut_idx);
 
             bool success = update_cap_list_after_revoke(parent_ut_idx);
             if (!success) {
@@ -414,8 +408,29 @@ seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL
 /*     } */
 /* } */
 
+seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
+{
+    seL4_CPtr retyped_cptr;
+    // TODO: round_down for large pages and check if it's a page type
+    seL4_Error error = retype_at_paddr(ROUND_DOWN(paddr, 1UL << seL4_PageBits), page_type, 0, &retyped_cptr);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", paddr);
+        return error;
+    }
+
+    error = map_frame(retyped_cptr, vspace, vaddr, rights);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", vaddr, error);
+        return error;
+    }
+
+    return seL4_NoError;
+}
+
 void init(void)
 {
+    seL4_Error error;
+
     // TODO: probably should use Bill's patch for prefilling memory regions
     // TODO: extract RSDT according to revision
     bootinfo_rsdp_t *bi_rsdp = (bootinfo_rsdp_t *)bootinfo_rsdp;
@@ -454,16 +469,10 @@ void init(void)
     volatile acpi_rsdt_t *acpi_rsdt = (acpi_rsdt_t *)(acpi_vaddr + rsdt_offset);
 
     for (; rsdt_cur_paddr < rsdt_addr + rsdt_len; rsdt_cur_paddr += (1UL << seL4_PageBits)) {
-        seL4_CPtr retyped_cptr;
-        seL4_Error error = retype_at_paddr(ROUND_DOWN(rsdt_cur_paddr, 1UL << seL4_PageBits), seL4_X86_4K, 0, &retyped_cptr);
+        error = retype_and_map_frame(rsdt_cur_paddr, acpi_vaddr + rsdt_cur_paddr - rsdt_addr, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_CanRead);
         if (error != seL4_NoError) {
-            sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", rsdt_cur_paddr);
+            sddf_dprintf("Error: failed to retype or map a frame.\n");
             return;
-        }
-
-        error = map_frame(retyped_cptr, seL4_CapInitThreadVSpace, acpi_vaddr + rsdt_cur_paddr - rsdt_addr, seL4_CanRead);
-        if (error != seL4_NoError) {
-            sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", acpi_vaddr, error);
         }
 
         if (rsdt_len == 1) {
@@ -483,166 +492,136 @@ void init(void)
         acpi_rsdt_entries[i] = acpi_rsdt->entry[i];
     }
     sddf_dprintf("entries: %d, rsdt_offset: 0x%x, length: %d\n", entries, rsdt_offset, acpi_rsdt->header.length);
+    error = untypeds_revoke();
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error);
+        return;
+    }
 
-    untypeds_revoke();
+    for (int i = 0; i < entries; i++) {
+        // TODO: edge cases? the struture acorss two pages?
+        error = retype_and_map_frame(acpi_rsdt_entries[i], acpi_vaddr, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_CanRead);
+        if (error != seL4_NoError) {
+            sddf_dprintf("Error: failed to retype or map a frame.\n");
+            return;
+        }
 
-    /* // depth = guard_size(50) + size_bits(8) */
-    /* error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, acpi_ut_idx, 58); */
-    /* sddf_dprintf("Error: %d\n", error); */
+        acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + (acpi_rsdt_entries[i] & 0xfff));
 
-    /* for (int i = 0; i < entries; i++) { */
-    /*     acpi_ut_idx = find_untyped_id_by_paddr(acpi_rsdt_entries[i]); */
-    /*     retype_at_paddr(cnode_cptr_remaining_untypeds + acpi_ut_idx, */
-    /*                      capDLBootInfo->untypedList[acpi_ut_idx].paddr, */
-    /*                      cnode_cptr_remaining_untypeds, */
-    /*                      acpi_rsdt_entries[i], seL4_X86_4K, 0, &free_slot); */
+        sddf_dprintf("Signature: %c%c%c%c\n",
+                 header->signature[0],
+                 header->signature[1],
+                 header->signature[2],
+                 header->signature[3]);
+        sddf_dprintf("location: 0x%x, length: %d\n", acpi_rsdt_entries[i], header->length);
 
-    /*     error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr, */
-    /*                           seL4_CanRead, */
-    /*                           seL4_X86_Default_VMAttributes); */
+        if (strncmp(header->signature, acpi_str_fadt, 4) == 0) {
+            sddf_dprintf("Found FADT table!\n");
+            acpi_fadt_t *fadt_table = (acpi_fadt_t *)header;
+            sddf_dprintf("DSDT address: 0x%x\n", fadt_table->dsdt);
+            acpi_dsdt_addr = fadt_table->dsdt;
+        } else if (strncmp(header->signature, acpi_str_mcfg, 4) == 0) {
+            sddf_dprintf("Found MCFG table!\n");
 
-    /*     acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + (acpi_rsdt_entries[i] & 0xfff)); */
+            acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)header;
+            uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
+            for (int j = 0; j < num_pci_seg_grps; j++) {
+                memcpy(&pci_resources.pci_seg_groups[pci_resources.num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
+                pci_resources.num_pci_groups++;
+            }
+        }
 
-    /*     sddf_dprintf("Signature: %c%c%c%c\n", */
-    /*              header->signature[0], */
-    /*              header->signature[1], */
-    /*              header->signature[2], */
-    /*              header->signature[3]); */
-    /*     sddf_dprintf("location: 0x%x, length: %d\n", acpi_rsdt_entries[i], header->length); */
+        error = untypeds_revoke();
+        if (error != seL4_NoError) {
+            sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error);
+            return;
+        }
+    }
 
-    /*     if (strncmp(header->signature, acpi_str_fadt, 4) == 0) { */
-    /*         sddf_dprintf("Found FADT table!\n"); */
-    /*         acpi_fadt_t *fadt_table = (acpi_fadt_t *)header; */
-    /*         sddf_dprintf("DSDT address: 0x%x\n", fadt_table->dsdt); */
-    /*         acpi_dsdt_addr = fadt_table->dsdt; */
-    /*     } else if (strncmp(header->signature, acpi_str_mcfg, 4) == 0) { */
-    /*         sddf_dprintf("Found MCFG table!\n"); */
+    uintptr_t dsdt_cur_paddr = acpi_dsdt_addr;
+    uint32_t dsdt_offset = acpi_dsdt_addr & 0xfff;
+    acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + dsdt_offset);
+    uint32_t dsdt_len = 1;
+    for (; dsdt_cur_paddr < acpi_dsdt_addr + dsdt_len; dsdt_cur_paddr += (1UL << seL4_PageBits)) {
+        error = retype_and_map_frame(dsdt_cur_paddr, acpi_vaddr + dsdt_cur_paddr - acpi_dsdt_addr, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_CanRead);
+        if (error != seL4_NoError) {
+            sddf_dprintf("Error: failed to retype or map a frame.\n");
+            return;
+        }
 
-    /*         acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)header; */
-    /*         uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t); */
-    /*         for (int j = 0; j < num_pci_seg_grps; j++) { */
-    /*             memcpy(&pci_resources.pci_seg_groups[pci_resources.num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t)); */
-    /*             pci_resources.num_pci_groups++; */
-    /*         } */
+        if (dsdt_len == 1) {
+            dsdt_len = header->length;
+            sddf_dprintf("Signature: %c%c%c%c\n",
+                         header->signature[0],
+                         header->signature[1],
+                         header->signature[2],
+                         header->signature[3]);
+            sddf_dprintf("length: %d\n", header->length);
+        }
+    }
 
-    /*     } */
+    sddf_dprintf("===============Scanning DSDT===============\n");
 
-    /*     error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, acpi_ut_idx, 58); */
-    /*     sddf_dprintf("Error: %d\n", error); */
-    /*     sddf_dprintf("\n=====================\n"); */
-    /* } */
+    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
+    scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
+    object_pool.next = aml_object_pool_start;
+    object_pool.end = aml_object_pool_start + 0x10000;
+    sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current);
 
+    uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t);
+    object_root.start = scanner.current;
+    object_root.op_code = NULL_OP;
+    object_root.name[0] = '\\';
+    scan_objects(&object_root, dsdt_end);
+    print_object_tree(&object_root, 0);
 
-    /* free_slot = capDLBootInfo->untypeds.end + frame + 1; */
-    /* // Parse DSDT table */
-    /* acpi_ut_idx = find_untyped_id_by_paddr(acpi_dsdt_addr); */
-    /* retype_at_paddr(cnode_cptr_remaining_untypeds + acpi_ut_idx, */
-    /*                  capDLBootInfo->untypedList[acpi_ut_idx].paddr, */
-    /*                  cnode_cptr_remaining_untypeds, */
-    /*                  acpi_dsdt_addr, seL4_X86_4K, 0, &free_slot); */
+    sddf_dprintf("===========Lookup Results=========\n");
+    lookup_cnt = 0;
+    query_all_objects_by_name(&object_root, acpi_str_hid);
+    // TODO: get rid of lookup_list and return a list with all the parsed resources
+    for (uint32_t i = 0; i < lookup_cnt; i++) {
+        aml_object_t *node = lookup_results[i];
+        char eisa_id[10];
+        read_eisa_id(node, eisa_id);
+        if (!strcmp(eisa_id, eisaid_str_pcie)) {
+            sddf_dprintf("Found PCIe Bus\n");
 
-    /* error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr, */
-    /*                       seL4_CanRead, */
-    /*                       seL4_X86_Default_VMAttributes); */
+            aml_object_t *crs_node = query_child_object_by_name(node->parent, acpi_str_crs);
+            if (crs_node == NULL) {
+                sddf_dprintf("_CRS node is not found\n");
+                return;
+            }
+            acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
+            print_crs_list(crs_list);
+            /* pass_crs_and_caps(crs_list, i); */
 
-    /* uint32_t dsdt_offset = acpi_dsdt_addr & 0xfff; */
-    /* acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + dsdt_offset); */
-    /* sddf_dprintf("Signature: %c%c%c%c\n", */
-    /*          header->signature[0], */
-    /*          header->signature[1], */
-    /*          header->signature[2], */
-    /*          header->signature[3]); */
-    /* sddf_dprintf("length: %d\n", header->length); */
-
-
-    /* // Map all the frames covering the DSDT table */
-    /* for (int i = 1; i * 4096 < dsdt_offset + header->length; i++) { */
-    /*     uint32_t following_acpi_ut_idx = find_untyped_id_by_paddr(acpi_dsdt_addr + i * 4096); */
-    /*     free_slot++; */
-
-    /*     if (following_acpi_ut_idx == acpi_ut_idx) { */
-    /*         acpi_ut_paddr =  acpi_dsdt_addr + i * 4096; */
-    /*     } else { */
-    /*         acpi_ut_paddr = capDLBootInfo->untypedList[following_acpi_ut_idx].paddr; */
-    /*     } */
-
-    /*     sddf_dprintf("map %d-th page at paddr 0x%lx, ut_paddr: 0x%lx\n", i, acpi_dsdt_addr + 1 * 4096, acpi_ut_paddr); */
-    /*     retype_at_paddr(cnode_cptr_remaining_untypeds + following_acpi_ut_idx, */
-    /*                      acpi_ut_paddr, */
-    /*                      cnode_cptr_remaining_untypeds, */
-    /*                      acpi_dsdt_addr + i * 4096, seL4_X86_4K, 0, &free_slot); */
-
-    /*     seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, */
-    /*                       seL4_CapInitThreadVSpace, */
-    /*                       acpi_vaddr + i * 4096, */
-    /*                       seL4_CanRead, */
-    /*                       seL4_X86_Default_VMAttributes); */
-    /* } */
-
-
-    /* sddf_dprintf("===============Scanning DSDT===============\n"); */
-
-    /* acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header; */
-    /* scanner.current = (uint8_t *)&acpi_dsdt_table->content[0]; */
-    /* object_pool.next = aml_object_pool_start; */
-    /* object_pool.end = aml_object_pool_start + 0x10000; */
-    /* sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current); */
-
-    /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */
-    /* object_root.start = scanner.current; */
-    /* object_root.op_code = NULL_OP; */
-    /* object_root.name[0] = '\\'; */
-    /* scan_objects(&object_root, dsdt_end); */
-    /* print_object_tree(&object_root, 0); */
-
-    /* sddf_dprintf("===========Lookup Results=========\n"); */
-    /* lookup_cnt = 0; */
-    /* free_slot++; */
-    /* query_all_objects_by_name(&object_root, acpi_str_hid); */
-    /* // TODO: get rid of lookup_list and return a list with all the parsed resources */
-    /* for (uint32_t i = 0; i < lookup_cnt; i++) { */
-    /*     aml_object_t *node = lookup_results[i]; */
-    /*     char eisa_id[10]; */
-    /*     read_eisa_id(node, eisa_id); */
-    /*     if (!strcmp(eisa_id, eisaid_str_pcie)) { */
-    /*         sddf_dprintf("Found PCIe Bus\n"); */
-
-    /*         aml_object_t *crs_node = query_child_object_by_name(node->parent, acpi_str_crs); */
-    /*         if (crs_node == NULL) { */
-    /*             sddf_dprintf("_CRS node is not found\n"); */
-    /*             return; */
-    /*         } */
-    /*         acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
-    /*         print_crs_list(crs_list); */
-    /*         pass_crs_and_caps(crs_list, i); */
-
-    /*         aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt); */
-    /*         if (prt_node == NULL) { */
-    /*             sddf_dprintf("_PRT node is not found\n"); */
-    /*             return; */
-    /*         } */
-    /*         char package_name[5]; */
-    /*         if (extract_pcie_prt(prt_node, package_name)) { */
-    /*             sddf_dprintf("Routing table package \'%s'\n", package_name); */
-    /*             aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name); */
-    /*             if (prt_package) { */
-    /*                 sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start); */
-    /*                 extract_prt_package(prt_package); */
-    /*             } else { */
-    /*                 sddf_dprintf("PRT package is not found\n"); */
-    /*             } */
-    /*         } else { */
-    /*             sddf_dprintf("Failed to parse the package name for routing tables\n"); */
-    /*         } */
-    /*     } */
-    /* } */
-
-    /* /\* error = seL4_CNode_Revoke(cnode_cptr_remaining_untypeds, acpi_ut_idx, 58); *\/ */
-    /* /\* sddf_dprintf("seL4_CNode_Revoke Error: %d\n", error); *\/ */
-    /* free_slot++; */
+            aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
+            if (prt_node == NULL) {
+                sddf_dprintf("_PRT node is not found\n");
+                return;
+            }
+            char package_name[5];
+            if (extract_pcie_prt(prt_node, package_name)) {
+                sddf_dprintf("Routing table package \'%s'\n", package_name);
+                aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name);
+                if (prt_package) {
+                    sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start);
+                    extract_prt_package(prt_package);
+                } else {
+                    sddf_dprintf("PRT package is not found\n");
+                }
+            } else {
+                sddf_dprintf("Failed to parse the package name for routing tables\n");
+            }
+        }
+    }
+    error = untypeds_revoke();
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error);
+        return;
+    }
 
     /* // TODO: pass PCI resource information here so pages mapped in ACPI driver can be revoked simplpy */
-
 
     /* // Print summary */
     /* sddf_dprintf("\n======PCI resources summary:======\n"); */
