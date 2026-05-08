@@ -257,8 +257,8 @@ typedef struct object_lookup_list {
 } object_lookup_list_t;
 
 typedef struct {
-    uintptr_t paddr;
-    uint8_t size_bits;
+    uintptr_t base_addr;
+    uintptr_t end_addr;
     uint8_t is_device;
     uint8_t object_type;
     uint8_t child;
