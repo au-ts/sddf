@@ -31,6 +31,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     sdf.add_mr(virtio_queues)
     sound_driver.add_map(Map(virtio_queues, 0x30_000_000, "rw", cached=False))
 
+    virtio_data = MemoryRegion(sdf, "virtio_data", 0x400_000, paddr=0x5_5000_000)
+    sdf.add_mr(virtio_data)
+    sound_driver.add_map(Map(virtio_data, 0x40_000_000, "rw", cached=False))
+
+    sound_driver.add_irq(SystemDescription.IrqConventional(79, trigger=SystemDescription.IrqConventional.Trigger.EDGE))
+
     pds = [sound_driver, client]
     for pd in pds:
         sdf.add_pd(pd)

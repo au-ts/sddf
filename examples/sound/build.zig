@@ -352,7 +352,7 @@ pub fn build(b: *std.Build) !void {
     if (microkit_board_option == .qemu_virt_aarch64) {
         const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
         qemu_cmd = b.addSystemCommand(&[_][]const u8{
-            "qemu-system-aarch64",
+            "/home/ivanv/ts/qemu/build/qemu-system-aarch64",
             "-machine",
             "virt,virtualization=on",
             "-cpu",
