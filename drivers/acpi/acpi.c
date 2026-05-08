@@ -35,8 +35,10 @@ uintptr_t pci_resource;
 seL4_CPtr vspace_cptr_pci_driver;
 seL4_CPtr cnode_cptr_remaining_untypeds;
 seL4_CPtr cnode_cptr_pci_resources;
+seL4_CPtr cnode_cptr_acpi_driver;
 uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
+seL4_CPtr cnode_pci_resources_free_slot = 1;
 
 scanner_t scanner;
 aml_object_pool_t object_pool;
@@ -47,6 +49,7 @@ uint32_t lookup_cnt;
 
 // TODO: let capDL initialiser create the PTs for ACPI
 
+seL4_CPtr free_slot;
 seL4_CPtr pdpt = 0;
 seL4_CPtr pd = 1;
 seL4_CPtr pt = 2;
@@ -73,7 +76,8 @@ seL4_Error retype_at_offset(seL4_CPtr parent_untyped,
                             seL4_Word parent_paddr,
                             seL4_CPtr cnode_cptr,
                             seL4_Word target_paddr,
-                            seL4_Word page_object,
+                            seL4_Word object_type,
+                            seL4_Word size_bits,
                             seL4_CPtr *free_slots)
 {
     seL4_Error error;
@@ -88,7 +92,6 @@ seL4_Error retype_at_offset(seL4_CPtr parent_untyped,
 
         while (remaining_offset >= size) {
             // Create a "filler" Untyped to move the allocation pointer forward
-            sddf_dprintf("bits: %d\n", bits);
             error = seL4_Untyped_Retype(parent_untyped,
                                         seL4_UntypedObject,
                                         bits,
@@ -99,15 +102,14 @@ seL4_Error retype_at_offset(seL4_CPtr parent_untyped,
             (*free_slots)++; // Use next slot
             remaining_offset -= size;
             current_paddr += size;
-            sddf_dprintf("create untyped size bits: %d at 0x%lx\n", bits, current_paddr - size);
         }
     }
 
     // 2. Now the parent Untyped's internal pointer is at target_paddr
     // Retype the actual Frame
     error = seL4_Untyped_Retype(parent_untyped,
-                                page_object,
-                                0,
+                                object_type,
+                                size_bits,
                                 cnode_cptr, 0, 0,
                                 *free_slots, 1);
 
@@ -129,6 +131,45 @@ uint32_t find_untyped_id_by_paddr(uintptr_t paddr)
     }
 
     return capDLBootInfo->untypeds.end;
+}
+
+seL4_Word max_size_bits(seL4_Word size)
+{
+    seL4_Word i = 63;
+    sddf_dprintf("size: 0x%lx, shift: 0x%llx\n", size, 1ULL << i);
+    while (((1ULL << i) & size) == 0) {
+        i--;
+    }
+    return i;
+}
+
+seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
+{
+    seL4_CPtr crs_ut_idx = find_untyped_id_by_paddr(min_addr);
+    seL4_Word new_ut_size = MIN(max_addr - min_addr, 1ULL << capDLBootInfo->untypedList[crs_ut_idx].sizeBits);
+    seL4_Word new_ut_size_bits = max_size_bits(new_ut_size);
+
+    seL4_Error error = retype_at_offset(cnode_cptr_remaining_untypeds + crs_ut_idx,
+                     capDLBootInfo->untypedList[crs_ut_idx].paddr,
+                     cnode_cptr_remaining_untypeds,
+                     min_addr, seL4_UntypedObject, new_ut_size_bits, &free_slot);
+    if (error) {
+        return error;
+    }
+
+    // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
+    error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, free_slot, 58, seL4_ReadWrite);
+    if (error) {
+        return error;
+    }
+
+    free_slot++;
+    cnode_pci_resources_free_slot++;
+
+    if (min_addr + new_ut_size < max_addr) {
+        pass_ut_with_range(min_addr + new_ut_size, max_addr);
+    }
+    return seL4_NoError;
 }
 
 seL4_Error map_frame(seL4_CPtr obj_ut_cap, seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL4_CapRights_t rights, seL4_CPtr cnode_cptr, seL4_CPtr *free_slots)
@@ -171,6 +212,91 @@ seL4_Error map_frame(seL4_CPtr obj_ut_cap, seL4_CPtr frame_cap, seL4_CPtr vspace
     return err;
 }
 
+void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
+{
+    sddf_dprintf("=====pass CRS untypeds=====\n");
+    while (crs_list) {
+        uint8_t new_res_idx = pci_resources.bridges[bridge_idx].num_dev_resources;
+        device_resource_t *dev_res = (device_resource_t *)&pci_resources.bridges[bridge_idx].dev_resources[new_res_idx];
+        switch (crs_list->resource_type) {
+            case WORD_AS_DESCRIPTOR: {
+                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = word_as->min_address;
+                dev_res->max_addr = word_as->max_address;
+
+                switch (word_as->resource_type) {
+                    case 0: {
+                        dev_res->type = WORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = WORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = WORD_BUS;
+                        break;
+                    }
+                }
+                dev_res->min_addr = word_as->min_address;
+                dev_res->max_addr = word_as->max_address;
+                break;
+            }
+            case DWORD_AS_DESCRIPTOR: {
+                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = dword_as->min_address;
+                dev_res->max_addr = dword_as->max_address;
+
+                switch (dword_as->resource_type) {
+                    case 0: {
+                        dev_res->type = DWORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = DWORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = DWORD_BUS;
+                        break;
+                    }
+                }
+
+                break;
+            }
+            case QWORD_AS_DESCRIPTOR: {
+                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = qword_as->min_address;
+                dev_res->max_addr = qword_as->max_address;
+
+                switch (qword_as->resource_type) {
+                    case 0: {
+                        dev_res->type = QWORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = QWORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = QWORD_BUS;
+                        break;
+                    }
+                }
+                break;
+            }
+            default: {
+                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type);
+            }
+        }
+
+        crs_list = crs_list->next;
+    }
+}
+
 void init(void)
 {
     // TODO: probably should use Bill's patch for prefilling memory regions
@@ -211,11 +337,11 @@ void init(void)
     map_pts(cnode_cptr_remaining_untypeds + ut_pt_idx, cnode_cptr_remaining_untypeds, capDLBootInfo->untypeds.end);
 
     sddf_dprintf("PT mapping finished\n");
-    seL4_CPtr free_slot = capDLBootInfo->untypeds.end + frame + 1;
+    free_slot = capDLBootInfo->untypeds.end + frame + 1;
     retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                      capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                      cnode_cptr_remaining_untypeds,
-                     rsdt_addr, seL4_X86_4K, &free_slot);
+                     rsdt_addr, seL4_X86_4K, 0, &free_slot);
 
     seL4_Error error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                               seL4_CanRead,
@@ -251,7 +377,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + following_acpi_ut_idx,
                          acpi_ut_paddr,
                          cnode_cptr_remaining_untypeds,
-                         rsdt_addr + i * 4096, seL4_X86_4K, &free_slot);
+                         rsdt_addr + i * 4096, seL4_X86_4K, 0, &free_slot);
 
         seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot,
                           seL4_CapInitThreadVSpace,
@@ -279,7 +405,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                          capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                          cnode_cptr_remaining_untypeds,
-                         acpi_rsdt_entries[i], seL4_X86_4K, &free_slot);
+                         acpi_rsdt_entries[i], seL4_X86_4K, 0, &free_slot);
 
         error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                               seL4_CanRead,
@@ -323,7 +449,7 @@ void init(void)
     retype_at_offset(cnode_cptr_remaining_untypeds + acpi_ut_idx,
                      capDLBootInfo->untypedList[acpi_ut_idx].paddr,
                      cnode_cptr_remaining_untypeds,
-                     acpi_dsdt_addr, seL4_X86_4K, &free_slot);
+                     acpi_dsdt_addr, seL4_X86_4K, 0, &free_slot);
 
     error = seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot, seL4_CapInitThreadVSpace, acpi_vaddr,
                           seL4_CanRead,
@@ -354,7 +480,7 @@ void init(void)
         retype_at_offset(cnode_cptr_remaining_untypeds + following_acpi_ut_idx,
                          acpi_ut_paddr,
                          cnode_cptr_remaining_untypeds,
-                         acpi_dsdt_addr + i * 4096, seL4_X86_4K, &free_slot);
+                         acpi_dsdt_addr + i * 4096, seL4_X86_4K, 0, &free_slot);
 
         seL4_X86_Page_Map(cnode_cptr_remaining_untypeds + free_slot,
                           seL4_CapInitThreadVSpace,
@@ -381,6 +507,7 @@ void init(void)
 
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
+    free_slot++;
     query_all_objects_by_name(&object_root, acpi_str_hid);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
@@ -397,6 +524,7 @@ void init(void)
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
             print_crs_list(crs_list);
+            pass_crs_and_caps(crs_list, i);
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {
@@ -426,10 +554,9 @@ void init(void)
     // TODO: pass PCI resource information here so pages mapped in ACPI driver can be revoked simplpy
 
 
-
-
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
+    sddf_dprintf("init cnode: 0x%x\n", seL4_CapInitThreadCNode);
     for (int i = 0; i < pci_resources.num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
                      pci_resources.pci_seg_groups[i].group_id,
@@ -449,6 +576,7 @@ void init(void)
                              cnode_cptr_remaining_untypeds,
                              cur_paddr,
                              seL4_X86_LargePageObject,
+                             0,
                              &free_slot);
 
             sddf_dprintf("try mapping\n");

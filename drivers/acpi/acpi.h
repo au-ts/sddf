@@ -129,11 +129,34 @@ typedef struct {
 // see Section 20.2.4 Package Length Encoding
 typedef uint32_t aml_pkg_len_t;
 
+#define MAX_NUM_AS_RESOURCES 10
+
+enum device_resource_type {
+    IO_PORT = 0,
+    DWORD_MEMORY,
+    DWORD_IO,
+    DWORD_BUS,
+    WORD_MEMORY,
+    WORD_IO,
+    WORD_BUS,
+    QWORD_MEMORY,
+    QWORD_IO,
+    QWORD_BUS,
+};
+
+typedef struct {
+    enum device_resource_type type;
+    uintptr_t min_addr;
+    uintptr_t max_addr;
+} device_resource_t;
+
 typedef struct {
     char path_name[AML_MAX_PATH_STR];
     uint32_t path_len;
     uint32_t bus_start;
     uint32_t bus_end;
+    device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
+    uint8_t num_dev_resources;
 } pci_bridge_t;
 
 typedef struct {
@@ -232,6 +255,15 @@ typedef struct object_lookup_list {
     aml_object_t *node;
     aml_object_t *next;
 } object_lookup_list_t;
+
+typedef struct {
+    uintptr_t paddr;
+    uint8_t size_bits;
+    uint8_t is_device;
+    uint8_t object_type;
+    uint8_t child;
+    uint8_t next;
+} cap_desc_t;
 
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);

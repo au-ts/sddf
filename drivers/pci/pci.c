@@ -30,8 +30,6 @@ void pci_bus_scan(uintptr_t bus_base)
                              (((uintptr_t)pci_header >> 12) & 0x7),
                              pci_header->vendor_id,
                              pci_header->device_id);
-
-                sddf_dprintf("\n");
             }
         }
     }
@@ -41,4 +39,11 @@ void notified(microkit_channel ch)
 {
     sddf_dprintf("[PCI driver] notified by ch %d\n", ch);
     pci_bus_scan(0x5000000);
+
+    seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 1,
+                                           seL4_X86_LargePageObject,
+                                           0,
+                                           cnode_cptr_pci_resources, 0, 0,
+                                           2, 1);
+    sddf_dprintf("error: %d\n", error);
 }
