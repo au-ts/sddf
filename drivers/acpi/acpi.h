@@ -261,8 +261,9 @@ typedef struct {
     uintptr_t end_addr;
     uint8_t is_device;
     uint8_t object_type;
-    uint8_t child;
-    uint8_t next;
+    uint32_t parent;
+    uint32_t child;
+    uint32_t next;
 } cap_desc_t;
 
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
