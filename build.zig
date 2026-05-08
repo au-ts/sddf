@@ -178,7 +178,14 @@ fn addTimerDriver(
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/timer/time_conv.c"),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/timer/timer_common.c"),
+    });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/timer"));
     driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);

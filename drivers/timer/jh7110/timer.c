@@ -10,6 +10,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
@@ -43,7 +44,7 @@
 
 #if defined(CONFIG_PLAT_STAR64)
 /* 24 MHz frequency. */
-#define STARFIVE_TIMER_TICKS_PER_SECOND 0x16e3600
+#define JH7110_CLK_FREQ 0x16e3600
 #else
 #error "Unknown clock-frequency for JH7110 timer"
 #endif
@@ -97,13 +98,7 @@ static uint64_t get_ticks_in_ns(void)
 
     uint64_t value_ticks = (value_h << 32) | value_l;
 
-    /* convert from ticks to nanoseconds */
-    uint64_t value_whole_seconds = value_ticks / STARFIVE_TIMER_TICKS_PER_SECOND;
-    uint64_t value_subsecond_ticks = value_ticks % STARFIVE_TIMER_TICKS_PER_SECOND;
-    uint64_t value_subsecond_ns = (value_subsecond_ticks * NS_IN_S) / STARFIVE_TIMER_TICKS_PER_SECOND;
-    uint64_t value_ns = value_whole_seconds * NS_IN_S + value_subsecond_ns;
-
-    return value_ns;
+    return tick_to_ns_cached(value_ticks, 0, JH7110_CLK_FREQ);
 }
 
 static void process_timeouts(uint64_t curr_time)
@@ -128,9 +123,7 @@ static void process_timeouts(uint64_t curr_time)
         timeout_timer_elapses = 0;
         timeout_regs->ctrl = STARFIVE_TIMER_MODE_SINGLE;
 
-        uint64_t ticks_whole_seconds = (ns / NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND;
-        uint64_t ticks_remainder = (ns % NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND / NS_IN_S;
-        uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
+        uint64_t num_ticks = ns_to_tick_cached(ns, 0, JH7110_CLK_FREQ);
 
         if (num_ticks > STARFIVE_TIMER_MAX_TICKS) {
             /* truncate num_ticks to maximum timeout, will use multiple interrupts to process the requested timeout. */

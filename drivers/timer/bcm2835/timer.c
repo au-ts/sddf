@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/timer/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
@@ -14,8 +15,9 @@
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 #if !defined(CONFIG_PLAT_BCM2711)
-#error "Driver assumes 100MHz clock frequency, check if your platform supports that"
+#error "Driver assumes 1MHz clock frequency, check if your platform supports that"
 #endif
+#define BCM2835_CLK_FREQ ((sddf_timer_freq_hz_t) 1*MEGA)
 
 /*
  * The system timer has four 32-bit compare registers available.
@@ -61,12 +63,12 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_h = (uint64_t)timer_regs->chi;
     uint64_t value_l = (uint64_t)timer_regs->clo;
     uint64_t value_us = (value_h << 32) | value_l;
-    return value_us * NS_IN_US;
+    return tick_to_ns_cached(value_us, 0, BCM2835_CLK_FREQ);
 }
 
 void set_timeout(uint64_t ns)
 {
-    uint64_t value_us = ns / NS_IN_US;
+    uint64_t value_us = ns_to_tick_cached(ns, 0, BCM2835_CLK_FREQ);
     if (value_us > BCM2835_TIMER_MAX_US) {
         value_us = BCM2835_TIMER_MAX_US;
     }

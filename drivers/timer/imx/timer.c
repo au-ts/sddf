@@ -4,8 +4,19 @@
  */
 
 /*
- * Very basic timer driver. Currently only permtis
- * a maximum of a single timeout per client for simplicity.
+ * This is a driver for the imx8m general purpose timer (GPT).
+ * It is a 32 bit timer with a 12 bit prescaler.
+ *
+ * The input clock for this device is NOT fixed. A set of muxes
+ * allows selection between one of the following clocks:
+ * ~~ ipg_clk_24M: Fixed 24MHz crystal,
+ * ~~ gpt_clk: external clock, frequency defined by board,
+ * ~~ ipg_clk: peripheral clock, frequency defined by clock tree,
+ * ~~ ipg_clk_32k: low-freq reference clock, fixed 32kHz frequency,
+ * ~~ ipg_clkc_highfreq: high-freq reference clock, frequency depends on board.
+ *
+ * Uboot sets up the 24MHz clock for us, and we just trust that it's there.
+ * TODO: use clock driver to set this up properly, enforced by sdfgen.
  */
 
 #include <stdint.h>
@@ -13,6 +24,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/timer/config.h>
 
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
@@ -29,7 +41,8 @@
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
-#define GPT_FREQ   (12u)
+#define GPT_FREQ   (24*MEGA)
+#define GPT_PRESCALER (0)
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -101,13 +114,15 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
     switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
+        uint64_t time_ns = tick_to_ns_cached(get_ticks(), GPT_PRESCALER, (sddf_timer_freq_hz_t)GPT_FREQ);
+        // uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
         sddf_set_mr(0, time_ns);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
-        uint64_t offset_ticks = (sddf_get_mr(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
+        uint64_t offset_ticks = ns_to_tick_cached(sddf_get_mr(0), GPT_PRESCALER, (sddf_timer_freq_hz_t)GPT_FREQ);
+        // uint64_t offset_ticks = (sddf_get_mr(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
         timeouts[ch] = curr_time + offset_ticks;
         process_timeouts(curr_time);
         break;
@@ -142,19 +157,17 @@ void init(void)
     /* SWR will be 0 when the reset is done */
     while (gpt[CR] & (1 << 15));
 
-    uint32_t cr = (
-                      (1 << 9) | // Free run mode
-                      (1 << 6) | // Peripheral clocks
-                      (1) // Enable
-                  );
+    uint32_t cr = ((1 << 9) | // Free run mode
+                   (1 << 6) | // Peripheral clocks
+                   (1) // Enable
+    );
 
     gpt[CR] = cr;
 
-    gpt[IR] = (
-                  (1 << 5) // rollover interrupt
-              );
+    gpt[IR] = ((1 << 5) // rollover interrupt
+    );
 
-    gpt[PR] = 1; // prescaler.
+    gpt[PR] = GPT_PRESCALER; // prescaler of 0 - use raw 24MHz clock.
 
     /* Now go passive! */
 }

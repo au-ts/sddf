@@ -7,6 +7,7 @@
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
@@ -75,21 +76,13 @@ static inline uint64_t get_ticks_in_ns(void)
     load_values |= (uint64_t)timestamp_timer->current_value1 << 32;
     uint64_t ticks = UINT64_MAX - load_values;
 
-    /* convert from ticks to nanoseconds */
-    uint64_t value_s = ticks / RK3568_TIMER_FREQUENCY;
-    uint64_t value_frac = ticks % RK3568_TIMER_FREQUENCY;
-    uint64_t value_ns = (value_s * NANO_INVERSE) + (value_frac * NANO_INVERSE) / RK3568_TIMER_FREQUENCY;
-
-    LOG_TIMER("get_ticks_in_ns load_values: %lu value_ns: %lu\n", load_values, value_ns);
-    return value_ns;
+    return tick_to_ns_cached(ticks, 0, RK3568_TIMER_FREQUENCY);
 }
 
 void set_timeout(uint64_t ns)
 {
     /* load the timeout timer with ticks to count down from */
-    uint64_t num_s = ns / NANO_INVERSE;
-    uint64_t num_frac = ns % NANO_INVERSE;
-    uint64_t num_ticks = (num_s * RK3568_TIMER_FREQUENCY) + (num_frac * RK3568_TIMER_FREQUENCY) / NANO_INVERSE;
+    uint64_t num_ticks = ns_to_tick_cached(ns, 0, RK3568_TIMER_FREQUENCY);
     uint32_t timeout_ticks_l = (uint32_t)num_ticks;
     uint32_t timeout_ticks_h = (uint32_t)(num_ticks >> 32);
 

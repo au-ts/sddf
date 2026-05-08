@@ -8,6 +8,7 @@
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
@@ -30,12 +31,13 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
  * You can read the IOPLL clk value in u-boot using `clk dump` and view the source and divider value for
  * LSBUS by reading LPD_LSBUS_CTRL register.
 */
-#define CDNS_TIMER_REF_CLOCK_RATE (100UL * 1000UL * 1000UL)
+#define CDNS_TIMER_REF_CLOCK_RATE (100*MEGA)
 #else
 #error "unknown LSBUS clock frequency (timer device reference clock)"
 #endif
 /* default source clock, scaled down by a factor of 2^(CDNS_TIMER_PRESCALE_VALUE+1) if enabled prescale */
 #define CDNS_TIMER_TICKS_PER_SECOND (CDNS_TIMER_REF_CLOCK_RATE >> ((CDNS_TIMER_PRESCALE_VALUE & CDNS_TIMER_MAX_PRESCALE) + 1))
+#define CDNS_TRUE_PRESCALE (CDNS_TIMER_PRESCALE_VALUE + 1)
 
 #define TTC_COUNTER_TIMER 0
 #define TTC_TIMEOUT_TIMER 1
@@ -111,21 +113,14 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_ticks = (value_h << 32) | value_l;
 
     /* convert from ticks to nanoseconds */
-    uint64_t value_whole_seconds = value_ticks / CDNS_TIMER_TICKS_PER_SECOND;
-    uint64_t value_subsecond_ticks = value_ticks % CDNS_TIMER_TICKS_PER_SECOND;
-    uint64_t value_subsecond_ns = (value_subsecond_ticks * NS_IN_S) / CDNS_TIMER_TICKS_PER_SECOND;
-    uint64_t value_ns = value_whole_seconds * NS_IN_S + value_subsecond_ns;
-
-    return value_ns;
+    return tick_to_ns_cached(value_ticks, CDNS_TRUE_PRESCALE, CDNS_TIMER_REF_CLOCK_RATE);
 }
 
 void set_timeout(uint64_t ns)
 {
     /* stop the timeout timer */
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= CDNS_TIMER_DISABLE;
-    uint64_t ticks_whole_seconds = (ns / NS_IN_S) * CDNS_TIMER_TICKS_PER_SECOND;
-    uint64_t ticks_remainder = (ns % NS_IN_S) * CDNS_TIMER_TICKS_PER_SECOND / NS_IN_S;
-    uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
+    uint64_t num_ticks = ns_to_tick_cached(ns, CDNS_TRUE_PRESCALE, CDNS_TIMER_REF_CLOCK_RATE);
 
     if (num_ticks > CDNS_TIMER_MAX_TICKS) {
         /* truncate num_ticks to maximum timeout, will use multiple interrupts to process the requested timeout. */
@@ -253,8 +248,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_us = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch - CLIENT_CH_START] = curr_time + offset_us;
+        uint64_t offset_ns = (uint64_t)(sddf_get_mr(0));
+        timeouts[ch - CLIENT_CH_START] = curr_time + offset_ns;
         process_timeouts(curr_time);
         break;
     }

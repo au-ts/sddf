@@ -8,17 +8,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/timer/config.h>
-#include <sddf/util/udivmodti4.h>
-
-#define DEBUG_TIMER
-#ifdef DEBUG_TIMER
-#define LOG_TIMER(...) do{ sddf_printf("TIMER|INFO: ");sddf_printf(__VA_ARGS__); }while(0)
-#else
-#define LOG_TIMER(...) do{}while(0)
-#endif /* DEBUG_TIMER */
-
-#define LOG_TIMER_WARN(...) do{ sddf_printf("TIMER|WARN: ");sddf_printf(__VA_ARGS__); }while(0)
+#include <sddf/util/si_units.h>
 
 /* Documents referenced:
  * 1. IA-PC HPET (High Precision Event Timers) Specification
@@ -121,7 +113,7 @@ typedef struct __attribute__((packed)) hpet_timer {
 uintptr_t HPET_REGION = 0x50000000;
 
 volatile hpet_timer_t *timer_0;
-uint64_t tick_period_fs; // main counter tick period in femtoseconds
+uint64_t hpet_freq = 0;
 uint64_t tsc_freq = 0;
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
@@ -148,16 +140,12 @@ uint64_t get_hpet_ticks(void)
 
 uint64_t ns_to_hpet_ticks(uint64_t ns)
 {
-    __uint128_t fs = (__uint128_t)ns * (__uint128_t)FS_IN_NS;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(fs), LOW_WORD(fs), tick_period_fs, &rem);
+    return ns_to_tick_cached(ns, 0, hpet_freq);
 }
 
 uint64_t hpet_ticks_to_ns(uint64_t ticks)
 {
-    __uint128_t counter_as_fs = (__uint128_t)ticks * (__uint128_t)tick_period_fs;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(counter_as_fs), LOW_WORD(counter_as_fs), FS_IN_NS, &rem);
+    return tick_to_ns_cached(ticks, 0, hpet_freq);
 }
 
 void set_timeout(uint64_t timeout)
@@ -212,14 +200,14 @@ static uint64_t get_tsc_frequency(void)
     /* Checks whether the CPU expose TSC/Crystal ratio and Crystal frequency via cpuid leaf 0x15. */
     cpuid(CPUID_VENDOR_ID_LEAF, 0, &max_basic_leaf, &b, &c, &d);
     if (max_basic_leaf < CPUID_TSC_LEAF) {
-        LOG_TIMER("CPU does not expose TSC leaf.\n");
+        LOG_TIMER_DRIVER("CPU does not expose TSC leaf.\n");
         return 0;
     }
 
     uint32_t denominator, numerator, crystal_khz;
     cpuid(CPUID_TSC_LEAF, 0, &denominator, &numerator, &crystal_khz, &d);
     if (!denominator || !numerator) {
-        LOG_TIMER("TSC/Crystal ratio cannot be calculated.\n");
+        LOG_TIMER_DRIVER("TSC/Crystal ratio cannot be calculated.\n");
         return 0;
     }
 
@@ -227,7 +215,7 @@ static uint64_t get_tsc_frequency(void)
 
     uint32_t crystal_hz;
     if (!crystal_khz) {
-        LOG_TIMER("CPU does not report Crystal frequency, deriving...\n");
+        LOG_TIMER_DRIVER("CPU does not report Crystal frequency, deriving...\n");
 
         /* From [3]: "Some Intel SoCs like Skylake and Kabylake don't report the crystal
          * clock, but we can easily calculate it to a high degree of accuracy
@@ -241,8 +229,8 @@ static uint64_t get_tsc_frequency(void)
         uint64_t proc_base_hz = proc_base_mhz * 1000ull * 1000ull;
         crystal_hz = proc_base_hz * (1 / tsc_to_crystal_freq_ratio);
 
-        LOG_TIMER("Processor base speed is %u MHz\n", proc_base_mhz);
-        LOG_TIMER("Crystal clock is %u Hz\n", crystal_hz);
+        LOG_TIMER_DRIVER("Processor base speed is %u MHz\n", proc_base_mhz);
+        LOG_TIMER_DRIVER("Crystal clock is %u Hz\n", crystal_hz);
     } else {
         crystal_hz = crystal_khz * 1000;
     }
@@ -255,15 +243,13 @@ static uint64_t get_tsc_frequency(void)
      */
 
     uint64_t tsc_hz = crystal_hz * tsc_to_crystal_freq_ratio;
-    LOG_TIMER("TSC frequency is %u * (%u / %u) = %lu Hz\n", crystal_hz, numerator, denominator, tsc_hz);
+    LOG_TIMER_DRIVER("TSC frequency is %u * (%u / %u) = %lu Hz\n", crystal_hz, numerator, denominator, tsc_hz);
     return tsc_hz;
 }
 
 static uint64_t tsc_ticks_to_ns(uint64_t tsc)
 {
-    __uint128_t numerator = (__uint128_t)tsc * (__uint128_t)NS_IN_S;
-    uint64_t rem = 0;
-    return udiv128by64to64(HIGH_WORD(numerator), LOW_WORD(numerator), tsc_freq, &rem);
+    return tick_to_ns_cached(tsc, 0, tsc_freq);
 }
 
 void init(void)
@@ -274,7 +260,8 @@ void init(void)
 
     /* Read the tick period so we can convert between ticks <-> nanoseconds. */
     volatile uint64_t capability = *((uint64_t *)(HPET_REGION + HPET_GENERAL_CAP_ID_REG));
-    tick_period_fs = capability >> 32;
+    uint64_t tick_period_fs = capability >> 32;
+    hpet_freq = FS_IN_S / tick_period_fs;
 
     /* Make sure that the main counter is 64-bit wide and legacy IRQ routing capable. */
     assert(capability & BIT(COUNT_SIZE_CAP));
@@ -316,12 +303,12 @@ void init(void)
 
     /* Detect TSC */
     if (!is_intel_cpu()) {
-        LOG_TIMER_WARN("Not an Intel CPU, can't detect TSC frequency, expect performance degradation.\n");
+        LOG_TIMER_DRIVER_ERR("Not an Intel CPU, can't detect TSC frequency, expect performance degradation.\n");
         /* It can be measured, but the measurement procedure is complicated if we want to be accurate.
            See `quick_pit_calibrate()` or `pit_hpet_ptimer_calibrate_cpu()` in Linux arch/x86/kernel/tsc.c */
     } else {
         if (!is_invariant_tsc()) {
-            LOG_TIMER_WARN("Invariant TSC not supported, expect performance degradation.\n");
+            LOG_TIMER_DRIVER_ERR("Invariant TSC not supported, expect performance degradation.\n");
             /* Because SDDF_TIMER_GET_TIME calls will go to the HPET rather than from the TSC.
              * Which is very slow to read. See:
              * https://docs.redhat.com/en/documentation/red_hat_enterprise_linux_for_real_time/7/html/reference_guide/chap-timestamping
@@ -331,10 +318,10 @@ void init(void)
         } else {
             tsc_freq = get_tsc_frequency();
             if (!tsc_freq) {
-                LOG_TIMER_WARN("cannot detect TSC frequency via cpuid, expect performance degradation.\n");
+                LOG_TIMER_DRIVER_ERR("cannot detect TSC frequency via cpuid, expect performance degradation.\n");
                 /* Because same reason as above. */
             } else {
-                LOG_TIMER("using TSC as clocksource, HPET as clockevent\n");
+                LOG_TIMER_DRIVER("using TSC as clocksource, HPET as clockevent\n");
                 /* Great! Can fastpath time read PPCs. But we still use the HPET for interrupts,
                  * as seL4 uses already used the TSC interrupt mechanism (Local APIC timer) for scheduling. */
             }
