@@ -66,6 +66,10 @@ const DriverClass = struct {
     const Gpu = enum {
         virtio,
     };
+
+    const Sound = enum {
+        virtio,
+    };
 };
 
 const util_src = [_][]const u8{
@@ -454,6 +458,38 @@ fn addGpuDriver(
     return driver;
 }
 
+fn addSoundDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Sound,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_sound_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    const source = b.fmt("drivers/sound/{s}/sound.c", .{@tagName(class)});
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    // TODO: fix
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{"mmio"})),
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/sound/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -668,6 +704,13 @@ pub fn build(b: *std.Build) !void {
         // Gpu drivers
         inline for (std.meta.fields(DriverClass.Gpu)) |class| {
             const driver = addGpuDriver(b, gpu_config_include, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Sound drivers
+        inline for (std.meta.fields(DriverClass.Sound)) |class| {
+            const driver = addSoundDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
