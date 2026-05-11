@@ -15,15 +15,10 @@ seL4_CPtr cnode_cptr_pci_resources;
 pci_resources_t *pci_resources;
 cnode_caps_t *cnode_caps;
 
-void init(void)
-{
-    sddf_dprintf("PCI driver\n");
-    pci_resources = (pci_resources_t *)pci_resources_vaddr;
-    cnode_caps = (cnode_caps_t *)&pci_resources->cnode_caps;
-}
+bool acpi_ready = false;
 
 // TODO: pass bus start and end as arguments
-void pci_bus_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
+void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 {
     for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
         for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
@@ -59,10 +54,17 @@ void get_ut_by_paddr(uintptr_t target_paddr)
     }
 }
 
-void notified(microkit_channel ch)
+void init(void)
 {
-    sddf_dprintf("\n=========PCI driver is running==========\n");
-    sddf_dprintf("[PCI driver] notified by ch %d\n", ch);
+    if (!acpi_ready) {
+        sddf_dprintf("ACPI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
+    pci_resources = (pci_resources_t *)pci_resources_vaddr;
+    cnode_caps = (cnode_caps_t *)&pci_resources->cnode_caps;
+
+    sddf_dprintf("=========PCI driver is running==========\n");
 
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
@@ -71,7 +73,7 @@ void notified(microkit_channel ch)
                      pci_resources->pci_seg_groups[i].bus_start,
                      pci_resources->pci_seg_groups[i].bus_end);
         pci_seg_group_t *pci_seg_group = &pci_resources->pci_seg_groups[i];
-        pci_bus_scan(pci_seg_group->base_addr,
+        pci_ecam_scan(pci_seg_group->base_addr,
                      pci_seg_group->bus_start,
                      pci_seg_group->bus_end);
     }
@@ -97,4 +99,14 @@ void notified(microkit_channel ch)
     /*                                        cnode_cptr_pci_resources, 0, 0, */
     /*                                        2, 1); */
     /* sddf_dprintf("error: %d\n", error); */
+}
+
+void notified(microkit_channel ch)
+{
+    sddf_dprintf("\n[PCI driver] notified by ch %d", ch);
+    if (ch == 0 && !acpi_ready) {
+        acpi_ready = true;
+        init();
+    }
+
 }
