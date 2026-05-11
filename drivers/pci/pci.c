@@ -40,7 +40,7 @@ void pci_bus_scan(uintptr_t bus_base)
     }
 }
 
-void get_ut_by_paddr(uintptr_t target_paddr)
+void print_cnode_caps()
 {
     sddf_dprintf("idx,   base_addr,  end_addr\n")
     for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
@@ -48,8 +48,18 @@ void get_ut_by_paddr(uintptr_t target_paddr)
     }
 }
 
+void get_ut_by_paddr(uintptr_t target_paddr)
+{
+    for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
+        if (target_paddr >= cnode_caps->desc[i].base_addr && target_paddr < cnode_caps->desc[i].end_addr) {
+            sddf_dprintf("Found the untyped %u containing the target physical address: 0x%lx\n", i, target_paddr);
+        }
+    }
+}
+
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("\n=========PCI driver is running==========\n");
     sddf_dprintf("[PCI driver] notified by ch %d\n", ch);
 
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
@@ -61,7 +71,7 @@ void notified(microkit_channel ch)
         pci_bus_scan(pci_resources->pci_seg_groups[i].base_addr);
     }
 
-
+    print_cnode_caps();
 
     for (int i = 0; i < pci_resources->num_bridges; i++) {
         uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
@@ -70,7 +80,7 @@ void notified(microkit_channel ch)
             device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
             sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr);
 
-            if (dev_res->type == WORD_IO) {
+            if (dev_res->type == DWORD_MEMORY) {
                 get_ut_by_paddr(dev_res->min_addr);
             }
         }
