@@ -8,8 +8,6 @@
 
 #include <stdint.h>
 
-/* ----------------- UDP Protocol Definitions ---------------------------*/
-
 typedef struct __attribute__((__packed__)) udp_hdr {
     /* source port */
     uint16_t src_port;
@@ -17,6 +15,6 @@ typedef struct __attribute__((__packed__)) udp_hdr {
     uint16_t dst_port;
     /* length in bytes of the UDP datagram including header */
     uint16_t len;
-    /* checksum over the UDP datagram and psuedo-header, optional for IPv4 */
+    /* checksum over the UDP datagram and pseudo-header, optional for IPv4 */
     uint16_t check;
 } udp_hdr_t;

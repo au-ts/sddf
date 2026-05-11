@@ -8,8 +8,6 @@
 
 #include <stdint.h>
 
-/* ----------------- TCP Protocol Definitions ---------------------------*/
-
 typedef struct __attribute__((__packed__)) tcp_hdr {
     /* source port */
     uint16_t src_port;
@@ -41,7 +39,7 @@ typedef struct __attribute__((__packed__)) tcp_hdr {
     uint16_t cwr : 1;
     /* size of the receive window*/
     uint16_t window;
-    /* checksum over the TCP packet and psuedo-header */
+    /* checksum over the TCP packet and pseudo-header */
     uint16_t check;
     /* urgent pointer */
     uint16_t urg_ptr;

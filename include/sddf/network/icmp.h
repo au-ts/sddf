@@ -8,9 +8,7 @@
 
 #include <stdint.h>
 
-/* ----------------- ICMP Protocol Definitions ---------------------------*/
-
-/* Shared ICMP header prefix accross all control types */
+/* Shared ICMP header prefix across all control types */
 typedef struct __attribute__((__packed__)) icmp_hdr {
     /* ICMP type */
     uint8_t type;
@@ -18,5 +16,5 @@ typedef struct __attribute__((__packed__)) icmp_hdr {
     uint8_t code;
     /* internet checksum calculated over ICMP header and data */
     uint16_t check;
-    /* The following 4 bytes of the header are ICMP type dependent */
+    /* the following 4 bytes of the header are ICMP type dependent */
 } icmp_hdr_t;
