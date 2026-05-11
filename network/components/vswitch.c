@@ -132,7 +132,7 @@ static void clear_checksums(ether_hdr_t *eth_frame)
     }
     default: {
         sddf_dprintf("VSWITCH|ERR: Unsupported IP protocol %u received checksums may not be cleared!\n",
-            ip_header->protocol);
+                     ip_header->protocol);
         break;
     }
     }
