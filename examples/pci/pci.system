@@ -6,7 +6,7 @@
 -->
 <system>
     <memory_region name="aml_object_pool" size="0x10000"/>
-    <memory_region name="pci_resources" size="0x2000"/>
+    <memory_region name="pci_resources" size="0x3000"/>
 
     <cnode name="remaining_untypeds" remaining_untypeds="true" size_bits="8" />
     <cnode name="pci_resources" size_bits="8" />

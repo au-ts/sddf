@@ -13,11 +13,13 @@
 uintptr_t pci_resources_vaddr;
 seL4_CPtr cnode_cptr_pci_resources;
 pci_resources_t *pci_resources;
+cnode_caps_t *cnode_caps;
 
 void init(void)
 {
     sddf_dprintf("PCI driver\n");
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
+    cnode_caps = (cnode_caps_t *)&pci_resources->cnode_caps;
 }
 
 // TODO: pass bus start and end as arguments
@@ -38,6 +40,14 @@ void pci_bus_scan(uintptr_t bus_base)
     }
 }
 
+void get_ut_by_paddr(uintptr_t target_paddr)
+{
+    sddf_dprintf("idx,   base_addr,  end_addr\n")
+    for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
+        sddf_dprintf("%3u: 0x%09lx, 0x%09lx\n", i, cnode_caps->desc[i].base_addr, cnode_caps->desc[i].end_addr);
+    }
+}
+
 void notified(microkit_channel ch)
 {
     sddf_dprintf("[PCI driver] notified by ch %d\n", ch);
@@ -51,12 +61,18 @@ void notified(microkit_channel ch)
         pci_bus_scan(pci_resources->pci_seg_groups[i].base_addr);
     }
 
+
+
     for (int i = 0; i < pci_resources->num_bridges; i++) {
         uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
         sddf_dprintf("num_res: %u\n", num_res);
         for (int j = 0; j < num_res; j++) {
             device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
             sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr);
+
+            if (dev_res->type == WORD_IO) {
+                get_ut_by_paddr(dev_res->min_addr);
+            }
         }
     }
 
