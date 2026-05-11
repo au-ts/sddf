@@ -27,9 +27,9 @@ sddf_channel gpio_channel_encoder_b = 0;
 sddf_channel timer_channel = 0;
 
 void notified(sddf_channel ch) {
-    LOG_TELEM("NOTIFICATION FROM %d\n", ch);
+    // LOG_TELEM("NOTIFICATION FROM %d\n", ch);
     if (ch == timer_channel) {
-        LOG_TELEM("TEST TIMER\n");
+        // LOG_TELEM("TEST TIMER\n");
     }
 }
 

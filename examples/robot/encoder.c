@@ -20,29 +20,6 @@
 
 int encoder_count = 0;
 
-// void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
-//     int prev_a_state = GPIO_LOW; 
-//     int prev_b_state = GPIO_LOW;
-
-//     while (true) {
-//         if (prev_a_state == GPIO_LOW && digital_read(gpio_ch_a) == GPIO_HIGH) {
-//             prev_a_state = GPIO_HIGH;
-//             LOG_ENCODER("rising edge in A\n");
-//         } 
-//         else if (digital_read(gpio_ch_b) == GPIO_LOW) {
-//             prev_a_state = GPIO_LOW;
-//         }
-
-//         if (prev_b_state == GPIO_LOW && digital_read(gpio_ch_b) == GPIO_HIGH) {
-//             prev_b_state = GPIO_HIGH;
-//             LOG_ENCODER("rising edge in B\n");
-//         }
-//         else if (digital_read(gpio_ch_b) == GPIO_LOW) {
-//             prev_b_state = GPIO_LOW;
-//         }
-//     }
-// }
-
 // Quadrature encoder polling using state transitions
 // Detects rising edges on each pin and checks the other pin to determine direction
 void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel) {
@@ -50,16 +27,21 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel)
     int prev_b_state = GPIO_LOW;
 
     uint64_t prev_time = sddf_timer_time_now(timer_channel);
+    int prev_encoder_count = 0;
 
     while (true) {
         uint64_t curr_time = sddf_timer_time_now(timer_channel);
 
         if (curr_time - prev_time >= NS_IN_S) {
-            // calculate revolutions per second
+
+            // calculate number of encoder pulses per revolution
             double wheel_ppr = PPR * REDUCTION;
-            double rpm = (encoder_count / wheel_ppr)*60;
+
+            // calculate revolutions per minute
+            double rpm = ((encoder_count - prev_encoder_count) / wheel_ppr)*60;
             // TOOD: should this be reset here?
             prev_time = curr_time;
+            prev_encoder_count = encoder_count;
 
             LOG_ENCODER("Encoder: %f\n", rpm);
         }
