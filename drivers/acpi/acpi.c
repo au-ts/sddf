@@ -30,7 +30,7 @@ const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI E
 
 capDLBootInfo_t *capDLBootInfo;
 uintptr_t aml_object_pool_start;
-uintptr_t pci_resource;
+uintptr_t pci_resources_vaddr;
 
 seL4_CPtr vspace_cptr_pci_driver;
 seL4_CPtr cnode_cptr_remaining_untypeds;
@@ -39,11 +39,12 @@ seL4_CPtr cnode_cptr_acpi_driver;
 uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
 seL4_CPtr cnode_pci_resources_free_slot = 1;
+#define IDX_TO_CPTR(idx) (seL4_CPtr)(cnode_cptr_remaining_untypeds + idx)
 
 scanner_t scanner;
 aml_object_pool_t object_pool;
 aml_object_t object_root;
-pci_resources_t pci_resources;
+pci_resources_t *pci_resources;
 aml_object_t *lookup_results[50];
 uint32_t lookup_cnt;
 
@@ -60,13 +61,12 @@ uintptr_t acpi_dsdt_addr = 0x0;
 #define MAX_NUM_RSDT_ENTRIES 2048
 uint32_t acpi_rsdt_entries[MAX_NUM_RSDT_ENTRIES];
 
-
 cap_desc_t cap_list[256];
 uint32_t cap_list_start;
 uint32_t cap_list_end;
 uint32_t kernel_objects_ut_idx;
 
-// TODO: check if this makes sense to go libsel4
+// TODO: check if this makes sense to go to libsel4
 uint8_t get_object_size(seL4_Word object_type, seL4_Word size_bits)
 {
     switch (object_type) {
@@ -98,7 +98,7 @@ uint8_t get_object_size(seL4_Word object_type, seL4_Word size_bits)
 seL4_Error untyped_retype(uint32_t ut_idx,
                           seL4_Word object_type,
                           seL4_Word size_bits,
-                          seL4_CPtr *retyped_cptr)
+                          uint32_t *retyped_cptr_idx)
 {
     seL4_Error error = seL4_Untyped_Retype(cnode_cptr_remaining_untypeds + ut_idx,
                                 object_type,
@@ -110,11 +110,12 @@ seL4_Error untyped_retype(uint32_t ut_idx,
         return error;
     }
 
-    sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cap_list[ut_idx].base_addr);
+    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cap_list[ut_idx].base_addr); */
 
     cap_list[cap_list_end].base_addr = cap_list[ut_idx].base_addr;
     cap_list[cap_list_end].end_addr = cap_list[ut_idx].base_addr + (1ULL << get_object_size(object_type, size_bits));
     cap_list[cap_list_end].object_type = object_type;
+    cap_list[cap_list_end].object_type = cap_list[ut_idx].is_device;
     cap_list[cap_list_end].parent = ut_idx;
     cap_list[cap_list_end].child = 0;
     cap_list[cap_list_end].next = 0;
@@ -131,8 +132,8 @@ seL4_Error untyped_retype(uint32_t ut_idx,
         cap_list[child_ut_idx].next = cap_list_end;
     }
 
-    if (retyped_cptr != NULL) {
-        *retyped_cptr = cnode_cptr_remaining_untypeds + cap_list_end;
+    if (retyped_cptr_idx != NULL) {
+        *retyped_cptr_idx = cap_list_end;
     }
     cap_list_end++;
 
@@ -148,10 +149,8 @@ seL4_Word max_size_bits(seL4_Word size)
     return i;
 }
 
-seL4_Error retype_at_paddr(seL4_Word target_paddr,
-                           seL4_Word object_type,
-                           seL4_Word size_bits,
-                           seL4_CPtr *retyped_cptr)
+seL4_Error get_untyped_at_paddr(seL4_Word target_paddr,
+                                uint32_t *target_ut_idx)
 {
     uint32_t ut_idx = cap_list_end;
     for (uint32_t i = cap_list_start; i < cap_list_end; i++) {
@@ -164,21 +163,8 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
         sddf_dprintf("Error: Untyped containing physical address 0x%lx is not found\n", target_paddr);
         return seL4_InvalidArgument;
     }
-    sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr);
-    sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cap_list[ut_idx].base_addr, cap_list[ut_idx].end_addr);
-
-    seL4_Word avai_mem_size = cap_list[ut_idx].end_addr - target_paddr;
-    seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
-
-    if (object_type != seL4_UntypedObject && avai_mem_size_bits < size_bits) {
-        sddf_dprintf("Error: Untyped(%d)[0x%lx-0x%lx] has insufficient memory for (paddr: 0x%lx, size_bits: %lu)\n",
-                     ut_idx,
-                     cap_list[ut_idx].base_addr,
-                     cap_list[ut_idx].end_addr,
-                     target_paddr,
-                     size_bits);
-        return 0;
-    }
+    /* sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr); */
+    /* sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cap_list[ut_idx].base_addr, cap_list[ut_idx].end_addr); */
 
     seL4_Error error;
 
@@ -198,9 +184,37 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
         }
     }
 
+    *target_ut_idx = ut_idx;
+    return seL4_NoError;
+}
+
+seL4_Error retype_at_paddr(seL4_Word target_paddr,
+                           seL4_Word object_type,
+                           seL4_Word size_bits,
+                           uint32_t *retyped_cptr_idx)
+{
+    uint32_t target_ut_idx;
+    seL4_Error error = get_untyped_at_paddr(target_paddr, &target_ut_idx);
+    if (error != seL4_NoError) {
+        return error;
+    }
+
+    seL4_Word avai_mem_size = cap_list[target_ut_idx].end_addr - target_paddr;
+    seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
+
+    if (object_type != seL4_UntypedObject && avai_mem_size_bits < size_bits) {
+        sddf_dprintf("Error: Untyped(%d)[0x%lx-0x%lx] has insufficient memory for (paddr: 0x%lx, size_bits: %lu)\n",
+                     target_ut_idx,
+                     cap_list[target_ut_idx].base_addr,
+                     cap_list[target_ut_idx].end_addr,
+                     target_paddr,
+                     size_bits);
+        return 0;
+    }
+
     // Retype the target object
-    sddf_dprintf("Retype object type: %lu\n", object_type);
-    return untyped_retype(ut_idx, object_type, size_bits, retyped_cptr);
+    /* sddf_dprintf("Retype object type: %lu\n", object_type); */
+    return untyped_retype(target_ut_idx, object_type, size_bits, retyped_cptr_idx);
 }
 
 void clear_cap_list_entry(uint32_t ut_idx)
@@ -281,34 +295,48 @@ seL4_Error untypeds_revoke()
     return seL4_NoError;
 }
 
-/* seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr) */
-/* { */
-/*     seL4_CPtr crs_ut_idx = 0; */
-/*     seL4_Word new_ut_size = MIN(max_addr - min_addr, 1ULL << capDLBootInfo->untypedList[crs_ut_idx].sizeBits); */
-/*     seL4_Word new_ut_size_bits = max_size_bits(new_ut_size); */
+seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
+{
+    uint32_t target_ut_idx;
+    seL4_Error error = get_untyped_at_paddr(min_addr, &target_ut_idx);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to found the untyped containing physical address: 0x%lx\n", min_addr);
+        return error;
+    }
 
-/*     seL4_Error error = retype_at_paddr(cnode_cptr_remaining_untypeds + crs_ut_idx, */
-/*                      capDLBootInfo->untypedList[crs_ut_idx].paddr, */
-/*                      cnode_cptr_remaining_untypeds, */
-/*                      min_addr, seL4_UntypedObject, new_ut_size_bits, &free_slot); */
-/*     if (error) { */
-/*         return error; */
-/*     } */
+    seL4_Word avai_mem_size = cap_list[target_ut_idx].end_addr - min_addr;
+    seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
+    seL4_Word max_target_size_bits = max_size_bits(max_addr - min_addr);
+    seL4_Word new_ut_size_bits = MIN(avai_mem_size_bits, max_target_size_bits);
+    seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
 
-/*     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds' */
-/*     error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, free_slot, 58, seL4_ReadWrite); */
-/*     if (error) { */
-/*         return error; */
-/*     } */
+    uint32_t retyped_cptr_idx;
+    sddf_dprintf("min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr);
+    error = untyped_retype(target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",
+                     min_addr,
+                     max_addr,
+                     retyped_cptr_idx,
+                     cap_list[retyped_cptr_idx].base_addr,
+                     cap_list[retyped_cptr_idx].end_addr);
+        return error;
+    }
 
-/*     free_slot++; */
-/*     cnode_pci_resources_free_slot++; */
+    // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
+    error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, retyped_cptr_idx, 58, seL4_ReadWrite);
+    if (error) {
+        sddf_dprintf("Error: failed to copy a capability\n");
+        return error;
+    }
 
-/*     if (min_addr + new_ut_size < max_addr) { */
-/*         pass_ut_with_range(min_addr + new_ut_size, max_addr); */
-/*     } */
-/*     return seL4_NoError; */
-/* } */
+    cnode_pci_resources_free_slot++;
+
+    if (min_addr + new_ut_size < max_addr) {
+        pass_ut_with_range(min_addr + new_ut_size, max_addr);
+    }
+    return seL4_NoError;
+}
 
 seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL4_CapRights_t rights)
 {
@@ -316,31 +344,31 @@ seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL
 
     for (int i = 0; i < 4 && err == seL4_FailedLookup; i++) {
         seL4_Word failed = seL4_MappingFailedLookupLevel();
-        seL4_CPtr retyped_cptr;
+        uint32_t retyped_cptr_idx;
 
         switch (failed) {
             case SEL4_MAPPING_LOOKUP_NO_PT: {
-                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageTableObject, 0, &retyped_cptr);
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageTableObject, 0, &retyped_cptr_idx);
                 if (err != seL4_NoError) {
                     return err;
                 }
-                err = seL4_X86_PageTable_Map(retyped_cptr, vspace, vaddr, seL4_X86_Default_VMAttributes);
+                err = seL4_X86_PageTable_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
                 break;
             }
             case SEL4_MAPPING_LOOKUP_NO_PD: {
-                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageDirectoryObject, 0, &retyped_cptr);
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageDirectoryObject, 0, &retyped_cptr_idx);
                 if (err != seL4_NoError) {
                     return err;
                 }
-                err = seL4_X86_PageDirectory_Map(retyped_cptr, vspace, vaddr, seL4_X86_Default_VMAttributes);
+                err = seL4_X86_PageDirectory_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
                 break;
             }
             case SEL4_MAPPING_LOOKUP_NO_PDPT: {
-                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PDPTObject, 0, &retyped_cptr);
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PDPTObject, 0, &retyped_cptr_idx);
                 if (err != seL4_NoError) {
                     return err;
                 }
-                err = seL4_X86_PDPT_Map(retyped_cptr, vspace, vaddr, seL4_X86_Default_VMAttributes);
+                err = seL4_X86_PDPT_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
                 break;
             }
         }
@@ -353,94 +381,92 @@ seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL
     return err;
 }
 
-/* void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx) */
-/* { */
-/*     sddf_dprintf("=====pass CRS untypeds=====\n"); */
-/*     while (crs_list) { */
-/*         uint8_t new_res_idx = pci_resources.bridges[bridge_idx].num_dev_resources; */
-/*         device_resource_t *dev_res = (device_resource_t *)&pci_resources.bridges[bridge_idx].dev_resources[new_res_idx]; */
-/*         switch (crs_list->resource_type) { */
-/*             case WORD_AS_DESCRIPTOR: { */
-/*                 acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr; */
-/*                 dev_res->min_addr = word_as->min_address; */
-/*                 dev_res->max_addr = word_as->max_address; */
+void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
+{
+    sddf_dprintf("=====pass CRS untypeds=====\n");
+    while (crs_list) {
+        uint8_t new_res_idx = pci_resources->bridges[bridge_idx].num_dev_resources;
+        device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[bridge_idx].dev_resources[new_res_idx];
+        switch (crs_list->resource_type) {
+            case WORD_AS_DESCRIPTOR: {
+                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = word_as->min_address;
+                dev_res->max_addr = word_as->min_address + word_as->address_length;
 
-/*                 switch (word_as->resource_type) { */
-/*                     case 0: { */
-/*                         dev_res->type = WORD_MEMORY; */
-/*                         pass_ut_with_range(dev_res->min_addr, dev_res->max_addr); */
-/*                         break; */
-/*                     } */
-/*                     case 1: { */
-/*                         dev_res->type = WORD_IO; */
-/*                         break; */
-/*                     } */
-/*                     case 2: { */
-/*                         dev_res->type = WORD_BUS; */
-/*                         break; */
-/*                     } */
-/*                 } */
-/*                 dev_res->min_addr = word_as->min_address; */
-/*                 dev_res->max_addr = word_as->max_address; */
-/*                 break; */
-/*             } */
-/*             case DWORD_AS_DESCRIPTOR: { */
-/*                 acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr; */
-/*                 dev_res->min_addr = dword_as->min_address; */
-/*                 dev_res->max_addr = dword_as->max_address; */
+                switch (word_as->resource_type) {
+                    case 0: {
+                        dev_res->type = WORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = WORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = WORD_BUS;
+                        break;
+                    }
+                }
+                break;
+            }
+            case DWORD_AS_DESCRIPTOR: {
+                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = dword_as->min_address;
+                dev_res->max_addr = dword_as->min_address + dword_as->address_length;
 
-/*                 switch (dword_as->resource_type) { */
-/*                     case 0: { */
-/*                         dev_res->type = DWORD_MEMORY; */
-/*                         pass_ut_with_range(dev_res->min_addr, dev_res->max_addr); */
-/*                         break; */
-/*                     } */
-/*                     case 1: { */
-/*                         dev_res->type = DWORD_IO; */
-/*                         break; */
-/*                     } */
-/*                     case 2: { */
-/*                         dev_res->type = DWORD_BUS; */
-/*                         break; */
-/*                     } */
-/*                 } */
+                switch (dword_as->resource_type) {
+                    case 0: {
+                        dev_res->type = DWORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = DWORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = DWORD_BUS;
+                        break;
+                    }
+                }
 
-/*                 break; */
-/*             } */
-/*             case QWORD_AS_DESCRIPTOR: { */
-/*                 acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr; */
-/*                 dev_res->min_addr = qword_as->min_address; */
-/*                 dev_res->max_addr = qword_as->max_address; */
+                break;
+            }
+            case QWORD_AS_DESCRIPTOR: {
+                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr;
+                dev_res->min_addr = qword_as->min_address;
+                dev_res->max_addr = qword_as->min_address + qword_as->address_length;
 
-/*                 switch (qword_as->resource_type) { */
-/*                     case 0: { */
-/*                         dev_res->type = QWORD_MEMORY; */
-/*                         pass_ut_with_range(dev_res->min_addr, dev_res->max_addr); */
-/*                         break; */
-/*                     } */
-/*                     case 1: { */
-/*                         dev_res->type = QWORD_IO; */
-/*                         break; */
-/*                     } */
-/*                     case 2: { */
-/*                         dev_res->type = QWORD_BUS; */
-/*                         break; */
-/*                     } */
-/*                 } */
-/*                 break; */
-/*             } */
-/*             default: { */
-/*                 sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type); */
-/*             } */
-/*         } */
+                switch (qword_as->resource_type) {
+                    case 0: {
+                        dev_res->type = QWORD_MEMORY;
+                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
+                        break;
+                    }
+                    case 1: {
+                        dev_res->type = QWORD_IO;
+                        break;
+                    }
+                    case 2: {
+                        dev_res->type = QWORD_BUS;
+                        break;
+                    }
+                }
+                break;
+            }
+            default: {
+                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type);
+            }
+        }
 
-/*         crs_list = crs_list->next; */
-/*     } */
-/* } */
+        crs_list = crs_list->next;
+    }
+}
 
 seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
 {
-    seL4_CPtr retyped_cptr;
+    uint32_t retyped_cptr_idx;
     // TODO: round_down for large pages and check if it's a page type
     if (page_type == seL4_X86_4K) {
         paddr = ROUND_DOWN(paddr, 1UL << seL4_PageBits);
@@ -449,13 +475,13 @@ seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspa
         paddr = ROUND_DOWN(paddr, 1UL << seL4_LargePageBits);
         vaddr = ROUND_DOWN(vaddr, 1UL << seL4_LargePageBits);
     }
-    seL4_Error error = retype_at_paddr(paddr, page_type, 0, &retyped_cptr);
+    seL4_Error error = retype_at_paddr(paddr, page_type, 0, &retyped_cptr_idx);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", paddr);
         return error;
     }
 
-    error = map_frame(retyped_cptr, vspace, vaddr, rights);
+    error = map_frame(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, rights);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", vaddr, error);
         return error;
@@ -467,6 +493,7 @@ seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspa
 void init(void)
 {
     seL4_Error error;
+    pci_resources = (pci_resources_t *)pci_resources_vaddr;
 
     // TODO: probably should use Bill's patch for prefilling memory regions
     // TODO: extract RSDT according to revision
@@ -519,6 +546,7 @@ void init(void)
                          acpi_rsdt->header.signature[1],
                          acpi_rsdt->header.signature[2],
                          acpi_rsdt->header.signature[3]);
+            // TODO: edge case: length is in next page?
             rsdt_len = acpi_rsdt->header.length;
         }
     }
@@ -563,8 +591,8 @@ void init(void)
             acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)header;
             uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
             for (int j = 0; j < num_pci_seg_grps; j++) {
-                memcpy(&pci_resources.pci_seg_groups[pci_resources.num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
-                pci_resources.num_pci_groups++;
+                memcpy(&pci_resources->pci_seg_groups[pci_resources->num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
+                pci_resources->num_pci_groups++;
             }
         }
 
@@ -610,7 +638,7 @@ void init(void)
     object_root.op_code = NULL_OP;
     object_root.name[0] = '\\';
     scan_objects(&object_root, dsdt_end);
-    print_object_tree(&object_root, 0);
+    /* print_object_tree(&object_root, 0); */
 
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
@@ -629,8 +657,8 @@ void init(void)
                 return;
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
-            print_crs_list(crs_list);
-            /* pass_crs_and_caps(crs_list, i); */
+            /* print_crs_list(crs_list); */
+            pass_crs_and_caps(crs_list, i);
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {
@@ -663,64 +691,29 @@ void init(void)
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
     sddf_dprintf("init cnode: 0x%x\n", seL4_CapInitThreadCNode);
-    for (int i = 0; i < pci_resources.num_pci_groups; i++) {
+    uintptr_t ecam_base_vaddr = 0x50000000;
+    for (int i = 0; i < pci_resources->num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
-                     pci_resources.pci_seg_groups[i].group_id,
-                     pci_resources.pci_seg_groups[i].base_addr,
-                     pci_resources.pci_seg_groups[i].bus_start,
-                     pci_resources.pci_seg_groups[i].bus_end);
-        uint32_t ecam_size = (1 + pci_resources.pci_seg_groups[i].bus_end - pci_resources.pci_seg_groups[i].bus_start) * (1 << 20);
-        uintptr_t end_paddr = pci_resources.pci_seg_groups[i].base_addr + ecam_size;
-        uintptr_t cur_paddr = pci_resources.pci_seg_groups[i].base_addr;
-        uintptr_t cur_vaddr = 0x5000000;
+                     pci_resources->pci_seg_groups[i].group_id,
+                     pci_resources->pci_seg_groups[i].base_addr,
+                     pci_resources->pci_seg_groups[i].bus_start,
+                     pci_resources->pci_seg_groups[i].bus_end);
+        uint32_t ecam_size = (1 + pci_resources->pci_seg_groups[i].bus_end - pci_resources->pci_seg_groups[i].bus_start) * (1 << 20);
+        uintptr_t end_paddr = pci_resources->pci_seg_groups[i].base_addr + ecam_size;
+        uintptr_t cur_paddr = pci_resources->pci_seg_groups[i].base_addr;
+        uintptr_t cur_vaddr = ecam_base_vaddr;
         while (cur_paddr < end_paddr) {
             error = retype_and_map_frame(cur_paddr, cur_vaddr, vspace_cptr_pci_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
             if (error != seL4_NoError) {
                 sddf_dprintf("Error: failed to retype or map a frame.\n");
                 return;
             }
-
-            /* uint32_t ut_idx = find_untyped_id_by_paddr(cur_paddr); */
-            /* uintptr_t ut_end_paddr = capDLBootInfo->untypedList[ut_idx].paddr + (1 << capDLBootInfo->untypedList[ut_idx].sizeBits); */
-            /* sddf_dprintf("Found ut paddr: 0x%lx-0x%lx, cur_paddr: 0x%lx\n", capDLBootInfo->untypedList[ut_idx].paddr, ut_end_paddr, cur_paddr); */
-            /* retype_at_paddr(cnode_cptr_remaining_untypeds + ut_idx, */
-            /*                  capDLBootInfo->untypedList[ut_idx].paddr, */
-            /*                  cnode_cptr_remaining_untypeds, */
-            /*                  cur_paddr, */
-            /*                  seL4_X86_LargePageObject, */
-            /*                  0, */
-            /*                  &free_slot); */
-
-            /* free_slot++; */
-            /* error = map_frame(cnode_cptr_remaining_untypeds + ut_pt_idx, cnode_cptr_remaining_untypeds + free_slot - 1, vspace_cptr_pci_driver, cur_vaddr, seL4_CanRead, cnode_cptr_remaining_untypeds, &free_slot); */
-            /* if (error) { */
-            /*     sddf_dprintf("map_frame error - %d\n", error); */
-            /*     return; */
-            /* } */
-            /* sddf_dprintf("largePage: 0x%x\n", 1 << seL4_LargePageBits); */
-
-            /* free_slot++; */
             cur_paddr += (1 << seL4_LargePageBits);
             cur_vaddr += (1 << seL4_LargePageBits);
-
-            /* while (cur_paddr < end_paddr && cur_paddr < ut_end_paddr) { */
-            /*     error = seL4_Untyped_Retype(cnode_cptr_remaining_untypeds + ut_idx, */
-            /*                                 seL4_X86_LargePageObject, */
-            /*                                 0, */
-            /*                                 cnode_cptr_remaining_untypeds, 0, 0, */
-            /*                                 free_slot, 1); */
-            /*     free_slot++; */
-
-            /*     map_frame(cnode_cptr_remaining_untypeds + ut_pt_idx, cnode_cptr_remaining_untypeds + free_slot - 1, vspace_cptr_pci_driver, cur_vaddr, seL4_CanRead, cnode_cptr_remaining_untypeds, &free_slot); */
-            /*     if (error) { */
-            /*         sddf_dprintf("map_frame error - %d\n", error); */
-            /*         return; */
-            /*     } */
-
-            /*     cur_paddr += (1 << seL4_LargePageBits); */
-            /*     cur_vaddr += (1 << seL4_LargePageBits); */
-            /* } */
         }
+
+        pci_resources->pci_seg_groups[i].base_addr = ecam_base_vaddr;
+        ecam_base_vaddr = cur_vaddr;
     }
     sddf_dprintf("Finished ECAM mapping!\n");
 

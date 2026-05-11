@@ -151,8 +151,8 @@ typedef struct {
 } device_resource_t;
 
 typedef struct {
-    char path_name[AML_MAX_PATH_STR];
-    uint32_t path_len;
+    /* char path_name[AML_MAX_PATH_STR]; */
+    /* uint32_t path_len; */
     uint32_t bus_start;
     uint32_t bus_end;
     device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
@@ -281,7 +281,7 @@ extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
 extern aml_object_pool_t object_pool;
 extern aml_object_t object_root;
-extern pci_resources_t pci_resources;
+extern pci_resources_t *pci_resources;
 extern aml_object_t *lookup_results[50];
 extern uint32_t lookup_cnt;
 

@@ -229,3 +229,50 @@ typedef struct pci_ecam_config {
     uint8_t num_requests;
     config_request_t requests[ECAM_MAX_REQUESTS];
 } pci_ecam_config_t;
+
+// ===================sort out this=============
+#define MAX_NUM_PCI_SEG_GROUP 16
+#define MAX_NUM_AS_RESOURCES 10
+
+typedef struct pci_seg_group {
+    uint64_t base_addr;
+    uint16_t group_id;
+    uint8_t bus_start;
+    uint8_t bus_end;
+    uint8_t reserved[4];
+} __attribute__((packed)) pci_seg_group_t;
+
+enum device_resource_type {
+    IO_PORT = 0,
+    DWORD_MEMORY,
+    DWORD_IO,
+    DWORD_BUS,
+    WORD_MEMORY,
+    WORD_IO,
+    WORD_BUS,
+    QWORD_MEMORY,
+    QWORD_IO,
+    QWORD_BUS,
+};
+
+typedef struct {
+    enum device_resource_type type;
+    uintptr_t min_addr;
+    uintptr_t max_addr;
+} device_resource_t;
+
+typedef struct {
+    /* char path_name[AML_MAX_PATH_STR]; */
+    /* uint32_t path_len; */
+    uint32_t bus_start;
+    uint32_t bus_end;
+    device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
+    uint8_t num_dev_resources;
+} pci_bridge_t;
+
+typedef struct {
+    pci_seg_group_t pci_seg_groups[MAX_NUM_PCI_SEG_GROUP];
+    uint32_t num_pci_groups;
+    pci_bridge_t bridges[10];
+    uint32_t num_bridges;
+} pci_resources_t;
