@@ -23,18 +23,20 @@ void init(void)
 }
 
 // TODO: pass bus start and end as arguments
-void pci_bus_scan(uintptr_t bus_base)
+void pci_bus_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 {
-    for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
-        for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
-            struct pci_config_space *pci_header = (struct pci_config_space *)(bus_base + (pci_dev << 15) + (pci_func << 12));
-            if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) {
-                sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vedor_id: 0x%x, device_id: 0x%x\n",
-                             (((uintptr_t)pci_header >> 20) & 0xff),
-                             (((uintptr_t)pci_header >> 15) & 0x1f),
-                             (((uintptr_t)pci_header >> 12) & 0x7),
-                             pci_header->vendor_id,
-                             pci_header->device_id);
+    for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
+        for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
+            for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
+                struct pci_config_space *pci_header = (struct pci_config_space *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
+                if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) {
+                    sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vedor_id: 0x%x, device_id: 0x%x\n",
+                                 (((uintptr_t)pci_header >> 20) & 0xff),
+                                 (((uintptr_t)pci_header >> 15) & 0x1f),
+                                 (((uintptr_t)pci_header >> 12) & 0x7),
+                                 pci_header->vendor_id,
+                                 pci_header->device_id);
+                }
             }
         }
     }
@@ -68,7 +70,10 @@ void notified(microkit_channel ch)
                      pci_resources->pci_seg_groups[i].base_addr,
                      pci_resources->pci_seg_groups[i].bus_start,
                      pci_resources->pci_seg_groups[i].bus_end);
-        pci_bus_scan(pci_resources->pci_seg_groups[i].base_addr);
+        pci_seg_group_t *pci_seg_group = &pci_resources->pci_seg_groups[i];
+        pci_bus_scan(pci_seg_group->base_addr,
+                     pci_seg_group->bus_start,
+                     pci_seg_group->bus_end);
     }
 
     print_cnode_caps();
