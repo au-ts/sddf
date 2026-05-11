@@ -36,8 +36,10 @@ state_t state;
 /* Boolean to indicate whether a packet has been enqueued into the driver's free queue during notification handling */
 static bool notify_drv;
 
-/* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
-  is a broadcast address, return -1 if we have not found the match. */
+/**
+ * Return the client ID if the MAC address is a match to a client, return the
+ * broadcast ID if the MAC address is a broadcast address, return -1 otherwise.
+ */
 int get_mac_addr_match(ether_hdr_t *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
