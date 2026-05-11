@@ -16,5 +16,5 @@
 extern int encoder_count;
 
 /* Client-side Ultrasonic Functions */
-void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b);
+void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel);
 void encoder_init(int gpio_ch_a, int gpio_ch_b);

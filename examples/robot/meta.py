@@ -60,6 +60,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
+    serial_virt_rx = ProtectionDomain(
+        "serial_virt_rx", "serial_virt_rx.elf", priority=199
+    )
+
+
     clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=150, passive=True)
     # Ensure the priority is exclusively the highest as the pinctrl driver must run first!
     # This is enforced by sdfgen at the render() step.
@@ -75,8 +80,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=253, passive=True)
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=253, passive=True)
 
-    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=2, budget=2000, period=8000)
-    client = ProtectionDomain("client", "client.elf", priority=1, budget=1500000, period=2000000)
+    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
+    client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
 
     # client = ProtectionDomain("client", "client.elf", priority=2)
 
@@ -148,7 +153,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert chan.pd_a_id == 1, chan.pd_a_id
     assert chan.pd_b_id == 0, chan.pd_b_id
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx)
+    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx)
     serial_system.add_client(client)
 
     pds = [
@@ -158,6 +163,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         gpio_driver,
         serial_driver,
         serial_virt_tx,
+        serial_virt_rx,
         pinctrl_driver,
         clk_driver,
         pwm_driver

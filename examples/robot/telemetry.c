@@ -30,15 +30,6 @@ void notified(sddf_channel ch) {
     LOG_TELEM("NOTIFICATION FROM %d\n", ch);
     if (ch == timer_channel) {
         LOG_TELEM("TEST TIMER\n");
-
-        // calculate revolutions per second
-        double wheel_ppr = PPR * REDUCTION;
-        double rps = encoder_count / wheel_ppr;
-        encoder_count = 0;
-        
-        LOG_TELEM("%f\n", rps);
-        sddf_timer_set_timeout(timer_channel, NS_IN_S);
-        // co_switch(t_main);
     }
 }
 
@@ -51,15 +42,7 @@ void init(void) {
     gpio_channel_encoder_b = gpio_config.driver_channel_ids[7];
 
     encoder_init(gpio_channel_encoder_a, gpio_channel_encoder_b);
-    sddf_timer_set_timeout(timer_channel, NS_IN_S);
-
-    while (true) {
-        for (volatile int i = 0; i < 1000000; i++) {}
-        LOG_TELEM("TESTING\n");
-    }
-
-    // detect_encoder_rising_edge(gpio_channel_encoder_a, gpio_channel_encoder_b);
-
+    detect_encoder_rising_edge(gpio_channel_encoder_a, gpio_channel_encoder_b, timer_channel);
 
     // LOG_TELEM("Init\n");
 

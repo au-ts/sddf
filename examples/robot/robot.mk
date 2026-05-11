@@ -48,7 +48,7 @@ SDFGEN_OUT = ${ROBOT_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/robot.system
 
 # Images to build
-IMAGES := pwm_driver.elf gpio_driver.elf timer_driver.elf client.elf telemetry.elf clk_driver.elf pinctrl_driver.elf  serial_virt_tx.elf serial_driver.elf 
+IMAGES := pwm_driver.elf gpio_driver.elf timer_driver.elf client.elf telemetry.elf clk_driver.elf pinctrl_driver.elf  serial_virt_tx.elf serial_driver.elf serial_virt_rx.elf 
 
 # Compiler flags
 CFLAGS += \
@@ -125,6 +125,7 @@ endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/pinctrl_driver_device_resources.data pinctrl_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=${SDFGEN_OUT}/serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=${SDFGEN_OUT}/serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_virt_rx_config=${SDFGEN_OUT}/serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .serial_client_config=${SDFGEN_OUT}/serial_client_client.data client.elf
 
 	$(OBJCOPY) --update-section .gpio_telemetry_config=${SDFGEN_OUT}/gpio_client_telemetry.data telemetry.elf

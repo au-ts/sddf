@@ -8,7 +8,7 @@
 
 #include "include/motor/encoder.h"
 
-#define DEBUG_LOG
+// #define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_ENCODER(...) do{ sddf_printf("ENCODER|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -45,11 +45,25 @@ int encoder_count = 0;
 
 // Quadrature encoder polling using state transitions
 // Detects rising edges on each pin and checks the other pin to determine direction
-void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b) {
+void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel) {
     int prev_a_state = GPIO_LOW; 
     int prev_b_state = GPIO_LOW;
 
+    uint64_t prev_time = sddf_timer_time_now(timer_channel);
+
     while (true) {
+        uint64_t curr_time = sddf_timer_time_now(timer_channel);
+
+        if (curr_time - prev_time >= NS_IN_S) {
+            // calculate revolutions per second
+            double wheel_ppr = PPR * REDUCTION;
+            double rpm = (encoder_count / wheel_ppr)*60;
+            // TOOD: should this be reset here?
+            prev_time = curr_time;
+
+            LOG_ENCODER("Encoder: %f\n", rpm);
+        }
+
         int curr_a_state = digital_read(gpio_ch_a);
         int curr_b_state = digital_read(gpio_ch_b);
 
