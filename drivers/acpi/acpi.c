@@ -68,6 +68,7 @@ cnode_caps_t *cnode_caps_pci_resources;
 uint32_t kernel_objects_ut_idx;
 
 // TODO: check if this makes sense to go to libsel4
+// https://github.com/seL4/seL4_libs/blob/master/libsel4vka/arch_include/x86/vka/arch/object.h#L62
 uint8_t get_object_size(seL4_Word object_type, seL4_Word size_bits)
 {
     switch (object_type) {
@@ -504,7 +505,6 @@ void init(void)
     seL4_Error error;
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
 
-    // TODO: probably should use Bill's patch for prefilling memory regions
     // TODO: extract RSDT according to revision
     bootinfo_rsdp_t *bi_rsdp = (bootinfo_rsdp_t *)bootinfo_rsdp;
     sddf_dprintf("revision: %d, rsdt_addr: 0x%x, xsdt_addr: 0x%lx\n", bi_rsdp->content.revision, bi_rsdp->content.rsdt_address, bi_rsdp->content.xsdt_address);
