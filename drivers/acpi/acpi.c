@@ -408,6 +408,8 @@ void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
                         break;
                     }
                 }
+
+                pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
             case DWORD_AS_DESCRIPTOR: {
@@ -431,6 +433,7 @@ void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
                     }
                 }
 
+                pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
             case QWORD_AS_DESCRIPTOR: {
@@ -453,6 +456,8 @@ void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
                         break;
                     }
                 }
+
+                pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
             default: {
@@ -658,7 +663,8 @@ void init(void)
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
             /* print_crs_list(crs_list); */
-            pass_crs_and_caps(crs_list, i);
+            pass_crs_and_caps(crs_list, pci_resources->num_bridges);
+            pci_resources->num_bridges++;
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {
@@ -685,8 +691,6 @@ void init(void)
         sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error);
         return;
     }
-
-    // TODO: pass PCI resource information here so pages mapped in ACPI driver can be revoked simplpy
 
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
@@ -718,9 +722,6 @@ void init(void)
     sddf_dprintf("Finished ECAM mapping!\n");
 
     sddf_deferred_notify(0);
-
-    // TODO: unmap all the pages/frames
-    // TODO: revoke all the untypeds used
 }
 
 void notified(microkit_channel ch)
