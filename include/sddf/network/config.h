@@ -132,7 +132,7 @@ typedef struct net_vswitch_config {
      * The region must be mapped R-W, zero-initialised and large enough to store
      * a count for each buffer:
      *
-     * (ports[0].tx.capacity + ... + ports[num_ports].tx.capacity) * sizeof(uin8_t) bytes
+     * (ports[0].tx.num_buffers + ... + ports[num_ports].tx.num_buffers) * sizeof(uin8_t) bytes
      */
     region_resource_t buffer_metadata;
 } net_vswitch_config_t;
