@@ -41,8 +41,9 @@ void rx_return(void)
                 err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
                 assert(!err);
 
-                assert(config.rx_data[virt_buffer.oid].vaddr != 0);
                 void *cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
+                /* Data region of buffer must be mapped into the copy component */
+                assert(config.rx_data[virt_buffer.oid].vaddr != 0);
                 void *virt_addr = config.rx_data[virt_buffer.oid].vaddr + virt_buffer.io_or_offset;
 
                 memcpy(cli_addr, virt_addr, virt_buffer.len);
