@@ -18,13 +18,27 @@ typedef struct net_buff_desc {
     uint64_t io_or_offset;
     /* length of data inside buffer */
     uint16_t len;
-    /* id of the PD which owns this buffer, and thus which memory region the buffer belongs to.
-     * Used for extracting virtual/physical addresses and for returning buffers to the correct PD.
-     * This field is required in cases where a queue holds buffers belonging to multiple memory regions,
-     * and the memory region source cannot be identified otherwise.
-     * This scenario arises in systems containing a vswitch - in particular in queues shared between the copiers and vswitch,
-     * as well as the vswitch and Tx virtualiser.
-     * The field is ignored by the Rx virtualiser and Ethernet drivers, and should be set to 0 by net clients */
+    /**
+     * Ownership identifier of the buffer, which is used to identify which
+     * memory region a buffer belongs to.
+     *
+     * For systems without a vswitch, the region a buffer belongs to can either
+     * be deduced from the queue it was dequeued from or its io address.
+     *
+     *  However, when a vswitch is introduced buffers belonging to more than one
+     *  region can now be enqueued in the same queue. For example, the Rx active
+     *  queue of the copy component only contains Rx DMA buffers in systems
+     *  without a vswitch, but when a vswitch is present the copier's queue may
+     *  also contain Tx buffers belonging to another client's data region.
+     *
+     * In these ambiguous cases, the oid field is used to resolve the source
+     * region of each buffer. oids are not globally unique for each memory
+     * region, they are just required to be consistent between neighbouring
+     * pairs of components like the vswitch and the copy components.
+     *
+     * oid is ignored by components which do not use it, like the Rx virtualiser
+     * and Ethernet drivers, and should always be set to 0 by net clients.
+     */
     uint8_t oid : 6;
 } net_buff_desc_t;
 
@@ -35,7 +49,7 @@ typedef struct net_queue {
     uint16_t head;
     /* flag to indicate whether consumer requires signalling */
     uint32_t consumer_signalled;
-    /* buffer descripter array */
+    /* buffer descriptor array */
     net_buff_desc_t buffers[];
 } net_queue_t;
 
@@ -216,10 +230,18 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 }
 
 /**
- * Initialise the free queue by filling with all free buffers.
+ * Fill an unpopulated free queue with all the buffers belonging to the data
+ * region starting at base_addr.
+ *
+ * The free queues populated by this function are queues associated with only a
+ * single data region. For example, a client's Tx free queue which only contains
+ * Tx buffers from the client's Tx data region, or the driver's Rx free queue
+ * which only contains Rx DMA buffers. Thus, the ownership identifier descriptor
+ * field is not required, so it is set to 0.
  *
  * @param queue queue handle to use.
- * @param base_addr start of the memory region the offsets are applied to (only used between virt and driver)
+ * @param base_addr start of the memory region the offsets are applied to (only
+ * used between virt and driver)
  */
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
