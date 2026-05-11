@@ -51,6 +51,15 @@ void notified(microkit_channel ch)
         pci_bus_scan(pci_resources->pci_seg_groups[i].base_addr);
     }
 
+    for (int i = 0; i < pci_resources->num_bridges; i++) {
+        uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
+        sddf_dprintf("num_res: %u\n", num_res);
+        for (int j = 0; j < num_res; j++) {
+            device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
+            sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr);
+        }
+    }
+
     /* seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 1, */
     /*                                        seL4_X86_LargePageObject, */
     /*                                        0, */
