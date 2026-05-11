@@ -10,14 +10,17 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 
-uintptr_t pci_resource;
+uintptr_t pci_resources_vaddr;
 seL4_CPtr cnode_cptr_pci_resources;
+pci_resources_t *pci_resources;
 
 void init(void)
 {
     sddf_dprintf("PCI driver\n");
+    pci_resources = (pci_resources_t *)pci_resources_vaddr;
 }
 
+// TODO: pass bus start and end as arguments
 void pci_bus_scan(uintptr_t bus_base)
 {
     for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
@@ -38,12 +41,20 @@ void pci_bus_scan(uintptr_t bus_base)
 void notified(microkit_channel ch)
 {
     sddf_dprintf("[PCI driver] notified by ch %d\n", ch);
-    pci_bus_scan(0x5000000);
 
-    seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 1,
-                                           seL4_X86_LargePageObject,
-                                           0,
-                                           cnode_cptr_pci_resources, 0, 0,
-                                           2, 1);
-    sddf_dprintf("error: %d\n", error);
+    for (int i = 0; i < pci_resources->num_pci_groups; i++) {
+        sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
+                     pci_resources->pci_seg_groups[i].group_id,
+                     pci_resources->pci_seg_groups[i].base_addr,
+                     pci_resources->pci_seg_groups[i].bus_start,
+                     pci_resources->pci_seg_groups[i].bus_end);
+        pci_bus_scan(pci_resources->pci_seg_groups[i].base_addr);
+    }
+
+    /* seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 1, */
+    /*                                        seL4_X86_LargePageObject, */
+    /*                                        0, */
+    /*                                        cnode_cptr_pci_resources, 0, 0, */
+    /*                                        2, 1); */
+    /* sddf_dprintf("error: %d\n", error); */
 }
