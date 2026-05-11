@@ -143,7 +143,7 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
 {
     /* Don't forward more than the destination queue's capacity before some
     buffers are returned */
-    if (num_forwarded_bufs[dst_id] >= config.ports[dst_id].rx.capacity) {
+    if (num_forwarded_bufs[dst_id] >= config.ports[dst_id].rx.num_buffers) {
         return false;
     }
 
@@ -315,7 +315,7 @@ static void forward_traffic_from(uint8_t port_id)
             assert(!err);
 
             if (buffer.io_or_offset % NET_BUFFER_SIZE
-                || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.capacity) {
+                || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.num_buffers) {
                 sddf_dprintf(
                     "VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
                     buffer.io_or_offset);
@@ -386,16 +386,16 @@ void init(void)
     /* If no RX DMA buffers are present for the last port it means there is no
     virtualiser connected */
     state.max_ports = config.num_ports;
-    if (config.ports[config.num_ports].tx.capacity) {
+    if (config.ports[config.num_ports].tx.num_buffers) {
         state.max_ports++;
     }
 
     /* Set up queues and buffers references */
     for (uint8_t i = 0; i < state.max_ports; i++) {
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
-                       config.ports[i].rx.capacity);
+                       config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
-                       config.ports[i].tx.capacity);
+                       config.ports[i].tx.num_buffers);
 
         /* Set the allow_list based on predefined settings */
         state.allow_list[i] = config.ports[i].acl;
@@ -403,7 +403,7 @@ void init(void)
         /* Pre-calculate the start of the buffer reference count for each client
         for faster reference count calculations */
         if (i > 0) {
-            buffer_refs_start[i] = buffer_refs_start[i - 1] + config.ports[i - 1].tx.capacity;
+            buffer_refs_start[i] = buffer_refs_start[i - 1] + config.ports[i - 1].tx.num_buffers;
         }
     }
 }
