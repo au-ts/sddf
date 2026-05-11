@@ -58,12 +58,16 @@ typedef struct net_virt_rx_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     device_region_resource_t data;
-    // The Rx virtualiser uses a reference count system to keep track of buffer ownership.
-    // This is particularly important when a buffer is broadcast to multiple clients,
-    // as the buffer can only be safely returned to the driver for re-use once it has been freed by all clients.
-    // These reference counts are stored in the buffer_metadata region,
-    // thus the region must be large enough to store a count for each Rx DMA buffer in the system
-    // (i.e. >= sizeof(uint8_t) * drv_queue_capacity bytes). It must also be mapped R-W and zero-initialised.
+    /**
+     * The Rx virtualiser uses the buffer_metadata region for storing reference
+     * counts of Rx DMA buffers as they are passed to clients. This is
+     * particularly important in the case of broadcast, as buffers can only be
+     * safely returned to the driver for re-use once they have been freed by all
+     * clients.
+     *
+     * The region must be mapped R-W, zero-initialised and large enough to store
+     * a count for each buffer ( >= sizeof(uint8_t) * drv_queue_capacity bytes).
+     */
     region_resource_t buffer_metadata;
     net_virt_rx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
@@ -92,8 +96,10 @@ typedef struct net_client_config {
 typedef struct net_vswitch_port_config {
     net_connection_resource_t rx;
     net_connection_resource_t tx;
-    device_region_resource_t tx_data;
-    /* unused for the virts */
+    region_resource_t tx_data;
+    /**
+     * The mac address field is ignored in the case of the virtualiser port.
+     */
     mac_addr_t mac_addr;
     uint64_t acl;
 } net_vswitch_port_config_t;
@@ -101,16 +107,33 @@ typedef struct net_vswitch_port_config {
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
 
-    /* The first num_ports entries in this array are the vswitch's clients.
-     * The next port after the last client, index num_ports contains the vswitch's connection with the virtualisers.
-     * However, the rx field is the connection with Tx virtualiser, and the tx field is the connection with the Rx virtualiser.
-     * This allows the vswitch to treat the virtualiser the same way as it's other clients. */
+    /**
+     * Ports encode the vswitch's connection with both the virtualisers and its
+     * clients. The ports array is ordered as follows:
+     *
+     * ports[0 : num_ports] - client ports
+     * ports[num_ports].rx - Tx virtualiser connection
+     * ports[num_ports].tx - Rx virtualiser connection
+     *
+     * The rx connection is mapped to the tx virtualiser and vice versa, as it
+     * allows the vswitch to handle the virtualiser port the same way as a
+     * client port.
+     */
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
-    // Reference counting buffers; The system designer must allocate a buffer big enough to contain reference counters for buffers.
-    // The size of this region must be equal to at least num_ports * number_of_buffers_per_port * sizeof(uint8_t).
-    // It must be mapped R-W and zero-initialised.
+    /**
+     * The vswitch uses the buffer_metadata region for storing reference counts
+     * of each of its clients Tx buffers, as well as the Rx DMA buffers. Since a
+     * client may transmit a buffer to more than endpoint, the reference count
+     * ensures that the vswitch only returns a buffer once it has been freed by
+     * all its recipients.
+     *
+     * The region must be mapped R-W, zero-initialised and large enough to store
+     * a count for each buffer:
+     *
+     * (ports[0].tx.capacity + ... + ports[num_ports].tx.capacity) * sizeof(uin8_t) bytes
+     */
     region_resource_t buffer_metadata;
 } net_vswitch_config_t;
 
