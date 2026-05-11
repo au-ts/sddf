@@ -64,6 +64,7 @@ uint32_t acpi_rsdt_entries[MAX_NUM_RSDT_ENTRIES];
 cap_desc_t cap_list[256];
 uint32_t cap_list_start;
 uint32_t cap_list_end;
+cnode_caps_t *cnode_caps_pci_resources;
 uint32_t kernel_objects_ut_idx;
 
 // TODO: check if this makes sense to go to libsel4
@@ -330,6 +331,9 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
         return error;
     }
 
+    cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].base_addr = min_addr;
+    cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].end_addr = min_addr + new_ut_size;
+    cnode_caps_pci_resources->end++;
     cnode_pci_resources_free_slot++;
 
     if (min_addr + new_ut_size < max_addr) {
@@ -647,6 +651,9 @@ void init(void)
 
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
+    cnode_caps_pci_resources = (cnode_caps_t *)&pci_resources->cnode_caps;
+    cnode_caps_pci_resources->start = 1;
+    cnode_caps_pci_resources->end = 1;
     query_all_objects_by_name(&object_root, acpi_str_hid);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {

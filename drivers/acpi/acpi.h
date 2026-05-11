@@ -126,6 +126,22 @@ typedef struct {
     uint32_t len;
 } aml_path_seg_t;
 
+typedef struct {
+    uintptr_t base_addr;
+    uintptr_t end_addr;
+    uint8_t is_device;
+    uint8_t object_type;
+    uint32_t parent;
+    uint32_t child;
+    uint32_t next;
+} cap_desc_t;
+
+typedef struct {
+    cap_desc_t desc[256];
+    uint32_t start;
+    uint32_t end;
+} cnode_caps_t;
+
 // see Section 20.2.4 Package Length Encoding
 typedef uint32_t aml_pkg_len_t;
 
@@ -164,6 +180,7 @@ typedef struct {
     uint32_t num_pci_groups;
     pci_bridge_t bridges[10];
     uint32_t num_bridges;
+    cnode_caps_t cnode_caps;
 } pci_resources_t;
 
 typedef struct {
@@ -255,16 +272,6 @@ typedef struct object_lookup_list {
     aml_object_t *node;
     aml_object_t *next;
 } object_lookup_list_t;
-
-typedef struct {
-    uintptr_t base_addr;
-    uintptr_t end_addr;
-    uint8_t is_device;
-    uint8_t object_type;
-    uint32_t parent;
-    uint32_t child;
-    uint32_t next;
-} cap_desc_t;
 
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
