@@ -2,7 +2,7 @@
 #include "include/motor/encoder.h"
 #include "include/gpio_common/gpio_common.h"
 
-#define DEBUG_LOG
+// #define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_TELEM(...) do{ sddf_printf("TELEM|INFO: "); sddf_printf(__VA_ARGS__); }while(0)

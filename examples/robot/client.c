@@ -8,7 +8,7 @@
 
 #include "include/client/client.h"
 
-#define DEBUG_LOG
+// #define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)

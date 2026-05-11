@@ -43,7 +43,7 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel)
             prev_time = curr_time;
             prev_encoder_count = encoder_count;
 
-            LOG_ENCODER("Encoder: %f\n", rpm);
+            sddf_printf("RPM: %f\n", rpm);
         }
 
         int curr_a_state = digital_read(gpio_ch_a);
@@ -53,10 +53,10 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel)
         if (prev_a_state == GPIO_LOW && curr_a_state == GPIO_HIGH) {
             // check Pin B for direction
             if (curr_b_state == GPIO_LOW) {
-                encoder_count++;
+                encoder_count--;
                 LOG_ENCODER("A rising, B low\n");
             } else {
-                encoder_count--;
+                encoder_count++;
                 LOG_ENCODER("A rising, B high\n");
             }
         }
@@ -65,10 +65,10 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel)
         if (prev_b_state == GPIO_LOW && curr_b_state == GPIO_HIGH) {
             // check Pin A for direction
             if (curr_a_state == GPIO_LOW) {
-                encoder_count--;
+                encoder_count++;
                 LOG_ENCODER("B rising, A low\n");
             } else {
-                encoder_count++;
+                encoder_count--;
                 LOG_ENCODER("B rising, A high\n");
             }
         }
@@ -81,7 +81,7 @@ void detect_encoder_rising_edge(int gpio_ch_a, int gpio_ch_b, int timer_channel)
 
 void encoder_init(int gpio_ch_a, int gpio_ch_b)
 {
-    LOG_ENCODER("init\n");
+    // LOG_ENCODER("init\n");
     gpio_init(gpio_ch_a, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_NONE);
     gpio_init(gpio_ch_b, GPIO_DIRECTION_INPUT, SDDF_IRQ_TYPE_NONE);
 }

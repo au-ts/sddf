@@ -1,6 +1,6 @@
 #include "include/gpio_common/gpio_common.h"
 
-#define DEBUG_LOG
+// #define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_GPIO(...) do{ sddf_printf("GPIO COMMON|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -11,7 +11,6 @@
 #endif
 
 void gpio_init(int gpio_ch, int direction, int irq) {
-    sddf_printf("GPIO INIT called\n");    
     int ret = 0;
 
     if (direction == GPIO_DIRECTION_OUTPUT) {
