@@ -104,7 +104,7 @@ static void virtio_blk_print_req(struct virtio_blk_req *req)
                req->type, req->reserved, req->sector, req->status);
 }
 
-static void virtio_blk_print_config(volatile struct virtio_blk_config *config)
+static inline void __attribute__((unused)) virtio_blk_print_config(volatile struct virtio_blk_config *config)
 {
     LOG_DRIVER("capacity: 0x%lx (0x%lx bytes)\n", config->capacity, config->capacity * VIRTIO_BLK_SECTOR_SIZE);
     LOG_DRIVER("size_max: 0x%x\n", config->size_max);
@@ -130,7 +130,7 @@ static void virtio_blk_print_config(volatile struct virtio_blk_config *config)
     LOG_DRIVER("secure_erase_sector_alignment: 0x%x\n", config->secure_erase_sector_alignment);
 }
 
-static void virtio_blk_print_features(uint64_t features)
+static inline __attribute((unused)) void virtio_blk_print_features(uint64_t features)
 {
     if (features & ((uint64_t)1 << VIRTIO_BLK_F_SIZE_MAX)) {
         LOG_DRIVER("    VIRTIO_BLK_F_SIZE_MAX\n");
