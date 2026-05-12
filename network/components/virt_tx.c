@@ -19,21 +19,17 @@ typedef struct state {
 
 state_t state;
 
-bool extract_offset(uintptr_t *phys, uint8_t *client, uint8_t *oid)
+int extract_offset(uintptr_t *phys)
 {
-    for (uint8_t c = 0; c < config.num_clients; c++) {
-        for (uint8_t i = 0; i < config.clients[c].num_regions; i++) {
-            if (*phys >= config.clients[c].regions[i].data.io_addr
-                && *phys < config.clients[c].regions[i].data.io_addr
-                               + config.clients[c].regions[i].num_buffers * NET_BUFFER_SIZE) {
-                *phys = *phys - config.clients[c].regions[i].data.io_addr;
-                *client = c;
-                *oid = i;
-                return true;
-            }
+    for (int client = 0; client < config.num_clients; client++) {
+        if (*phys >= config.clients[client].data.io_addr
+            && *phys
+                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+            *phys = *phys - config.clients[client].data.io_addr;
+            return client;
         }
     }
-    return false;
+    return -1;
 }
 
 void tx_provide(void)
@@ -47,18 +43,8 @@ void tx_provide(void)
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
 
-                if (buffer.oid >= config.clients[client].num_regions) {
-                    sddf_dprintf(
-                        "VIRT_TX|LOG: Client provided buffer with id %d which is not from within the mapped memory\n",
-                        buffer.oid);
-                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
-                    assert(!err);
-                    continue;
-                }
-
                 if (buffer.io_or_offset % NET_BUFFER_SIZE
-                    || buffer.io_or_offset
-                           >= NET_BUFFER_SIZE * config.clients[client].regions[buffer.oid].num_buffers) {
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
                                  buffer.io_or_offset);
                     err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
@@ -66,11 +52,10 @@ void tx_provide(void)
                     continue;
                 }
 
-                uintptr_t buffer_vaddr = buffer.io_or_offset
-                                       + (uintptr_t)config.clients[client].regions[buffer.oid].data.region.vaddr;
+                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
                 cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].regions[buffer.oid].data.io_addr;
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;
@@ -102,10 +87,8 @@ void tx_return(void)
             int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
             assert(!err);
 
-            uint8_t oid = 0, client = 0;
-            bool success = extract_offset(&buffer.io_or_offset, &client, &oid);
-            assert(success);
-            buffer.oid = oid;
+            int client = extract_offset(&buffer.io_or_offset);
+            assert(client >= 0);
 
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
             assert(!err);
