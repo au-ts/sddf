@@ -130,7 +130,14 @@ pub fn build(b: *std.Build) !void {
             true => @as([]const u8, "hpet"),
             false => null,
         },
-        else => null,
+        .qemu_virt_aarch64 => switch (nvme) {
+            true => @as([]const u8, "arm"),
+            false => null,
+        },
+        .qemu_virt_riscv64 => switch (nvme) {
+            true => @as([]const u8, "goldfish"),
+            false => null,
+        },
     };
     var timer_driver_install: ?*Step.InstallArtifact = null;
     if (timer_driver_class) |c| {
@@ -140,7 +147,7 @@ pub fn build(b: *std.Build) !void {
     }
 
     const blk_driver_class = switch (microkit_board_option) {
-        .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio_mmio",
+        .qemu_virt_aarch64, .qemu_virt_riscv64 => if (nvme) "nvme_pci" else "virtio_mmio",
         .maaxboard => "mmc_imx",
         .x86_64_generic => if (nvme) "nvme_pci" else "virtio_pci",
     };
@@ -358,8 +365,16 @@ pub fn build(b: *std.Build) !void {
 
         const qemu_virtio_device = switch (target.result.cpu.arch) {
             .x86_64 => switch (nvme) {
-                true => "nvme,drive=hd,serial=TEST1234,addr=0x4.0",
+                true => "nvme,drive=hd,serial=X86_64_TEST1234,addr=0x4.0",
                 false => "virtio-blk-pci,drive=hd,addr=0x3.0",
+            },
+            .aarch64 => switch (nvme) {
+                true => "nvme,drive=hd,serial=AARCH64_TEST1234,bus=pcie.0,addr=0x4.0",
+                false => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
+            },
+            .riscv64 => switch (nvme) {
+                true => "nvme,drive=hd,serial=RISCV64_TEST1234,bus=pcie.0,addr=0x4.0",
+                false => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
             },
             else => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
         };

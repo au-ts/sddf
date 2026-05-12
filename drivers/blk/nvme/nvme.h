@@ -375,9 +375,121 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_IDENTIFY_SGLS_TRANSPORT_DWORD_ALIGNED BIT(1)
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  Platform Constants
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+#define NVME_ADMIN_QUEUE_SIZE 0x1000
+#define NVME_IO_QUEUE_SIZE    0x1000
+
+/*
+ * PCI Configuration (hardcoded)
+ * FUTURE: Get these from PCIe enumeration
+ */
+
+#define NVME_PCI_BUS 0
+#define NVME_PCI_DEV 4
+#define NVME_PCI_FUNC 0
+
+/* Memory Region Virtual Addresses */
+#define NVME_CONTROLLER_VADDR 0x20000000
+#define NVME_ASQ_VADDR        0x20100000
+#define NVME_ACQ_VADDR        0x20101000
+#define NVME_IO_SQ_VADDR      0x20102000
+#define NVME_IO_CQ_VADDR      0x20103000
+#define NVME_IDENTIFY_VADDR   0x20104000
+#define NVME_PRP_LIST_VADDR   0x20200000
+
+/* Memory Region Physical Addresses */
+#if defined(CONFIG_ARCH_RISCV)
+#define NVME_ASQ_PADDR        0x9EDF0000
+#define NVME_ACQ_PADDR        0x9EDF1000
+#define NVME_IO_SQ_PADDR      0x9EDF2000
+#define NVME_IO_CQ_PADDR      0x9EDF3000
+#define NVME_IDENTIFY_PADDR   0x9EDF4000
+#define NVME_PRP_LIST_PADDR   0x9F800000
+#else /* ARM / x86 */
+#define NVME_ASQ_PADDR        0x5EDF0000
+#define NVME_ACQ_PADDR        0x5EDF1000
+#define NVME_IO_SQ_PADDR      0x5EDF2000
+#define NVME_IO_CQ_PADDR      0x5EDF3000
+#define NVME_IDENTIFY_PADDR   0x5EDF4000
+#define NVME_PRP_LIST_PADDR   0x5F800000
+#endif
+
+/*
+ * Architecture-specific: BAR0 physical address, IRQ, I/O port config.
+ * FUTURE: Replace with PCI enumeration.
+ */
+
+#if defined(CONFIG_ARCH_X86_64)
+
+#define NVME_IRQ 17
+
+#elif defined(CONFIG_ARCH_RISCV)
+
+#define NVME_CONTROLLER_PADDR 0x40000000
+#define NVME_IRQ 32 /* slot 4 INT_A: masked dev addr = 0x0000 -> PLIC IRQ 0x20 = 32 */
+
+#else /* ARM */
+
+#define NVME_CONTROLLER_PADDR 0x10000000
+#define NVME_IRQ 35 /* slot 4 INT_A: (1+4)%4=1 -> SPI 3 -> GIC IRQ 35 */
+
+#endif /* CONFIG_ARCH_X86_64 */
+
+/* Memory Region Sizes. */
+#define NVME_ASQ_REGION_SIZE        0x1000
+#define NVME_ACQ_REGION_SIZE        0x1000
+#define NVME_IO_SQ_REGION_SIZE      0x1000
+#define NVME_IO_CQ_REGION_SIZE      0x1000
+#define NVME_IDENTIFY_REGION_SIZE   0x2000
+#define NVME_PRP_LIST_REGION_SIZE   0x80000
+
+/* Identify response buffers (one page each). */
+#define NVME_IDENTIFY_BUFFER_BYTES 0x1000
+#define NVME_IDENTIFY_CTRL_VADDR   (NVME_IDENTIFY_VADDR)
+#define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
+#define NVME_IDENTIFY_NS_VADDR     (NVME_IDENTIFY_VADDR + NVME_IDENTIFY_BUFFER_BYTES)
+#define NVME_IDENTIFY_NS_PADDR     (NVME_IDENTIFY_PADDR + NVME_IDENTIFY_BUFFER_BYTES)
+
+/* Host page size exponent; CC.MPS encodes page size as 2^(12 + MPS). [NVMe-2.1 §3.1.4.5, Fig. 41] */
+#define NVME_PAGE_SIZE_LOG2 12
+
+/* Queue structures must fit their dedicated queue regions. */
+_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ASQ_REGION_SIZE, "ASQ allocation exceeds nvme_admin_sq region size");
+_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ACQ_REGION_SIZE, "ACQ allocation exceeds nvme_admin_cq region size");
+_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_SQ_REGION_SIZE, "IO SQ allocation exceeds nvme_io_sq region size");
+_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_CQ_REGION_SIZE, "IO CQ allocation exceeds nvme_io_cq region size");
+
+/* Identify buffers must fit in their shared region and not overlap. */
+_Static_assert(sizeof(nvme_identify_ctrl_t) <= NVME_IDENTIFY_BUFFER_BYTES,
+               "Identify Controller structure must fit within one Identify buffer");
+_Static_assert(NVME_IDENTIFY_CTRL_VADDR + NVME_IDENTIFY_BUFFER_BYTES <= NVME_IDENTIFY_NS_VADDR,
+               "Identify Controller buffer must not overlap Identify Namespace buffer");
+_Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
+               "NVMe identify region must fit both Identify buffers");
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  PCIe Transport
  * ═══════════════════════════════════════════════════════════════════════ */
 
+/* Type 0/1 configuration space register offsets. [NVMe-PCIe-1.1 §3.8.1, Fig. 10] */
+#define NVME_PCIE_CFG_OFFSET_ID          0x00
+#define NVME_PCIE_CFG_OFFSET_COMMAND     0x04
+#define NVME_PCIE_CFG_OFFSET_BAR0        0x10
+#define NVME_PCIE_CFG_OFFSET_BAR1        0x14
+#define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
+
+/* Interrupt information field layout. [NVMe-PCIe-1.1 §3.8.1.20] */
+#define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
+#define NVME_PCIE_INTR_PIN_SHIFT  8U
+#define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
+
+/* PCI Command register bits. [PCI-3.0 §6.2.2] */
+#define NVME_PCI_CMD_MEMORY_SPACE  BIT(1) /* Memory Space Enable */
+#define NVME_PCI_CMD_BUS_MASTER    BIT(2) /* Bus Master Enable */
+
+#if defined(CONFIG_ARCH_X86_64)
 /* PCI Configuration Mechanism #1 I/O ports. [PCI-3.0 §3.2.2.3.2] */
 /* I/O Port Configuration */
 #define NVME_PCI_CONFIG_ADDR_IOPORT_ID 1
@@ -391,17 +503,6 @@ static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
 #define NVME_PCIE_CFG_ADDR_DEV_SHIFT   11
 #define NVME_PCIE_CFG_ADDR_FUNC_SHIFT  8
 #define NVME_PCIE_CFG_ADDR_OFFSET_MASK 0xFC
-
-/* Type 0/1 configuration space register offsets. [NVMe-PCIe-1.1 §3.8.1, Fig. 10] */
-#define NVME_PCIE_CFG_OFFSET_ID          0x00
-#define NVME_PCIE_CFG_OFFSET_COMMAND     0x04
-#define NVME_PCIE_CFG_OFFSET_BAR0        0x10
-#define NVME_PCIE_CFG_OFFSET_INTR_INFO   0x3C
-
-/* Interrupt information field layout. [PCIe2-0.9 §7.5.1.20] */
-#define NVME_PCIE_INTR_LINE_MASK  BIT_MASK(0, 7)
-#define NVME_PCIE_INTR_PIN_SHIFT  8U
-#define NVME_PCIE_INTR_PIN_MASK   BIT_MASK(8, 15)
 
 static inline uint32_t nvme_pcie_cfg_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
 {
@@ -424,69 +525,31 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
     microkit_x86_ioport_write_32(NVME_PCI_CONFIG_DATA_IOPORT_ID, NVME_PCI_CFG_DATA_PORT, value);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  Platform Constants
- * ═══════════════════════════════════════════════════════════════════════ */
-
-#define NVME_ADMIN_QUEUE_SIZE 0x1000
-#define NVME_IO_QUEUE_SIZE    0x1000
+#else /* !CONFIG_ARCH_X86_64 -- use ECAM (memory-mapped PCI config space) */
 
 /*
- * PCI Configuration (hardcoded for x86_64)
- * FUTURE: Get these from PCIe enumeration
+ * ECAM (Enhanced Configuration Access Mechanism) address encoding.
+ * offset = (bus << 20) | (dev << 15) | (func << 12) | reg
+ * [PCIe2-0.9 §7.2.2]
  */
+#define NVME_ECAM_BUS_SHIFT   20
+#define NVME_ECAM_DEV_SHIFT   15
+#define NVME_ECAM_FUNC_SHIFT  12
 
-#define NVME_PCI_BUS 0
-#define NVME_PCI_DEV 4
-#define NVME_PCI_FUNC 0
+#define NVME_ECAM_VADDR 0x20300000
+#define NVME_ECAM_BASE  (NVME_ECAM_VADDR - ((uintptr_t)NVME_PCI_DEV << NVME_ECAM_DEV_SHIFT))
 
-/* Memory Region Virtual Addresses */
-#define NVME_CONTROLLER_VADDR 0x20000000
-#define NVME_ASQ_VADDR        0x20100000
-#define NVME_ACQ_VADDR        0x20101000
-#define NVME_IO_SQ_VADDR      0x20102000
-#define NVME_IO_CQ_VADDR      0x20103000
-#define NVME_IDENTIFY_VADDR   0x20104000
-#define NVME_PRP_LIST_VADDR   0x20200000
+static inline uint32_t pci_config_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
+{
+    uintptr_t bdf_offset = ((uint32_t)bus << NVME_ECAM_BUS_SHIFT) | ((uint32_t)dev << NVME_ECAM_DEV_SHIFT)
+                         | ((uint32_t)func << NVME_ECAM_FUNC_SHIFT) | (uint32_t)offset;
+    return *(volatile uint32_t *)(NVME_ECAM_BASE + bdf_offset);
+}
 
-/* Memory Region Physical Addresses */
-#define NVME_ASQ_PADDR        0x5FDF0000
-#define NVME_ACQ_PADDR        0x5FDF1000
-#define NVME_IO_SQ_PADDR      0x5FDF2000
-#define NVME_IO_CQ_PADDR      0x5FDF3000
-#define NVME_IDENTIFY_PADDR   0x5FDF4000
-#define NVME_PRP_LIST_PADDR   0x5FE00000
-
-/* Memory Region Sizes. */
-#define NVME_ASQ_REGION_SIZE        0x1000
-#define NVME_ACQ_REGION_SIZE        0x1000
-#define NVME_IO_SQ_REGION_SIZE      0x1000
-#define NVME_IO_CQ_REGION_SIZE      0x1000
-#define NVME_IDENTIFY_REGION_SIZE   0x2000
-#define NVME_PRP_LIST_REGION_SIZE   0x80000
-
-/* Identify response buffers (one page each). */
-#define NVME_IDENTIFY_BUFFER_BYTES 0x1000
-#define NVME_IDENTIFY_CTRL_VADDR   (NVME_IDENTIFY_VADDR)
-#define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
-#define NVME_IDENTIFY_NS_VADDR     (NVME_IDENTIFY_VADDR + NVME_IDENTIFY_BUFFER_BYTES)
-#define NVME_IDENTIFY_NS_PADDR     (NVME_IDENTIFY_PADDR + NVME_IDENTIFY_BUFFER_BYTES)
-
-#define NVME_IRQ 17
-
-/* Host page size exponent; CC.MPS encodes page size as 2^(12 + MPS). [NVMe-2.1 §3.1.4.5, Fig. 41] */
-#define NVME_PAGE_SIZE_LOG2 12
-
-/* Queue structures must fit their dedicated queue regions. */
-_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ASQ_REGION_SIZE, "ASQ allocation exceeds nvme_admin_sq region size");
-_Static_assert(NVME_ADMIN_QUEUE_SIZE <= NVME_ACQ_REGION_SIZE, "ACQ allocation exceeds nvme_admin_cq region size");
-_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_SQ_REGION_SIZE, "IO SQ allocation exceeds nvme_io_sq region size");
-_Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_CQ_REGION_SIZE, "IO CQ allocation exceeds nvme_io_cq region size");
-
-/* Identify buffers must fit in their shared region and not overlap. */
-_Static_assert(sizeof(nvme_identify_ctrl_t) <= NVME_IDENTIFY_BUFFER_BYTES,
-               "Identify Controller structure must fit within one Identify buffer");
-_Static_assert(NVME_IDENTIFY_CTRL_VADDR + NVME_IDENTIFY_BUFFER_BYTES <= NVME_IDENTIFY_NS_VADDR,
-               "Identify Controller buffer must not overlap Identify Namespace buffer");
-_Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
-               "NVMe identify region must fit both Identify buffers");
+static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset, uint32_t value)
+{
+    uintptr_t bdf_offset = ((uint32_t)bus << NVME_ECAM_BUS_SHIFT) | ((uint32_t)dev << NVME_ECAM_DEV_SHIFT)
+                         | ((uint32_t)func << NVME_ECAM_FUNC_SHIFT) | (uint32_t)offset;
+    *(volatile uint32_t *)(NVME_ECAM_BASE + bdf_offset) = value;
+}
+#endif
