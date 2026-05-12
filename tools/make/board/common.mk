@@ -72,7 +72,7 @@ COMMON_CONFIG +=  ${TOOLCHAIN} \
 	${MICROKIT_BOARD} \
 	${MICROKIT_CONFIG} \
 	${SMP_CONFIG} \
-	 ${BENCH_PMU_EVENTS}
+	${BENCH_PMU_EVENTS}
 
 CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${COMMON_CONFIG} | \
 	 shasum | sed 's/ *-//g')

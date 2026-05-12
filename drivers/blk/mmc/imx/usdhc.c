@@ -176,14 +176,14 @@ static inline void clear_card_state(void)
     };
 }
 
-__attribute__ ((unused)) static inline void usdhc_debug(void) 
+__attribute__((unused)) static inline void usdhc_debug(void)
 {
-    LOG_DRIVER("PRES_STATE: %u, PROT_CTRL: %u, SYS_CTRL: %u, MIX_CTRL: %u\n", usdhc_regs->pres_state, usdhc_regs->prot_ctrl,
-               usdhc_regs->sys_ctrl, usdhc_regs->mix_ctrl);
+    LOG_DRIVER("PRES_STATE: %u, PROT_CTRL: %u, SYS_CTRL: %u, MIX_CTRL: %u\n", usdhc_regs->pres_state,
+               usdhc_regs->prot_ctrl, usdhc_regs->sys_ctrl, usdhc_regs->mix_ctrl);
     LOG_DRIVER("CMD_RSP0: %u, CMD_RSP1: %u, CMD_RSP2: %u, CMD_RSP3: %u\n", usdhc_regs->cmd_rsp0, usdhc_regs->cmd_rsp1,
                usdhc_regs->cmd_rsp2, usdhc_regs->cmd_rsp3);
-    LOG_DRIVER("INT_STATUS: %u, INT_STATUS_EN: %u, INT_SIGNAL_EN: %u\n", usdhc_regs->int_status, usdhc_regs->int_status_en,
-               usdhc_regs->int_signal_en);
+    LOG_DRIVER("INT_STATUS: %u, INT_STATUS_EN: %u, INT_SIGNAL_EN: %u\n", usdhc_regs->int_status,
+               usdhc_regs->int_status_en, usdhc_regs->int_signal_en);
     LOG_DRIVER("VEND_SPEC: %u, VEND_SPEC2: %u, BLK_ATT: %u\n", usdhc_regs->vend_spec, usdhc_regs->vend_spec2,
                usdhc_regs->blk_att);
 }
@@ -197,8 +197,10 @@ static uint32_t get_command_xfr_typ(sd_cmd_t cmd)
         cmd_xfr_typ |= USDHC_CMD_XFR_TYP_DPSEL;
     }
 
-    /* [IMX8MDQLQRM] Table 10-42. Relationship between parameters and the name of the response type
-     * Note that R7 doesn't exist in the table but is essentially just R1.
+    /*
+     * [IMX8MDQLQRM] Table 10-42. Relationship between parameters and
+     * the name of the response type. Note that R7 doesn't exist in the
+     * table but is essentially just R1.
      */
     switch (cmd.cmd_response_type) {
     case RespType_None:
@@ -206,8 +208,7 @@ static uint32_t get_command_xfr_typ(sd_cmd_t cmd)
         break;
 
     case RespType_R2:
-        cmd_xfr_typ |= USDHC_CMD_XFR_TYP_CCCEN \
-                       | (USDHC_CMD_XFR_TYP_RSPTYP_L136 << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
+        cmd_xfr_typ |= USDHC_CMD_XFR_TYP_CCCEN | (USDHC_CMD_XFR_TYP_RSPTYP_L136 << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
         break;
 
     case RespType_R3:
@@ -219,13 +220,13 @@ static uint32_t get_command_xfr_typ(sd_cmd_t cmd)
     case RespType_R5:
     case RespType_R6:
     case RespType_R7:
-        cmd_xfr_typ |= USHDC_CMD_XFR_TYP_CICEN | USDHC_CMD_XFR_TYP_CCCEN \
-                       | (USDHC_CMD_XFR_TYP_RSPTYP_L48 << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
+        cmd_xfr_typ |= USHDC_CMD_XFR_TYP_CICEN | USDHC_CMD_XFR_TYP_CCCEN
+                     | (USDHC_CMD_XFR_TYP_RSPTYP_L48 << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
         break;
 
     case RespType_R1b:
-        cmd_xfr_typ |= USHDC_CMD_XFR_TYP_CICEN | USDHC_CMD_XFR_TYP_CCCEN \
-                       | (USDHC_CMD_XFR_TYP_RSPTYP_L48B << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
+        cmd_xfr_typ |= USHDC_CMD_XFR_TYP_CICEN | USDHC_CMD_XFR_TYP_CCCEN
+                     | (USDHC_CMD_XFR_TYP_RSPTYP_L48B << USDHC_CMD_XFR_TYP_RSPTYP_SHIFT);
         break;
 
     default:
@@ -241,7 +242,10 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     case DrvSuccess:
         return BLK_RESP_OK;
 
-    /* TODO: Make this error more specific once we implemented SD error recovery */
+    /*
+     * TODO: Make this error more specific once we implemented SD
+     * error recovery
+     */
     case DrvErrorInternal:
         return BLK_RESP_ERR_UNSPEC;
 
@@ -268,35 +272,43 @@ static bool card_detected(void)
 
 static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
 {
-    /* Important Note: INT_STATUS register is of the W1C (write 1 to clear) type */
+    /*
+     * Important Note: INT_STATUS register is of the W1C (write 1 to
+     * clear) type
+     */
     uint32_t int_status = usdhc_regs->int_status;
 
     /* If any bits aside from Command Complete / Transfer Complete are set... */
     if (int_status & ~(USDHC_INT_STATUS_CC | USDHC_INT_STATUS_TC)) {
         /* [IMX8MDQLQRM] Tables 10-44, 10-45, 10-46.
-
-            TODO: Map the specific errors to something sensible.
-            TODO: Run the RST_C / RST_D to reset the comamnd/ data inhibit?
-                & Follow the proper [SD-HOST] error handling flow.
-
-            NOTE: As we don't do this, any errors cause the driver to
-                  continuously error with 'Could not send a command as CMD/DATA-inhibit
-                  fields were set' for any further commands.
+         *
+         *  TODO: Map the specific errors to something sensible.
+         *  TODO: Run the RST_C / RST_D to reset the comamnd/ data inhibit?
+         *      & Follow the proper [SD-HOST] error handling flow.
+         *
+         *  NOTE: As we don't do this, any errors cause the driver to
+         *        continuously error with 'Could not send a command as
+         *        CMD/DATA-inhibit fields were set' for any further
+         *        commands.
          */
         LOG_DRIVER("-> received error response\n");
 
         if (int_status & USDHC_INT_STATUS_DMAE) {
-            /* DMA error ==> probably a virtualiser error because of an
-               incorrect memory address. */
+            /*
+             * DMA error ==> probably a virtualiser error because of
+             *  an incorrect memory address.
+             */
             LOG_DRIVER_ERR("DMA error encountered: DS_ADDR: 0x%x\n", usdhc_regs->ds_addr);
         }
 
         usdhc_regs->int_status = 0xffffffff;
 
         if (!card_detected()) {
-            /* If the card isn't detected, the error is because of that
-               ... don't do anything with this aside from return an error,
-                   though, as this is the wrong layer for that to make sense */
+            /*
+             * If the card isn't detected, the error is because of that
+             *  ... don't do anything with this aside from return an error,
+             *     though, as this is the wrong layer for that to make sense
+             */
             return DrvErrorCardGone;
         }
 
@@ -318,17 +330,19 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
     }
 
     /*
-        [SD-HOST] 2.2.18 Normal Interrupt Status Register states that
-
-            Transfer Complete
-                This bit indicates stop of transaction on three cases:
-                (1) Completion of data transfer
-                (2) Completion of a command pairing with response-with-busy (R1b, R5b)
-
-        [IMX8MDQLQRM] INT_STATUS for TC bit also indicates similarly...
-
-        However, we never get transfer complete interrupts for response-with-busy.
-    */
+     *  [SD-HOST] 2.2.18 Normal Interrupt Status Register states that
+     *
+     *      Transfer Complete
+     *          This bit indicates stop of transaction on three cases:
+     *          (1) Completion of data transfer
+     *          (2) Completion of a command pairing with response-with-
+     *              busy (R1b, R5b)
+     *
+     *  [IMX8MDQLQRM] INT_STATUS for TC bit also indicates similarly...
+     *
+     *  However, we never get transfer complete interrupts for
+     *  response-with-busy.
+     */
 
     if (transfer_complete) {
         usdhc_regs->int_status = USDHC_INT_STATUS_TC;
@@ -350,8 +364,9 @@ drv_status_t send_command_inner(command_state_t *state, sd_cmd_t cmd, uint32_t c
     switch (*state) {
     case SendStateInit:
         /* [IMX8MDQLQRM] 10.3.7.1.5 Command Transfer Type
-         * The host driver checks the Command Inhibit DAT field (PRES_STATE[CDIHB]) and
-         * the \Command Inhibit CMD field (PRES_STATE[CIHB]) in the Present State register
+         * The host driver checks the Command Inhibit DAT field
+         * (PRES_STATE[CDIHB]) and the \Command Inhibit CMD field
+         * (PRES_STATE[CIHB]) in the Present State register
          * before writing to this register.
          *
          * There seems to be an issue with this IMX8 uSDHC device, where even
@@ -384,9 +399,9 @@ drv_status_t send_command_inner(command_state_t *state, sd_cmd_t cmd, uint32_t c
     case SendStateSend:
         cmd_xfr_typ = get_command_xfr_typ(cmd);
 
-        LOG_DRIVER("Running %s%2u; argument=0x%08x; cmd_xfr_typ=0x%08x; data_present=%s\n",
-                   cmd.is_app_cmd ? "ACMD" : " CMD",
-                   cmd.cmd_index, cmd_arg, cmd_xfr_typ,
+        LOG_DRIVER("Running %s%2u; argument=0x%08x; cmd_xfr_typ=0x%08x; "
+                   "data_present=%s\n",
+                   cmd.is_app_cmd ? "ACMD" : " CMD", cmd.cmd_index, cmd_arg, cmd_xfr_typ,
                    cmd.data_present ? "yes" : "no");
 
         usdhc_regs->cmd_arg = cmd_arg;
@@ -518,14 +533,15 @@ void wait_clock_stable()
  */
 void usdhc_change_clock_frequency(sd_clock_freq_t frequency)
 {
-    /* [IMX8MDQLQRM] Section 10.3.6.7 Changing clock frequency
-        > To prevent possible glitch on the card clock, clear the FRC_SDCLK_ON
-        > bit when changing the clock divisor value (SDCLKFS or DVS in
-        > System Control Register) or [...].
-        >
-        > Also, before changing the clock divisor value, the host driver should
-        > make sure that the SDSTB bit is high.
-    */
+    /*
+     * [IMX8MDQLQRM] Section 10.3.6.7 Changing clock frequency
+     *  > To prevent possible glitch on the card clock, clear the FRC_SDCLK_ON
+     *  > bit when changing the clock divisor value (SDCLKFS or DVS in
+     *  > System Control Register) or [...].
+     *  >
+     *  > Also, before changing the clock divisor value, the host driver should
+     *  > make sure that the SDSTB bit is high.
+     */
     usdhc_regs->vend_spec &= ~USDHC_VEND_SPEC_FRC_SDCLK_ON;
 
     wait_clock_stable();
@@ -540,17 +556,19 @@ void usdhc_setup_clock()
     usdhc_change_clock_frequency(ClockSpeedIdentify_400KHz);
 }
 
-/*
-    Reset the uSDHC (SD Host Controller), bringing all cards back to the idle State.
-
-    Ref: [IMX8MDQLQRM] Section 10.3.4.2.2 Reset
-*/
+/**
+ *  Reset the uSDHC (SD Host Controller), bringing all cards back to
+ *  the idle State.
+ *
+ *  Ref: [IMX8MDQLQRM] Section 10.3.4.2.2 Reset
+ */
 void usdhc_reset(void)
 {
-    /* [IMX8MDQLQRM] Section 10.3.6.7 Changing clock frequency
-        > To prevent possible glitch on the card clock, clear the FRC_SDCLK_ON
-        > bit when changing [...] or setting the RSTA bit.
-    */
+    /*
+     * [IMX8MDQLQRM] Section 10.3.6.7 Changing clock frequency
+     * > To prevent possible glitch on the card clock, clear the FRC_SDCLK_ON
+     * > bit when changing [...] or setting the RSTA bit.
+     */
     usdhc_regs->vend_spec &= ~USDHC_VEND_SPEC_FRC_SDCLK_ON;
 
     /* Software reset for all; wait until it self-clears */
@@ -559,13 +577,14 @@ void usdhc_reset(void)
 
     usdhc_setup_clock();
 
-    /* Wait 74 (~80) clock ticks for power up as required by the spec.
-
-       [IMX8MDQLQRM] 10.3.7.1.13 System Control:
-        > INITA / Field 27 can only be set when CIHB & CDIHB fields are unset.
-
-       At this stage, there should be no commands happening...
-    */
+    /*
+     * Wait 74 (~80) clock ticks for power up as required by the spec.
+     *
+     * [IMX8MDQLQRM] 10.3.7.1.13 System Control:
+     *  > INITA / Field 27 can only be set when CIHB & CDIHB fields are unset.
+     *
+     * At this stage, there should be no commands happening...
+     */
     assert(!(usdhc_regs->pres_state & (USDHC_PRES_STATE_CIHB | USDHC_PRES_STATE_CDIHB)));
     usdhc_regs->sys_ctrl |= USDHC_SYS_CTRL_INITA;
     while (!(usdhc_regs->sys_ctrl & USDHC_SYS_CTRL_INITA));
@@ -574,28 +593,29 @@ void usdhc_reset(void)
     usdhc_regs->int_status_en = INT_STATUSES_ENABLED;
     usdhc_regs->int_signal_en = INT_SIGNALS_ENABLED;
 
-    /* Following [1] and [2], we set several registers that are not cleared
-       after software reset.
+    /*
+     * Following [1] and [2], we set several registers that are not cleared
+     * after software reset.
 
-       [1]: https://github.com/BarrelfishOS/barrelfish/blob/master/usr/drivers/imx8x/sdhc/sdhc.c#L166-L175
-       [2]: https://github.com/u-boot/u-boot/blob/v2024.07/drivers/mmc/fsl_esdhc_imx.c#L999-L1015
-    */
+     * [1]: https://github.com/BarrelfishOS/barrelfish/blob/master/usr/drivers/imx8x/sdhc/sdhc.c#L166-L175
+     * [2]: https://github.com/u-boot/u-boot/blob/v2024.07/drivers/mmc/fsl_esdhc_imx.c#L999-L1015
+     */
     usdhc_regs->mmc_boot = 0;
     usdhc_regs->clk_tune_ctrl_status = 0;
     usdhc_regs->dll_ctrl = 0;
 
     /* Enable DMA, Auto-CMD12 */
-    usdhc_regs->mix_ctrl = USDHC_MIX_CTRL_DMAEN | USDHC_MIX_CTRL_AC12EN \
-                           /* Do multi-block transfers (impl detail: we always do) */
-                           | USDHC_MIX_CTRL_MSBSEL | USDHC_MIX_CTRL_BCEN;
+    usdhc_regs->mix_ctrl = USDHC_MIX_CTRL_DMAEN
+                         | USDHC_MIX_CTRL_AC12EN /* Do multi-block transfers (impl detail: we always do) */
+                         | USDHC_MIX_CTRL_MSBSEL | USDHC_MIX_CTRL_BCEN;
 
     /* Again following [1] and [2] we configure various registers to good values */
     // TODO(#187): UBoot sets these to blocksize/4 on each data command
     // => this is just arbitrarily set to 1 here. What are good values?
     usdhc_regs->wtmk_lvl = (0x01 << 16) | (0x01);
     usdhc_regs->prot_ctrl = (USDHC_PROT_CTRL_DTW_1_BIT << USDHC_PROT_CTRL_DTW_SHIFT)
-                            | (USDHC_PROT_CTRL_EMODE_LITTLE << USDHC_PROT_CTRL_EMODE_SHIFT)
-                            | (USDHC_PROT_CTRL_DMASEL_SIMPLE << USDHC_PROT_CTRL_DMASEL_SHIFT);
+                          | (USDHC_PROT_CTRL_EMODE_LITTLE << USDHC_PROT_CTRL_EMODE_SHIFT)
+                          | (USDHC_PROT_CTRL_DMASEL_SIMPLE << USDHC_PROT_CTRL_DMASEL_SHIFT);
 
     // TODO(#187): Probably should set up VEND_SPEC as desired...?
 }
@@ -611,17 +631,20 @@ static void read_r2_response(uint32_t response[4])
     response[3] = (usdhc_regs->cmd_rsp0 << 8);
 }
 
-/* [SD-PHY] Section 4.2 Card Identification Mode. Following the flowcharts of
-    - Figure 4-1: SD Memory Card State Diagram (card identification mode)
-    - Figure 4-2: Card Initialization and Identification Flow (SD Mode)
-*/
+/**
+ * [SD-PHY] Section 4.2 Card Identification Mode. Following the flowcharts of
+ *  - Figure 4-1: SD Memory Card State Diagram (card identification mode)
+ *  - Figure 4-2: Card Initialization and Identification Flow (SD Mode)
+ */
 drv_status_t perform_card_identification_and_select()
 {
     drv_status_t status;
     switch (driver_state.card_ident) {
     case CardIdentStateInit:
-        /* [SD-PHY] Section 4.21.5 Pre-init mode
-            => we now exit this mode and move to idle */
+        /*
+         * [SD-PHY] Section 4.21.5 Pre-init mode
+         *   => we now exit this mode and move to idle
+         */
         status = send_command(SD_CMD0_GO_IDLE_STATE, 0x0);
         if (status == DrvIrqWait) {
             return DrvIrqWait;
@@ -635,12 +658,13 @@ drv_status_t perform_card_identification_and_select()
         fallthrough;
 
     case CardIdentStateIfCond:
-        /* [SD-PHY] Section 4.3.13 Send Interface Condition Command
-            > [19:16] Voltage supplied (VHS) from Table 4-18
-            > [15:8 ] Check pattern to any 8-bit pattern.
-        */
-        status = send_command(SD_CMD8_SEND_IF_COND,
-                              (SD_IF_COND_VHS27_36 << SD_IF_COND_VHS_SHIFT) | (IF_COND_CHECK_PATTERN << SD_IF_COND_CHECK_SHIFT));
+        /*
+         * [SD-PHY] Section 4.3.13 Send Interface Condition Command
+         *  > [19:16] Voltage supplied (VHS) from Table 4-18
+         *  > [15:8 ] Check pattern to any 8-bit pattern.
+         */
+        status = send_command(SD_CMD8_SEND_IF_COND, (SD_IF_COND_VHS27_36 << SD_IF_COND_VHS_SHIFT)
+                                                        | (IF_COND_CHECK_PATTERN << SD_IF_COND_CHECK_SHIFT));
         if (status == DrvIrqWait) {
             return DrvIrqWait;
         }
@@ -650,15 +674,17 @@ drv_status_t perform_card_identification_and_select()
             return DrvErrorCardGone;
         } else if (status != DrvSuccess) {
             /* TODO: Unhandled card type. */
-            LOG_DRIVER_ERR("Ver 1.X SD Card, or Ver2.00 with voltage mismatch not supported\n");
+            LOG_DRIVER_ERR("Ver 1.X SD Card, or Ver2.00 with voltage mismatch "
+                           "not supported\n");
             return DrvErrorCardIncompatible;
         }
 
         uint32_t r7_resp = usdhc_regs->cmd_rsp0;
         /* [SD-PHY] 4.2.2 Operating Condition Validation
-            > If the card can operate on the supplied voltage, the response echoes
-            > back the supply voltage and the check pattern that were set in the command argument.
-        */
+         * > If the card can operate on the supplied voltage, the response echoes
+         * > back the supply voltage and the check pattern that were
+         * > set in the command argument.
+         */
         if (((r7_resp & SD_IF_COND_VHS_MASK) >> SD_IF_COND_VHS_SHIFT) != SD_IF_COND_VHS27_36) {
             LOG_DRIVER_ERR("CMD8: Non-compatible voltage range\n");
             return DrvErrorCardIncompatible;
@@ -672,12 +698,13 @@ drv_status_t perform_card_identification_and_select()
         fallthrough;
 
     case CardIdentStateOpCondInquiry:
-        /* [SD-PHY] 4.2.3.1 Initialization Command
-            > If the voltage window field (bit 23-0) in the argument is set
-            > to zero, it is called "inquiry CMD41" that does not start
-            > initialization and is use for getting OCR. The inquiry ACMD41
-            > shall ignore the other field (bit 31-24) in the argument.
-        */
+        /*
+         * [SD-PHY] 4.2.3.1 Initialization Command
+         *  > If the voltage window field (bit 23-0) in the argument is set
+         *  > to zero, it is called "inquiry CMD41" that does not start
+         *  > initialization and is use for getting OCR. The inquiry ACMD41
+         *  > shall ignore the other field (bit 31-24) in the argument.
+         */
         status = send_command(SD_ACMD41_SD_SEND_OP_COND, 0x0);
         if (status == DrvIrqWait) {
             return DrvIrqWait;
@@ -700,29 +727,34 @@ drv_status_t perform_card_identification_and_select()
         fallthrough;
 
     case CardIdentStateOpCond:
-        /* [SD-PHY] 4.2.3.1 Initialization Command
-           > If the voltage window field (bit 23-0) in the argument is set to
-           > non-zero at the first time, it is called "first ACMD41" that starts
-           > initialization. The other field (bit 31-24) in the argument is effective.
-           >
-           > The argument of following ACMD41 shall be the same as that of the first ACMD41.
-           >
-           > The HCS (Host Capacity Support) bit set to 1 indicates that the
-           > host supports SDHC or SDXC Card. The HCS (Host Capacity Support)
-           > bit set to 0 indicates that the host supports neither SDHC nor SDXC Card.
-           > If HCS is set to 0, SDHC and SDXC Cards never return ready status.
-           >
-           > The host shall set ACMD41 timeout more than 1 second to abort repeat of
-           > issuing ACMD41 when the card does not indicate ready. The timeout count
-           > starts from the first ACMD41 which is set voltage window in the argument.
-        */
+        /*
+         * [SD-PHY] 4.2.3.1 Initialization Command
+         * > If the voltage window field (bit 23-0) in the argument is set to
+         * > non-zero at the first time, it is called "first ACMD41"
+         * > that starts initialization. The other field (bit 31-24)
+         * > in the argument is effective.
+         *
+         * > The argument of following ACMD41 shall be the same as
+         * > that of the first ACMD41.
+         * >
+         * > The HCS (Host Capacity Support) bit set to 1 indicates that the
+         * > host supports SDHC or SDXC Card. The HCS (Host Capacity Support)
+         * > bit set to 0 indicates that the host supports neither
+         * > SDHC nor SDXC Card.
+         * > If HCS is set to 0, SDHC and SDXC Cards never return
+         * > ready status.
+         *
+         * > The host shall set ACMD41 timeout more than 1 second to
+         * > abort repeat of issuing ACMD41 when the card does not
+         * > indicate ready. The timeout count starts from the first
+         * > ACMD41 which is set voltage window in the argument.
+         */
         if (driver_state.card_init_start_time == DRIVER_STATE_INIT) {
             driver_state.card_init_start_time = sddf_timer_time_now(timer_config.driver_id);
         }
 
         do {
-            status = send_command(SD_ACMD41_SD_SEND_OP_COND,
-                                  SD_OCR_HCS | SD_OCR_VDD31_32 | SD_OCR_VDD32_33);
+            status = send_command(SD_ACMD41_SD_SEND_OP_COND, SD_OCR_HCS | SD_OCR_VDD31_32 | SD_OCR_VDD32_33);
             if (status == DrvIrqWait) {
                 return DrvIrqWait;
             }
@@ -789,7 +821,8 @@ drv_status_t perform_card_identification_and_select()
         fallthrough;
 
     case CardIdentStateFrequencyChange:
-        /* [SD-PHY] 4.3 Data Transfer Mode
+        /*
+         * [SD-PHY] 4.3 Data Transfer Mode
          * > In Data Transfer Mode the host may operate the card in f_PP frequency range.
          */
         usdhc_change_clock_frequency(ClockSpeedDefaultSpeed_25MHz);
@@ -835,19 +868,20 @@ drv_status_t perform_card_identification_and_select()
     }
 }
 
-/* [IMX8MDQLQRM] 10.3.4.3.2.1 Normal read
-
-    1. Wait until the card is ready for data
-    2. Set the block length with SET_BLOCKLEN
-    3. Set the uSDHC block length register
-    4. Set the uSDHC number block register
-    5. a. Disable the buffer read ready interrupt, configure the DMA settings
-       b. enable the uSDHC DMA when sending the command with data transfer
-       c. The AC12EN bit should also be set.
-    6. Wait for the Transfer Complete interrupt.
-
-    Also reference [SD-PHY] 4.3.3 Data Read.
-*/
+/**
+ *   [IMX8MDQLQRM] 10.3.4.3.2.1 Normal read
+ *
+ *   1. Wait until the card is ready for data
+ *   2. Set the block length with SET_BLOCKLEN
+ *   3. Set the uSDHC block length register
+ *   4. Set the uSDHC number block register
+ *   5. a. Disable the buffer read ready interrupt, configure the DMA settings
+ *      b. enable the uSDHC DMA when sending the command with data transfer
+ *      c. The AC12EN bit should also be set.
+ *   6. Wait for the Transfer Complete interrupt.
+ *
+ *   Also reference [SD-PHY] 4.3.3 Data Read.
+ */
 drv_status_t usdhc_read_blocks(uintptr_t dma_address, uint32_t sector_number, uint16_t sector_count)
 {
     drv_status_t status;
@@ -864,8 +898,8 @@ drv_status_t usdhc_read_blocks(uintptr_t dma_address, uint32_t sector_number, ui
             return status;
         }
 
-        usdhc_regs->blk_att = (usdhc_regs->blk_att & ~USDHC_BLK_ATT_BLKSIZE_MASK) | (SD_BLOCK_SIZE <<
-                                                                                     USDHC_BLK_ATT_BLKSIZE_SHIFT);
+        usdhc_regs->blk_att = (usdhc_regs->blk_att & ~USDHC_BLK_ATT_BLKSIZE_MASK)
+                            | (SD_BLOCK_SIZE << USDHC_BLK_ATT_BLKSIZE_SHIFT);
 
         usdhc_regs->ds_addr = dma_address;
 
@@ -937,8 +971,8 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
             return status;
         }
 
-        usdhc_regs->blk_att = (usdhc_regs->blk_att & ~USDHC_BLK_ATT_BLKSIZE_MASK) | (SD_BLOCK_SIZE <<
-                                                                                     USDHC_BLK_ATT_BLKSIZE_SHIFT);
+        usdhc_regs->blk_att = (usdhc_regs->blk_att & ~USDHC_BLK_ATT_BLKSIZE_MASK)
+                            | (SD_BLOCK_SIZE << USDHC_BLK_ATT_BLKSIZE_SHIFT);
 
         usdhc_regs->ds_addr = dma_address;
 
@@ -991,13 +1025,10 @@ void setup_blk_storage_info()
     // storage_info->read_only = /* TODO(#187): look at write protect flag */
     storage_info->block_size = 1;
 
-    __uint128_t csd = ((__uint128_t)card_info.csd[0] << 96)
-                      | ((__uint128_t)card_info.csd[1] << 64)
-                      | ((__uint128_t)card_info.csd[2] << 32)
-                      | ((__uint128_t)card_info.csd[3] <<  0);
+    __uint128_t csd = ((__uint128_t)card_info.csd[0] << 96) | ((__uint128_t)card_info.csd[1] << 64)
+                    | ((__uint128_t)card_info.csd[2] << 32) | ((__uint128_t)card_info.csd[3] << 0);
 
-    LOG_DRIVER("CSD Version: %x\n",
-               (uint32_t)((csd & SD_CSD_CSD_STRUCTURE_MASK) >> SD_CSD_CSD_STRUCTURE_SHIFT));
+    LOG_DRIVER("CSD Version: %x\n", (uint32_t)((csd & SD_CSD_CSD_STRUCTURE_MASK) >> SD_CSD_CSD_STRUCTURE_SHIFT));
 
     /* [SD-PHY] 5.3.1 CSD Structure specifies the version. */
     switch ((csd & SD_CSD_CSD_STRUCTURE_MASK) >> SD_CSD_CSD_STRUCTURE_SHIFT) {
@@ -1151,7 +1182,8 @@ void handle_client(bool was_irq)
         }
 
         driver_state.blk_req.inflight = true;
-        LOG_DRIVER("Received command: code=%d, paddr=0x%lx, block_number=%lu, count=%d, id=%d\n",
+        LOG_DRIVER("Received command: code=%d, paddr=0x%lx, block_number=%lu, "
+                   "count=%d, id=%d\n",
                    driver_state.blk_req.code, driver_state.blk_req.paddr, driver_state.blk_req.blk_number,
                    driver_state.blk_req.blk_count, driver_state.blk_req.id);
     }

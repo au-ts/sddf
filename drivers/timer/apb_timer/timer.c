@@ -22,7 +22,7 @@
 #define LOG_APBTIMER_ERR(...) do{ sddf_dprintf("APBTIMER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 /*
- * Adjust NUM_TIMERS if synthesised with more timers.                 
+ * Adjust NUM_TIMERS if synthesised with more timers.
  * Minimum = 2 due to a bug in the HDL, assumed for rest
  * of this driver.
  */
