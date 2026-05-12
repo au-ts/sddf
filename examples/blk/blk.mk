@@ -41,20 +41,29 @@ SYSTEM_FILE := blk.system
 SUPPORTED_BOARDS := qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \
 		    maaxboard \
-			x86_64_generic
+		    x86_64_generic
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
 SDDF_CUSTOM_LIBC := 1
 
+# Force rebuild if partition or NVME args change
+# This is probably too crude: it forces _everything_ to be rebuilt
+COMMON_CONFIG += ${PARTITION} ${NVME}
+
 include ${SDDF}/tools/make/board/common.mk
 
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
-CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
-		  -I$(SDDF)/include \
-		  -I$(SDDF)/include/microkit \
-		  -I$(CONFIGS_INCLUDE)
+IMAGES := blk_driver.elf \
+	  client.elf \
+	  blk_virt.elf \
+	  serial_virt_tx.elf \
+	  serial_driver.elf
+
+CFLAGS += -Wall -Werror \
+	  -I$(SDDF)/include \
+	  -I$(SDDF)/include/microkit \
+	  -I$(CONFIGS_INCLUDE)
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group

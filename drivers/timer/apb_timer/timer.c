@@ -21,23 +21,37 @@
 
 #define LOG_APBTIMER_ERR(...) do{ sddf_dprintf("APBTIMER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define NUM_TIMERS 2 // Adjust if synthesised with more timers.                                                                       \
-                        // Minimum = 2 due to a bug in the HDL, assumed for rest of this driver.
+/*
+ * Adjust NUM_TIMERS if synthesised with more timers.
+ * Minimum = 2 due to a bug in the HDL, assumed for rest
+ * of this driver.
+ */
+#define NUM_TIMERS 2
 #define APBTIMER_MAX_TICKS (UINT32_MAX)
 #define APBTIMER_CLK_FREQ ((uint64_t)50000000) // 50MHz
 #define NANO_INVERSE NS_IN_S
 
-// The APB timer has an array of internal timers. Use one for long-running time measurements, use
-// the other for generating interrupts at finer granularity using prescalers.
-// TODO: support >2 timers; probably exposed over a different API for drivers etc?
+/*
+ * The APB timer has an array of internal timers. Use one for
+ * long-running time measurements, use the other for generating
+ * interrupts at finer granularity using prescalers.
+ *
+ * TODO: support >2 timers; probably exposed over a different API for
+ * drivers etc?
+ */
 #define TIMER_TIMEOUT    (0)
-// We are conservative with IRQs in config.json. We don't use the 2nd (cmp) interrupt
-// for the timekeeper, and since that IRQ isn't in config.json we must make sure the timekeeper
-// is the last ID to avoid accessing the wrong IRQ.
+/*
+ * We are conservative with IRQs in config.json. We don't use the 2nd
+ * (cmp) interrupt for the timekeeper, and since that IRQ isn't in
+ * config.json we must make sure the timekeeper is the last ID to
+ * avoid accessing the wrong IRQ.
+ */
 #define TIMER_TIMEKEEPER (1)
 
-// NOTE: at the time of writing, the APB timer's prescaler logic is completely
-// broken. We use no prescaler as a result.
+/*
+ * NOTE: at the time of writing, the APB timer's prescaler logic is
+ * completely broken. We use no prescaler as a result.
+ */
 #define TIMEKEEPER_PRESCALER (0)
 
 #define APBTIMER_CTRL_EN_BIT            (BIT(0))
@@ -52,7 +66,10 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-// Timer block implements NUM_TIMERS separate timers with back-to-back registers
+/*
+ * Timer block implements NUM_TIMERS separate timers with back-to-back
+ * registers
+ */
 struct timer_regs {
     uint32_t timer;
     uint32_t ctrl;
@@ -63,7 +80,8 @@ struct timer_regs {
 // Array of regs structs, not just one set!
 volatile struct timer_regs *regs;
 
-/* Keep track of how many timer overflows have occured.
+/*
+ * Keep track of how many timer overflows have occured.
  * Used as the most significant segment of ticks.
  * We need to keep track of this state as the value register is only
  * 32 bits as opposed to the common 64 bit timer value regsiters found
@@ -80,11 +98,12 @@ typedef struct apbtimer_timeout_conf {
 } apbtimer_timeout_conf_t;
 
 /**
- * Convert the tick count of a timer to nanoseconds, given the expected prescaler
- * and overflow counter. Prescaler can be set to 0 to ignore.
+ * Convert the tick count of a timer to nanoseconds, given the
+ * expected prescaler and overflow counter. Prescaler can be set to 0
+ * to ignore.
  *
- * Prescaler should be given in same format as ctrl reg - i.e. 0 = disabled (multiply
- * by 1), 1 = multiply by 2, etc.
+ * Prescaler should be given in same format as ctrl reg - i.e. 0 =
+ * disabled (multiply by 1), 1 = multiply by 2, etc.
  */
 static inline uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler)
 {
@@ -99,8 +118,8 @@ static inline uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler)
 
 /**
  * Return number of ticks since driver startup using timekeeper timer.
- * NOTE: one round of timer @ 50MHz with prescaler of (1<<3)=4 lasts for 171.8
- *          seconds. Time resolution = 80ns per tick.
+ * NOTE: one round of timer @ 50MHz with prescaler of (1<<3)=4 lasts
+ * for 171.8 seconds. Time resolution = 80ns per tick.
  */
 static uint64_t get_time_ns(void)
 {
@@ -112,27 +131,32 @@ static uint64_t get_time_ns(void)
 }
 
 /**
- * Calculate the cmp value and prescaler for the timeout timer given
- * a desired delay in nanoseconds. If delay exceeds capacity of timer,
+ * Calculate the cmp value and prescaler for the timeout timer given a
+ * desired delay in nanoseconds. If delay exceeds capacity of timer,
  * returns maximum prescaler and cmp.
  */
 static apbtimer_timeout_conf_t calculate_timeout_from_ns(uint64_t ns_delay)
 {
-    // Convert nanoseconds to ticks with a prescaler of zero (x1)
-    // tick = 1 timer period = 1/f_clk = T_clk
-    // ticks = n. periods in delay = seconds_delay / T_clk
-    //
-    // To get ticks efficiently, precalculate 1/nano (10e-9).
-    // Hence, T_clk = NANO_INVERSE / F_clk
-    // and T_delay = seconds_delay / (NANO_INVERSE/F_clk)
-    // uint64_t divisor = NANO_INVERSE / APBTIMER_CLK_FREQ;
-    // uint64_t ticks = ns_delay / divisor;
+    /*
+     * Convert nanoseconds to ticks with a prescaler of zero (x1)
+     * tick = 1 timer period = 1/f_clk = T_clk
+     * ticks = n. periods in delay = seconds_delay / T_clk
+     *
+     * To get ticks efficiently, precalculate 1/nano (10e-9).
+     * Hence, T_clk = NANO_INVERSE / F_clk
+     * and T_delay = seconds_delay / (NANO_INVERSE/F_clk)
+     * uint64_t divisor = NANO_INVERSE / APBTIMER_CLK_FREQ;
+     * uint64_t ticks = ns_delay / divisor;
+     */
     uint64_t ticks = (ns_delay * APBTIMER_CLK_FREQ) / NANO_INVERSE;
 
     uint32_t prescaler = 0;
     uint32_t cmp = ticks;
-    // NOTE: at the time of writing, the APB timer's prescaler logic is completely
-    // broken. The prescaler calculator is disabled as a result.
+    /*
+     * NOTE: at the time of writing, the APB timer's prescaler logic
+     * is completely broken. The prescaler calculator is disabled as a
+     * result.
+     */
 
     // if (ticks <= UINT32_MAX) {
     //     // No prescaler needed
@@ -170,9 +194,9 @@ static inline void set_timeout_prescaler(uint8_t prescaler)
 }
 
 /**
- * Set up timekeeper timer for timestamping execution.
- * Use maximum prescaler, disable cmp interrupts to minimise performance
- * impact from timeouts.
+ * Set up timekeeper timer for timestamping execution.  Use maximum
+ * prescaler, disable cmp interrupts to minimise performance impact
+ * from timeouts.
  */
 static inline void setup_timekeeper(void)
 {
@@ -197,15 +221,15 @@ static inline void timeout_set_enable(bool enable)
 }
 
 /**
- * Process timeouts from the queue using the timeout timer.
- * This *differs* from most other sDDF timers because we process timeouts
- * on a relative basis rather than with respect to the absolute time, as such
- * a method is cumbersome and inefficient with 32 bit timers.
+ * Process timeouts from the queue using the timeout timer.  This
+ * *differs* from most other sDDF timers because we process timeouts
+ * on a relative basis rather than with respect to the absolute time,
+ * as such a method is cumbersome and inefficient with 32 bit timers.
  *
- * Timeouts are stored using absolute time upon PPC, this function converts the
- * next timeout into a relative stamp from the current time and awaits it using
- * the timeout timer. Automatically sets prescaler to satisfy most granular time
- * resolution.
+ * Timeouts are stored using absolute time upon PPC, this function
+ * converts the next timeout into a relative stamp from the current
+ * time and awaits it using the timeout timer. Automatically sets
+ * prescaler to satisfy most granular time resolution.
  */
 static void process_timeouts(void)
 {
