@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/resources/device.h>
 
 uintptr_t pci_resources_vaddr;
 seL4_CPtr cnode_cptr_pci_resources;
@@ -16,6 +17,115 @@ pci_resources_t *pci_resources;
 cnode_caps_t *cnode_caps;
 
 bool acpi_ready = false;
+
+// regions[1..] are used for MSI-X BARs
+uint8_t avail_region_idx = 1;
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".ecam_configs"))) pci_ecam_config_t pci_ecam_config;
+
+/**
+ * Look for the capability of a device by ID
+ * */
+static struct shared_pci_cap *find_pci_cap_by_id(struct pci_config_space *config_space, uint8_t cap_id)
+{
+    struct shared_pci_cap *cap = (struct shared_pci_cap *)((uintptr_t)config_space + config_space->cap_ptr);
+    while (cap != (struct shared_pci_cap *)config_space) {
+        if (cap->cap_id == cap_id) {
+            return cap;
+        }
+        cap = (struct shared_pci_cap *)((uintptr_t)config_space + cap->next_ptr);
+    }
+    return NULL;
+}
+
+void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_bar_t pci_bar_cfg)
+{
+    sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, pci_bar_cfg.base_addr);
+    if (pci_bar_cfg.base_addr) {
+            volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+            // TODO: check if the BAR type is matched
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            *mem_bar = 0xFFFFFFFF;
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    }
+}
+
+void configure_irqs(struct pci_config_space *pci_header, config_request_t config_request)
+{
+    bool ioapic_enabled = true;
+    for (int i = 0; i < config_request.num_irqs; i++) {
+        if (config_request.irqs[i].kind != irq_ioapic) {
+            ioapic_enabled = false;
+        }
+
+        if (!ioapic_enabled && config_request.irqs[i].kind == irq_ioapic) {
+            sddf_dprintf("error: I/O APIC can not be enabled with MSI/MSI-X\n");
+            return;
+        }
+    }
+
+    // Enable/Disable I/O APIC interrupts
+    if (ioapic_enabled) {
+        pci_header->command &= (~BIT(10));
+        return;
+    } else {
+        pci_header->command |= BIT(10);
+    }
+
+    for (int i = 0; i < config_request.num_irqs; i++) {
+        switch (config_request.irqs[i].kind) {
+            case irq_ioapic: {
+                // TODO: figure out how to reconfigure interrupt vectors
+                break;
+            };
+            case irq_msi: {
+                // TODO: configure MSI interrupts
+                break;
+            };
+            case irq_msix: {
+                struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
+                if (msix_cap) {
+                    // Bits 2-0 refer to BAR ID
+                    uint8_t bar_id = msix_cap->table_offset_bir & 0x5;
+                    pci_bar_t msix_bar;
+                    msix_bar.bar_id = bar_id;
+                    msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr;
+                    msix_bar.ioport = false;
+
+                    configure_pci_bar(pci_header, bar_id, msix_bar);
+
+                    // Enable MSI-X
+                    struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
+                    msg_ctrl->msix_enable = 1;
+                    sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
+                    sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
+                    sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
+
+                    struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr;
+                    msix_table->msg_addr_low = 0xFEEu << 20;
+                    msix_table->msg_data = 0x4030 + config_request.irqs[i].vector;
+                    msix_table->vec_ctrl = 0x0;
+                    sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
+                    sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
+                    sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
+                    sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
+
+                    uint32_t *msix_pba = (uint32_t *)(device_resources.regions[avail_region_idx].region.vaddr + 0x800);
+                    sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
+
+                    avail_region_idx += 1;
+                } else {
+                    sddf_dprintf("error: device does not support MSI-X\n");
+                }
+                break;
+            };
+        }
+
+    }
+}
 
 // TODO: pass bus start and end as arguments
 void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
@@ -39,6 +149,7 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 
 void print_cnode_caps()
 {
+    sddf_dprintf("========Descriptions of received capabilities========\n");
     sddf_dprintf("idx,   base_addr,  end_addr\n")
     for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
         sddf_dprintf("%3u: 0x%09lx, 0x%09lx\n", i, cnode_caps->desc[i].base_addr, cnode_caps->desc[i].end_addr);
@@ -80,6 +191,7 @@ void init(void)
 
     print_cnode_caps();
 
+    sddf_dprintf("=========Descriptions of PCI resources==========\n");
     for (int i = 0; i < pci_resources->num_bridges; i++) {
         uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
         sddf_dprintf("num_res: %u\n", num_res);
@@ -99,11 +211,20 @@ void init(void)
     /*                                        cnode_cptr_pci_resources, 0, 0, */
     /*                                        2, 1); */
     /* sddf_dprintf("error: %d\n", error); */
+
+    sddf_dprintf("Try creating an IRQ handler capability: ");
+    int ret = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 13, 0, 0, 13);
+    if (ret) {
+        sddf_dprintf("Error - %d\n", ret);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
 }
 
 void notified(microkit_channel ch)
 {
-    sddf_dprintf("\n[PCI driver] notified by ch %d", ch);
+    sddf_dprintf("\n[PCI driver] notified by ch %d\n", ch);
     if (ch == 0 && !acpi_ready) {
         acpi_ready = true;
         init();
