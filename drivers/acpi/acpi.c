@@ -388,6 +388,7 @@ seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL
 
 void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
 {
+    // TODO: deal with WORD_IO and WORD_BUS
     sddf_dprintf("=====pass CRS untypeds=====\n");
     while (crs_list) {
         uint8_t new_res_idx = pci_resources->bridges[bridge_idx].num_dev_resources;

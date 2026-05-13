@@ -47,8 +47,12 @@ void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_
             // TODO: check if the BAR type is matched
             sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
             *mem_bar = 0xFFFFFFFF;
+            // TODO: read the size of BAR and allocate from the resource window
+            //   and map it to the device driver's PD
             sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            // TODO: write the allocated physical address to the BAR register
             *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
+            // TODO: check if it has been updated
             sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
     }
 }
@@ -151,6 +155,7 @@ void print_cnode_caps()
 {
     sddf_dprintf("========Descriptions of received capabilities========\n");
     sddf_dprintf("idx,   base_addr,  end_addr\n")
+    sddf_dprintf("%3u: (IRQControl capability)\n", 1);
     for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
         sddf_dprintf("%3u: 0x%09lx, 0x%09lx\n", i, cnode_caps->desc[i].base_addr, cnode_caps->desc[i].end_addr);
     }
@@ -199,7 +204,7 @@ void init(void)
             device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
             sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr);
 
-            if (dev_res->type == DWORD_MEMORY) {
+            if (dev_res->type == DWORD_MEMORY || dev_res->type == WORD_MEMORY || dev_res->type == QWORD_MEMORY) {
                 get_ut_by_paddr(dev_res->min_addr);
             }
         }
