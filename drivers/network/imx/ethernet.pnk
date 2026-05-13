@@ -63,6 +63,8 @@ inline fun set_rdar()
               acc(slot(gv.hardware_ring_rx, i).hw_len) &&
               is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len) &&
               is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) @/
+  /@ requires forall i: Int :: i in gv.rx_await_ack ==> forall x: Seq[Int] :: x in gv.rx_handled ==>
+                |x| == 2 && x[0] != slot(gv.hardware_ring_rx, i).hw_addr @/
   /@ ensures acc(gv.eth_reg, 1/2) @/
   /@ ensures acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() &&
        acc(gv.hardware_ring_rx, 2/3) && acc(gv.rx_handled) @/
@@ -92,6 +94,8 @@ inline fun set_tdar()
               acc(slot(gv.hardware_ring_tx, i).hw_len) &&
               is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len) &&
               is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) @/
+  /@ requires forall i: Int :: i in gv.tx_await_ack ==> forall x: Seq[Int] :: x in gv.tx_handled ==>
+                |x| == 2 && x[0] != slot(gv.hardware_ring_tx, i).hw_addr @/
   /@ ensures acc(gv.eth_reg, 1/2) @/
   /@ ensures acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() &&
        acc(gv.hardware_ring_tx, 2/3) && acc(gv.tx_handled) @/
@@ -933,8 +937,7 @@ fun tx_return()
                    forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
                      !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
                      element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
-    // TODO: for some reason helps viper :\
-    /@ invariant true != false @/
+    /@ invariant true @/
 
     /@ unfold valid_hardware_ring_tx_read() @/
     /@ label l_lp @/
