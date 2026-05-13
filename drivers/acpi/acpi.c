@@ -649,11 +649,21 @@ void init(void)
     scan_objects(&object_root, dsdt_end);
     /* print_object_tree(&object_root, 0); */
 
+
+    sddf_dprintf("===========Pass IRQControl capability======\n");
+    // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
+    error = seL4_CNode_Move(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, 1, 58);
+    if (error) {
+        sddf_dprintf("Error: failed to copy a capability\n");
+        return;
+    }
+    cnode_pci_resources_free_slot++;
+
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
     cnode_caps_pci_resources = (cnode_caps_t *)&pci_resources->cnode_caps;
-    cnode_caps_pci_resources->start = 1;
-    cnode_caps_pci_resources->end = 1;
+    cnode_caps_pci_resources->start = 2;
+    cnode_caps_pci_resources->end = 2;
     query_all_objects_by_name(&object_root, acpi_str_hid);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
@@ -701,7 +711,6 @@ void init(void)
 
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");
-    sddf_dprintf("init cnode: 0x%x\n", seL4_CapInitThreadCNode);
     uintptr_t ecam_base_vaddr = 0x50000000;
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
