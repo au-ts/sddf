@@ -261,8 +261,7 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat) {
 fun rx_provide()
 {
   /@ requires acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
-              acc(gv.rx_free.net_head) &&
-              acc(gv.rx_free.net_tail, 2/3) &&
+              acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail) &&
               acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
               acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
               acc(gv.rx_free.net_removed_addr) &&
@@ -286,8 +285,7 @@ fun rx_provide()
                 s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
   /@ requires disjoint_net_queue_removed_handled_rx() @/
   /@ ensures acc(gv.net_rx_free, 2/3) && acc(gv.rx_free, 2/3) &&
-             acc(gv.rx_free.net_head) &&
-             acc(gv.rx_free.net_tail, 2/3) &&
+             acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail) &&
              acc(gv.net_rx_capacity, 2/3) && acc(gv.rx_free.net_signal) &&
              acc(gv.rx_free.net_descr, 2/3) &&
              acc(gv.rx_free.net_removed_addr) &&
@@ -319,8 +317,7 @@ fun rx_provide()
   while (reprocess)
   {
     /@ invariant acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
-                 acc(gv.rx_free.net_head) &&
-                 acc(gv.rx_free.net_tail, 2/3) &&
+                 acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail) &&
                  acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
                  acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
                  acc(gv.rx_free.net_removed_addr) &&
@@ -355,8 +352,7 @@ fun rx_provide()
     while ((!full + !empty) == 2)
     {
       /@ invariant acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
-                   acc(gv.rx_free.net_head) &&
-                   acc(gv.rx_free.net_tail, 2/3) &&
+                   acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail) &&
                    acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
                    acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
                    acc(gv.rx_free.net_removed_addr) &&
@@ -601,13 +597,6 @@ fun rx_return()
       var io_addr = 0;
       !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
 
-      /*var queue_full = net_queue_full(net_rx_active, net_rx_capacity);
-      if (queue_full) {
-        // panic -- unreachable
-        /@ assert (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY @/
-        /@ inhale false @/
-        return 1;
-      }*/
       // the following should be provable with more work
       /@ inhale (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) != QUEUE_CAPACITY @/
       /@ assert io_addr == slot(gv.hardware_ring_rx, idx).hw_addr @/
@@ -967,13 +956,6 @@ fun tx_return()
 
       var io_addr = 0;
       !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
-      // the following should be provable with more work
-      /*var queue_full = net_queue_full(net_tx_free, net_tx_capacity);
-      if (queue_full) {
-        // panic
-        /@ fold valid_hardware_ring_tx_read() @/
-        return 1;
-      }*/
       /@ inhale (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) != QUEUE_CAPACITY @/
       /@ assert io_addr == slot(gv.hardware_ring_tx, idx).hw_addr @/
       net_enqueue(net_tx_free, io_addr, 0, net_tx_capacity);
