@@ -163,7 +163,7 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
             return existing_object;
         }
 
-        sddf_dprintf("Create a type 0x%02X object: %s\n", op_code, name_segment);
+        /* sddf_dprintf("Create a type 0x%02X object: %s\n", op_code, name_segment); */
         return insert_child_object(parent, name_segment, op_code);
     }
 
@@ -226,7 +226,7 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
                 break;
             }
             default: {
-                sddf_dprintf("Op code 0x%04X is not implemented (at 0x%lx)\n", op_code, (uintptr_t)scanner.current);
+                sddf_dprintf("Op code 0x%04X is not implemented (at 0x%lx), so jump to the end\n", op_code, (uintptr_t)scanner.current);
                 return;
             }
         }
@@ -468,7 +468,10 @@ void extract_prt_package(aml_object_t *node)
         // Parse Source Index, i.e. index in I/O APIC
         uint32_t element_4 = get_integer_data();
 
-        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4);
+        // TODO: remove this
+        element_4 += (element_1 + element_2 + ext_irq->irq_num);
+        (void)element_4;
+        /* sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4); */
     }
 }
 
