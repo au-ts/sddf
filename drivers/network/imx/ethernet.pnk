@@ -933,8 +933,8 @@ fun tx_return()
                    forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
                      !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
                      element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
-    // TODO: for some reason, helps viper :\
-    /@ invariant true @/
+    // TODO: for some reason helps viper :\
+    /@ invariant true != false @/
 
     /@ unfold valid_hardware_ring_tx_read() @/
     /@ label l_lp @/

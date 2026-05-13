@@ -21,6 +21,7 @@ define f_is_valid_data_addr(_, _, x) is_valid_data_addr(x)
 define f_is_valid_data_len(_, _, x) is_valid_data_len(x)
 define f_is_valid_rx_stat(_, _, x) is_valid_rx_stat(x)
 define f_is_valid_tx_stat(_, _, x) is_valid_tx_stat(x)
+define f_true(_, _) true
 
 /* Hard-coded register addresses specified in
  * `examples/echo_server/board/maaxborad/echo_server.system` and
