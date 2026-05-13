@@ -629,18 +629,17 @@ fun rx_return()
 
 #define disjoint_net_queue_removed_handled_tx() ( \
   (forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==> \
-    !(element2_seq(slotq(gv.tx_active.net_descr, i).ndescr_addr, slotq(gv.tx_active.net_descr, i).ndescr_len) \
-       in gv.tx_active.net_removed)) && \
+    forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> |x| == 2 && \
+      x[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr) && \
   (forall j: Int :: gv.tx_active.net_head <= j && j < gv.tx_active.net_tail ==> \
-    !(element2_seq(slotq(gv.tx_active.net_descr, j).ndescr_addr, slotq(gv.tx_active.net_descr, j).ndescr_len) \
-       in gv.tx_handled)) \
+    forall y: Seq[Int] :: y in gv.tx_handled ==> |y| == 2 && \
+      y[0] != slotq(gv.tx_active.net_descr, j).ndescr_addr) \
 )
 
 fun tx_provide()
 {
   /@ requires acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
-              acc(gv.tx_active.net_head) &&
-              acc(gv.tx_active.net_tail, 2/3) &&
+              acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail) &&
               acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
               acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
               acc(gv.tx_active.net_removed) &&
@@ -663,12 +662,10 @@ fun tx_provide()
   /@ requires forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
   /@ requires disjoint_net_queue_removed_handled_tx() @/
   /@ ensures acc(gv.net_tx_active, 2/3) && acc(gv.tx_active, 2/3) &&
-             acc(gv.tx_active.net_head) &&
-             acc(gv.tx_active.net_tail, 2/3) && acc(gv.net_tx_capacity, 2/3) &&
-             acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
-             acc(gv.tx_active.net_removed) &&
+             acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail) &&
+             acc(gv.net_tx_capacity, 2/3) && acc(gv.tx_active.net_signal) &&
+             acc(gv.tx_active.net_descr, 2/3) && acc(gv.tx_active.net_removed) &&
              0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
-             gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
              forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
                acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
                acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
@@ -694,12 +691,10 @@ fun tx_provide()
   while (reprocess)
   {
     /@ invariant acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
-                 acc(gv.tx_active.net_head) &&
-                 acc(gv.tx_active.net_tail, 2/3) &&
+                 acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail) &&
                  acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
                  acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
                  acc(gv.tx_active.net_removed) &&
-                 gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
                  0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
                  forall i : Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
                    acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
@@ -729,13 +724,11 @@ fun tx_provide()
     while ((!full + !empty) == 2)
     {
       /@ invariant acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
-                   acc(gv.tx_active.net_head) &&
-                   acc(gv.tx_active.net_tail, 2/3) &&
+                   acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail) &&
                    acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
                    acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
                    acc(gv.tx_active.net_removed) &&
                    0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
-                   gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
                    forall i: Int :: gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
                      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
                      acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
