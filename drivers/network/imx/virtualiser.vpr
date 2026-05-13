@@ -198,7 +198,7 @@ method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail)
   requires acc(gv.rx_free.net_removed_addr, 1/4) && acc(gv.rx_handled, 1/4) && acc(gv.rx_free.net_descr, 1/4) &&
-    acc(gv.rx_free.net_head, 1/4) 
+    acc(gv.rx_free.net_head, 1/4)
   requires 0 <= gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
     forall i: Int :: gv.rx_free.net_head <= i < gv.rx_free.net_tail ==>
       acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
@@ -468,12 +468,51 @@ method store_tx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
 
 method load_tx_active_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
+  requires acc(gv.tx_active.net_removed_addr, 1/4) && acc(gv.tx_handled, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
+    acc(gv.tx_active.net_head, 1/4)
+  requires 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+    forall i: Int :: gv.tx_active.net_head <= i < gv.tx_active.net_tail ==>
+      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
   requires address == TX_ACTIVE_BASE + TAIL_OFFSET
-  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4)
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
+  ensures acc(gv.tx_active.net_removed_addr, 1/4) && acc(gv.tx_handled, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
+    acc(gv.tx_active.net_head, 1/4) && 0 <= old(gv.tx_active.net_tail) - gv.tx_active.net_head <= 256 &&
+    forall i: Int :: gv.tx_active.net_head <= i < old(gv.tx_active.net_tail) ==>
+      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
   ensures retval == gv.tx_active.net_tail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
+  ensures 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256
+  ensures gv.tx_active.net_tail >= old(gv.tx_active.net_tail)
+  ensures forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+    acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+    is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
+  ensures forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
+    gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
+    slotq(gv.tx_active.net_descr, i).ndescr_addr == slotq(gv.tx_active.net_descr, j).ndescr_addr ==>
+      i == j
+  ensures forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+    !(slotq(gv.tx_active.net_descr, i).ndescr_addr in gv.tx_active.net_removed_addr)
+  ensures forall s: Seq[Int] :: s in gv.tx_handled ==>
+    |s| == 2 && forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
 {
+  exhale acc(gv.tx_active.net_tail)
+  inhale acc(gv.tx_active.net_tail)
+  inhale 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256
+  inhale gv.tx_active.net_tail >= old(gv.tx_active.net_tail)
+  inhale forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+    acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+    is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
+  inhale forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
+    gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
+    slotq(gv.tx_active.net_descr, i).ndescr_addr == slotq(gv.tx_active.net_descr, j).ndescr_addr ==>
+      i == j
+  inhale forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+    !(slotq(gv.tx_active.net_descr, i).ndescr_addr in gv.tx_active.net_removed_addr)
+  inhale forall s: Seq[Int] :: s in gv.tx_handled ==>
+    |s| == 2 && forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
   retval := gv.tx_active.net_tail % (MAX_INT16 + 1)
   refute false
 }
