@@ -40,6 +40,7 @@ Device Tree compatible strings/platforms it is known to work with.
     * `amlogic,meson-g12a-dwmac`
 * virtIO network
     * `virtio,mmio`
+    * PCI is also supported for x86-64 platforms.
 
 ## GPU
 
@@ -84,3 +85,5 @@ Device Tree compatible strings/platforms it is known to work with.
     * `cdns,ttc`
 * BCM2835
     * `brcm,bcm2835-system-timer`
+* x86-64 TSC & HPET:
+    * `tsc_hpet`
