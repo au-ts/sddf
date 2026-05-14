@@ -59,19 +59,24 @@ def build_zig(args: argparse.Namespace, test_config: common.TestConfig):
     }
     zig_optimize = zig_optimize_table[test_config.config]
 
+    zig_cmd = [
+        "zig",
+        "build",
+        f"-Dsdk={args.microkit_sdk}",
+        f"-Dboard={test_config.board}",
+        f"-Dconfig={test_config.config}",
+        f"-Doptimize={zig_optimize}",
+        "-p",
+        build_dir,
+        f"-j{args.num_jobs}",
+    ]
+
+    if "PYTHON" in os.environ:
+        zig_cmd.append(f"-Dpython={os.getenv('PYTHON')}")
+
     with contextlib.chdir(example_dir):
         subprocess.run(
-            [
-                "zig",
-                "build",
-                f"-Dsdk={args.microkit_sdk}",
-                f"-Dboard={test_config.board}",
-                f"-Dconfig={test_config.config}",
-                f"-Doptimize={zig_optimize}",
-                "-p",
-                build_dir,
-                f"-j{args.num_jobs}",
-            ],
+            zig_cmd,
             check=True,
             env=zig_env,
         )

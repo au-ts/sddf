@@ -186,7 +186,7 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
     }
 
     std.log.err("Board '{}' is not supported\n", .{board});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
 const ConfigOptions = enum { debug, release, benchmark };
@@ -209,7 +209,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const default_python = "python3";
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
@@ -267,14 +267,14 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    client.addCSourceFile(.{ .file = b.path("client.c") });
-    client.addIncludePath(sddf_dep.path("include"));
-    client.addIncludePath(sddf_dep.path("include/microkit"));
-    client.linkLibrary(sddf_dep.artifact("util"));
-    client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client.root_module.addCSourceFile(.{ .file = b.path("client.c") });
+    client.root_module.addIncludePath(sddf_dep.path("include"));
+    client.root_module.addIncludePath(sddf_dep.path("include/microkit"));
+    client.root_module.linkLibrary(sddf_dep.artifact("util"));
+    client.root_module.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 
-    client.addIncludePath(libmicrokit_include);
-    client.addObjectFile(libmicrokit);
+    client.root_module.addIncludePath(libmicrokit_include);
+    client.root_module.addObjectFile(libmicrokit);
     client.setLinkerScript(libmicrokit_linker_script);
 
     b.installArtifact(client);
@@ -286,7 +286,7 @@ pub fn build(b: *std.Build) !void {
             const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
             dtc_cmd.addFileInput(dts);
             dtc_cmd.addFileArg(dts);
-            break :blk dtc_cmd.captureStdOut();
+            break :blk dtc_cmd.captureStdOut(.{});
         } else {
             break :blk null;
         }

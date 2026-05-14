@@ -43,7 +43,7 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
     }
 
     std.log.err("Board '{}' is not supported\n", .{board});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
 const ConfigOptions = enum { debug, release, benchmark };
@@ -66,7 +66,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const default_python = "python3";
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
@@ -135,23 +135,23 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    client_scan.addCSourceFiles(.{
+    client_scan.root_module.addCSourceFiles(.{
         .files = &.{"client_scan.c"},
         .flags = &.{"-DLIBI2C_RAW"},
     });
-    client_scan.addIncludePath(sddf_dep.path("include"));
-    client_scan.addIncludePath(sddf_dep.path("include/microkit"));
-    client_scan.linkLibrary(sddf_dep.artifact("util"));
-    client_scan.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
-    client_scan.linkLibrary(sddf_dep.artifact("libi2c_raw"));
+    client_scan.root_module.addIncludePath(sddf_dep.path("include"));
+    client_scan.root_module.addIncludePath(sddf_dep.path("include/microkit"));
+    client_scan.root_module.linkLibrary(sddf_dep.artifact("util"));
+    client_scan.root_module.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
+    client_scan.root_module.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
-    client_scan.addIncludePath(sddf_dep.path("libco"));
-    client_scan.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    client_scan.root_module.addIncludePath(sddf_dep.path("libco"));
+    client_scan.root_module.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client_scan.addIncludePath(libmicrokit_include);
-    client_scan.addObjectFile(libmicrokit);
+    client_scan.root_module.addIncludePath(libmicrokit_include);
+    client_scan.root_module.addObjectFile(libmicrokit);
     client_scan.setLinkerScript(libmicrokit_linker_script);
 
     b.installArtifact(client_scan);
@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) !void {
     const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
-    const dtb = dtc_cmd.captureStdOut();
+    const dtb = dtc_cmd.captureStdOut(.{});
 
     // Run the metaprogram to get sDDF configuration binary files and the SDF file.
     const metaprogram = b.path("meta.py");
