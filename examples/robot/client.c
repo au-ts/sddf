@@ -8,7 +8,7 @@
 
 #include "include/client/client.h"
 
-// #define DEBUG_LOG
+#define DEBUG_LOG
 
 #ifdef DEBUG_LOG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -18,7 +18,7 @@
 #define LOG_CLIENT_ERR(...) do{}while(0)
 #endif
 
-#define REMOTE_CONTROL (1)
+#define REMOTE_CONTROL (0)
 
 #define STACK_SIZE (4096)
 #define BUFFER_SIZE (1024)
@@ -158,17 +158,18 @@ void send_avoidance_command() {
     LOG_CLIENT("dist sensor c: %lu\n", dist_sensor_c);
     
     if (dist_sensor_b > 40 && dist_sensor_a > 40 && dist_sensor_c > 40) {
-        LOG_CLIENT("attempting drive\n");
         control_forward();
-        LOG_CLIENT("returned from drive\n");
     }
     else {
         control_stop();
+
+        // TODO (and note) i think i accidentally swapped the pins for left/right motors
+        // so i had to swar right/left here, the other way around is correct
         if (dist_sensor_a > dist_sensor_c) {
-            control_right();
+            control_left();
         }
         else {
-            control_left();
+            control_right();
         }
     }
 
@@ -184,7 +185,6 @@ void client_main(void) {
 
     // time_start = sddf_timer_time_now(timer_channel);
     // digital_write(gpio_channel_echo_a, GPIO_LOW);
-    LOG_CLIENT("Anything\n");
 
     // control_forward();
     delay_microseconds(1000, SENSOR_TIMEOUT_ID);
@@ -212,7 +212,6 @@ void notified(sddf_channel ch) {
 
     if (ch == timer_channel) {
         int timeout_id = dequeue(&timeout_queue);
-        LOG_CLIENT("TIMEOUT\n");
 
         if (timeout_id == SENSOR_TIMEOUT_ID) {
             co_switch(t_main);
@@ -223,7 +222,6 @@ void notified(sddf_channel ch) {
     }
     else if (ch == serial_channel_rx) {
         // pass command from serial to buffer
-        LOG_CLIENT("RX RECEIVED\n");
 
         if (REMOTE_CONTROL) {
             char c;
@@ -251,9 +249,6 @@ void init(void) {
     // ultrasonic channels
     gpio_channel_echo_a = gpio_config.driver_channel_ids[0];
     gpio_channel_trigger_a = gpio_config.driver_channel_ids[1];
-
-    LOG_CLIENT("echo: %d\n", gpio_channel_echo_a);
-    LOG_CLIENT("trigger: %d\n", gpio_channel_trigger_a);
 
     gpio_channel_echo_b = gpio_config.driver_channel_ids[2];
     gpio_channel_trigger_b = gpio_config.driver_channel_ids[3];
