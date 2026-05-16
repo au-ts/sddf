@@ -313,7 +313,7 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
     seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
 
     uint32_t retyped_cptr_idx;
-    sddf_dprintf("min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr);
+    /* sddf_dprintf("min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
     error = untyped_retype(target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",
@@ -327,12 +327,12 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
 
     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
     error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, retyped_cptr_idx, 58, seL4_ReadWrite);
-    if (error) {
+    /* error = seL4_CNode_Move(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, retyped_cptr_idx, 58); */
+    if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
     sddf_dprintf("copy ut to slot %lu, start: %u, end: %u\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end);
-    sddf_dprintf("size of pci_resources_t: %lu\n", sizeof(pci_resources_t));
 
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].base_addr = min_addr;
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].end_addr = min_addr + new_ut_size;
@@ -655,6 +655,7 @@ void init(void)
 
     sddf_dprintf("===========Pass IRQControl capability======\n");
     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
+    /* error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, 1, 58, seL4_ReadWrite); */
     error = seL4_CNode_Move(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, 1, 58);
     if (error) {
         sddf_dprintf("Error: failed to copy a capability\n");
@@ -662,11 +663,27 @@ void init(void)
     }
     cnode_pci_resources_free_slot++;
 
+    non_dev_mem_id = 0;
+    uint32_t pci_kernel_objects_ut_idx = cap_list_end;
+    for (uint32_t i = cap_list_start; i < cap_list_end; i++) {
+        if (!cap_list[i].is_device) {
+            if (non_dev_mem_id == 8) {
+                pci_kernel_objects_ut_idx = i;
+                break;
+            }
+            non_dev_mem_id++;
+        }
+    }
+    // @terryb: slot 1 for IRQ control, slot 2 for kernel objects
+    cnode_caps_pci_resources = (cnode_caps_t *)&pci_resources->cnode_caps;
+    cnode_caps_pci_resources->start = 3;
+    cnode_caps_pci_resources->end = 2;
+    if (pci_kernel_objects_ut_idx < cap_list_end) {
+        pass_ut_with_range(cap_list[pci_kernel_objects_ut_idx].base_addr, cap_list[pci_kernel_objects_ut_idx].end_addr);
+    }
+
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
-    cnode_caps_pci_resources = (cnode_caps_t *)&pci_resources->cnode_caps;
-    cnode_caps_pci_resources->start = 2;
-    cnode_caps_pci_resources->end = 2;
     query_all_objects_by_name(&object_root, acpi_str_hid);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
@@ -706,11 +723,13 @@ void init(void)
             }
         }
     }
-    error = untypeds_revoke();
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error);
-        return;
-    }
+
+    // TODO: figure out a proper way to revoke used untypeds without affecting copied device memory
+    /* error = untypeds_revoke(); */
+    /* if (error != seL4_NoError) { */
+    /*     sddf_dprintf("Error: failed to revoke the untypeds, err - %u\n", error); */
+    /*     return; */
+    /* } */
 
     // Print summary
     sddf_dprintf("\n======PCI resources summary:======\n");

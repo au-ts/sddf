@@ -10,13 +10,16 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
+#include <sel4/sel4_arch/mapping.h>
 
 uintptr_t pci_resources_vaddr = 0x60000000;
 seL4_CPtr cnode_cptr_pci_resources;
 seL4_CPtr vspace_cptr_ethernet_driver;
 pci_resources_t *pci_resources;
 cnode_caps_t *cnode_caps;
+uint32_t kernel_objects_ut_idx = 2;
 
+#define IDX_TO_CPTR(idx) (seL4_CPtr)(cnode_cptr_pci_resources + idx)
 bool acpi_ready = false;
 
 // regions[1..] are used for MSI-X BARs
@@ -55,6 +58,252 @@ void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_
             *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
             // TODO: check if it has been updated
             sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    }
+}
+
+uint8_t get_object_size(seL4_Word object_type, seL4_Word size_bits)
+{
+    switch (object_type) {
+    /* Generic objects. */
+    case seL4_UntypedObject:
+        return size_bits;
+    case seL4_TCBObject:
+        return seL4_TCBBits;
+    case seL4_EndpointObject:
+        return seL4_EndpointBits;
+    case seL4_NotificationObject:
+        return seL4_NotificationBits;
+    case seL4_CapTableObject:
+        return (seL4_SlotBits + size_bits);
+    case seL4_X86_4K:
+        return seL4_PageBits;
+    case seL4_X86_LargePageObject:
+        return seL4_LargePageBits;
+    case seL4_X86_PageTableObject:
+        return seL4_PageTableBits;
+    case seL4_X86_PageDirectoryObject:
+        return seL4_PageDirBits;
+    default:
+        // TODO: double-check this
+        return size_bits;
+    }
+}
+
+seL4_Error untyped_retype(uint32_t ut_idx,
+                          seL4_Word object_type,
+                          seL4_Word size_bits,
+                          uint32_t *retyped_cptr_idx)
+{
+    seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + ut_idx,
+                                object_type,
+                                size_bits,
+                                cnode_cptr_pci_resources, 0, 0,
+                                cnode_caps->end, 1);
+    if (error != seL4_NoError) {
+        sddf_dprintf("ut: 0x%lx-0x%lx, idx: %u\n", cnode_caps->desc[ut_idx].base_addr, cnode_caps->desc[ut_idx].end_addr, ut_idx);
+        sddf_dprintf("Error: failed to retype an object type %lu, size_bits: %lu - error: %d\n", object_type, size_bits, error);
+        return error;
+    }
+
+    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cnode_caps->desc[ut_idx].base_addr); */
+
+    cnode_caps->desc[cnode_caps->end].base_addr = cnode_caps->desc[ut_idx].base_addr;
+    cnode_caps->desc[cnode_caps->end].end_addr = cnode_caps->desc[ut_idx].base_addr + (1ULL << get_object_size(object_type, size_bits));
+    cnode_caps->desc[cnode_caps->end].object_type = object_type;
+    cnode_caps->desc[cnode_caps->end].object_type = cnode_caps->desc[ut_idx].is_device;
+    cnode_caps->desc[cnode_caps->end].parent = ut_idx;
+    cnode_caps->desc[cnode_caps->end].child = 0;
+    cnode_caps->desc[cnode_caps->end].next = 0;
+    cnode_caps->desc[ut_idx].base_addr = cnode_caps->desc[cnode_caps->end].end_addr;
+
+    if (cnode_caps->desc[ut_idx].child == 0) {
+        cnode_caps->desc[ut_idx].child = cnode_caps->end;
+    } else {
+        uint32_t child_ut_idx = cnode_caps->desc[ut_idx].child;
+
+        while (cnode_caps->desc[child_ut_idx].next != 0) {
+            child_ut_idx = cnode_caps->desc[child_ut_idx].next;
+        }
+        cnode_caps->desc[child_ut_idx].next = cnode_caps->end;
+    }
+
+    if (retyped_cptr_idx != NULL) {
+        *retyped_cptr_idx = cnode_caps->end;
+    }
+    cnode_caps->end++;
+
+    return seL4_NoError;
+}
+
+seL4_Word max_size_bits(seL4_Word size)
+{
+    seL4_Word i = 63;
+    while (((1ULL << i) & size) == 0) {
+        i--;
+    }
+    return i;
+}
+
+seL4_Error get_untyped_at_paddr(seL4_Word target_paddr,
+                                uint32_t *target_ut_idx)
+{
+    uint32_t ut_idx = cnode_caps->end;
+    for (uint32_t i = cnode_caps->start; i < cnode_caps->end; i++) {
+        if (cnode_caps->desc[i].base_addr <= target_paddr && target_paddr < cnode_caps->desc[i].end_addr && cnode_caps->desc[i].object_type == seL4_UntypedObject) {
+            ut_idx = i;
+            break;
+        }
+    }
+    if (ut_idx == cnode_caps->end) {
+        sddf_dprintf("Error: Untyped containing physical address 0x%lx is not found\n", target_paddr);
+        return seL4_InvalidArgument;
+    }
+    sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr);
+    sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cnode_caps->desc[ut_idx].base_addr, cnode_caps->desc[ut_idx].end_addr);
+
+    seL4_Error error;
+
+    // Divide untyped to smaller ones
+    // TODO: figure out what's the maxinum and minimum bits here
+    for (int bits = 63; bits >= 12; bits--) {
+        while (target_paddr - cnode_caps->desc[ut_idx].base_addr >= (1ULL << bits)) {
+            error = untyped_retype(ut_idx, seL4_UntypedObject, bits, NULL);
+            if (error != seL4_NoError){
+                sddf_dprintf("Error: failed to divide an untyped(%d)[0x%lx-0x%lx] to a smaller untyped with size_bits=%d\n",
+                             ut_idx,
+                             cnode_caps->desc[ut_idx].base_addr,
+                             cnode_caps->desc[ut_idx].end_addr,
+                             bits);
+                return error;
+            }
+        }
+    }
+
+    *target_ut_idx = ut_idx;
+    return seL4_NoError;
+}
+
+seL4_Error retype_at_paddr(seL4_Word target_paddr,
+                           seL4_Word object_type,
+                           seL4_Word size_bits,
+                           uint32_t *retyped_cptr_idx)
+{
+    uint32_t target_ut_idx;
+    seL4_Error error = get_untyped_at_paddr(target_paddr, &target_ut_idx);
+    if (error != seL4_NoError) {
+        return error;
+    }
+
+    sddf_dprintf("ut_idx: %u\n", target_ut_idx);
+    seL4_Word avai_mem_size = cnode_caps->desc[target_ut_idx].end_addr - target_paddr;
+    seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
+
+    if (object_type != seL4_UntypedObject && avai_mem_size_bits < size_bits) {
+        sddf_dprintf("Error: Untyped(%d)[0x%lx-0x%lx] has insufficient memory for (paddr: 0x%lx, size_bits: %lu)\n",
+                     target_ut_idx,
+                     cnode_caps->desc[target_ut_idx].base_addr,
+                     cnode_caps->desc[target_ut_idx].end_addr,
+                     target_paddr,
+                     size_bits);
+        return 0;
+    }
+
+    // Retype the target object
+    /* sddf_dprintf("Retype object type: %lu\n", object_type); */
+    return untyped_retype(target_ut_idx, object_type, size_bits, retyped_cptr_idx);
+}
+
+seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL4_CapRights_t rights)
+{
+    seL4_Error err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+
+    for (int i = 0; i < 4 && err == seL4_FailedLookup; i++) {
+        seL4_Word failed = seL4_MappingFailedLookupLevel();
+        uint32_t retyped_cptr_idx;
+
+        switch (failed) {
+            case SEL4_MAPPING_LOOKUP_NO_PT: {
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageTableObject, 0, &retyped_cptr_idx);
+                if (err != seL4_NoError) {
+                    return err;
+                }
+                err = seL4_X86_PageTable_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
+                break;
+            }
+            case SEL4_MAPPING_LOOKUP_NO_PD: {
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PageDirectoryObject, 0, &retyped_cptr_idx);
+                if (err != seL4_NoError) {
+                    return err;
+                }
+                err = seL4_X86_PageDirectory_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
+                break;
+            }
+            case SEL4_MAPPING_LOOKUP_NO_PDPT: {
+                err = untyped_retype(kernel_objects_ut_idx, seL4_X86_PDPTObject, 0, &retyped_cptr_idx);
+                if (err != seL4_NoError) {
+                    return err;
+                }
+                err = seL4_X86_PDPT_Map(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
+                break;
+            }
+        }
+
+        if (err == seL4_NoError) {
+            err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+        }
+    }
+
+    return err;
+}
+
+seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
+{
+    uint32_t retyped_cptr_idx;
+    // TODO: round_down for large pages and check if it's a page type
+    if (page_type == seL4_X86_4K) {
+        paddr = ROUND_DOWN(paddr, 1UL << seL4_PageBits);
+        vaddr = ROUND_DOWN(vaddr, 1UL << seL4_PageBits);
+    } else if (page_type == seL4_X86_LargePageObject) {
+        paddr = ROUND_DOWN(paddr, 1UL << seL4_LargePageBits);
+        vaddr = ROUND_DOWN(vaddr, 1UL << seL4_LargePageBits);
+    }
+    seL4_Error error = retype_at_paddr(paddr, page_type, 0, &retyped_cptr_idx);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", paddr);
+        return error;
+    }
+
+    error = map_frame(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, rights);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", vaddr, error);
+        return error;
+    }
+
+    return seL4_NoError;
+}
+
+void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id)
+{
+    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    uintptr_t dev_regs_paddr = *mem_bar;
+    *mem_bar = 0xFFFFFFFF;
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    uint32_t dev_regs_size = (~(*mem_bar) | 0xF) + 1;
+    sddf_dprintf("size: 0x%x\n", dev_regs_size);
+
+    seL4_Error error;
+    uintptr_t cur_paddr = dev_regs_paddr;
+    uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
+    uintptr_t cur_vaddr = 0x60000000;
+    while (cur_paddr < end_paddr) {
+        error = retype_and_map_frame(cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_4K, seL4_ReadWrite);
+        if (error != seL4_NoError) {
+            sddf_dprintf("Error: failed to retype or map a frame.\n");
+            return;
+        }
+        cur_paddr += (1 << seL4_PageBits);
+        cur_vaddr += (1 << seL4_PageBits);
     }
 }
 
@@ -147,6 +396,11 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                                  pci_header->vendor_id,
                                  pci_header->device_id);
                 }
+
+                // TODO: convert it to general solution
+                if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
+                    map_pci_bar(pci_header, 4);
+                }
             }
         }
     }
@@ -213,12 +467,12 @@ void init(void)
         }
     }
 
-    /* seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 1, */
-    /*                                        seL4_X86_LargePageObject, */
+    /* seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 3, */
+    /*                                        seL4_X86_4K, */
     /*                                        0, */
     /*                                        cnode_cptr_pci_resources, 0, 0, */
     /*                                        2, 1); */
-    /* sddf_dprintf("error: %d\n", error); */
+    /* sddf_dprintf("Frame retype error: %d\n", error); */
 
     sddf_dprintf("Try creating an IRQ handler capability: ");
     int ret = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 13, 0, 0, 13);
