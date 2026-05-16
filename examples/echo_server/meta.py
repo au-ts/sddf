@@ -333,6 +333,7 @@ def generate(
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
 
+    pci_driver.add_capmap(CapMap("vspace", ethernet_driver, None, 2))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     net_virt_tx = ProtectionDomain(
