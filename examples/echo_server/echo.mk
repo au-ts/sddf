@@ -121,10 +121,14 @@ endif
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
 	touch $@
 
-${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+SPEC = capdl_spec.json
+$(BUILD_DIR):
+	mkdir -p $@
+
+${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE) $(BUILD_DIR)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
-	-o $(IMAGE_FILE) -r $(REPORT_FILE)
+	-o $(IMAGE_FILE) -r $(REPORT_FILE)  --capdl-json ${SPEC}
 
 
 include ${SDDF}/drivers/acpi/acpi_driver.mk
