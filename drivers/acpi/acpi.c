@@ -331,7 +331,7 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
-    sddf_dprintf("copy ut to slot %lu, start: %lu, end: %lu\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end);
+    sddf_dprintf("copy ut to slot %lu, start: %u, end: %u\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end);
     sddf_dprintf("size of pci_resources_t: %lu\n", sizeof(pci_resources_t));
 
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].base_addr = min_addr;
