@@ -29,8 +29,8 @@ const char acpi_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
 const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI Express Bus
 
 capDLBootInfo_t *capDLBootInfo;
-uintptr_t aml_object_pool_start;
-uintptr_t pci_resources_vaddr;
+uintptr_t aml_object_pool_start = 0x30000000;
+uintptr_t pci_resources_vaddr = 0x60000000;
 
 seL4_CPtr vspace_cptr_pci_driver;
 seL4_CPtr cnode_cptr_remaining_untypeds;
@@ -331,6 +331,8 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
+    sddf_dprintf("copy ut to slot %lu, start: %lu, end: %lu\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end);
+    sddf_dprintf("size of pci_resources_t: %lu\n", sizeof(pci_resources_t));
 
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].base_addr = min_addr;
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].end_addr = min_addr + new_ut_size;
@@ -680,7 +682,7 @@ void init(void)
                 return;
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
-            /* print_crs_list(crs_list); */
+            print_crs_list(crs_list);
             pass_crs_and_caps(crs_list, pci_resources->num_bridges);
             pci_resources->num_bridges++;
 

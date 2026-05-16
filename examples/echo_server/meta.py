@@ -16,7 +16,10 @@ from board import BOARDS, add_x86_hpet
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
+CNode = SystemDescription.CNode
 Map = SystemDescription.Map
+CapMap = SystemDescription.CapMap
+BootInfo = SystemDescription.BootInfo
 Channel = SystemDescription.Channel
 
 
@@ -202,6 +205,35 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
+    print("start cnode")
+    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200)
+    pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
+
+    acpi_driver.add_bootinfo(BootInfo("remaining_untypeds"))
+    acpi_driver.add_bootinfo(BootInfo("rsdp"))
+
+    cnode_remaining_untypeds = CNode(sdf, "remaining_untypeds", True, 8)
+    sdf.add_cnode(cnode_remaining_untypeds)
+    acpi_driver.add_capmap(CapMap("cnode", None, cnode_remaining_untypeds, 1))
+    acpi_driver.add_capmap(CapMap("vspace", pci_driver, None, 2))
+    acpi_driver.add_capmap(CapMap("cnode", acpi_driver, None, 3))
+
+    cnode_pci_resources = CNode(sdf, "pci_resources", False, 8)
+    sdf.add_cnode(cnode_pci_resources)
+    acpi_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 4))
+    pci_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 1))
+
+    mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x10000)
+    sdf.add_mr(mr_aml_object_poool)
+    acpi_driver.add_map(Map(mr_aml_object_poool, 0x30000000, "rw"))
+
+    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x3000)
+    sdf.add_mr(mr_pci_resources)
+    acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+    pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+
+    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
+
     timer_driver = ProtectionDomain(
         "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
     )
@@ -274,21 +306,21 @@ def generate(
         ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
     if board.arch == SystemDescription.Arch.X86_64:
-        hw_net_rings = SystemDescription.MemoryRegion(
-            sdf, "hw_net_rings", 65536, paddr=0x7A000000
-        )
-        sdf.add_mr(hw_net_rings)
-        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
-        ethernet_driver.add_map(hw_net_rings_map)
+        # hw_net_rings = SystemDescription.MemoryRegion(
+        #     sdf, "hw_net_rings", 65536, paddr=0x7A000000
+        # )
+        # sdf.add_mr(hw_net_rings)
+        # hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
+        # ethernet_driver.add_map(hw_net_rings_map)
 
-        virtio_net_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
-        )
-        sdf.add_mr(virtio_net_regs)
-        virtio_net_regs_map = SystemDescription.Map(
-            virtio_net_regs, 0x6000_0000, "rw", cached=False
-        )
-        ethernet_driver.add_map(virtio_net_regs_map)
+        # virtio_net_regs = SystemDescription.MemoryRegion(
+        #     sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        # )
+        # sdf.add_mr(virtio_net_regs)
+        # virtio_net_regs_map = SystemDescription.Map(
+        #     virtio_net_regs, 0x6000_0000, "rw", cached=False
+        # )
+        # ethernet_driver.add_map(virtio_net_regs_map)
 
         virtio_net_irq = SystemDescription.IrqIoapic(
             ioapic_id=0, pin=11, vector=1, id=16
@@ -300,6 +332,8 @@ def generate(
 
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
+
+    sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
@@ -351,6 +385,8 @@ def generate(
 
     # Echo server protection domains
     child_pds = [
+        acpi_driver,
+        pci_driver,
         uart_driver,
         serial_virt_tx,
         ethernet_driver,

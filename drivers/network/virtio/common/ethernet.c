@@ -402,6 +402,11 @@ static void eth_setup(void)
 
 void init(void)
 {
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
@@ -445,6 +450,17 @@ void init(void)
 
 void notified(sddf_channel ch)
 {
+    sddf_dprintf("notified by ch %u\n", ch);
+    if (ch == 10) {
+        pci_ready = true;
+        init();
+        rx_provide();
+    }
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     if (ch == 16) {
