@@ -50,7 +50,8 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
+	  timer_driver.elf serial_driver.elf serial_virt_tx.elf \
+	  pci_driver.elf acpi_driver.elf
 
 
 CFLAGS += \
@@ -93,7 +94,7 @@ ifneq ($(strip $(DTS)),)
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
@@ -122,6 +123,8 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 
+include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pci/pci_driver.mk
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk

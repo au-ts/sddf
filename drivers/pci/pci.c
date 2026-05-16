@@ -11,7 +11,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 
-uintptr_t pci_resources_vaddr;
+uintptr_t pci_resources_vaddr = 0x60000000;
 seL4_CPtr cnode_cptr_pci_resources;
 pci_resources_t *pci_resources;
 cnode_caps_t *cnode_caps;
@@ -154,6 +154,8 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 void print_cnode_caps()
 {
     sddf_dprintf("========Descriptions of received capabilities========\n");
+    sddf_dprintf("cnode_caps start: %lu, end: %lu\n", cnode_caps->start, cnode_caps->end);
+    sddf_dprintf("size of pci_resources_t: %lu\n", sizeof(pci_resources_t));
     sddf_dprintf("idx,   base_addr,  end_addr\n")
     sddf_dprintf("%3u: (IRQControl capability)\n", 1);
     for (int i = cnode_caps->start; i < cnode_caps->end; i++) {
@@ -225,6 +227,7 @@ void init(void)
         sddf_dprintf("Success!\n");
     }
 
+    sddf_deferred_notify(1);
 }
 
 void notified(microkit_channel ch)
