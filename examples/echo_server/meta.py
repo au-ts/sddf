@@ -319,12 +319,12 @@ def generate(
         ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
     if board.arch == SystemDescription.Arch.X86_64:
-        # hw_net_rings = SystemDescription.MemoryRegion(
-        #     sdf, "hw_net_rings", 65536, paddr=0x7A000000
-        # )
-        # sdf.add_mr(hw_net_rings)
-        # hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
-        # ethernet_driver.add_map(hw_net_rings_map)
+        hw_net_rings = SystemDescription.MemoryRegion(
+            sdf, "hw_net_rings", 65536, paddr=0x7A000000
+        )
+        sdf.add_mr(hw_net_rings)
+        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
+        ethernet_driver.add_map(hw_net_rings_map)
 
         # virtio_net_regs = SystemDescription.MemoryRegion(
         #     sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
