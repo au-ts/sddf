@@ -124,11 +124,6 @@ static void process_timeouts(uint64_t curr_time)
 
 void init(void)
 {
-    if (!pci_ready) {
-        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
-        return;
-    }
-
     // Read COUNTER_CLK_PERIOD 32:63 from General Capabilities and ID Register
     volatile uint64_t cap = *((uint64_t *)HPET_REGION + HPET_GENERAL_CAP_ID_REG);
     tick_period_fs = cap >> 32;
@@ -179,8 +174,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void notified(microkit_channel ch)
 {
-    return;
-
     if (ch != IRQ_CH) {
         return;
     }

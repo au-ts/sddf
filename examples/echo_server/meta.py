@@ -242,6 +242,19 @@ def generate(
     if board.arch == SystemDescription.Arch.X86_64:
         add_x86_hpet(sdf, timer_driver)
 
+        hpet_regs = SystemDescription.MemoryRegion(
+            sdf, "hpet_regs", 0x1000, paddr=0xFED00000
+        )
+        hpet_regs_map = SystemDescription.Map(
+            hpet_regs, 0x5000_0000, "rw", cached=False
+        )
+        timer_driver.add_map(hpet_regs_map)
+        sdf.add_mr(hpet_regs)
+
+    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=99
+    )
     uart_driver = ProtectionDomain(
         "serial_driver",
         "serial_driver.elf",

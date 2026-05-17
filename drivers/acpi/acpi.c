@@ -655,6 +655,7 @@ void init(void)
 
     sddf_dprintf("===========Pass IRQControl capability======\n");
     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
+    // TODO: figure out why cannot copy the cap
     /* error = seL4_CNode_Copy(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, 1, 58, seL4_ReadWrite); */
     error = seL4_CNode_Move(cnode_cptr_pci_resources, cnode_pci_resources_free_slot, 58, cnode_cptr_remaining_untypeds, 1, 58);
     if (error) {
@@ -699,7 +700,7 @@ void init(void)
                 return;
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
-            print_crs_list(crs_list);
+            /* print_crs_list(crs_list); */
             pass_crs_and_caps(crs_list, pci_resources->num_bridges);
             pci_resources->num_bridges++;
 
