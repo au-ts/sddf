@@ -291,6 +291,8 @@ void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id)
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
     uint32_t dev_regs_size = (~(*mem_bar) | 0xF) + 1;
     sddf_dprintf("size: 0x%x\n", dev_regs_size);
+    *mem_bar = dev_regs_paddr;
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
 
     seL4_Error error;
     uintptr_t cur_paddr = dev_regs_paddr;

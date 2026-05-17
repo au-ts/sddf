@@ -468,6 +468,7 @@ void notified(sddf_channel ch)
         pci_ready = true;
         init();
         rx_provide();
+        return;
     }
     if (!pci_ready) {
         sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
