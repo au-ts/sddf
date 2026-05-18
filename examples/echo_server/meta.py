@@ -216,11 +216,10 @@ def generate(
     sdf.add_cnode(cnode_remaining_untypeds)
     acpi_driver.add_capmap(CapMap("cnode", None, cnode_remaining_untypeds, 1))
     acpi_driver.add_capmap(CapMap("vspace", pci_driver, None, 2))
-    acpi_driver.add_capmap(CapMap("cnode", acpi_driver, None, 3))
 
     cnode_pci_resources = CNode(sdf, "pci_resources", False, 8)
     sdf.add_cnode(cnode_pci_resources)
-    acpi_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 4))
+    acpi_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 3))
     pci_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 1))
 
     mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x10000)
@@ -336,7 +335,7 @@ def generate(
         # ethernet_driver.add_map(virtio_net_regs_map)
 
         virtio_net_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=16
+            ioapic_id=10, pin=10, vector=10, id=16
         )
         ethernet_driver.add_irq(virtio_net_irq)
 
@@ -347,6 +346,7 @@ def generate(
         ethernet_driver.add_ioport(pci_config_data_port)
 
     pci_driver.add_capmap(CapMap("vspace", ethernet_driver, None, 2))
+    pci_driver.add_capmap(CapMap("cnode", ethernet_driver, None, 3))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     net_virt_tx = ProtectionDomain(

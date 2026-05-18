@@ -19,6 +19,8 @@ pci_resources_t *pci_resources;
 cnode_caps_t *cnode_caps;
 uint32_t kernel_objects_ut_idx = 2;
 
+seL4_CPtr cnode_cptr_ethernet_driver;
+
 #define IDX_TO_CPTR(idx) (seL4_CPtr)(cnode_cptr_pci_resources + idx)
 bool acpi_ready = false;
 
@@ -469,17 +471,31 @@ void init(void)
         }
     }
 
-    /* seL4_Error error = seL4_Untyped_Retype(cnode_cptr_pci_resources + 3, */
-    /*                                        seL4_X86_4K, */
-    /*                                        0, */
-    /*                                        cnode_cptr_pci_resources, 0, 0, */
-    /*                                        2, 1); */
-    /* sddf_dprintf("Frame retype error: %d\n", error); */
-
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    int ret = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 13, 0, 0, 13);
-    if (ret) {
-        sddf_dprintf("Error - %d\n", ret);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 11, 0, 0, 13);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
+    sddf_dprintf("Try minting a notification capability: ");
+    uint8_t base_irq_cap = 138;
+    uint8_t irq_num = 16;
+    error = seL4_CNode_Mint(cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_AllRights, 1 << irq_num);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to mint a notification - %d\n", error);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
+    seL4_IRQHandler handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
+    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 251;
+
+    sddf_dprintf("Try bind the handler to notification: ");
+    error = seL4_IRQHandler_SetNotification(handler_cap, ntf_cap);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to bind to notification - %d\n", error);
     } else {
         sddf_dprintf("Success!\n");
     }
