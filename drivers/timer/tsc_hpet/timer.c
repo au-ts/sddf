@@ -131,8 +131,9 @@ uint64_t next_timeout = UINT64_MAX;
 
 static inline uint64_t rdtsc(void)
 {
-    uint32_t lo, hi;
-    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+    uint32_t lo, hi, unused;
+    __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(unused));
+    __asm__ __volatile__("lfence" ::: "memory");
     return ((uint64_t)hi << 32) | lo;
 }
 
