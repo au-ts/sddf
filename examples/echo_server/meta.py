@@ -335,7 +335,7 @@ def generate(
         # ethernet_driver.add_map(virtio_net_regs_map)
 
         virtio_net_irq = SystemDescription.IrqIoapic(
-            ioapic_id=10, pin=10, vector=10, id=16
+            ioapic_id=0, pin=11, vector=1, id=16
         )
         ethernet_driver.add_irq(virtio_net_irq)
 

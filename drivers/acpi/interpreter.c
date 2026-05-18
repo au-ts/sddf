@@ -471,7 +471,7 @@ void extract_prt_package(aml_object_t *node)
         // TODO: remove this
         element_4 += (element_1 + element_2 + ext_irq->irq_num);
         (void)element_4;
-        /* sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4); */
+        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4);
     }
 }
 
