@@ -7,7 +7,9 @@ wrap_int8 Bitvec
 tx_update_ring_slot Int
 wrap_hw_tx_capacity Bitvec
 tx_return Int
+tx_return_body Int
 tx_provide Int
+tx_provide_body Int
 tx_hw_ring_full Int
 tx_hw_ring_empty Int
 set_tdar Int
@@ -16,8 +18,9 @@ set_eir Int
 rx_update_ring_slot Int
 wrap_hw_rx_capacity Bitvec
 rx_return Int
-rx_return_helper Int
+rx_return_body Int
 rx_provide Int
+rx_provide_body Int
 handle_irq Int
 irq_get_set_eir Bitvec
 main Int

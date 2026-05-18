@@ -90,8 +90,11 @@ var 1 eth_reg = ETH_REG;
 /@ extern field net_removed_addr: Set[Int] @/
 /@ extern field net_removed: Set[Seq[Int]] @/
 /@ extern field net_added: Set[Seq[Int]] @/
+/@ extern field ghost_unprocessed: Bool @/
 /@ extern function net_queue_injective_produce(r: Ref): Bool @/
 /@ extern function net_queue_injective_consume(r: Ref): Bool @/
+/@ extern function garbage_a(): Bool @/
+/@ extern function garbage_b(): Bool @/
 
 /@ extern predicate valid_hardware_ring_rx_write @/
 /@ extern predicate valid_hardware_ring_rx_read @/
@@ -109,6 +112,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern field rx_await_ack: Seq[Int] @/
 /@ extern field tx_handled: Set[Seq[Int]] @/
 /@ extern field rx_handled: Set[Seq[Int]] @/
+/@ extern field tx_processed: Set[Int] @/
 /@ extern field hw_addr: Int @/
 /@ extern field hw_stat: Int @/
 /@ extern field hw_len: Int @/
@@ -116,6 +120,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern function union_elem(s: Set[Int], t: Set[Int], e: Int): Bool @/
 /@ extern function union_elem_seq(s: Set[Seq[Int]], t: Set[Seq[Int]], e: Seq[Int]): Bool @/
 /@ extern function empty_set(): Set[Int] @/
+/@ extern function empty_set_seqint(): Set[Seq[Int]] @/
 /@ extern function element_set(e: Int): Set[Int] @/
 /@ extern function element_seq(e: Int): Seq[Int] @/
 /@ extern function element2_seq(e1: Int, e2: Int): Seq[Int] @/
