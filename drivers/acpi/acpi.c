@@ -699,7 +699,7 @@ void init(void)
                 return;
             }
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
-            /* print_crs_list(crs_list); */
+            print_crs_list(crs_list);
             pass_crs_and_caps(crs_list, pci_resources->num_bridges);
             pci_resources->num_bridges++;
 

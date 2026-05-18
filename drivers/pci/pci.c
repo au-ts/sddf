@@ -160,8 +160,8 @@ seL4_Error get_untyped_at_paddr(seL4_Word target_paddr,
         sddf_dprintf("Error: Untyped containing physical address 0x%lx is not found\n", target_paddr);
         return seL4_InvalidArgument;
     }
-    sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr);
-    sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cnode_caps->desc[ut_idx].base_addr, cnode_caps->desc[ut_idx].end_addr);
+    /* sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr); */
+    /* sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cnode_caps->desc[ut_idx].base_addr, cnode_caps->desc[ut_idx].end_addr); */
 
     seL4_Error error;
 
@@ -196,7 +196,6 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
         return error;
     }
 
-    sddf_dprintf("ut_idx: %u\n", target_ut_idx);
     seL4_Word avai_mem_size = cnode_caps->desc[target_ut_idx].end_addr - target_paddr;
     seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
 
@@ -472,7 +471,7 @@ void init(void)
     }
 
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 11, 0, 0, 13);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 11, 1, 0, 13);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
@@ -489,9 +488,11 @@ void init(void)
         sddf_dprintf("Success!\n");
     }
 
-    seL4_IRQHandler handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
-    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 251;
+    seL4_CPtr ntf_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
+    seL4_CPtr handler_cap = cnode_cptr_pci_resources + 250;
 
+    seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
+    sddf_dprintf("ret: %lu\n", ret);
     sddf_dprintf("Try bind the handler to notification: ");
     error = seL4_IRQHandler_SetNotification(handler_cap, ntf_cap);
     if (error != seL4_NoError) {
