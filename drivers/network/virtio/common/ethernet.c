@@ -463,7 +463,6 @@ void init(void)
 
 void notified(sddf_channel ch)
 {
-    sddf_dprintf("notified by ch %u\n", ch);
     if (ch == 10) {
         pci_ready = true;
         init();

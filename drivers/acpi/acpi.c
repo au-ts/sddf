@@ -35,7 +35,6 @@ uintptr_t pci_resources_vaddr = 0x60000000;
 seL4_CPtr vspace_cptr_pci_driver;
 seL4_CPtr cnode_cptr_remaining_untypeds;
 seL4_CPtr cnode_cptr_pci_resources;
-seL4_CPtr cnode_cptr_acpi_driver;
 uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
 seL4_CPtr cnode_pci_resources_free_slot = 1;
