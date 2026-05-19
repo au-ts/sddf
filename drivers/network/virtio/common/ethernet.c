@@ -407,7 +407,6 @@ static void eth_setup(void)
 
     // Set the DRIVER_OK status bit
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER_OK);
-    sddf_dprintf("here\n");
     virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
 }
 
