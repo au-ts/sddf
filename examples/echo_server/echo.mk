@@ -145,7 +145,6 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
-		--trace "virtio_*" \
 		-netdev user,id=netdev0,\
 hostfwd=udp::1235-10.0.2.15:1235,\
 hostfwd=tcp::1236-10.0.2.15:1236,\

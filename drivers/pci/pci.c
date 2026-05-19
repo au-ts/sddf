@@ -470,8 +470,10 @@ void init(void)
         }
     }
 
+    uint8_t base_irq_cap = 138;
+    uint8_t irq_num = 16;
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_pci_resources, 250, 58, 0, 11, 1, 0, 13);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, 11, 1, 0, 1);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
@@ -479,17 +481,15 @@ void init(void)
     }
 
     sddf_dprintf("Try minting a notification capability: ");
-    uint8_t base_irq_cap = 138;
-    uint8_t irq_num = 16;
-    error = seL4_CNode_Mint(cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_AllRights, 1 << irq_num);
+    error = seL4_CNode_Mint(cnode_cptr_pci_resources, 250, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_ReadWrite, 1 << irq_num);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to mint a notification - %d\n", error);
     } else {
         sddf_dprintf("Success!\n");
     }
 
-    seL4_CPtr ntf_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
-    seL4_CPtr handler_cap = cnode_cptr_pci_resources + 250;
+    seL4_CPtr handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
+    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 250;
 
     seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
     sddf_dprintf("ret: %lu\n", ret);
@@ -502,6 +502,7 @@ void init(void)
     }
 
     sddf_deferred_notify(1);
+
 }
 
 void notified(microkit_channel ch)
