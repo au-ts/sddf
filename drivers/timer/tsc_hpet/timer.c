@@ -51,6 +51,16 @@ __attribute__((__section__(".device_resources"), retain, used)) device_resources
 #define CPUID_INVARIANT_TSC_LEAF 0x80000007
 #define CPUID_INVARIANT_TSC_EDX_BIT 8
 
+/* Parameters for the TSC measurement process if it cannot be inferred from CPUID leafs. */
+/* How many time to try to measure the TSC frequency */
+#define MAX_MEASUREMENT_ATTEMPT 10000
+/* How long should the delay loop goes for */
+#define DELAY_LOOP_ITER 100000000
+/* We accept a 100 KHz TSC frequency error */
+#define ACCEPTABLE_TSC_HZ_ERROR 100000
+/* How many consecutive TSC Hz measurement attempts must be within `ACCEPTABLE_TSC_HZ_ERROR` of each others */
+#define NUM_CONSECUTIVE_MEASURES 5
+
 /* hpet data structures / memory maps
  * each timer has its own configuration registers:
  *   - Timer n Configuration and Capability Register
@@ -206,6 +216,72 @@ static bool is_invariant_tsc(void)
     return !!(invariant_tsc & BIT(CPUID_INVARIANT_TSC_EDX_BIT));
 }
 
+static uint64_t measure_tsc_frequency(void)
+{
+    /* This function expects that the HPET have been initialised and it's frequency known.
+     * Since we know the HPET frequency, we can use that as a reference point to easily
+     * measure the TSC frequency with a high degree of accuracy. */
+
+    LOG_TIMER("trying to measure TSC frequency with HPET\n");
+
+    bool measured_ok = false;
+    uint64_t tsc_hz_attempts[NUM_CONSECUTIVE_MEASURES] = { 0 };
+
+    int i = 0;
+    uint64_t tsc_hz, tsc_pre, tsc_post, tsc_delta, ns_pre, ns_post, ns_delta, final_hz;
+    for (; i < MAX_MEASUREMENT_ATTEMPT && !measured_ok; i++) {
+        tsc_pre = rdtsc();
+        ns_pre = hpet_ticks_to_ns(get_hpet_ticks());
+
+        volatile int j = 0;
+        while (j < DELAY_LOOP_ITER) {
+            j++;
+        }
+
+        ns_post = hpet_ticks_to_ns(get_hpet_ticks());
+        tsc_post = rdtsc();
+
+        tsc_delta = tsc_post - tsc_pre;
+        ns_delta = ns_post - ns_pre;
+
+        /* NS timestamp is just a 1GHz counter so the math is simple. */
+        tsc_hz = (tsc_delta * 1000000000) / ns_delta;
+
+        tsc_hz_attempts[i % NUM_CONSECUTIVE_MEASURES] = tsc_hz;
+
+        if (i >= NUM_CONSECUTIVE_MEASURES - 1) {
+            uint64_t min_hz = tsc_hz_attempts[0];
+            uint64_t max_hz = tsc_hz_attempts[0];
+            uint64_t sum_hz = 0;
+
+            for (int k = 0; k < NUM_CONSECUTIVE_MEASURES; k++) {
+                uint64_t val = tsc_hz_attempts[k];
+                if (val < min_hz) {
+                    min_hz = val;
+                }
+                if (val > max_hz) {
+                    max_hz = val;
+                }
+                sum_hz += val;
+            }
+
+            if ((max_hz - min_hz) < ACCEPTABLE_TSC_HZ_ERROR) {
+                measured_ok = true;
+                final_hz = sum_hz / NUM_CONSECUTIVE_MEASURES;
+            }
+        }
+    }
+
+    if (measured_ok) {
+        LOG_TIMER("measured TSC frequency %lu Hz in %d attempts\n", final_hz, i - NUM_CONSECUTIVE_MEASURES + 1);
+        return final_hz;
+    } else {
+        LOG_TIMER("could not measure TSC frequency to %d Hz error within %d attempts\n", ACCEPTABLE_TSC_HZ_ERROR,
+                  MAX_MEASUREMENT_ATTEMPT);
+        return 0;
+    }
+}
+
 static uint64_t get_tsc_frequency(void)
 {
     uint32_t max_basic_leaf, b, c, d;
@@ -213,7 +289,7 @@ static uint64_t get_tsc_frequency(void)
     cpuid(CPUID_VENDOR_ID_LEAF, 0, &max_basic_leaf, &b, &c, &d);
     if (max_basic_leaf < CPUID_TSC_LEAF) {
         LOG_TIMER("CPU does not expose TSC leaf.\n");
-        return 0;
+        return measure_tsc_frequency();
     }
 
     uint32_t denominator, numerator, crystal_khz;
@@ -317,8 +393,6 @@ void init(void)
     /* Detect TSC */
     if (!is_intel_cpu()) {
         LOG_TIMER_WARN("Not an Intel CPU, can't detect TSC frequency, expect performance degradation.\n");
-        /* It can be measured, but the measurement procedure is complicated if we want to be accurate.
-           See `quick_pit_calibrate()` or `pit_hpet_ptimer_calibrate_cpu()` in Linux arch/x86/kernel/tsc.c */
     } else {
         if (!is_invariant_tsc()) {
             LOG_TIMER_WARN("Invariant TSC not supported, expect performance degradation.\n");
