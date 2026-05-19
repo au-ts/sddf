@@ -19,42 +19,43 @@ void iperf3_stream_init(iperf3_stream_t *stream, uint8_t *cookie, iperf_ctrl_t *
     stream->bytes = 0;
 }
 
-// maybe transmit data on this stream
+// maybe transmit data on this stream — loops to fill the send buffer in one call
 void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   if (stream->pcb == NULL) return;
   if (stream->phase == STOPPED) return;
-  if (stream->phase == SEND_PAYLOAD) {
-    iperf_ctrl_t *c = stream->ctrl;
-    if (c == NULL) return;
+  if (stream->phase == SEND_PAYLOAD && stream->ctrl == NULL) return;
+  if (stream->tx_buf == NULL) return;
+
+  bool wrote = false;
+  for (;;) {
+    if (stream->tick_byte_limit > 0 && stream->bytes_this_tick >= stream->tick_byte_limit) break;
+
+    if (stream->tx_off == stream->tx_len) {
+      if (stream->phase == SEND_PAYLOAD) {
+        stream->tx_off = 0;
+      } else {
+        break;
+      }
+    }
+
+    u16_t avail = tcp_sndbuf(stream->pcb);
+    if (avail == 0) break;
+
+    u16_t remaining = stream->tx_len - stream->tx_off;
+    u16_t chunk = remaining > avail ? avail : remaining;
+    if (stream->tick_byte_limit > 0) {
+      uint32_t budget = stream->tick_byte_limit - stream->bytes_this_tick;
+      if ((uint32_t)chunk > budget) chunk = (u16_t)budget;
+    }
+    if (chunk == 0) break;
+
+    if (tcp_write(stream->pcb, stream->tx_buf + stream->tx_off, chunk, TCP_WRITE_FLAG_COPY) != ERR_OK) break;
+
+    stream->tx_off += chunk;
+    stream->bytes_this_tick += chunk;
+    wrote = true;
   }
-
-  if (stream->tx_buf == NULL) return; 
-  if (stream->tx_len == stream->tx_off && stream->phase == SEND_PAYLOAD) {
-    stream->tx_off = 0; // loop payload until STOPPED
-  }
-
-  if (stream->tx_len == stream->tx_off && stream->phase != SEND_PAYLOAD) {
-    return;
-  }
-  // ask how much space
-
-  u16_t avail = tcp_sndbuf(stream->pcb);
-  if (avail == 0) return;
-  // compete chunk 
-  u16_t remaining = stream->tx_len - stream->tx_off;
-  u16_t chunk = remaining > avail ? avail : remaining;
-  // try to enqueue
-  err_t err = tcp_write(stream->pcb, stream->tx_buf + stream->tx_off, chunk, TCP_WRITE_FLAG_COPY);
-
-  // if (err return
-  if (err != ERR_OK) {
-
-    return;
-  }
-  // advance progress
-  stream->tx_off += chunk;
-  // flush
-  tcp_output(stream->pcb);
+  if (wrote) tcp_output(stream->pcb);
 }
 
  err_t iperf3_stream_connect(void *arg, struct tcp_pcb *tpcb, err_t err) {

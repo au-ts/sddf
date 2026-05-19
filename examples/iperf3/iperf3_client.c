@@ -16,12 +16,18 @@
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/benchmark/config.h>
+#include <sddf/benchmark/bench.h>
 #include "lwip/pbuf.h"
 #include "lwip/ip_addr.h"
 
 #include "iperf3_ctrl.h"
 
 static bool iperf3_started = false;
+
+static uint64_t bench_core_start;
+static uint64_t bench_idle_start;
+static bool bench_snapshotted;
+static bool bench_reported;
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
@@ -79,7 +85,7 @@ void netif_status_callback(char *ip_addr)
         iperf3_started = true;
         sddf_printf("Starting iperf3 now (DHCP ready)\n");
         ip_addr_t server_addr;
-        IP_ADDR4(&server_addr, 10, 0, 2, 2);
+        IP_ADDR4(&server_addr, 192, 168, 64, 1);
         struct tcp_pcb *pcb;
 
         pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
@@ -137,8 +143,13 @@ void notified(sddf_channel ch)
     if (ch == net_config.rx.id) {
         sddf_lwip_process_rx();
     } else if (ch == timer_config.driver_id) {
-
         sddf_lwip_process_timeout();
+        for (int s = 0; s < MAX_STREAMS; s++) {
+            if (ctrl.streams[s].pcb != NULL && ctrl.streams[s].phase == SEND_PAYLOAD) {
+                ctrl.streams[s].bytes_this_tick = 0;
+                iperf3_stream_maybe_tx(&ctrl.streams[s]);
+            }
+        }
         set_timeout();
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {
         // Nothing to do
@@ -147,4 +158,36 @@ void notified(sddf_channel ch)
     }
 
     sddf_lwip_maybe_notify();
+
+    /* Snapshot idle-PD counters when test becomes active */
+    if (ctrl.test_active && !bench_snapshotted && benchmark_config.num_cores > 0) {
+        struct bench *b = (struct bench *)benchmark_config.core_ccounts[0];
+        bench_core_start = __atomic_load_n(&b->core_ccount, __ATOMIC_RELAXED);
+        bench_idle_start = __atomic_load_n(&b->idle_ccount, __ATOMIC_RELAXED);
+        bench_snapshotted = true;
+        microkit_notify(benchmark_config.start_ch);
+    }
+
+    /* Report when TEST_END has been sent */
+    if (bench_snapshotted && ctrl.sent_test_end && !bench_reported) {
+        microkit_notify(benchmark_config.stop_ch);
+        bench_reported = true;
+
+        if (benchmark_config.num_cores > 0) {
+            struct bench *b = (struct bench *)benchmark_config.core_ccounts[0];
+            uint64_t total = __atomic_load_n(&b->core_ccount, __ATOMIC_RELAXED) - bench_core_start;
+            uint64_t idle  = __atomic_load_n(&b->idle_ccount, __ATOMIC_RELAXED) - bench_idle_start;
+            if (total > 0) {
+                ctrl.cpu_util_percent = (double)(total - idle) / (double)total * 100.0;
+                sddf_printf("[cpu_util] %.1f%% (busy=%llu idle=%llu total=%llu cycles)\n",
+                    ctrl.cpu_util_percent,
+                    (unsigned long long)(total - idle),
+                    (unsigned long long)idle,
+                    (unsigned long long)total);
+            } else {
+                sddf_printf("[cpu_util] no data — build with MICROKIT_CONFIG=benchmark\n");
+                ctrl.cpu_util_percent = 0.0;
+            }
+        }
+    }
 }

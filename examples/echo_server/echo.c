@@ -35,10 +35,10 @@ serial_queue_handle_t serial_tx_queue_handle;
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
 
-#define LWIP_TICK_MS 100
-
 struct pbuf *head;
 struct pbuf *tail;
+
+#define LWIP_TICK_MS 100
 
 /**
  * Netif status callback function that output's client's name and

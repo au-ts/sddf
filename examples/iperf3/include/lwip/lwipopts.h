@@ -128,10 +128,17 @@
 #define TCP_WND (2 * TCP_MSS)
 
 /**
- * TCP sender buffer space (bytes). To achieve good performance, this
- * should be at least 2 * TCP_MSS.
+ * TCP sender buffer space (bytes). Needs to be large enough to keep the pipe
+ * full at the target bandwidth even with QEMU user-mode networking RTT.
+ * 4 MB allows ~400 Mbps at 80 ms RTT.
  */
-#define TCP_SND_BUF TCP_WND
+#define TCP_SND_BUF (4 * 1024 * 1024)
+
+/**
+ * Explicitly size the segment queue to match the large send buffer.
+ * Default formula (4*SND_BUF/MSS) would be ~11000; set a round number.
+ */
+#define TCP_SND_QUEUELEN 12000
 
 /**
  * TCP writable space (bytes). This must be less than TCP_SND_BUF. It is
@@ -190,7 +197,7 @@
  * memory, thus there is a scaling factor added based on the number of TCP echo
  * sockets we concurrently support.
  */
-#define MEMP_NUM_TCP_SEG 10000
+#define MEMP_NUM_TCP_SEG 12000
 
 //memp_malloc: out of memory in pool TCP_SEG
 // tcp_create_segment: no memory.

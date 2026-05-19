@@ -27,7 +27,8 @@ typedef struct {
   uint16_t tx_off;
   stream_phase_t phase;
 
-  // rx handling for streeam
+  uint32_t bytes_this_tick;
+  uint32_t tick_byte_limit;   /* 0 = unlimited */
 
   iperf_ctrl_t *ctrl; // back reference to ctrl
 

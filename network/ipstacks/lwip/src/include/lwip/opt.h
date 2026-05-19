@@ -1275,7 +1275,7 @@
  * @{
  */
 /**
- * LWIP_TCP==1: Turn on TCP.
+ *       : Turn on TCP.
  */
 #if !defined LWIP_TCP || defined __DOXYGEN__
 #define LWIP_TCP                        1

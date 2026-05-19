@@ -7,7 +7,6 @@
 # and operated on from there.
 #
 
-
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 

@@ -64,8 +64,8 @@
 
 /* Minimal changes to opt.h required for tcp unit tests: */
 #define MEM_SIZE                        16000
-#define TCP_SND_QUEUELEN                40
-#define MEMP_NUM_TCP_SEG                TCP_SND_QUEUELEN
+#define TCP_SND_QUEUELEN                (8 * (TCP_SND_BUF / TCP_MSS))
+#define MEMP_NUM_TCP_SEG                2 * TCP_SND_QUEUELEN
 #define TCP_OVERSIZE                    1
 #define TCP_SND_BUF                     (12 * TCP_MSS)
 #define TCP_WND                         (10 * TCP_MSS)

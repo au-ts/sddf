@@ -20,7 +20,6 @@
 #include "lwip/ip_addr.h"
 #define IPERF_MAX_CONNS 1
 
-// #include "iperf3_client.h"
 #include "iperf3_ctrl.h"
 
 static bool iperf3_started = false;

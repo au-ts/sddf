@@ -7,10 +7,14 @@
 #include "lwip/ip_addr.h"
 #include <string.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
 
 #include "iperf3_ctrl.h"
+
+#define _S(x) #x
+#define _STR(x) _S(x)
 
 #define PARAM_EXCHANGE  9
 #define CREATE_STREAMS 10
@@ -114,10 +118,12 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
           
           // test params are all hardcoded
           if (st == PARAM_EXCHANGE) {
-            const char *json = "{\"tcp\":true,\"time\":5,\"parallel\":4}";
-
-            // need to add omit, time, num(), blockcount(ehhh number of blocks), parallel len pacingtimer and client version
-            ctrl->duration_ms = 5000;
+#ifdef TARGET_BW_MBPS
+            const char *json = "{\"tcp\":true,\"time\":10,\"parallel\":1,\"bitrate\":" _STR(TARGET_BW_MBPS) "000000}";
+#else
+            const char *json = "{\"tcp\":true,\"time\":10,\"parallel\":1}";
+#endif
+            ctrl->duration_ms = 10000;
             ctrl->omit_ms = 0000;
   
             // send the json length first as 4 byte big endian
@@ -137,7 +143,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
           } else if (st == CREATE_STREAMS) {
             // start the number of streams agreed in params
             
-            ctrl->num_streams = 4; // hardcoded for now
+            ctrl->num_streams = 1;
 
             // for each stream create tcp pcb and stream struct
             for (int s = 0; s < ctrl->num_streams; s++) {
@@ -184,15 +190,20 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
             for (int s = 0; s < MAX_STREAMS; s++) {
                 iperf3_stream_t *stream = &ctrl->streams[s];
                 if (stream->pcb != NULL) {
-                    // set stream to send payload now
                     stream->phase = SEND_PAYLOAD;
-                    stream->tx_buf = ctrl->payload; // set to payload buffer
-                    stream->tx_len = PAYLOAD_SIZE; // set to payload length
+                    stream->tx_buf = ctrl->payload;
+                    stream->tx_len = PAYLOAD_SIZE;
                     stream->tx_off = 0;
-                    stream->ctrl = ctrl; // set back reference to ctrl
+                    stream->ctrl = ctrl;
+                    stream->bytes_this_tick = 0;
+#ifdef TARGET_BW_MBPS
+                    stream->tick_byte_limit = ((uint32_t)(TARGET_BW_MBPS) * 1000000UL) / (8UL * 10UL);
+#else
+                    stream->tick_byte_limit = 0;
+#endif
                     iperf3_stream_maybe_tx(stream);
                 } else {
-                  break;
+                    break;
                 }
             }
            
@@ -208,40 +219,43 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
 
             // sddf_printf("[iperf3] Test complete, total bytes transferred: %llu\n", ctrl->bytes_sent);
 
-            // Stub result so server can send results and state byte
-            const char *json =
-              "{\n"
-              "  \"cpu_util_total\": 0.67,\n"
-              "  \"cpu_util_user\": 0.45,\n"
-              "  \"cpu_util_system\": 0.22,\n"
-              "  \"sender_has_retransmits\": 0,\n"
-              "  \"congestion_used\": \"cubic\",\n"
-              "  \"streams\": [\n"
-              "    {\n"
-              "      \"id\": 1,\n"
-              "      \"bytes\": 12345678,\n"
-              "      \"retransmits\": 0,\n"
-              "      \"jitter\": 0.0001,\n"
-              "      \"errors\": 0,\n"
-              "      \"omitted_errors\": 0,\n"
-              "      \"packets\": 1500,\n"
-              "      \"omitted_packets\": 0,\n"
-              "      \"start_time\": 0.000000,\n"
-              "      \"end_time\": 10.000000\n"
-              "    }\n"
-              "  ],\n"
-              "  \"server_output_text\": \"\"\n"
-              "}";
+            uint64_t total_bytes = 0;
+            for (int s = 0; s < ctrl->num_streams; s++) {
+                total_bytes += ctrl->streams[s].bytes;
+            }
+            sddf_snprintf(ctrl->json_send_buf, sizeof(ctrl->json_send_buf),
+              "{"
+              "\"cpu_util_total\":%.2f,"
+              "\"cpu_util_user\":%.2f,"
+              "\"cpu_util_system\":0.00,"
+              "\"sender_has_retransmits\":0,"
+              "\"congestion_used\":\"cubic\","
+              "\"streams\":[{"
+              "\"id\":1,"
+              "\"bytes\":%llu,"
+              "\"retransmits\":0,"
+              "\"jitter\":0.0,"
+              "\"errors\":0,"
+              "\"omitted_errors\":0,"
+              "\"packets\":0,"
+              "\"omitted_packets\":0,"
+              "\"start_time\":0.0,"
+              "\"end_time\":10.0"
+              "}],"
+              "\"server_output_text\":\"\""
+              "}",
+              ctrl->cpu_util_percent,
+              ctrl->cpu_util_percent,
+              (unsigned long long)total_bytes);
 
-            ctrl->tx_buf = (const int8_t *)json;
-            uint32_t json_length = strlen(json);
+            uint32_t json_length = strlen(ctrl->json_send_buf);
             uint32_t be = htonl(json_length);
             memcpy(ctrl->json_len_buf, &be, 4);
             ctrl->tx_buf = (const int8_t *)ctrl->json_len_buf;
             ctrl->tx_len = 4;
             ctrl->tx_off = 0;
             iperf3_ctrl_maybe_tx(ctrl);
-            ctrl->tx_buf = (const int8_t *)json;
+            ctrl->tx_buf = (const int8_t *)ctrl->json_send_buf;
             ctrl->tx_len = json_length;
             ctrl->tx_off = 0;
             iperf3_ctrl_maybe_tx(ctrl);

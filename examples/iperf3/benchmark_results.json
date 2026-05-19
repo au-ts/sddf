@@ -1,0 +1,82 @@
+[
+  {
+    "requested_mbps": 100,
+    "recv_mbps": 97.22,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 122290176,
+    "seconds": 10.06
+  },
+  {
+    "requested_mbps": 200,
+    "recv_mbps": 189.46,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 238944256,
+    "seconds": 10.09
+  },
+  {
+    "requested_mbps": 300,
+    "recv_mbps": 290.87,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 364511232,
+    "seconds": 10.03
+  },
+  {
+    "requested_mbps": 400,
+    "recv_mbps": 358.16,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 449445888,
+    "seconds": 10.04
+  },
+  {
+    "requested_mbps": 500,
+    "recv_mbps": 468.44,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 621674496,
+    "seconds": 10.62
+  },
+  {
+    "requested_mbps": 600,
+    "recv_mbps": 548.6,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 724172800,
+    "seconds": 10.56
+  },
+  {
+    "requested_mbps": 700,
+    "recv_mbps": 560.27,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 739115008,
+    "seconds": 10.55
+  },
+  {
+    "requested_mbps": 800,
+    "recv_mbps": 591.45,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 779616256,
+    "seconds": 10.55
+  },
+  {
+    "requested_mbps": 900,
+    "recv_mbps": 557.2,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 734920704,
+    "seconds": 10.55
+  },
+  {
+    "requested_mbps": 1000,
+    "recv_mbps": 580.41,
+    "send_mbps": 0.0,
+    "retransmits": 0,
+    "bytes_received": 766246912,
+    "seconds": 10.56
+  }
+]

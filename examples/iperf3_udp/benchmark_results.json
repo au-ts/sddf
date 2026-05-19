@@ -1,0 +1,112 @@
+[
+  {
+    "requested_mbps": 100,
+    "recv_mbps": 85.87,
+    "lost_percent": 0,
+    "jitter_ms": 0.0474,
+    "lost_packets": 0,
+    "total_packets": 36808,
+    "out_of_order": 0,
+    "pps": 7351.5,
+    "seconds": 5.01
+  },
+  {
+    "requested_mbps": 200,
+    "recv_mbps": 177.58,
+    "lost_percent": 0,
+    "jitter_ms": 0.0115,
+    "lost_packets": 0,
+    "total_packets": 77040,
+    "out_of_order": 0,
+    "pps": 15203.8,
+    "seconds": 5.07
+  },
+  {
+    "requested_mbps": 300,
+    "recv_mbps": 258.93,
+    "lost_percent": 0,
+    "jitter_ms": 0.0116,
+    "lost_packets": 0,
+    "total_packets": 110928,
+    "out_of_order": 0,
+    "pps": 22168.3,
+    "seconds": 5.0
+  },
+  {
+    "requested_mbps": 400,
+    "recv_mbps": 358.68,
+    "lost_percent": 0,
+    "jitter_ms": 0.0146,
+    "lost_packets": 0,
+    "total_packets": 153728,
+    "out_of_order": 0,
+    "pps": 30709.2,
+    "seconds": 5.01
+  },
+  {
+    "requested_mbps": 500,
+    "recv_mbps": 309.6,
+    "lost_percent": 0,
+    "jitter_ms": 0.0238,
+    "lost_packets": 0,
+    "total_packets": 133624,
+    "out_of_order": 0,
+    "pps": 26506.6,
+    "seconds": 5.04
+  },
+  {
+    "requested_mbps": 600,
+    "recv_mbps": 462.13,
+    "lost_percent": 0,
+    "jitter_ms": 0.0171,
+    "lost_packets": 0,
+    "total_packets": 198273,
+    "out_of_order": 0,
+    "pps": 39565.6,
+    "seconds": 5.01
+  },
+  {
+    "requested_mbps": 700,
+    "recv_mbps": 417.69,
+    "lost_percent": 0,
+    "jitter_ms": 0.0128,
+    "lost_packets": 0,
+    "total_packets": 200617,
+    "out_of_order": 0,
+    "pps": 35761.5,
+    "seconds": 5.61
+  },
+  {
+    "requested_mbps": 800,
+    "recv_mbps": 289.35,
+    "lost_percent": 0,
+    "jitter_ms": 0.0323,
+    "lost_packets": 0,
+    "total_packets": 124186,
+    "out_of_order": 0,
+    "pps": 24773.5,
+    "seconds": 5.01
+  },
+  {
+    "requested_mbps": 900,
+    "recv_mbps": 437.62,
+    "lost_percent": 0,
+    "jitter_ms": 0.018,
+    "lost_packets": 0,
+    "total_packets": 187697,
+    "out_of_order": 0,
+    "pps": 37467.1,
+    "seconds": 5.01
+  },
+  {
+    "requested_mbps": 1000,
+    "recv_mbps": 431.11,
+    "lost_percent": 0,
+    "jitter_ms": 0.0143,
+    "lost_packets": 0,
+    "total_packets": 184869,
+    "out_of_order": 0,
+    "pps": 36910.2,
+    "seconds": 5.01
+  }
+]

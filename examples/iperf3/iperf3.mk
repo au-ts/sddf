@@ -43,10 +43,14 @@ CFLAGS += \
 	  -I${ETHERNET_CONFIG_INCLUDE} \
 	  -I$(LWIPDIR)/include \
 	  -I$(LWIPDIR)/include/ipv4 \
-	  -I $(IPERF_CLIENT)/include \
+	  -I $(IPERF3_CLIENT)/include \
 	  -MP
 
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
+
+ifneq ($(TARGET_BW_MBPS),)
+CFLAGS += -DTARGET_BW_MBPS=$(TARGET_BW_MBPS)
+endif
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
@@ -80,6 +84,10 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_client_config=net_client_iperf3.data iperf3_client.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_iperf3.data iperf3_client.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_iperf3.data iperf3_client.elf
+	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data iperf3_client.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_benchmark.data benchmark.elf
 	touch $@
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -100,7 +108,7 @@ qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
 		-nographic \
 		-device virtio-net-device,netdev=netdev0 \
-		-netdev user,id=netdev0 \
+		-netdev vmnet-bridged,id=netdev0,ifname=en0 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors -smp 4
 

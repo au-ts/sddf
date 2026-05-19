@@ -49,6 +49,8 @@ typedef struct iperf_ctrl {
   // check if test active (started but not done)
   bool test_active;
   bool sent_test_end; // to check if we've sent the TEST_END state to server
+  double cpu_util_percent; // measured during test, sent in EXCHANGE_RESULTS
+  char json_send_buf[512]; // buffer for dynamically built EXCHANGE_RESULTS JSON
 
   // omitting
   uint32_t omit_ms;
