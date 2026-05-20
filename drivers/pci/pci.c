@@ -473,7 +473,7 @@ void init(void)
     uint8_t base_irq_cap = 138;
     uint8_t irq_num = 16;
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, 11, 1, 0, 1);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, 0x16, 1, 0, 1);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
