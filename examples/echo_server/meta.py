@@ -226,7 +226,7 @@ def generate(
     sdf.add_mr(mr_aml_object_poool)
     acpi_driver.add_map(Map(mr_aml_object_poool, 0x30000000, "rw"))
 
-    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x3000)
+    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x8000)
     sdf.add_mr(mr_pci_resources)
     acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
     pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))

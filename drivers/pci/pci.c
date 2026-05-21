@@ -468,6 +468,13 @@ void init(void)
                 get_ut_by_paddr(dev_res->min_addr);
             }
         }
+
+        uint8_t num_prt_entries = pci_resources->bridges[i].num_prt_entries;
+        sddf_dprintf("num_prt_entries: %u\n", num_prt_entries);
+        for (int j = 0; j < num_prt_entries; j++) {
+            pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[i].prt_entries[j];
+            sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
+        }
     }
 
     uint8_t base_irq_cap = 138;
