@@ -409,7 +409,7 @@ acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
     return crs_list;
 }
 
-void extract_prt_package(aml_object_t *node)
+void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
 {
     scanner.current = node->start;
     if (advance() != NAME_OP) {
@@ -469,9 +469,14 @@ void extract_prt_package(aml_object_t *node)
         uint32_t element_4 = get_integer_data();
 
         // TODO: remove this
-        element_4 += (element_1 + element_2 + ext_irq->irq_num);
-        (void)element_4;
-        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4);
+        /* element_4 += (element_1 + element_2 + ext_irq->irq_num); */
+        /* (void)element_4; */
+        pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
+        pci_prt->address = element_1;
+        pci_prt->pin = element_2;
+        pci_prt->gsi = ext_irq->irq_num;
+        pci_bridge_resource->num_prt_entries++;
+        /* sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4); */
     }
 }
 

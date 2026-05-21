@@ -146,6 +146,7 @@ typedef struct {
 typedef uint32_t aml_pkg_len_t;
 
 #define MAX_NUM_AS_RESOURCES 10
+#define MAX_NUM_PRT_ENTRIES 256
 
 enum device_resource_type {
     IO_PORT = 0,
@@ -167,12 +168,20 @@ typedef struct {
 } device_resource_t;
 
 typedef struct {
+    uint32_t address;
+    uint8_t pin;
+    uint8_t gsi;
+} pci_prt_t;
+
+typedef struct {
     /* char path_name[AML_MAX_PATH_STR]; */
     /* uint32_t path_len; */
     uint32_t bus_start;
     uint32_t bus_end;
     device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
     uint8_t num_dev_resources;
+    pci_prt_t prt_entries[MAX_NUM_PRT_ENTRIES];
+    uint8_t num_prt_entries;
 } pci_bridge_t;
 
 typedef struct {
@@ -279,7 +288,7 @@ void read_eisa_id(aml_object_t *node, char *eisa_id_str);
 acpi_crs_list_t *extract_pcie_crs(aml_object_t *node);
 void print_crs_list(acpi_crs_list_t *crs_list);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
-void extract_prt_package(aml_object_t *node);
+void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);

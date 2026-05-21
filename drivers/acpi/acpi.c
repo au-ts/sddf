@@ -701,7 +701,6 @@ void init(void)
             acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node);
             print_crs_list(crs_list);
             pass_crs_and_caps(crs_list, pci_resources->num_bridges);
-            pci_resources->num_bridges++;
 
             aml_object_t *prt_node = query_child_object_by_name(node->parent, acpi_str_prt);
             if (prt_node == NULL) {
@@ -714,13 +713,14 @@ void init(void)
                 aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name);
                 if (prt_package) {
                     sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start);
-                    extract_prt_package(prt_package);
+                    extract_prt_package(prt_package, &pci_resources->bridges[pci_resources->num_bridges]);
                 } else {
                     sddf_dprintf("PRT package is not found\n");
                 }
             } else {
                 sddf_dprintf("Failed to parse the package name for routing tables\n");
             }
+            pci_resources->num_bridges++;
         }
     }
 
