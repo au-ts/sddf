@@ -384,6 +384,90 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
     }
 }
 
+uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
+{
+    for (int i = 0; i < pci_resources->num_bridges; i++) {
+        uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
+        sddf_dprintf("num_res: %u\n", num_res);
+        for (int j = 0; j < num_res; j++) {
+            device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
+            /* sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr); */
+
+            if (dev_res->type == WORD_BUS) {
+                if (pci_bus >= dev_res->min_addr && pci_bus < dev_res->max_addr) {
+                    sddf_dprintf("Found the bridge %u[0x%02x-0x%02x] containing bus 0x%02x\n", i, dev_res->min_addr, dev_res->max_addr, pci_bus);
+                    return i;
+                }
+
+            }
+        }
+    }
+}
+
+void bind_irq(struct pci_config_space *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
+{
+    uint8_t base_irq_cap = 138;
+    uint8_t bridge_idx = get_pci_bridge_idx_by_bus(pci_bus);
+
+    uint8_t num_prt_entries = pci_resources->bridges[bridge_idx].num_prt_entries;
+    sddf_dprintf("num_prt_entries: %u\n", num_prt_entries);
+    uint8_t gsi_number = 0;
+    for (int j = 0; j < num_prt_entries; j++) {
+        pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[bridge_idx].prt_entries[j];
+        sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
+        uint32_t dev_num = (pci_prt->address >> 16) & 0x1F;
+        uint32_t func_num = pci_prt->address & 0xFFFF;
+        if (func_num != 0xFFFF) {
+            sddf_dprintf("func numebr: 0x%X, pci_prt->address: 0x%X, &: 0x%X\n", func_num, pci_prt->address, pci_prt->address & 0xFFFF);
+            sddf_dprintf("Error: PRT rule (address: 0x%X, pin: %u, gsi: %u) does not apply to the current implementation\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
+            return;
+        }
+
+        if (dev_num == pci_dev) {
+            gsi_number = pci_prt->gsi;
+            sddf_dprintf("Found the GSI numebr %u for the device\n", gsi_number);
+            break;
+        }
+    }
+
+    if (gsi_number == 0) {
+        sddf_dprintf("Error: failed to find the PRT rule for PCI device at %02x:%02x.%x\n", pci_bus, pci_dev, pci_func);
+        return;
+    }
+
+    sddf_dprintf("Try creating an IRQ handler capability: ");
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 0, 1);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
+    sddf_dprintf("Try minting a notification capability: ");
+    error = seL4_CNode_Mint(cnode_cptr_pci_resources, 250, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_ReadWrite, 1 << irq_num);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to mint a notification - %d\n", error);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
+    seL4_CPtr handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
+    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 250;
+
+    seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
+    sddf_dprintf("ret: %lu\n", ret);
+    sddf_dprintf("Try bind the handler to notification: ");
+    error = seL4_IRQHandler_SetNotification(handler_cap, ntf_cap);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to bind to notification - %d\n", error);
+    } else {
+        sddf_dprintf("Success!\n");
+    }
+
+    sddf_deferred_notify(1);
+}
+
+
 // TODO: pass bus start and end as arguments
 void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 {
@@ -403,6 +487,7 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                 // TODO: convert it to general solution
                 if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
                     map_pci_bar(pci_header, 4);
+                    bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16);
                 }
             }
         }
@@ -456,59 +541,27 @@ void init(void)
 
     print_cnode_caps();
 
-    sddf_dprintf("=========Descriptions of PCI resources==========\n");
-    for (int i = 0; i < pci_resources->num_bridges; i++) {
-        uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
-        sddf_dprintf("num_res: %u\n", num_res);
-        for (int j = 0; j < num_res; j++) {
-            device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
-            sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr);
+    /* sddf_dprintf("=========Descriptions of PCI resources==========\n"); */
+    /* for (int i = 0; i < pci_resources->num_bridges; i++) { */
+    /*     uint8_t num_res = pci_resources->bridges[i].num_dev_resources; */
+    /*     sddf_dprintf("num_res: %u\n", num_res); */
+    /*     for (int j = 0; j < num_res; j++) { */
+    /*         device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j]; */
+    /*         sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr); */
 
-            if (dev_res->type == DWORD_MEMORY || dev_res->type == WORD_MEMORY || dev_res->type == QWORD_MEMORY) {
-                get_ut_by_paddr(dev_res->min_addr);
-            }
-        }
+    /*         if (dev_res->type == DWORD_MEMORY || dev_res->type == WORD_MEMORY || dev_res->type == QWORD_MEMORY) { */
+    /*             get_ut_by_paddr(dev_res->min_addr); */
+    /*         } */
+    /*     } */
 
-        uint8_t num_prt_entries = pci_resources->bridges[i].num_prt_entries;
-        sddf_dprintf("num_prt_entries: %u\n", num_prt_entries);
-        for (int j = 0; j < num_prt_entries; j++) {
-            pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[i].prt_entries[j];
-            sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
-        }
-    }
+    /*     uint8_t num_prt_entries = pci_resources->bridges[i].num_prt_entries; */
+    /*     sddf_dprintf("num_prt_entries: %u\n", num_prt_entries); */
+    /*     for (int j = 0; j < num_prt_entries; j++) { */
+    /*         pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[i].prt_entries[j]; */
+    /*         sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi); */
+    /*     } */
+    /* } */
 
-    uint8_t base_irq_cap = 138;
-    uint8_t irq_num = 16;
-    sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, 0x16, 1, 0, 1);
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
-    } else {
-        sddf_dprintf("Success!\n");
-    }
-
-    sddf_dprintf("Try minting a notification capability: ");
-    error = seL4_CNode_Mint(cnode_cptr_pci_resources, 250, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_ReadWrite, 1 << irq_num);
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to mint a notification - %d\n", error);
-    } else {
-        sddf_dprintf("Success!\n");
-    }
-
-    seL4_CPtr handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
-    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 250;
-
-    seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
-    sddf_dprintf("ret: %lu\n", ret);
-    sddf_dprintf("Try bind the handler to notification: ");
-    error = seL4_IRQHandler_SetNotification(handler_cap, ntf_cap);
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to bind to notification - %d\n", error);
-    } else {
-        sddf_dprintf("Success!\n");
-    }
-
-    sddf_deferred_notify(1);
 
 }
 
