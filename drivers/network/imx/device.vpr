@@ -122,6 +122,7 @@ field hw_stat: Int
 field hw_len: Int
 // refers to whether this descriptor is in the state where it has been returned from the device but not processed by the driver
 field ghost_unprocessed: Bool
+field rx_processed: Set[Seq[Int]]
 field tx_processed: Set[Int]
 field hardware_ring_rx: IArray
 field hardware_ring_tx: IArray
@@ -864,7 +865,8 @@ method store_TDAR(heap: IArray, gv: Ref, address: Int, value: Int)
     ensures forall x: Seq[Int] :: x in gv.tx_handled ==> x in old(gv.tx_handled) ||
                 (|x| == 2 && exists i: Int :: (0 <= i && i < old(|gv.tx_await_ack|) && x == Seq(
                     old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr), old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len))))
-{
+    ensures |gv.tx_handled| == |old(gv.tx_handled)| + |old(gv.tx_await_ack)|
+/*{
     var ix: Int := 0
     while (ix < |gv.tx_await_ack|)
         invariant acc(gv.tx_await_ack, 1/2) && acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
@@ -895,7 +897,7 @@ method store_TDAR(heap: IArray, gv: Ref, address: Int, value: Int)
     assert gv.tx_await_ack == old(gv.tx_await_ack)
     gv.tx_await_ack := Seq[Int]()
     refute false
-}
+}*/
 
 /////////////////////////////
 
@@ -942,12 +944,20 @@ method load_EIR(heap: IArray, gv: Ref, address: Int)
 
 method f_rx_set_descr_processed(heap: IArray, gv: Ref, i: Int)
     requires 0 <= i < 256
-    requires acc(gv.hardware_ring_rx, 1/4) && acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed)
+    requires acc(gv.hardware_ring_rx, 1/4) && acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed) &&
+      acc(gv.rx_processed) && acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/4) &&
+      acc(slot(gv.hardware_ring_rx, i).hw_len, 1/4)
     requires slot(gv.hardware_ring_rx, i).ghost_unprocessed == true
-    ensures acc(gv.hardware_ring_rx, 1/4) && acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed)
+    ensures acc(gv.hardware_ring_rx, 1/4) && acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed) &&
+      acc(gv.rx_processed) && acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/4) &&
+      acc(slot(gv.hardware_ring_rx, i).hw_len, 1/4)
     ensures slot(gv.hardware_ring_rx, i).ghost_unprocessed == false
+    ensures gv.rx_processed == old(gv.rx_processed) union
+              Set(Seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len))
 {
     slot(gv.hardware_ring_rx, i).ghost_unprocessed := false
+    gv.rx_processed := gv.rx_processed union
+              Set(Seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len))
 }
 
 method f_tx_set_descr_processed(heap: IArray, gv: Ref, i: Int)
@@ -958,8 +968,6 @@ method f_tx_set_descr_processed(heap: IArray, gv: Ref, i: Int)
     ensures acc(gv.hardware_ring_tx, 1/4) && acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed) &&
       acc(gv.tx_processed) && acc(slot(gv.hardware_ring_tx, i).hw_addr, 1/4)
     ensures slot(gv.hardware_ring_tx, i).ghost_unprocessed == false
-//    ensures forall x: Int :: x in old(gv.tx_processed) ==> x in gv.tx_processed
-//    ensures forall x: Int :: x in gv.tx_processed ==> x in old(gv.tx_processed) || x == slot(gv.hardware_ring_tx, i).hw_addr
     ensures gv.tx_processed == old(gv.tx_processed) union Set(slot(gv.hardware_ring_tx, i).hw_addr)
 {
     slot(gv.hardware_ring_tx, i).ghost_unprocessed := false
@@ -1031,3 +1039,28 @@ define f_garbage_b(heap, gv) (
     false
 )
 
+define f_garbage_a2(heap, gv) (
+  let a == (old(gv.hw_tx_tail)) in let b == (old(gv.hw_tx_head)) in a == b &&
+    (gv.hw_tx_tail - gv.hw_tx_head) % 65536 == gv.hw_tx_capacity &&
+    gv.hw_tx_tail == a && gv.hw_tx_head == b ==>
+    false
+)
+
+define f_garbage_b2(heap, gv) (
+  let a == (old(gv.tx_active.net_tail)) in let b == (old(gv.tx_active.net_head)) in
+    gv.tx_active.net_tail >= a && gv.tx_active.net_head >= b && a >= b &&
+    a != b && gv.tx_active.net_tail == gv.tx_active.net_head && gv.tx_active.net_head == b ==>
+    false
+)
+
+define f_garbage_c(heap, gv) (
+  let a == (old(gv.hw_tx_tail)) in let b == (old(gv.hw_tx_head)) in
+    (a - b) % (MAX_INT16 + 1) == QUEUE_CAPACITY && gv.hw_tx_tail == gv.hw_tx_head &&
+    gv.hw_tx_head == b && gv.hw_tx_tail == a ==> false
+)
+
+define f_garbage_c2(heap, gv) (
+  let a == (old(gv.hw_rx_tail)) in let b == (old(gv.hw_rx_head)) in
+    (a - b) % (MAX_INT16 + 1) == QUEUE_CAPACITY && gv.hw_rx_tail == gv.hw_rx_head &&
+    gv.hw_rx_head == b && gv.hw_rx_tail == a ==> false
+)

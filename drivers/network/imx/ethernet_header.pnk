@@ -95,6 +95,10 @@ var 1 eth_reg = ETH_REG;
 /@ extern function net_queue_injective_consume(r: Ref): Bool @/
 /@ extern function garbage_a(): Bool @/
 /@ extern function garbage_b(): Bool @/
+/@ extern function garbage_a2(): Bool @/
+/@ extern function garbage_b2(): Bool @/
+/@ extern function garbage_c(): Bool @/
+/@ extern function garbage_c2(): Bool @/
 
 /@ extern predicate valid_hardware_ring_rx_write @/
 /@ extern predicate valid_hardware_ring_rx_read @/
@@ -112,6 +116,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern field rx_await_ack: Seq[Int] @/
 /@ extern field tx_handled: Set[Seq[Int]] @/
 /@ extern field rx_handled: Set[Seq[Int]] @/
+/@ extern field rx_processed: Set[Seq[Int]] @/
 /@ extern field tx_processed: Set[Int] @/
 /@ extern field hw_addr: Int @/
 /@ extern field hw_stat: Int @/
