@@ -244,3 +244,24 @@ var 1 eth_reg = ETH_REG;
     0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity
   }
 @/
+
+#define empty_ghost_state() (
+	unfolding valid() in
+		(unfolding valid_virt() in
+			gv.rx_active.net_added == empty_set_seqint() &&
+			gv.rx_free.net_added == empty_set_seqint() &&
+			gv.tx_active.net_added == empty_set_seqint() &&
+			gv.tx_free.net_added == empty_set_seqint() &&
+			gv.rx_active.net_removed_addr == empty_set() &&
+			gv.rx_free.net_removed_addr == empty_set() &&
+			gv.tx_active.net_removed_addr == empty_set() &&
+			gv.tx_free.net_removed_addr == empty_set() &&
+			gv.rx_active.net_removed == empty_set_seqint() &&
+			gv.rx_free.net_removed == empty_set_seqint() &&
+			gv.tx_active.net_removed == empty_set_seqint() &&
+			gv.tx_free.net_removed == empty_set_seqint()) &&
+		gv.rx_handled == empty_set_seqint() &&
+		gv.tx_handled == empty_set_seqint() &&
+		gv.rx_await_ack == empty_set() &&
+		gv.tx_await_ack == empty_set()
+)
