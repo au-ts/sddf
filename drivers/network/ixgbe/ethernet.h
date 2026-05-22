@@ -14,95 +14,6 @@
 #define DEVICE_BASE 0x2000000lu
 #define DEVICE_MSIX_TABLE 0x4000000lu
 
-#define declare_register(base, name, offset)             \
-    uintptr_t name = (uintptr_t)(base + offset);
-
-#define declare_array_register(base, name, offset, count, multiplier)    \
-    static inline                                                       \
-    uintptr_t                                                           \
-    name(int index) {                                                   \
-        if (index >= count) {                                           \
-            sddf_dprintf("array register index out of bounds\n");             \
-            return 0;                                                   \
-        }                                                               \
-        return base + offset + multiplier * index;               \
-    }
-
-declare_register(PCIE_CONFIG_BASE, PCI_VENDOR_ID_16, 0x00);
-declare_register(PCIE_CONFIG_BASE, PCI_DEVICE_ID_16, 0x02);
-declare_register(PCIE_CONFIG_BASE, PCI_COMMAND_16, 0x04);
-declare_register(PCIE_CONFIG_BASE, PCI_STATUS_16, 0x06);
-declare_register(PCIE_CONFIG_BASE, PCI_INTERRUPT_PIN_LINE_16, 0x3C);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_CONTROL_16, 0x52);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_ADDRESS_LOW, 0x54);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_ADDRESS_HIGH, 0x58);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_DATA_16, 0x5C);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MASK, 0x60);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_PENDING, 0x64);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_CTRL, 0x70);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_OFFSET, 0x74);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_PENDING, 0x78);
-
-declare_register(DEVICE_BASE, CTRL, 0x00000);
-declare_register(DEVICE_BASE, STATUS, 0x00008);
-declare_register(DEVICE_BASE, CTRL_EXT, 0x00018);
-declare_register(DEVICE_BASE, EEC, 0x10010);
-declare_register(DEVICE_BASE, GPRC, 0x04074);
-declare_register(DEVICE_BASE, GPTC, 0x04080);
-declare_register(DEVICE_BASE, GORCL, 0x04088);
-declare_register(DEVICE_BASE, GORCH, 0x0408C);
-declare_register(DEVICE_BASE, GOTCL, 0x04090);
-declare_register(DEVICE_BASE, GOTCH, 0x04094);
-declare_register(DEVICE_BASE, HLREG0, 0x04240);
-declare_register(DEVICE_BASE, LINKS, 0x042A4);
-declare_register(DEVICE_BASE, FCTRL, 0x05080);
-declare_register(DEVICE_BASE, RXCTRL, 0x03000);
-declare_register(DEVICE_BASE, RDRXCTL, 0x02F00);
-declare_register(DEVICE_BASE, DTXMXSZRQ, 0x08100);
-declare_register(DEVICE_BASE, DMATXCTL, 0x04A80);
-declare_register(DEVICE_BASE, RTTDCS, 0x04900);
-declare_register(DEVICE_BASE, EICR, 0x00800);
-declare_register(DEVICE_BASE, EICS, 0x00808);
-declare_register(DEVICE_BASE, EIMS, 0x00880);
-declare_register(DEVICE_BASE, EIMC, 0x00888);
-declare_register(DEVICE_BASE, EIAC, 0x00810);
-declare_register(DEVICE_BASE, GPIE, 0x00898);
-declare_register(DEVICE_BASE, TXDGPC, 0x087A0);
-declare_register(DEVICE_BASE, TXDGBCL, 0x087A4);
-declare_register(DEVICE_BASE, TXDGBCH, 0x087A8);
-declare_register(DEVICE_BASE, FACTPS, 0x10150);
-declare_array_register(DEVICE_BASE, RDBAL, 0x01000, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDBAH, 0x01004, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDLEN, 0x01008, 64, 0x60);
-declare_array_register(DEVICE_BASE, RDH, 0x01010, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDT, 0x01018, 64, 0x40);
-declare_array_register(DEVICE_BASE, SRRCTL, 0x01014, 64, 0x40);
-declare_array_register(DEVICE_BASE, RXPBSIZE, 0x03C00, 8, 0x4);
-declare_array_register(DEVICE_BASE, DCA_RXCTRL, 0x0100C, 64, 0x40);
-declare_array_register(DEVICE_BASE, RXDCTL, 0x01028, 64, 0x40);
-declare_array_register(DEVICE_BASE, RSCCTL, 0x0102C, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDBAL, 0x06000, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDBAH, 0x06004, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDLEN, 0x06008, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDH, 0x06010, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDT, 0x06018, 64, 0x40);
-declare_array_register(DEVICE_BASE, TXPBSIZE, 0x0CC00, 8, 0x4);
-declare_array_register(DEVICE_BASE, TXPBTHRESH, 0x04950, 8, 0x4);
-declare_array_register(DEVICE_BASE, TXDCTL, 0x06028, 64, 0x40);
-declare_array_register(DEVICE_BASE, IVAR, 0x00900, 64, 0x4);
-declare_array_register(DEVICE_BASE, EITR, 0x00820, 24, 0x4);
-declare_array_register(DEVICE_BASE, QPTC, 0x08680, 16, 0x4);
-declare_array_register(DEVICE_BASE, RAL, 0x0A200, 128, 0x8);
-declare_array_register(DEVICE_BASE, RAH, 0x0A204, 128, 0x8);
-declare_array_register(DEVICE_BASE, RSCINT, 0x12000, 128, 0x4);
-
-// Queue Packets Received Count
-declare_array_register(DEVICE_BASE, QPRC, 0x01030, 16, 0x40);
-// Queue Packets Received Drop Count
-declare_array_register(DEVICE_BASE, QPRDC, 0x01430, 16, 0x40);
-// Receive Queue Statistic Mapping Registers
-declare_array_register(DEVICE_BASE, RQSMR, 0x02300, 32, 0x4);
-
 const uint64_t IXGBE_CTRL_LNK_RST = 0x00000008; /* Link Reset. Resets everything. */
 const uint64_t IXGBE_CTRL_RST = 0x04000000; /* Reset (SW) */
 const uint64_t IXGBE_CTRL_RST_MASK = IXGBE_CTRL_LNK_RST | IXGBE_CTRL_RST;
@@ -288,16 +199,20 @@ typedef struct {
     uint8_t unused2[12];      // 0x0000101C + 0x40*n
     uint32_t rxdctl;          // 0x00001028 + 0x40*n Receive Descriptor Control
     uint32_t rscctl;          // 0x0000102C + 0x40*n RSC Control
-    uint32_t unused3[16];     // 0x00001030 + 0x40*n
+    uint8_t unused3[16];     // 0x00001030 + 0x40*n
 } rx_dma_regs_t;
 
 typedef struct {
     uint32_t tdbal;           // 0x00006000 + 0x40*n Transmit Descriptor Base Address Low
     uint32_t tdbah;           // 0x00006004 + 0x40*n Transmit Descriptor Base Address High
     uint32_t tdlen;           // 0x00006008 + 0x40*n Transmit Descriptor Length
+    uint8_t unused1[4];       // 0x0000600C + 0x40*n
     uint32_t tdh;             // 0x00006010 + 0x40*n Transmit Descriptor Head
+    uint8_t unused2[4];       // 0x00006014 + 0x40*n
     uint32_t tdt;             // 0x00006018 + 0x40*n Transmit Descriptor Tail
+    uint8_t unused3[12];      // 0x0000601C + 0x40*n
     uint32_t txdctl;          // 0x00006028 + 0x40*n Transmit Descriptor Control
+    uint8_t unused4[12];      // 0x0000602C + 0x40*n
     uint32_t tdwbal;          // 0x00006038 + 0x40*n Tx Descriptor Completion Write Back Address Low
     uint32_t tdwbah;          // 0x0000603C + 0x40*n Tx Descriptor Completion Write Back Address High
 } tx_dma_regs_t;
@@ -341,7 +256,7 @@ typedef struct {
     uint8_t unused14[3068];   // 0x03004
 
     uint32_t rxpbsize[8];     // 0x03C00 + 0x4*n Receive Packet Buffer Size
-    uint8_t unused15[1076];   // 0x03C20
+    uint8_t unused15[1108];   // 0x03C20
 
     uint32_t gprc;            // 0x04074 Good Packets Received Count
     uint8_t unused16[8];      // 0x04078
@@ -359,7 +274,7 @@ typedef struct {
     uint8_t unused20[1704];   // 0x042A8
 
     uint32_t txpbthresh[8];   // 0x04950 + 0x4*n Tx Packet Buffer Threshold
-    uint8_t unused21[268];    // 0x04970
+    uint8_t unused21[272];    // 0x04970
 
     uint32_t dmatxctl;        // 0x04A80 DMA Tx Control
     uint8_t unused22[1532];   // 0x04A84
@@ -379,7 +294,7 @@ typedef struct {
     uint8_t unused26[6740];   // 0x087AC
 
     rx_addr_t rx_addr[128];   // 0x0A200 + 0x8*n Receive Address
-    uint8_t unused27[8704];   // 0x0AA00
+    uint8_t unused27[9728];   // 0x0A600
 
     uint32_t txpbsize[8];     // 0x0CC00 + 0x4*n Transmit Packet Buffer Size
     uint8_t unused28[13296];  // 0x0CC20
@@ -388,3 +303,40 @@ typedef struct {
     uint8_t unused29[316];    // 0x10014
     uint32_t factps;          // 0x10150 Function Active and Power State to Manageability
 } eth_regs_t;
+
+struct pci_config_space {
+    // Device Identification
+    uint16_t vendor_id;           // 0x00: Vendor ID
+    uint16_t device_id;           // 0x02: Device ID
+    uint16_t command;             // 0x04: Command Register
+    uint16_t status;              // 0x06: Status Register
+    uint8_t revision_id;         // 0x08: Revision ID
+    uint8_t prog_if;             // 0x09: Programming Interface
+    uint8_t subclass;            // 0x0A: Sub Class Code
+    uint8_t class_code;          // 0x0B: Base Class Code
+    uint8_t cache_line_size;     // 0x0C: Cache Line Size
+    uint8_t latency_timer;       // 0x0D: Latency Timer
+    uint8_t header_type;         // 0x0E: Header Type
+    uint8_t bist;                // 0x0F: Built-in Self Test
+
+    // Base Address Registers (BARs)
+    uint32_t bar[6];              // 0x10-0x27: Base Address Registers
+
+    // Subsystem Information
+    uint32_t cardbus_cis_ptr;     // 0x28: CardBus CIS Pointer
+    uint16_t subsystem_vendor_id; // 0x2C: Subsystem Vendor ID
+    uint16_t subsystem_device_id; // 0x2E: Subsystem Device ID
+    uint32_t expansion_rom_addr;  // 0x30: Expansion ROM Base Address
+
+    // Capabilities and Interrupts
+    uint8_t cap_ptr;             // 0x34: Capabilities Pointer
+    uint8_t reserved1[3];        // 0x35-0x37: Reserved
+    uint32_t reserved2;           // 0x38-0x3B: Reserved
+    uint8_t interrupt_line;      // 0x3C: Interrupt Line
+    uint8_t interrupt_pin;       // 0x3D: Interrupt Pin
+    uint8_t min_gnt;             // 0x3E: Min_Gnt
+    uint8_t max_lat;             // 0x3F: Max_Lat
+
+    // Capability list
+    uint8_t cap_data[192];
+};
