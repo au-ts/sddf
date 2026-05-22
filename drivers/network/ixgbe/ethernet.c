@@ -92,6 +92,7 @@ static inline bool hw_rx_ring_full(void)
 void clear_interrupts(void)
 {
     eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
+    (void)eth_regs->eicr;
 }
 
 void disable_interrupts(void)
@@ -195,6 +196,7 @@ void tx_return(void)
     while (!hw_tx_ring_empty()) {
         /* Ensure that this buffer has been sent by the device */
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
+
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
             break;
 
@@ -263,6 +265,7 @@ static void rx_return(void)
     while (!hw_rx_ring_empty()) {
         // @jade: why do we get into this loop all the time even when there is no packets in there?
 
+        THREAD_MEMORY_RELEASE();
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
@@ -287,6 +290,8 @@ static void rx_return(void)
 
 void init(void)
 {
+    eth_regs = (eth_regs_t *)0x2000000;
+
     // see PCI Express Technology 3.0 Chapter 17 for more details.
     // =====Uncomment the below code snippet to use MSI interrupts========
     /* set_flags16(PCI_COMMAND_16, BIT(10)); */
@@ -326,6 +331,7 @@ void init(void)
     eth_regs->ctrl = IXGBE_CTRL_PCIE_MASTER_DISABLE;
     while (eth_regs->status & IXGBE_STATUS_PCIE_MASTER_STATUS);
 
+
     // Global Reset and General Configuration, see Section 4.6.3.2
     eth_regs->ctrl |= IXGBE_CTRL_RST;
     while ((eth_regs->ctrl & IXGBE_CTRL_RST_MASK) != 0);
@@ -337,12 +343,24 @@ void init(void)
 void init_1(void)
 {
     device.init_stage = 1;
-
     // section 4.6.3.1 - disable interrupts again after reset
     disable_interrupts();
 
+    struct pci_config_space *header = (struct pci_config_space *)0x3000000;
+    sddf_dprintf("vendor id: 0x%x\n", header->vendor_id);
+    sddf_dprintf("device id: 0x%x\n", header->device_id);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[0]);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[1]);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[2]);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[3]);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[4]);
+    sddf_dprintf("BAR: 0x%x\n", header->bar[5]);
+    sddf_dprintf("interrupt pin: %d\n", header->interrupt_pin);
+    sddf_dprintf("interrupt line: %d\n", header->interrupt_line);
+
     uint8_t mac[6];
     get_mac_addr(mac);
+    sddf_dprintf("mac - %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // section 4.6.3 - wait for EEPROM auto read completion
     while((eth_regs->eec & IXGBE_EEC_ARD) != IXGBE_EEC_ARD);
@@ -388,7 +406,7 @@ void init_1(void)
         eth_regs->rdrxctl |= IXGBE_RDRXCTL_CRCSTRIP;
 
         // accept broadcast packets, promiscuous
-        eth_regs->fctrl = IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE;
+        eth_regs->fctrl |= IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE;
 
         // use only queue 0
         eth_regs->rx_dma[0].srrctl &= ~IXGBE_SRRCTL_DESCTYPE_MASK;
@@ -420,7 +438,7 @@ void init_1(void)
         }
 
         eth_regs->tx_dma[0].tdbal = hw_tx_ring_paddr & 0xFFFFFFFFull;
-        eth_regs->tx_dma[0].tdbal = hw_tx_ring_paddr >> 32;
+        eth_regs->tx_dma[0].tdbah = hw_tx_ring_paddr >> 32;
         eth_regs->tx_dma[0].tdh = 0;
         eth_regs->tx_dma[0].tdt = 0;
 
@@ -471,6 +489,7 @@ void init_3(void)
 
     enable_interrupts();
 
+    sddf_dprintf("Finish NIC reset\n");
     device.init_stage = 4;
 }
 
@@ -484,7 +503,9 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
         }
-    } else if (ch == device_resources.irqs[0].id) {
+    } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
+        microkit_deferred_irq_ack(ch);
+    } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
         // write/read-to-clear, no need for auto clear
         uint32_t cause = eth_regs->eicr;
         eth_regs->eicr &= ~cause;

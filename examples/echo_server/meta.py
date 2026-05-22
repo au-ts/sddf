@@ -324,13 +324,13 @@ def generate(
             sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
         )
         sdf.add_mr(hw_rx_ring_buffer)
-        ethernet_driver.add_map(Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw"))
+        ethernet_driver.add_map(Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw", cached=False))
 
         hw_tx_ring_buffer = MemoryRegion(
             sdf, name="hw_tx_ring_buffer", size=0x4000, paddr=0x10004000
         )
         sdf.add_mr(hw_tx_ring_buffer)
-        ethernet_driver.add_map(Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw"))
+        ethernet_driver.add_map(Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw", cached=False))
 
         # MSI
         # eth_irq = SystemDescription.IrqMsi(
@@ -350,8 +350,7 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8)
-
+        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=17, vector=8)
         ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
