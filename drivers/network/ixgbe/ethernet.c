@@ -174,9 +174,9 @@ void tx_provide(void)
         }
         // @jade: should I move this to the outer block?
         if (provided) {
-            /* set_reg(TDT(0), device.tx_tail); */
+            THREAD_MEMORY_RELEASE();
             eth_regs->tx_dma[0].tdt = device.tx_tail;
-            eth_regs->tx_dma[0].tdt;
+            eth_regs->tx_dma[0].tdt; // Write flush
         }
 
         net_request_signal_active(&tx_queue);
@@ -197,10 +197,9 @@ void tx_return(void)
         /* Ensure that this buffer has been sent by the device */
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
 
+        // performance optimisation suggested: https://github.com/au-ts/sddf/pull/682
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
             break;
-
-        THREAD_MEMORY_RELEASE();
 
         net_buff_desc_t descr_mdata = device.tx_descr_mdata[device.tx_head];
         int err = net_enqueue_free(&tx_queue, descr_mdata);
@@ -230,8 +229,6 @@ void rx_provide(void)
             volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
-
-            THREAD_MEMORY_RELEASE();
 
             device.rx_descr_mdata[device.rx_tail] = buffer;
 
@@ -265,13 +262,15 @@ static void rx_return(void)
     while (!hw_rx_ring_empty()) {
         // @jade: why do we get into this loop all the time even when there is no packets in there?
 
-        THREAD_MEMORY_RELEASE();
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
             break;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0)
             break;
+
+        // The access to `status_error` field should be ordered before the access to the `length` field
+        THREAD_MEMORY_ACQUIRE();
 
         net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
         buffer.len = desc.upper.length;
