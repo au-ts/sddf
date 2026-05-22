@@ -1,0 +1,1062 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+inline fun rx_hw_ring_empty()
+{
+  /@ requires acc(gv.hw_rx_head, 1/2) && acc(gv.hw_rx_tail, 1/2) @/
+  /@ ensures acc(gv.hw_rx_head, 1/2) && acc(gv.hw_rx_tail, 1/2) @/
+  /@ ensures retval == (gv.hw_rx_head == gv.hw_rx_tail) @/
+
+  return (hw_rx_head == hw_rx_tail);
+}
+
+inline fun tx_hw_ring_empty()
+{
+  /@ requires acc(gv.hw_tx_head, 1/2) && acc(gv.hw_tx_tail, 1/2) @/
+  /@ ensures acc(gv.hw_tx_head, 1/2) && acc(gv.hw_tx_tail, 1/2) @/
+  /@ ensures retval == (gv.hw_tx_head == gv.hw_tx_tail) @/
+
+  return (hw_tx_head == hw_tx_tail);
+}
+
+inline fun rx_hw_ring_full()
+{
+  /@ requires acc(gv.hw_rx_head, 1/2) && acc(gv.hw_rx_tail, 1/2) && acc(gv.hw_rx_capacity, 1/2) @/
+  /@ requires bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && bounded16(gv.hw_rx_capacity) @/
+  /@ ensures acc(gv.hw_rx_head, 1/2) && acc(gv.hw_rx_tail, 1/2) && acc(gv.hw_rx_capacity, 1/2) @/
+  /@ ensures bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && bounded16(gv.hw_rx_capacity) @/
+  /@ ensures retval == ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity) @/
+
+  if (hw_rx_tail >= hw_rx_head) {
+    return (hw_rx_tail - hw_rx_head) == hw_rx_capacity;
+  }
+  return (hw_rx_head - hw_rx_tail) == (MAX_INT16 + 1 - hw_rx_capacity);
+}
+
+inline fun tx_hw_ring_full()
+{
+  /@ requires acc(gv.hw_tx_head, 1/2) && acc(gv.hw_tx_tail, 1/2) && acc(gv.hw_tx_capacity, 1/2) @/
+  /@ requires bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && bounded16(gv.hw_tx_capacity) @/
+  /@ ensures acc(gv.hw_tx_head, 1/2) && acc(gv.hw_tx_tail, 1/2) && acc(gv.hw_tx_capacity, 1/2) @/
+  /@ ensures bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && bounded16(gv.hw_tx_capacity) @/
+  /@ ensures retval == ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity) @/
+
+  if (hw_tx_tail >= hw_tx_head) {
+    return (hw_tx_tail - hw_tx_head) == hw_tx_capacity;
+  }
+  return (hw_tx_head - hw_tx_tail) == (MAX_INT16 + 1 - hw_tx_capacity);
+}
+
+inline fun set_rdar()
+{
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ requires acc(gv.rx_await_ack) && acc(gv.hardware_ring_rx, 2/3) && acc(gv.rx_handled) @/
+  /@ requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j] @/
+  /@ requires forall i: Int :: i in gv.rx_await_ack ==>
+              acc(slot(gv.hardware_ring_rx, i).hw_addr) &&
+              is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
+              acc(slot(gv.hardware_ring_rx, i).hw_stat, 2/3) &&
+              is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat) &&
+              acc(slot(gv.hardware_ring_rx, i).hw_len) &&
+              is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len) &&
+              is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) @/
+  /@ ensures acc(gv.eth_reg, 1/2) @/
+  /@ ensures acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() &&
+       acc(gv.hardware_ring_rx, 2/3) && acc(gv.rx_handled) @/
+  /@ ensures forall i: Int :: i in old(gv.rx_await_ack) ==> acc(slot(gv.hardware_ring_rx, i).hw_stat, 2/3) @/
+  /@ ensures forall i: Int :: i in old(gv.rx_await_ack) ==>
+       element2_seq(old(slot(gv.hardware_ring_rx, i).hw_addr), 0) in gv.rx_handled @/
+  /@ ensures forall x: Seq[Int] :: x in old(gv.rx_handled) ==> x in gv.rx_handled @/
+  /@ ensures forall x: Seq[Int] :: x in gv.rx_handled ==> x in old(gv.rx_handled) ||
+               (|x| == 2 && exists i: Int :: 0 <= i && i < old(|gv.rx_await_ack|) &&
+                  x == element2_seq(old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr), 0)) @/
+
+  !st32 eth_reg + ETH_RDAR_OFF, RDAR_RDAR;
+  return 0;
+}
+
+inline fun set_tdar()
+{
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ requires acc(gv.tx_await_ack) && acc(gv.hardware_ring_tx, 2/3) && acc(gv.tx_handled) @/
+  /@ requires forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
+                gv.tx_await_ack[i] != gv.tx_await_ack[j] @/
+  /@ requires forall i: Int :: i in gv.tx_await_ack ==>
+              acc(slot(gv.hardware_ring_tx, i).hw_addr) &&
+              is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
+              acc(slot(gv.hardware_ring_tx, i).hw_stat, 2/3) &&
+              is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat) &&
+              acc(slot(gv.hardware_ring_tx, i).hw_len) &&
+              is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len) &&
+              is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) @/
+  /@ ensures acc(gv.eth_reg, 1/2) @/
+  /@ ensures acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() &&
+       acc(gv.hardware_ring_tx, 2/3) && acc(gv.tx_handled) @/
+  /@ ensures forall i: Int :: i in old(gv.tx_await_ack) ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 2/3) @/
+  /@ ensures forall i: Int :: i in old(gv.tx_await_ack) ==> element2_seq(
+       old(slot(gv.hardware_ring_tx, i).hw_addr), old(slot(gv.hardware_ring_tx, i).hw_len)) in gv.tx_handled @/
+  /@ ensures forall x: Seq[Int] :: x in old(gv.tx_handled) ==> x in gv.tx_handled @/
+  /@ ensures forall x: Seq[Int] :: x in gv.tx_handled ==> x in old(gv.tx_handled) ||
+               (|x| == 2 && exists i: Int :: 0 <= i && i < old(|gv.tx_await_ack|) &&
+                  x == element2_seq(old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr),
+                    old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len))) @/
+
+  !st32 eth_reg + ETH_TDAR_OFF, TDAR_TDAR;
+  return 0;
+}
+
+inline fun get_eir_status()
+{
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ ensures acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  // TODO: some kind of functional property
+
+  var eir = 0;
+  !ld32 eir, eth_reg + ETH_EIR_OFF;
+  return eir;
+}
+
+inline fun get_eir()
+{
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ ensures acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  // TODO: some kind of functional property
+
+  var 1 eir_full = get_eir_status();
+  return eir_full & IRQ_MASK;
+}
+
+inline fun set_eir(1 eir)
+{
+  /@ requires (eir & IRQ_MASK) == eir @/
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ ensures acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+
+  !st32 eth_reg + ETH_EIR_OFF, eir;
+  // guide the SMT solver to refute false
+  /@ assert eir == IRQ_MASK ==> (eir & IRQ_MASK) == eir @/
+  return 0;
+}
+
+inline fun or_WRAP(1 x)
+{
+  /@ ensures bounded16(x) ==> bounded16(retval) @/
+  /@ ensures bounded8(x) ==> bounded8(retval) @/
+  /@ ensures retval == (x | WRAP_MASK) @/
+  /@ ensures (retval | WRAP_MASK) == retval @/
+  /@ ensures (x & RX_STAT_MASK) == 0 ==> (retval & RX_STAT_MASK) == 0 @/
+  /@ ensures (x & TX_STAT_MASK) == 0 ==> (retval & TX_STAT_MASK) == 0 @/
+  /@ ensures (x & RXD_EMPTY_MASK) != 0 ==> (retval & RXD_EMPTY_MASK) != 0 @/
+  /@ ensures (x & TXD_READY_MASK) != 0 ==> (retval & TXD_READY_MASK) != 0 @/
+  return x | WRAP_MASK;
+}
+
+inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat) {
+  /@ requires is_valid_data_addr(phys) @/
+  /@ requires is_valid_data_len(len) @/
+  /@ requires is_valid_rx_stat(stat) && is_RXD_EMPTY(stat) && !is_WRAP(stat) @/
+  /@ requires acc(gv.hw_rx_capacity, 1/2) && acc(gv.hw_rx_descr, 1/2) &&
+              gv.hw_rx_capacity == QUEUE_CAPACITY &&
+              gv.hw_rx_descr == HW_RING_RX_ADDR &&
+              acc(gv.hardware_ring_rx, 2/3) &&
+              acc(slot(gv.hardware_ring_rx, idx).hw_addr) &&
+              acc(slot(gv.hardware_ring_rx, idx).hw_stat) &&
+              acc(slot(gv.hardware_ring_rx, idx).hw_len) @/
+  /@ requires acc(gv.rx_await_ack) @/
+  /@ requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j] @/
+  /@ requires 0 <= idx && idx < gv.hw_rx_capacity @/
+  /@ ensures acc(gv.hw_rx_capacity, 1/2) && acc(gv.hw_rx_descr, 1/2) &&
+             acc(gv.hardware_ring_rx, 2/3) &&
+             acc(slot(gv.hardware_ring_rx, idx).hw_addr) &&
+             acc(slot(gv.hardware_ring_rx, idx).hw_stat) &&
+             acc(slot(gv.hardware_ring_rx, idx).hw_len) @/
+  /@ ensures slot(gv.hardware_ring_rx, idx).hw_addr == phys &&
+             slot(gv.hardware_ring_rx, idx).hw_stat == (idx + 1 == gv.hw_rx_capacity ? old(stat) | WRAP_MASK : old(stat)) &&
+             is_valid_rx_stat(slot(gv.hardware_ring_rx, idx).hw_stat) &&
+             is_RXD_EMPTY(slot(gv.hardware_ring_rx, idx).hw_stat) &&
+             slot(gv.hardware_ring_rx, idx).hw_len == len @/
+  /@ ensures acc(gv.rx_await_ack) && idx in gv.rx_await_ack &&
+             (idx in old(gv.rx_await_ack) ==> gv.rx_await_ack == old(gv.rx_await_ack)) &&
+             (!(idx in old(gv.rx_await_ack)) ==> append_elem(gv.rx_await_ack, old(gv.rx_await_ack), idx)) @/
+  /@ ensures forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j] @/
+
+  var descr = hw_rx_descr + idx * DESCR_LEN;
+  if (idx + 1 == hw_rx_capacity) {
+    stat = or_WRAP(stat);
+  }
+  // help smt along
+  /@ assert stat == (idx + 1 == gv.hw_rx_capacity ? old(stat) | WRAP_MASK : old(stat)) @/
+
+  !st32 descr + DESCR_ADDR_OFF, phys;
+  !st16 descr + DESCR_LEN_OFF, len;
+  /* Ensure all writes to the descriptor complete, before we set the flags
+   * that makes hardware aware of this slot.
+   */
+  THREAD_MEMORY_RELEASE()
+  !st16 descr + DESCR_STAT_OFF, stat;
+  return 0;
+}
+
+inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat) {
+  /@ requires is_valid_data_addr(phys) @/
+  /@ requires is_valid_data_len(len) @/
+  /@ requires is_valid_tx_stat(stat) && is_TXD_READY(stat) && !is_WRAP(stat) @/
+  /@ requires acc(gv.hw_tx_capacity, 1/2) && acc(gv.hw_tx_descr, 1/2) &&
+              gv.hw_tx_capacity == QUEUE_CAPACITY &&
+              gv.hw_tx_descr == HW_RING_TX_ADDR &&
+              acc(gv.hardware_ring_tx, 2/3) &&
+              acc(slot(gv.hardware_ring_tx, idx).hw_addr) &&
+              acc(slot(gv.hardware_ring_tx, idx).hw_stat) &&
+              acc(slot(gv.hardware_ring_tx, idx).hw_len) @/
+  /@ requires acc(gv.tx_await_ack) @/
+  /@ requires forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
+                gv.tx_await_ack[i] != gv.tx_await_ack[j] @/
+  /@ requires 0 <= idx && idx < gv.hw_tx_capacity @/
+  /@ ensures acc(gv.hw_tx_capacity, 1/2) && acc(gv.hw_tx_descr, 1/2) &&
+             acc(gv.hardware_ring_tx, 2/3) &&
+             acc(slot(gv.hardware_ring_tx, idx).hw_addr) &&
+             acc(slot(gv.hardware_ring_tx, idx).hw_stat) &&
+             acc(slot(gv.hardware_ring_tx, idx).hw_len) @/
+  /@ ensures slot(gv.hardware_ring_tx, idx).hw_addr == phys &&
+             slot(gv.hardware_ring_tx, idx).hw_stat == (idx + 1 == gv.hw_tx_capacity ? old(stat) | WRAP_MASK : old(stat)) &&
+             is_valid_tx_stat(slot(gv.hardware_ring_tx, idx).hw_stat) &&
+             is_TXD_READY(slot(gv.hardware_ring_tx, idx).hw_stat) &&
+             slot(gv.hardware_ring_tx, idx).hw_len == len @/
+  /@ ensures acc(gv.tx_await_ack) && idx in gv.tx_await_ack &&
+             (idx in old(gv.tx_await_ack) ==> gv.tx_await_ack == old(gv.tx_await_ack)) &&
+             (!(idx in old(gv.tx_await_ack)) ==> append_elem(gv.tx_await_ack, old(gv.tx_await_ack), idx)) @/
+  /@ ensures forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
+               gv.tx_await_ack[i] != gv.tx_await_ack[j] @/
+
+  var descr = hw_tx_descr + idx * DESCR_LEN;
+  if (idx + 1 == hw_tx_capacity) {
+    stat = or_WRAP(stat);
+  }
+  // help smt along
+  /@ assert stat == (idx + 1 == gv.hw_tx_capacity ? old(stat) | WRAP_MASK : old(stat)) @/
+
+  !st32 descr + DESCR_ADDR_OFF, phys;
+  !st16 descr + DESCR_LEN_OFF, len;
+  /* Ensure all writes to the descriptor complete, before we set the flags
+   * that makes hardware aware of this slot.
+   */
+  THREAD_MEMORY_RELEASE()
+  !st16 descr + DESCR_STAT_OFF, stat;
+  return 0;
+}
+
+fun rx_provide()
+{
+  /@ requires acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
+              acc(gv.rx_free.net_head) &&
+              acc(gv.rx_free.net_tail, 2/3) &&
+              acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+              acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
+              acc(gv.rx_free.net_removed_addr) &&
+              0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
+              forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) &&
+                acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+                valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
+                valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
+  /@ requires net_queue_injective(gv.rx_free) @/
+  /@ requires acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
+              acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
+              acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
+              gv.hw_rx_descr == HW_RING_RX_ADDR @/
+  /@ requires bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) @/
+  /@ requires acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+  /@ requires acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() && acc(gv.rx_handled) @/
+  /@ requires valid_hardware_ring_rx_write() && valid_hardware_ring_rx_mdata_write() @/
+  /@ requires forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
+  /@ requires forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
+                s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+  /@ ensures acc(gv.net_rx_free, 2/3) && acc(gv.rx_free, 2/3) &&
+             acc(gv.rx_free.net_head) &&
+             acc(gv.rx_free.net_tail, 2/3) &&
+             acc(gv.net_rx_capacity, 2/3) && acc(gv.rx_free.net_signal) &&
+             acc(gv.rx_free.net_descr, 2/3) &&
+             acc(gv.rx_free.net_removed_addr) &&
+             0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
+             forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+               acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) &&
+               acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+               valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
+               valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
+  /@ ensures net_queue_injective(gv.rx_free) @/
+  /@ ensures acc(gv.hw_rx_ptr, 1/2) &&
+             acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) &&
+             acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) @/
+  /@ ensures bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && gv.hw_rx_capacity == 256 @/
+  /@ ensures acc(gv.eth_reg, 2/3) @/
+  /@ ensures acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() && acc(gv.rx_handled) @/
+  /@ ensures valid_hardware_ring_rx_write() && valid_hardware_ring_rx_mdata_write() @/
+  // either the hardware ring is full, or the queue consumed is empty
+  /@ ensures (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity ||
+               (gv.rx_free.net_tail == gv.rx_free.net_head) @/
+  // anything that was in the net queue and no longer is, is now in the hw queue, and v/v
+  /@ ensures forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
+  /@ ensures forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
+               s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+
+  var reprocess = true;
+
+  while (reprocess)
+  {
+    /@ invariant acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
+                 acc(gv.rx_free.net_head) &&
+                 acc(gv.rx_free.net_tail, 2/3) &&
+                 acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+                 acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
+                 acc(gv.rx_free.net_removed_addr) &&
+                 0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
+                 forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                   acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) &&
+                   acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+                   valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
+                   valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
+    /@ invariant net_queue_injective(gv.rx_free) @/
+    /@ invariant acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
+                 acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
+                 acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
+                 gv.hw_rx_descr == HW_RING_RX_ADDR @/
+    /@ invariant bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && gv.hw_rx_capacity == 256 @/
+    /@ invariant acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+    /@ invariant acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() && acc(gv.rx_handled) @/
+    // XXX: sadly, it is impossible to write that these sets contain exactly what we want them to.
+    /@ invariant forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
+    /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
+                   s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+    /@ invariant valid_hardware_ring_rx_write() && valid_hardware_ring_rx_mdata_write() @/
+    /@ invariant reprocess == false ==>
+                   ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity ||
+                     gv.rx_free.net_tail == gv.rx_free.net_head) @/
+
+    /@ label l_rpc @/
+
+    var 1 full = rx_hw_ring_full();
+    var 1 empty = net_queue_empty(net_rx_free);
+    while ((!full + !empty) == 2)
+    {
+      /@ invariant acc(gv.net_rx_free, 2/3) && gv.net_rx_free == RX_FREE_BASE && acc(gv.rx_free, 2/3) &&
+                   acc(gv.rx_free.net_head) &&
+                   acc(gv.rx_free.net_tail, 2/3) &&
+                   acc(gv.net_rx_capacity, 2/3) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+                   acc(gv.rx_free.net_signal) && acc(gv.rx_free.net_descr, 2/3) &&
+                   acc(gv.rx_free.net_removed_addr) &&
+                   0 <= gv.rx_free.net_tail - gv.rx_free.net_head && gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
+                   forall i: Int :: gv.rx_free.net_head <= i && i < gv.rx_free.net_tail ==>
+                     acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) &&
+                     acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+                     valid_net_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) &&
+                     valid_net_len(slotq(gv.rx_free.net_descr, i).ndescr_len) @/
+      /@ invariant net_queue_injective(gv.rx_free) @/
+      /@ invariant acc(gv.hw_rx_ptr, 1/2) && bounded(gv.hw_rx_ptr) &&
+                   acc(gv.hw_rx_tail) && acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
+                   acc(gv.hw_rx_descr, 2/3) && acc(gv.hw_rx_head, 2/3) &&
+                   gv.hw_rx_descr == HW_RING_RX_ADDR @/
+      /@ invariant bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && gv.hw_rx_capacity == 256 @/
+      /@ invariant acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+      /@ invariant acc(gv.rx_await_ack) && gv.rx_await_ack == empty_seq() && acc(gv.rx_handled) @/
+      /@ invariant valid_hardware_ring_rx_write() && valid_hardware_ring_rx_mdata_write() @/
+      /@ invariant full == ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity)  @/
+      /@ invariant empty == (gv.rx_free.net_tail == gv.rx_free.net_head) @/
+      /@ invariant forall x: Int :: x in gv.rx_free.net_removed_addr ==> element2_seq(x, 0) in gv.rx_handled @/
+      /@ invariant forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
+                     s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
+
+      /@ unfold valid_hardware_ring_rx_write() @/
+      /@ label l_it @/
+
+      var {1,1} buffer = net_dequeue(net_rx_free, net_rx_capacity);
+      var idx = wrap_hw_rx_capacity(hw_rx_tail);
+
+      var io_addr = buffer.0;
+      rx_update_ring_slot(hw_rx_ptr, idx, io_addr, 0, RXD_EMPTY);
+
+      var temp = wrap_int16(hw_rx_tail + 1);
+      hw_rx_tail = temp;
+      //st hw_rx_tail_slot, (hw_rx_tail + 1);
+      set_rdar();
+
+      full = rx_hw_ring_full();
+      empty = net_queue_empty(net_rx_free);
+
+      /@ refute false @/
+      /@ fold valid_hardware_ring_rx_write() @/
+    }
+
+    /* Only request a notification from virtualiser if HW ring not full */
+    full = rx_hw_ring_full();
+    if (!full) {
+      net_request_signal(net_rx_free);
+    } else {
+      net_cancel_signal(net_rx_free);
+    }
+    reprocess = false;
+
+    empty = net_queue_empty(net_rx_free);
+    if (!empty + !full == 2) {
+      net_cancel_signal(net_rx_free);
+      reprocess = true;
+    }
+    /@ refute false @/
+  }
+  return 0;
+}
+
+inline fun wrap_hw_rx_capacity(1 x)
+{
+  /@ requires acc(gv.hw_rx_capacity, 1/2) && gv.hw_rx_capacity == 256 @/
+  /@ ensures acc(gv.hw_rx_capacity, 1/2) && gv.hw_rx_capacity == 256 @/
+  /@ ensures retval < gv.hw_rx_capacity @/
+  /@ ensures retval == (x % gv.hw_rx_capacity) @/
+  return x & (hw_rx_capacity - 1);
+}
+
+inline fun and_RXD_EMPTY(1 x)
+{
+  /@ ensures retval != 0 <==> (x & RXD_EMPTY_MASK) != 0 @/
+  return x & RXD_EMPTY;
+}
+
+// i is between x and y in a ring
+/@ function ring_between(i: Word, x: Word, y: Word): Bool {
+    (x % 256 < y % 256 || y == x) ?
+      i >= x % 256 && i < y % 256 :
+      i >= x % 256 || i < y % 256
+} @/
+
+/@
+function disjoint_device_unprocessed_net_added_rx(): Bool
+  requires acc(gv.rx_active, wildcard) && acc(gv.rx_active.net_added, wildcard)
+  requires acc(gv.hw_rx_tail, wildcard) && acc(gv.hw_rx_head, wildcard) &&
+    acc(gv.hw_rx_capacity, wildcard) && gv.hw_rx_capacity == QUEUE_CAPACITY
+  requires valid_hardware_ring_rx_read()
+{
+  unfolding valid_hardware_ring_rx_read() in
+    forall s: Seq[Word] :: s in gv.rx_active.net_added ==>
+      |s| == 2 &&
+      forall i: Word :: 0 <= i && i < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+        ((gv.hw_rx_tail % gv.hw_rx_capacity) <= (gv.hw_rx_head % gv.hw_rx_capacity)
+          ? i < (gv.hw_rx_tail % gv.hw_rx_capacity) || i >= (gv.hw_rx_head % gv.hw_rx_capacity)
+          : i < (gv.hw_rx_tail % gv.hw_rx_capacity) && i >= (gv.hw_rx_head % gv.hw_rx_capacity)) &&
+         gv.hw_rx_head != gv.hw_rx_tail ==> s[0] != slot(gv.hardware_ring_rx, i).hw_addr
+}
+@/
+
+fun rx_return()
+{
+  /@ requires acc(gv.net_rx_active, 1/2) && gv.net_rx_active == RX_ACTIVE_BASE &&
+              acc(gv.net_rx_capacity, 1/2) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+              acc(gv.rx_active, 2/3) &&
+              acc(gv.rx_active.net_tail) &&
+              acc(gv.rx_active.net_head, 2/3) &&
+              acc(gv.rx_active.net_signal) && acc(gv.rx_active.net_added) &&
+              acc(gv.rx_active.net_descr, 2/3) &&
+              0 <= gv.rx_active.net_tail - gv.rx_active.net_head && gv.rx_active.net_tail - gv.rx_active.net_head <= 256 &&
+              forall i : Int :: gv.rx_active.net_tail <= i && i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
+                acc(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+                acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
+                valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+                valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
+  /@ requires acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) &&
+              acc(gv.hw_rx_tail, 2/3) && bounded16(gv.hw_rx_tail) &&
+              acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
+              acc(gv.hw_rx_descr, 1/2) && gv.hw_rx_descr == HW_RING_RX_ADDR @/
+  /@ requires acc(gv.rx_ch, 1/4) @/
+  /@ requires valid_hardware_ring_rx_read() && valid_hardware_ring_rx_mdata_read() @/
+  /@ requires disjoint_device_unprocessed_net_added_rx() @/
+  /@ ensures acc(gv.net_rx_active, 1/2) && gv.net_rx_active == RX_ACTIVE_BASE &&
+             acc(gv.net_rx_capacity, 1/2) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+             acc(gv.rx_active, 2/3) &&
+             acc(gv.rx_active.net_tail) &&
+             acc(gv.rx_active.net_head, 2/3) && acc(gv.rx_active.net_signal) &&
+             acc(gv.rx_active.net_added) && acc(gv.rx_active.net_descr, 2/3) &&
+             0 <= gv.rx_active.net_tail - gv.rx_active.net_head && gv.rx_active.net_tail - gv.rx_active.net_head <= 256 &&
+             forall i : Int :: gv.rx_active.net_tail <= i && i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
+               acc(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+               acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
+               valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+               valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
+  /@ ensures acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) && acc(gv.hw_rx_tail, 2/3) &&
+             acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 && acc(gv.hw_rx_descr, 1/2) @/
+  /@ ensures acc(gv.rx_ch, 1/4) @/
+  /@ ensures valid_hardware_ring_rx_read() && valid_hardware_ring_rx_mdata_read() @/
+  /@ ensures disjoint_device_unprocessed_net_added_rx() @/
+  // either the hw rx queue is empty, or the device is mid flight
+  /@ ensures gv.hw_rx_tail == gv.hw_rx_head ||
+               unfolding valid_hardware_ring_rx_read() in
+                 is_RXD_EMPTY(slot(gv.hardware_ring_rx, gv.hw_rx_head % QUEUE_CAPACITY).hw_stat) @/
+  // anything that is added to rx_active came from the device
+  /@ ensures unfolding valid_hardware_ring_rx_read() in
+              forall s: Seq[Int] :: { s in gv.rx_active.net_added } { s in old(gv.rx_active.net_added) }
+                s in gv.rx_active.net_added && !(s in old(gv.rx_active.net_added)) ==>
+                |s| == 2 &&
+                exists i: Int :: i >= 0 && i < QUEUE_CAPACITY &&
+                  (gv.hw_rx_tail % gv.hw_rx_capacity < gv.hw_rx_head % gv.hw_rx_capacity || (gv.hw_rx_tail - gv.hw_rx_head) % 65536 == 256
+                     ? i >= gv.hw_rx_tail % gv.hw_rx_capacity && i < gv.hw_rx_head % gv.hw_rx_capacity
+                     : i >= gv.hw_rx_tail % gv.hw_rx_capacity || i < gv.hw_rx_head % gv.hw_rx_capacity) &&
+                  !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                  s[0] == slot(gv.hardware_ring_rx, i).hw_addr &&
+                  s[1] == slot(gv.hardware_ring_rx, i).hw_len @/
+  // anything that head passes over from the device is added to rx_active
+  /@ ensures unfolding valid_hardware_ring_rx_read() in
+               forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
+                   !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                   element2_seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len) in gv.rx_active.net_added @/
+
+  var packets_transferred = false;
+
+  var 1 empty = rx_hw_ring_empty();
+  var reached_empty = 0;
+  var it = 0;
+  while ((!empty + !reached_empty) == 2)
+  {
+    /@ invariant acc(gv.net_rx_active, 1/2) && gv.net_rx_active == RX_ACTIVE_BASE &&
+                 acc(gv.net_rx_capacity, 1/2) && gv.net_rx_capacity == QUEUE_CAPACITY &&
+                 acc(gv.rx_active, 2/3) &&
+                 acc(gv.rx_active.net_tail) &&
+                 acc(gv.rx_active.net_head, 2/3) &&
+                 acc(gv.rx_active.net_signal) && acc(gv.rx_active.net_added) &&
+                 acc(gv.rx_active.net_descr, 2/3) &&
+                 0 <= gv.rx_active.net_tail - gv.rx_active.net_head && gv.rx_active.net_tail - gv.rx_active.net_head <= 256 &&
+                 forall i : Int :: gv.rx_active.net_tail <= i && i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
+                   acc(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+                   acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
+                   valid_net_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) &&
+                   valid_net_len(slotq(gv.rx_active.net_descr, i).ndescr_len) @/
+    /@ invariant acc(gv.hw_rx_head) && bounded16(gv.hw_rx_head) &&
+                 acc(gv.hw_rx_tail, 2/3) && bounded16(gv.hw_rx_tail) &&
+                 acc(gv.hw_rx_capacity, 2/3) && gv.hw_rx_capacity == 256 &&
+                 acc(gv.hw_rx_descr, 1/2) && gv.hw_rx_descr == HW_RING_RX_ADDR @/
+    /@ invariant valid_hardware_ring_rx_read() && valid_hardware_ring_rx_mdata_read() @/
+    /@ invariant empty == (gv.hw_rx_tail == gv.hw_rx_head) @/
+    /@ invariant unfolding valid_hardware_ring_rx_read() in
+                   (reached_empty != 0) ==> is_RXD_EMPTY(slot(gv.hardware_ring_rx, gv.hw_rx_head % QUEUE_CAPACITY).hw_stat) @/
+    /@ invariant disjoint_device_unprocessed_net_added_rx() @/
+    /@ invariant gv.rx_active.net_tail - old(gv.rx_active.net_tail) == (gv.hw_rx_head - old(gv.hw_rx_head)) % (MAX_INT16 + 1) @/
+    /@ invariant 0 <= (gv.hw_rx_tail - old(gv.hw_rx_head)) % (MAX_INT16 + 1) && (gv.hw_rx_tail - old(gv.hw_rx_head)) % (MAX_INT16 + 1) <= QUEUE_CAPACITY @/
+    /@ invariant 0 <= (gv.hw_rx_head - old(gv.hw_rx_head)) % (MAX_INT16 + 1) && (gv.hw_rx_head - old(gv.hw_rx_head)) % (MAX_INT16 + 1) <= QUEUE_CAPACITY @/
+    /@ invariant unfolding valid_hardware_ring_rx_read() in
+                 forall s: Seq[Int] :: { s in gv.rx_active.net_added } { s in old(gv.rx_active.net_added) }
+                  s in gv.rx_active.net_added && !(s in old(gv.rx_active.net_added)) ==>
+                    |s| == 2 &&
+                    exists i: Int :: i >= 0 && i < QUEUE_CAPACITY &&
+                      (gv.hw_rx_tail % gv.hw_rx_capacity < gv.hw_rx_head % gv.hw_rx_capacity || (gv.hw_rx_tail - gv.hw_rx_head) % 65536 == 256
+                         ? i >= gv.hw_rx_tail % gv.hw_rx_capacity && i < gv.hw_rx_head % gv.hw_rx_capacity
+                         : i >= gv.hw_rx_tail % gv.hw_rx_capacity || i < gv.hw_rx_head % gv.hw_rx_capacity) &&
+                      (empty == 0 ==> ring_head_incr_lemma(gv.hw_rx_tail, gv.hw_rx_head, i)) &&
+                      !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                      s[0] == slot(gv.hardware_ring_rx, i).hw_addr &&
+                      s[1] == slot(gv.hardware_ring_rx, i).hw_len @/
+    // anything that head passes over from the device is added to rx_active
+    /@ invariant unfolding valid_hardware_ring_rx_read() in
+                   forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_rx_head), gv.hw_rx_head) ==> 
+                       !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
+                       element2_seq(slot(gv.hardware_ring_rx, i).hw_addr, slot(gv.hardware_ring_rx, i).hw_len) in gv.rx_active.net_added @/
+
+    /@ unfold valid_hardware_ring_rx_read() @/
+    /@ label l_lp @/
+    /* If buffer slot is still empty, we have processed all packets the device has filled */
+    var idx = wrap_hw_rx_capacity(hw_rx_head);
+    var dscr_addr = hw_rx_descr + idx * DESCR_LEN;
+    var stat = 0;
+    !ld16 stat, dscr_addr + DESCR_STAT_OFF;
+    if (!(stat & RXD_EMPTY)) {
+      THREAD_MEMORY_ACQUIRE()
+
+      var len = 0;
+      !ld16 len, dscr_addr;
+      var io_addr = 0;
+      !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
+
+      /*var queue_full = net_queue_full(net_rx_active, net_rx_capacity);
+      if (queue_full) {
+        // panic -- unreachable
+        /@ assert (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY @/
+        /@ inhale false @/
+        return 1;
+      }*/
+      // the following should be provable with more work
+      /@ inhale (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) != QUEUE_CAPACITY @/
+      /@ assert io_addr == slot(gv.hardware_ring_rx, idx).hw_addr @/
+      /@ assert len == slot(gv.hardware_ring_rx, idx).hw_len @/
+      net_enqueue(net_rx_active, io_addr, len, net_rx_capacity);
+
+      var temp = wrap_int16(hw_rx_head + 1);
+      hw_rx_head = temp;
+      //st hw_rx_head_slot, (hw_rx_head + 1);
+
+      empty = rx_hw_ring_empty();
+      packets_transferred = true;
+    } else {
+      reached_empty = 1;
+    }
+    /@ refute false @/
+    /@ fold valid_hardware_ring_rx_read() @/
+    /@ refute false @/
+  }
+  /@ refute false @/
+
+  var 1 to_signal = net_require_signal(net_rx_active, net_rx_capacity);
+  if (!!packets_transferred + !!to_signal == 2) {
+    net_cancel_signal(net_rx_active);
+    microkit_notify(rx_ch);
+  }
+
+  /@ refute false @/
+  return 0;
+}
+
+fun tx_provide()
+{
+  /@ requires acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
+              acc(gv.tx_active.net_head) &&
+              acc(gv.tx_active.net_tail, 2/3) &&
+              acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+              acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
+              acc(gv.tx_active.net_removed) &&
+              0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+              forall i : Int :: { slotq(gv.tx_active.net_descr, i).ndescr_addr } { slotq(gv.tx_active.net_descr, i).ndescr_len }
+                gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                  acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
+                  acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+                  valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
+                  valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
+  /@ requires acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
+              acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
+              acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
+              gv.hw_tx_descr == HW_RING_TX_ADDR @/
+  /@ requires bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) @/
+  /@ requires acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+  /@ requires acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() && acc(gv.tx_handled) @/
+  /@ requires valid_hardware_ring_tx_write() && valid_hardware_ring_tx_mdata_write() @/
+  /@ requires gv.tx_active.net_removed == gv.tx_handled @/
+  /@ requires forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
+  /@ ensures acc(gv.net_tx_active, 2/3) && acc(gv.tx_active, 2/3) &&
+             acc(gv.tx_active.net_head) &&
+             acc(gv.tx_active.net_tail, 2/3) && acc(gv.net_tx_capacity, 2/3) &&
+             acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
+             acc(gv.tx_active.net_removed) &&
+             0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+             gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
+             forall i : Int :: { slotq(gv.tx_active.net_descr, i).ndescr_addr } { slotq(gv.tx_active.net_descr, i).ndescr_len }
+               gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                 acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
+                 acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+                 valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
+                 valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
+  /@ ensures acc(gv.hw_tx_ptr, 1/2) &&
+             acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && acc(gv.hw_tx_descr, 2/3) &&
+             acc(gv.hw_tx_head, 2/3) @/
+  /@ ensures bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && gv.hw_tx_capacity == 256 @/
+  /@ ensures acc(gv.eth_reg, 2/3) @/
+  /@ ensures acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() && acc(gv.tx_handled) @/
+  /@ ensures valid_hardware_ring_tx_write() && valid_hardware_ring_tx_mdata_write() @/
+  // either the hardware ring is full, or the queue consumed is empty
+  /@ ensures (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity ||
+               (gv.tx_active.net_tail == gv.tx_active.net_head) @/
+  // anything that was in the net queue and no longer is, is now in the hw queue and v/v
+  /@ ensures gv.tx_active.net_removed == gv.tx_handled @/
+
+  var reprocess = true;
+
+  while (reprocess)
+  {
+    /@ invariant acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
+                 acc(gv.tx_active.net_head) &&
+                 acc(gv.tx_active.net_tail, 2/3) &&
+                 acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+                 acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
+                 acc(gv.tx_active.net_removed) &&
+                 gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
+                 0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+                 forall i : Int :: { slotq(gv.tx_active.net_descr, i).ndescr_addr } { slotq(gv.tx_active.net_descr, i).ndescr_len }
+                   gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                     acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
+                     acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+                     valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
+                     valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
+    /@ invariant acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
+                 acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
+                 acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
+                 gv.hw_tx_descr == HW_RING_TX_ADDR @/
+    /@ invariant bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && gv.hw_tx_capacity == 256 @/
+    /@ invariant acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+    /@ invariant acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() && acc(gv.tx_handled) @/
+    /@ invariant gv.tx_active.net_removed == gv.tx_handled @/
+    /@ invariant valid_hardware_ring_tx_write() && valid_hardware_ring_tx_mdata_write() @/
+    /@ invariant reprocess == false ==>
+                   ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity ||
+                     gv.tx_active.net_tail == gv.tx_active.net_head) @/
+
+    /@ label l_rpc @/
+    
+    var 1 full = tx_hw_ring_full();
+    var 1 empty = net_queue_empty(net_tx_active);
+    // see same comment in rx_provide
+    while ((!full + !empty) == 2)
+    {
+      /@ invariant acc(gv.net_tx_active, 2/3) && gv.net_tx_active == TX_ACTIVE_BASE && acc(gv.tx_active, 2/3) &&
+                   acc(gv.tx_active.net_head) &&
+                   acc(gv.tx_active.net_tail, 2/3) &&
+                   acc(gv.net_tx_capacity, 2/3) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+                   acc(gv.tx_active.net_signal) && acc(gv.tx_active.net_descr, 2/3) &&
+                   acc(gv.tx_active.net_removed) &&
+                   0 <= gv.tx_active.net_tail - gv.tx_active.net_head && gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+                   gv.tx_active.net_tail == old(gv.tx_active.net_tail) && gv.tx_active.net_head >= old(gv.tx_active.net_head) &&
+                   forall i : Int :: { slotq(gv.tx_active.net_descr, i).ndescr_addr } { slotq(gv.tx_active.net_descr, i).ndescr_len }
+                     gv.tx_active.net_head <= i && i < gv.tx_active.net_tail ==>
+                       acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) &&
+                       acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+                       valid_net_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) &&
+                       valid_net_len(slotq(gv.tx_active.net_descr, i).ndescr_len) @/
+      /@ invariant acc(gv.hw_tx_ptr, 1/2) && bounded(gv.hw_tx_ptr) &&
+                   acc(gv.hw_tx_tail) && acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
+                   acc(gv.hw_tx_descr, 2/3) && acc(gv.hw_tx_head, 2/3) &&
+                   gv.hw_tx_descr == HW_RING_TX_ADDR @/
+      /@ invariant bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && gv.hw_tx_capacity == 256 @/
+      /@ invariant acc(gv.eth_reg, 2/3) && gv.eth_reg == HW_ETH_BASE @/
+      /@ invariant acc(gv.tx_await_ack) && gv.tx_await_ack == empty_seq() && acc(gv.tx_handled) @/
+      /@ invariant valid_hardware_ring_tx_write() && valid_hardware_ring_tx_mdata_write() @/
+      /@ invariant full == ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity) @/
+      /@ invariant empty == (gv.tx_active.net_tail == gv.tx_active.net_head) @/
+      /@ invariant forall x: Seq[Int] :: x in gv.tx_active.net_removed ==> x in gv.tx_handled @/
+      /@ invariant forall x: Seq[Int] :: x in gv.tx_handled ==> x in gv.tx_active.net_removed @/
+
+      /@ unfold valid_hardware_ring_tx_write() @/
+      /@ label l_it @/
+
+      var {1,1} buffer = net_dequeue(net_tx_active, net_tx_capacity);
+      var idx = wrap_hw_tx_capacity(hw_tx_tail);
+
+      var io_addr = buffer.0;
+      var len = buffer.1;
+      var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+      tx_update_ring_slot(hw_tx_ptr, idx, io_addr, len, stat);
+
+      var temp = wrap_int16(hw_tx_tail + 1);
+      hw_tx_tail = temp;
+      //st hw_tx_tail_slot, (hw_tx_tail + 1);
+      set_tdar();
+
+      full = tx_hw_ring_full();
+      empty = net_queue_empty(net_tx_active);
+
+      /@ refute false @/
+      /@ fold valid_hardware_ring_tx_write() @/
+    }
+
+    net_request_signal(net_tx_active);
+    reprocess = false;
+
+    full = tx_hw_ring_full();
+    empty = net_queue_empty(net_tx_active);
+    if (!empty + !full == 2) {
+      net_cancel_signal(net_tx_active);
+      reprocess = true;
+    }
+  }
+  return 0;
+}
+
+inline fun wrap_hw_tx_capacity(1 x)
+{
+  /@ requires acc(gv.hw_tx_capacity, 1/2) && gv.hw_tx_capacity == 256 @/
+  /@ ensures acc(gv.hw_tx_capacity, 1/2) && gv.hw_tx_capacity == 256 @/
+  /@ ensures retval < gv.hw_tx_capacity @/
+  /@ ensures retval == (x % gv.hw_tx_capacity) @/
+  return x & (hw_tx_capacity - 1);
+}
+
+/@
+function disjoint_device_unprocessed_net_added_tx(): Bool
+  requires acc(gv.tx_free, wildcard) && acc(gv.tx_free.net_added, wildcard)
+  requires acc(gv.hw_tx_tail, wildcard) && acc(gv.hw_tx_head, wildcard) &&
+    acc(gv.hw_tx_capacity, wildcard) && gv.hw_tx_capacity == QUEUE_CAPACITY
+  requires valid_hardware_ring_tx_read()
+{
+  unfolding valid_hardware_ring_tx_read() in
+    forall s: Seq[Word] :: s in gv.tx_free.net_added ==>
+      |s| == 2 &&
+      forall i: Word :: 0 <= i && i < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+        ((gv.hw_tx_tail % gv.hw_tx_capacity) <= (gv.hw_tx_head % gv.hw_tx_capacity)
+          ? i < (gv.hw_tx_tail % gv.hw_tx_capacity) || i >= (gv.hw_tx_head % gv.hw_tx_capacity)
+          : i < (gv.hw_tx_tail % gv.hw_tx_capacity) && i >= (gv.hw_tx_head % gv.hw_tx_capacity)) &&
+         gv.hw_tx_head != gv.hw_tx_tail ==> s[0] != slot(gv.hardware_ring_tx, i).hw_addr
+}
+@/
+
+fun tx_return()
+{
+  /@ requires acc(gv.net_tx_free, 1/2) && gv.net_tx_free == TX_FREE_BASE &&
+              acc(gv.net_tx_capacity, 1/2) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+              acc(gv.tx_free, 2/3) &&
+              acc(gv.tx_free.net_tail) &&
+              acc(gv.tx_free.net_head, 2/3) &&
+              acc(gv.tx_free.net_signal) && acc(gv.tx_free.net_added) &&
+              acc(gv.tx_free.net_descr, 2/3) &&
+              0 <= gv.tx_free.net_tail - gv.tx_free.net_head && gv.tx_free.net_tail - gv.tx_free.net_head <= 256 &&
+              forall i : Int :: gv.tx_free.net_tail <= i && i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
+                acc(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+                acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
+                valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+                valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
+  /@ requires acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
+              acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
+              acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
+              acc(gv.hw_tx_descr, 1/2) && gv.hw_tx_descr == HW_RING_TX_ADDR @/
+  /@ requires acc(gv.tx_ch, 1/4) @/
+  /@ requires valid_hardware_ring_tx_read() && valid_hardware_ring_tx_mdata_read() @/
+  /@ requires disjoint_device_unprocessed_net_added_tx() @/
+  /@ ensures acc(gv.net_tx_free, 1/2) && gv.net_tx_free == TX_FREE_BASE && acc(gv.net_tx_capacity, 1/2) &&
+             acc(gv.tx_free, 2/3) && acc(gv.tx_free.net_tail) &&
+             acc(gv.tx_free.net_head, 2/3) && acc(gv.tx_free.net_signal) &&
+             acc(gv.tx_free.net_descr, 2/3) && acc(gv.tx_free.net_added) &&
+             0 <= gv.tx_free.net_tail - gv.tx_free.net_head && gv.tx_free.net_tail - gv.tx_free.net_head <= 256 &&
+             gv.tx_free.net_tail >= old(gv.tx_free.net_tail) && gv.tx_free.net_head == old(gv.tx_free.net_head) &&
+             forall i : Int :: gv.tx_free.net_tail <= i && i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
+               acc(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+               acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
+               valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+               valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
+  /@ ensures acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
+             acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
+             acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 && acc(gv.hw_tx_descr, 1/2) @/
+  /@ ensures acc(gv.tx_ch, 1/4) @/
+  /@ ensures valid_hardware_ring_tx_read() && valid_hardware_ring_tx_mdata_read() @/
+  /@ ensures disjoint_device_unprocessed_net_added_tx() @/
+  // either the hw tx queue is empty, or the device is mid flight
+  /@ ensures gv.hw_tx_tail == gv.hw_tx_head ||
+               unfolding valid_hardware_ring_tx_read() in
+                 is_TXD_READY(slot(gv.hardware_ring_tx, gv.hw_tx_head % QUEUE_CAPACITY).hw_stat) @/
+  // anything added to tx_free came from the device
+  /@ ensures unfolding valid_hardware_ring_tx_read() in
+               forall s: Seq[Int] :: { s in gv.tx_free.net_added } { s in old(gv.tx_free.net_added) }
+                 s in gv.tx_free.net_added && !(s in old(gv.tx_free.net_added)) ==>
+                   |s| == 2 && exists i: Int :: i >= 0 && i < QUEUE_CAPACITY &&
+                     (gv.hw_tx_tail % gv.hw_tx_capacity < gv.hw_tx_head % gv.hw_tx_capacity || (gv.hw_tx_tail - gv.hw_tx_head) % 65536 == 256
+                        ? i >= gv.hw_tx_tail % gv.hw_tx_capacity && i < gv.hw_tx_head % gv.hw_tx_capacity
+                        : i >= gv.hw_tx_tail % gv.hw_tx_capacity || i < gv.hw_tx_head % gv.hw_tx_capacity) &&
+                     !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+                     s[0] == slot(gv.hardware_ring_tx, i).hw_addr &&
+                     s[1] == 0 @/
+  // anything that head passes over from the device is added to tx_free
+  /@ ensures unfolding valid_hardware_ring_tx_read() in
+               forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
+                 !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+                 element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
+
+  var enqueued = false;
+
+  var 1 empty = tx_hw_ring_empty();
+  var 1 reached_ready = 0;
+  while ((!empty + !reached_ready) == 2)
+  {
+    /@ invariant acc(gv.net_tx_free, 1/2) && gv.net_tx_free == TX_FREE_BASE &&
+                 acc(gv.net_tx_capacity, 1/2) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+                 acc(gv.tx_free, 2/3) &&
+                 acc(gv.tx_free.net_tail) &&
+                 acc(gv.tx_free.net_head, 2/3) &&
+                 acc(gv.tx_free.net_signal) && acc(gv.tx_free.net_added) &&
+                 acc(gv.tx_free.net_descr, 2/3) &&
+                 0 <= gv.tx_free.net_tail - gv.tx_free.net_head && gv.tx_free.net_tail - gv.tx_free.net_head <= 256 &&
+                 gv.tx_free.net_tail >= old(gv.tx_free.net_tail) && gv.tx_free.net_head == old(gv.tx_free.net_head) &&
+                 forall i : Int :: gv.tx_free.net_tail <= i && i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
+                   acc(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+                   acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
+                   valid_net_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) &&
+                   valid_net_len(slotq(gv.tx_free.net_descr, i).ndescr_len) @/
+    /@ invariant acc(gv.hw_tx_head) && bounded16(gv.hw_tx_head) &&
+                 acc(gv.hw_tx_tail, 2/3) && bounded16(gv.hw_tx_tail) &&
+                 acc(gv.hw_tx_capacity, 2/3) && gv.hw_tx_capacity == 256 &&
+                 acc(gv.hw_tx_descr, 1/2) && gv.hw_tx_descr == HW_RING_TX_ADDR @/
+    /@ invariant valid_hardware_ring_tx_read() && valid_hardware_ring_tx_mdata_read() @/
+    /@ invariant disjoint_device_unprocessed_net_added_tx() @/
+    /@ invariant empty == (gv.hw_tx_tail == gv.hw_tx_head) @/
+    /@ invariant gv.tx_free.net_tail - old(gv.tx_free.net_tail) == (gv.hw_tx_head - old(gv.hw_tx_head)) % (MAX_INT16 + 1) @/
+    /@ invariant 0 <= (gv.hw_tx_tail - old(gv.hw_tx_head)) % (MAX_INT16 + 1) && (gv.hw_tx_tail - old(gv.hw_tx_head)) % (MAX_INT16 + 1) <= QUEUE_CAPACITY @/
+    /@ invariant 0 <= (gv.hw_tx_head - old(gv.hw_tx_head)) % (MAX_INT16 + 1) && (gv.hw_tx_head - old(gv.hw_tx_head)) % (MAX_INT16 + 1) <= QUEUE_CAPACITY @/
+    /@ invariant unfolding valid_hardware_ring_tx_read() in
+                   (reached_ready != 0) ==> is_TXD_READY(slot(gv.hardware_ring_tx, gv.hw_tx_head % QUEUE_CAPACITY).hw_stat) @/
+    /@ invariant unfolding valid_hardware_ring_tx_read() in
+                   forall s: Seq[Int] :: { s in gv.tx_free.net_added } { s in old(gv.tx_free.net_added) }
+                     s in gv.tx_free.net_added && !(s in old(gv.tx_free.net_added)) ==>
+                       |s| == 2 && exists i: Int :: i >= 0 && i < QUEUE_CAPACITY &&
+                         (gv.hw_tx_tail % gv.hw_tx_capacity < gv.hw_tx_head % gv.hw_tx_capacity || (gv.hw_tx_tail - gv.hw_tx_head) % 65536 == 256
+                            ? i >= gv.hw_tx_tail % gv.hw_tx_capacity && i < gv.hw_tx_head % gv.hw_tx_capacity
+                            : i >= gv.hw_tx_tail % gv.hw_tx_capacity || i < gv.hw_tx_head % gv.hw_tx_capacity) &&
+                         (empty == 0 ==> ring_head_incr_lemma(gv.hw_tx_tail, gv.hw_tx_head, i)) &&
+                         !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+                         s[0] == slot(gv.hardware_ring_tx, i).hw_addr &&
+                         s[1] == 0 @/
+    /@ invariant unfolding valid_hardware_ring_tx_read() in
+                   forall i: Int :: 0 <= i && i < QUEUE_CAPACITY && ring_between(i, old(gv.hw_tx_head), gv.hw_tx_head) ==>
+                     !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+                     element2_seq(slot(gv.hardware_ring_tx, i).hw_addr, 0) in gv.tx_free.net_added @/
+
+    /@ unfold valid_hardware_ring_tx_read() @/
+    /@ label l_lp @/
+
+    /* Ensure that this buffer has been sent by the device */
+    var idx = wrap_hw_tx_capacity(hw_tx_head);
+    var dscr_addr = hw_tx_descr + idx * DESCR_LEN;
+    var stat = 0;
+    !ld16 stat, dscr_addr + DESCR_STAT_OFF;
+    if (!(stat & TXD_READY)) {
+      THREAD_MEMORY_ACQUIRE()
+
+      var io_addr = 0;
+      !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
+      // the following should be provable with more work
+      /*var queue_full = net_queue_full(net_tx_free, net_tx_capacity);
+      if (queue_full) {
+        // panic
+        /@ fold valid_hardware_ring_tx_read() @/
+        return 1;
+      }*/
+      /@ inhale (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) != QUEUE_CAPACITY @/
+      /@ assert io_addr == slot(gv.hardware_ring_tx, idx).hw_addr @/
+      net_enqueue(net_tx_free, io_addr, 0, net_tx_capacity);
+
+      enqueued = true;
+      var temp = wrap_int16(hw_tx_head + 1);
+      hw_tx_head = temp;
+
+      empty = tx_hw_ring_empty();
+    } else {
+      reached_ready = 1;
+    }
+
+    /@ refute false @/
+    /@ fold valid_hardware_ring_tx_read() @/
+  }
+  /@ refute false @/
+
+  var 1 to_signal = net_require_signal(net_tx_free, net_tx_capacity);
+  if (!!enqueued + !!to_signal == 2) {
+    net_cancel_signal(net_tx_free);
+    microkit_notify(tx_ch);
+  }
+
+  return 0;
+}
+
+inline fun 1 irq_get_set_eir() {
+  /@ requires acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+  /@ ensures acc(gv.eth_reg, 1/2) && gv.eth_reg == HW_ETH_BASE @/
+
+  var 1 eir_full = get_eir_status();
+  var eir = eir_full & IRQ_MASK;
+  set_eir(eir);
+  return eir;
+}
+
+inline fun irq_transaction(1 eir) {
+  /@ requires valid() @/
+  /@ ensures valid() @/
+
+  /@ unfold valid() @/
+  /@ unfold valid_virt() @/
+
+  if (eir & NETIRQ_TXF) {
+    // A frame was transmitted
+    /@ unfold valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) @/
+    tx_return();
+    /@ refute false @/
+    /@ fold valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) @/
+    /@ unfold valid_net_queue_consume(gv.tx_active, QUEUE_CAPACITY) @/
+    tx_provide();
+    /@ refute false @/
+    /@ fold valid_net_queue_consume(gv.tx_active, QUEUE_CAPACITY) @/
+  }
+  if (eir & NETIRQ_RXF) {
+    /@ unfold valid_net_queue_produce(gv.rx_active, QUEUE_CAPACITY) @/
+    rx_return();
+    /@ refute false @/
+    /@ fold valid_net_queue_produce(gv.rx_active, QUEUE_CAPACITY) @/
+    /@ unfold valid_net_queue_consume(gv.rx_free, QUEUE_CAPACITY) @/
+    rx_provide();
+    /@ refute false @/
+    /@ fold valid_net_queue_consume(gv.rx_free, QUEUE_CAPACITY) @/
+  }
+
+  /@ refute false @/
+  /@ fold valid_virt() @/
+  /@ fold valid() @/
+}
+
+fun handle_irq() {
+  /@ requires valid() @/
+  /@ ensures valid() @/
+
+  /@ unfold valid() @/
+  var 1 eir = irq_get_set_eir();
+  /@ refute false @/
+  /@ fold valid() @/
+  while (eir & IRQ_MASK)
+  {
+    /@ invariant valid() @/
+
+    /@ unfold valid() @/
+    /@ unfold valid_virt() @/
+    irq_transaction(eir)
+    /@ refute false @/
+    /@ fold valid_virt() @/
+    /@ fold valid() @/
+
+    /@ unfold valid() @/
+    /@ unfold valid_virt() @/
+    eir = irq_get_set_eir();
+    /@ refute false @/
+    /@ fold valid_virt() @/
+    /@ fold valid() @/
+  }
+
+  return 0;
+}
+
+export fun notified(1 ch)
+{
+  /@ requires valid() @/
+  /@ ensures valid() @/
+
+  /@ unfold valid() @/
+  if (ch == irq_ch) {
+    /@ refute false @/
+    /@ fold valid() @/
+    handle_irq();
+    /*
+     * Delay calling into the kernel to ack the IRQ until the next loop
+     * in the microkit event handler loop.
+     */
+    microkit_deferred_irq_ack(ch);
+    /@ unfold valid() @/
+  }
+  // XXX no else if?!
+  /@ unfold valid_virt() @/
+  if (ch == rx_ch) {
+    /@ unfold valid_net_queue(gv.rx_free, QUEUE_CAPACITY) @/
+    rx_provide();
+    /@ refute false @/
+    /@ fold valid_net_queue(gv.rx_free, QUEUE_CAPACITY) @/
+  }
+  if (ch == tx_ch) {
+    /@ unfold valid_net_queue(gv.tx_active, QUEUE_CAPACITY) @/
+    tx_provide();
+    /@ refute false @/
+    /@ fold valid_net_queue(gv.tx_active, QUEUE_CAPACITY) @/
+  }
+  /@ refute false @/
+  /@ fold valid_virt() @/
+  /@ refute false @/
+  /@ fold valid() @/
+
+  return 0;
+}
