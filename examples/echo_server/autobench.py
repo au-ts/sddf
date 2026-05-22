@@ -133,11 +133,11 @@ def check_and_release_stale_locks(use_print=False):
         )
 
         if result.returncode == 0:
-            # Parse output to find locks held by zhewen
-            # Format: "cheshire1 LOCKED zhewen 2025-10-29 13:45:50.069992383 +1100"
+            # Parse output to find locks held by samuelt
+            # Format: "cheshire1 LOCKED samuelt 2025-10-29 13:45:50.069992383 +1100"
             our_locked_boards = []
             for line in result.stdout.split("\n"):
-                if "LOCKED" in line and "zhewen" in line:
+                if "LOCKED" in line and "samuelt" in line:
                     parts = line.split()
                     if len(parts) >= 2:
                         board_name = parts[0]
@@ -185,7 +185,7 @@ def check_and_release_stale_locks(use_print=False):
         if result.returncode == 0:
             our_locked_vbs = []
             for line in result.stdout.split("\n"):
-                if "LOCKED" in line and "zhewen" in line:
+                if "LOCKED" in line and "samuelt" in line:
                     parts = line.split()
                     if len(parts) >= 2:
                         vb_name = parts[0]
@@ -255,7 +255,7 @@ def check_iq_lock_conflicts():
                 parts = line.split()
                 if len(parts) >= 2:
                     vb_name = parts[0]
-                    if "zhewen" in line:
+                    if "samuelt" in line:
                         our_locks.append(vb_name)
                     else:
                         other_locks.append(vb_name)
@@ -420,7 +420,7 @@ def run_single_benchmark(folder, throughputs, protocol, mode, benchmark_name):
                     "-w",
                     "8",  # Wait 8 seconds between lock acquisition attempts
                     "-f",
-                    "/home/zhewen/Documents/code/sddf_benchmarking/benchmark.py",
+                    "benchmark.py",
                     "-b",
                     "-c",
                     "vb01",
@@ -665,7 +665,7 @@ def run_single_benchmark(folder, throughputs, protocol, mode, benchmark_name):
             logging.info(f"clean mq log saved to: {folder}/mq.log")
 
             logging.info("processing mq.log to extract json metrics...")
-            process_script = "/home/zhewen/Documents/code/sddf_benchmarking/process_microkit_output.py"
+            process_script = "process_output.py"
             mq_json_path = f"{folder}/mq_metrics.json"
             try:
                 result = subprocess.run(
