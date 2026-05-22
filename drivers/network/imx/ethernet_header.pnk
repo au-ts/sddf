@@ -245,23 +245,24 @@ var 1 eth_reg = ETH_REG;
   }
 @/
 
-#define empty_ghost_state() (
-	unfolding valid() in
-		(unfolding valid_virt() in
-			gv.rx_active.net_added == empty_set_seqint() &&
-			gv.rx_free.net_added == empty_set_seqint() &&
-			gv.tx_active.net_added == empty_set_seqint() &&
-			gv.tx_free.net_added == empty_set_seqint() &&
-			gv.rx_active.net_removed_addr == empty_set() &&
-			gv.rx_free.net_removed_addr == empty_set() &&
-			gv.tx_active.net_removed_addr == empty_set() &&
-			gv.tx_free.net_removed_addr == empty_set() &&
-			gv.rx_active.net_removed == empty_set_seqint() &&
-			gv.rx_free.net_removed == empty_set_seqint() &&
-			gv.tx_active.net_removed == empty_set_seqint() &&
-			gv.tx_free.net_removed == empty_set_seqint()) &&
-		gv.rx_handled == empty_set_seqint() &&
-		gv.tx_handled == empty_set_seqint() &&
-		gv.rx_await_ack == empty_set() &&
-		gv.tx_await_ack == empty_set()
+#define empty_ghost_state() ( \
+	unfolding valid() in unfolding valid_virt() in \
+		gv.rx_active.net_added == empty_set_seqint() && \
+		gv.rx_free.net_added == empty_set_seqint() && \
+		gv.tx_active.net_added == empty_set_seqint() && \
+		gv.tx_free.net_added == empty_set_seqint() && \
+		gv.rx_active.net_removed_addr == empty_set() && \
+		gv.rx_free.net_removed_addr == empty_set() && \
+		gv.tx_active.net_removed_addr == empty_set() && \
+		gv.tx_free.net_removed_addr == empty_set() && \
+		gv.rx_active.net_removed == empty_set_seqint() && \
+		gv.rx_free.net_removed == empty_set_seqint() && \
+		gv.tx_active.net_removed == empty_set_seqint() && \
+		gv.tx_free.net_removed == empty_set_seqint() && \
+		gv.rx_handled == empty_set_seqint() && \
+		gv.tx_handled == empty_set_seqint() && \
+		gv.rx_await_ack == empty_seq() && \
+		gv.tx_await_ack == empty_seq() && \
+		gv.rx_processed == empty_set_seqint() && \
+		gv.tx_processed == empty_set() \
 )

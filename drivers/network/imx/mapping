@@ -38,3 +38,4 @@ rx_hw_ring_full Int
 rx_provide_helper Int
 mod_capacity Bitvec
 and_RXD_EMPTY Bitvec
+irq_transaction Int
