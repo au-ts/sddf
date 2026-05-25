@@ -15,10 +15,6 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := clang
-endif
-
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 

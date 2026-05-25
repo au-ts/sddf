@@ -26,7 +26,6 @@ SUPPORTED_BOARDS := \
 			x86_64_generic \
 			rpi4b_1gb
 
-TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system
 IMAGE_FILE := loader.img
