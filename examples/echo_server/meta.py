@@ -391,7 +391,7 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=17, vector=8)
+        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8)
         ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
