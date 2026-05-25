@@ -19,7 +19,6 @@ IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-TOOLCHAIN ?= clang
 
 SUPPORTED_BOARDS:= cheshire \
 		   hifive_p550 \

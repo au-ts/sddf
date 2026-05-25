@@ -11,10 +11,6 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := clang
-endif
-
 PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
 

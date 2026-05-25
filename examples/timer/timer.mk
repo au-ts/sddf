@@ -37,10 +37,6 @@ SUPPORTED_BOARDS := \
 		    x86_64_generic \
 		    x86_64_generic_vtx
 
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := clang
-endif
-
 include ${SDDF}/tools/make/board/common.mk
 
 TOP := ${SDDF}/examples/timer
