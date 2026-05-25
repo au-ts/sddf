@@ -13,6 +13,12 @@ class for sDDF.
 Please feel free to open an issue on GitHub if there is something missing or
 something is not clear.
 
+We use an **ownership system** to manage code review for this repository. When opening
+a pull request, please consult `MAINTAINERS.md` to see who you should request review from.
+
+If changing `MAINTAINERS.md`, ensure that you do this via a pull request and receive
+approval from anybody who is added, changed, or removed from the list.
+
 ## Examples
 
 For each device class in sDDF, we have an example system in `examples/` to show
