@@ -153,7 +153,7 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
     /* Clear ethernet checksum if the destination is the virtualiser and the NIC
     generates checksums */
     if (dst_id == (config.num_ports - 1)) {
-        clear_checksums((ether_hdr_t *)(config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset));
+        clear_checksums((ether_hdr_t *)(config.ports[src_id].tx_data.vaddr + src_buf->io_or_offset));
     }
 #endif
 
@@ -312,7 +312,7 @@ static void forward_traffic_from(uint8_t port_id)
                 continue;
             }
 
-            const char *frame_data = config.ports[port_id].tx_data.region.vaddr + buffer.io_or_offset;
+            const char *frame_data = config.ports[port_id].tx_data.vaddr + buffer.io_or_offset;
             const ether_hdr_t *macaddr = (ether_hdr_t *)frame_data;
             bool transmitted = false;
 
