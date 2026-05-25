@@ -1,6 +1,9 @@
 /*
  * Copyright 2026, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Intel Ethernet Controller X550 Datasheet:
+ *   https://cdrdv2-public.intel.com/333369/333369_X550_Datasheet_Rev2.7.pdf
  */
 
 #include <stdbool.h>
@@ -97,16 +100,17 @@ void clear_interrupts(void)
 
 void disable_interrupts(void)
 {
+    // TODO: why?
     eth_regs->eimc = 0;
     clear_interrupts();
 }
 
 void enable_interrupts(void)
 {
-    // @jade: we don't enable TX IRQ, just do TX complete on RX event
-    // TODO: why?
+    // TODO: Enable IRQ for RX queue 0, and map the cause to bit 1 in EICR?
     eth_regs->ivar[0] = RX_IRQ | BIT(7);
 
+    // TODO: separate operations for legacy mode and MSI/MSI-X mode
     eth_regs->eiac = 0;
     // @jade: enable auto clear (actually, what is it?)
     eth_regs->eitr[0] = IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL;
@@ -130,10 +134,10 @@ void get_mac_addr(uint8_t mac[6])
     mac[5] = high >> 8 & 0xff;
 }
 
-uint64_t get_link_speed(void)
+uint32_t get_link_speed(void)
 {
-    // TODO: why 64bits?
-    uint64_t speed = eth_regs->links;
+    // TODO: replace all constants with macros in header file
+    uint32_t speed = eth_regs->links;
     if ((speed & IXGBE_LINKS_UP) == 0) {
         return 0;
     }
@@ -263,6 +267,7 @@ static void rx_return(void)
         // @jade: why do we get into this loop all the time even when there is no packets in there?
 
         /* If buffer slot is still empty, we have processed all packets the device has filled */
+        // TODO: simplify the data structures
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
             break;
@@ -466,7 +471,7 @@ void init_1(void)
 
 void init_2(void)
 {
-    uint64_t speed = get_link_speed();
+    uint32_t speed = get_link_speed();
     if (speed == 0) {
         sddf_timer_set_timeout(timer_config.driver_id, 100 * NS_IN_MS);
         return;
