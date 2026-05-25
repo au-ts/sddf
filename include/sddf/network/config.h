@@ -111,9 +111,9 @@ typedef struct net_vswitch_config {
      * Ports encode the vswitch's connection with both the virtualisers and its
      * clients. The ports array is ordered as follows:
      *
-     * ports[0 : num_ports] - client ports
-     * ports[num_ports].rx - Tx virtualiser connection
-     * ports[num_ports].tx - Rx virtualiser connection
+     * ports[0 : num_ports - 1] - client ports
+     * ports[num_ports - 1].rx - Tx virtualiser connection
+     * ports[num_ports - 1].tx - Rx virtualiser connection
      *
      * The rx connection is mapped to the tx virtualiser and vice versa, as it
      * allows the vswitch to handle the virtualiser port the same way as a

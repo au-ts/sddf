@@ -27,9 +27,10 @@ typedef struct vswitch_state {
      * Rx and Tx queues are shared with both the virtualisers and vswitch
      * clients. The queue arrays are ordered as follows:
      *
-     * rx_queues[0 : num_ports] - client Rx queues rx_queues[num_ports] - Tx
-     * virtualiser connection tx_queues[0 : num_ports] - client Tx queues
-     * tx_queues[num_ports] - Rx virtualiser connection
+     * rx_queues[0 : num_ports - 1] - client Rx queues
+     * rx_queues[num_ports - 1] - Tx virtualiser connection
+     * tx_queues[0 : num_ports - 1] - client Tx queues
+     * tx_queues[num_ports - 1] - Rx virtualiser connection
      *
      * The Rx queue is mapped to the Tx virtualiser and vice versa, as it allows
      * the vswitch to handle the virtualiser queues the same way as the client
