@@ -48,13 +48,6 @@ typedef struct vswitch_state {
      *
      */
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
-    /**
-     * The number of valid ports/queues of the vswitch. If the vswitch has a
-     * connection to the virtualisers, the connection sits at index
-     * config.num_ports, so the number of valid ports/queues is config.num_ports
-     * + 1. Else, there are config.num_ports valid ports\queues.
-     */
-    uint8_t max_ports;
 } vswitch_state_t;
 
 static vswitch_state_t state;
@@ -158,7 +151,7 @@ static bool forward_frame(uint8_t src_id, uint8_t dst_id, net_buff_desc_t *src_b
 #ifdef NETWORK_HW_HAS_CHECKSUM
     /* Clear ethernet checksum if the destination is the virtualiser and the NIC
     generates checksums */
-    if (dst_id == config.num_ports) {
+    if (dst_id == (config.num_ports - 1)) {
         clear_checksums((ether_hdr_t *)(config.ports[src_id].tx_data.region.vaddr + src_buf->io_or_offset));
     }
 #endif
@@ -183,22 +176,16 @@ static uint8_t mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
     /* Try matching each vswitch client MAC */
-    for (uint8_t i = 0; i < config.num_ports; i++) {
+    for (uint8_t i = 0; i < config.num_ports - 1; i++) {
         mac = &config.ports[i].mac_addr;
         if (mac802_addr_eq(mac->addr, dest_macaddr->addr)) {
             return i;
         }
     }
 
-    /* Drop if there is no virt connected and we did not match against any port
-    */
-    if (state.max_ports == config.num_ports) {
-        return VSWITCH_WRONG_PORT;
-    }
-
     /* I tried so hard and got so far, and in the end it doesn't even matter -
     default to forward to external port */
-    return config.num_ports;
+    return config.num_ports - 1;
 }
 
 static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
@@ -207,10 +194,10 @@ static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
     /**
      * Forward the broadcast to all vswitch clients that the source is allowed
      * to transmit to, excluding the source itself. Then forward the broadcast
-     * to the virtualisers if they are connected and the client has permission
-     * to transmit to the network.
+     * to the virtualisers if the client has permission to transmit to the
+     * network.
      */
-    for (uint8_t i = 0; i < state.max_ports; i++) {
+    for (uint8_t i = 0; i < config.num_ports; i++) {
         if (i != src_id && vswitch_can_send_to(src_id, i)) {
 #ifdef NETWORK_HW_HAS_CHECKSUM
             /* To ensure that vswitch clients transmit packets with the correct
@@ -221,7 +208,7 @@ static bool try_broadcast(uint8_t src_id, net_buff_desc_t *buffer)
             * first transmit the packet with checksums to the other vswitch
             * clients, then once all clients have freed the packet we zero out
             * the checksums before passing to the virtualiser. */
-            if (success && i == config.num_ports) {
+            if (success && i == (config.num_ports - 1)) {
                 int ref_index = buffer->io_or_offset / NET_BUFFER_SIZE;
                 buffer_refs_start[src_id][ref_index].tx_to_virt = 1;
                 continue;
@@ -275,7 +262,7 @@ static void rx_return(uint8_t port_id)
             virtualisers now */
             if (buffer_refs_start[buffer.oid][ref_index].tx_to_virt) {
                 buffer_refs_start[buffer.oid][ref_index].tx_to_virt = 0;
-                bool success = forward_frame(buffer.oid, config.num_ports, &buffer);
+                bool success = forward_frame(buffer.oid, config.num_ports - 1, &buffer);
                 assert(success);
                 continue;
             }
@@ -352,7 +339,7 @@ static void forward_traffic_from(uint8_t port_id)
 
 void notified(sddf_channel ch)
 {
-    for (uint8_t i = 0; i < state.max_ports; i++) {
+    for (uint8_t i = 0; i < config.num_ports; i++) {
         if (ch == config.ports[i].tx.id) {
             forward_traffic_from(i);
             break;
@@ -362,7 +349,7 @@ void notified(sddf_channel ch)
         }
     }
 
-    for (uint8_t i = 0; i < state.max_ports; i++) {
+    for (uint8_t i = 0; i < config.num_ports; i++) {
         if (need_rx_signal[i] && net_require_signal_active(&state.rx_queues[i])) {
             net_cancel_signal_active(&state.rx_queues[i]);
             need_rx_signal[i] = false;
@@ -383,15 +370,8 @@ void init(void)
     buffer_refs = (buffer_ref_t *)config.buffer_metadata.vaddr;
     buffer_refs_start[0] = buffer_refs;
 
-    /* If no RX DMA buffers are present for the last port it means there is no
-    virtualiser connected */
-    state.max_ports = config.num_ports;
-    if (config.ports[config.num_ports].tx.num_buffers) {
-        state.max_ports++;
-    }
-
     /* Set up queues and buffers references */
-    for (uint8_t i = 0; i < state.max_ports; i++) {
+    for (uint8_t i = 0; i < config.num_ports; i++) {
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
