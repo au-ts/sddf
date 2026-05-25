@@ -102,7 +102,7 @@ uint32_t num_forwarded_bufs[SDDF_NET_MAX_CLIENTS];
  */
 static void clear_checksums(ether_hdr_t *eth_frame)
 {
-    if ((uint16_t)*eth_frame->etype != HTONS(ETH_TYPE_IP)) {
+    if ((uint16_t)eth_frame->etype != HTONS(ETH_TYPE_IP)) {
         return;
     }
 
