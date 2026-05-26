@@ -13,13 +13,13 @@
 #define NET_BUFFER_SIZE 2048
 
 struct ethernet_address {
-  uint8_t addr[6];
+    uint8_t addr[6];
 } __attribute__((packed));
 
 struct ethernet_header {
-  struct ethernet_address dest;
-  struct ethernet_address src;
-  uint16_t type;
+    struct ethernet_address dest;
+    struct ethernet_address src;
+    uint16_t type;
 } __attribute__((packed));
 
 /*
