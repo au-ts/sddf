@@ -15,6 +15,7 @@
 #include <sddf/network/tcp.h>
 #include <sddf/network/udp.h>
 #include <sddf/network/util.h>
+#include <sddf/network/vswitch.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
@@ -46,9 +47,13 @@ typedef struct vswitch_state {
      * can transmit to:
      *
      * allow_list[c] & BIT(i) == 1 - client c can transmit to client i
-     *
      */
     uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
+    /**
+     * IP addresses of clients. Clients can register their IP addresses, and
+     * query the IP address of their reachable neighbours using PPC.
+     */
+    uint32_t client_ip_addrs[SDDF_NET_MAX_CLIENTS];
 } vswitch_state_t;
 
 static vswitch_state_t state;
@@ -387,4 +392,70 @@ void init(void)
             buffer_refs_start[i] = buffer_refs_start[i - 1] + config.ports[i - 1].tx.num_buffers;
         }
     }
+}
+
+seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
+{
+    uint8_t ppc_client = 0;
+    while (ppc_client < config.num_ports) {
+        if (ch == config.ports[ppc_client].tx.id) {
+            break;
+        }
+        ppc_client++;
+    }
+
+    if (ppc_client == config.num_ports) {
+        sddf_dprintf("VSWITCH|ERR: Received PPC from unknown channel %u\n", ch);
+        sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
+        return seL4_MessageInfo_new(0, 0, 0, 1);
+    }
+
+    switch (microkit_msginfo_get_label(msginfo)) {
+    case VSWITCH_SET_IP_ADDR: {
+        uint32_t ip_addr = sddf_get_mr(VSWITCH_SET_IP_ADDR_ARG);
+        sddf_dprintf("VSWITCH|LOG: Client %u registered IP address 0x%08x\n", ppc_client, ip_addr);
+        if (ip_addr == 0) {
+            sddf_set_mr(VSWITCH_SET_RET_ERR, VSWITCH_ERR_INVALID_IP);
+            return seL4_MessageInfo_new(0, 0, 0, 1);
+        }
+        state.client_ip_addrs[ppc_client] = ip_addr;
+        sddf_set_mr(VSWITCH_SET_RET_ERR, VSWITCH_ERR_OKAY);
+
+        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_SET_RET_NUM_ARGS);
+    }
+    case VSWITCH_QUERY_STATE: {
+        sddf_dprintf("VSWITCH|LOG: Client %u queried vswitch state, returning 0x%lx\n", ppc_client, state.allow_list[ppc_client]);
+        sddf_set_mr(VSWITCH_QUERY_RET_ERR, VSWITCH_ERR_OKAY);
+        sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, ppc_client);
+        sddf_set_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP, state.allow_list[ppc_client]);
+
+        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_QUERY_RET_NUM_ARGS);
+    }
+    case VSWITCH_REQ_CLIENT: {
+        uint8_t req_client = sddf_get_mr(VSWITCH_REQ_CLIENT_ID);
+        sddf_dprintf("VSWITCH|LOG: Client %u requested client %u's IP address\n", ppc_client, req_client);
+        if (!vswitch_can_send_to(ppc_client, req_client)) {
+            sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OPERATION_DENIED);
+            return seL4_MessageInfo_new(0, 0, 0, 1);
+        } else if (req_client == config.num_ports - 1) {
+            sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_VIRT_PORT);
+            return seL4_MessageInfo_new(0, 0, 0, 1);
+        } else if (!state.client_ip_addrs[req_client]) {
+            sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_NO_IP);
+            return seL4_MessageInfo_new(0, 0, 0, 1);
+        }
+        uint32_t ip_addr = state.client_ip_addrs[req_client];
+        sddf_dprintf("VSWITCH|LOG: Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client, ip_addr);
+        sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OKAY);
+        sddf_set_mr(VSWITCH_REQ_RET_IP_ADDR, ip_addr);
+
+        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_REQ_RET_NUM_ARGS);
+    }
+    default: {
+        sddf_dprintf("VSWITCH|ERR: Received PPC from client %u with invalid label\n", ppc_client);
+        sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
+        return seL4_MessageInfo_new(0, 0, 0, 1);
+    }
+    }
+    return seL4_MessageInfo_new(0, 0, 0, 0);
 }
