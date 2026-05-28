@@ -75,17 +75,20 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert pinctrl_node is not None
     pinctrl_system = Sddf.Pinctrl(sdf, pinctrl_node, pinctrl_driver)
 
-    pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=100)
+    pwm_driver = ProtectionDomain("pwm_driver", "pwm_driver.elf", priority=100, budget=500, period=5000)
 
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=253, passive=True)
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=253, passive=True)
 
-    # telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=5000)
-    # client = ProtectionDomain("client", "client.elf", priority=2, budget=150000, period=250000)
+    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=1000, period=5000)
+    client = ProtectionDomain("client", "client.elf", priority=1, budget=50000, period=50000)
 
-    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1)
-    client = ProtectionDomain("client", "client.elf", priority=2)
+    # determine a period -> fake
+    # determine a budget -> not fake
+    # determine task priorities with this
 
+    # telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1)
+    # client = ProtectionDomain("client", "client.elf", priority=2)
     # client = ProtectionDomain("client", "client.elf", priority=2)
 
     serial_node = dtb.node(board.serial)
@@ -136,7 +139,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     clk_channel = Channel(clk_driver, pwm_driver, pp_b=True)
     sdf.add_channel(clk_channel)
     assert clk_channel.pd_b_id == 0, clk_channel.pd_b_id
-
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)

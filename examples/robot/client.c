@@ -18,7 +18,7 @@
 #define LOG_CLIENT_ERR(...) do{}while(0)
 #endif
 
-#define REMOTE_CONTROL (0)
+#define REMOTE_CONTROL (1)
 
 #define STACK_SIZE (4096)
 #define BUFFER_SIZE (1024)
@@ -191,12 +191,17 @@ void client_main(void) {
 
     while(true)
     {
+        uint64_t time_prev = get_time_now();
+
         if (REMOTE_CONTROL) {
             send_rc_command();
         }
         else {
             send_avoidance_command();
         }
+
+        uint64_t time_new = get_time_now();
+        LOG_CLIENT("time max %d\n", time_new - time_prev);
     }
 }
 
