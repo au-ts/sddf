@@ -395,13 +395,16 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
 
             if (dev_res->type == WORD_BUS) {
                 if (pci_bus >= dev_res->min_addr && pci_bus < dev_res->max_addr) {
-                    sddf_dprintf("Found the bridge %u[0x%02x-0x%02x] containing bus 0x%02x\n", i, dev_res->min_addr, dev_res->max_addr, pci_bus);
+                    sddf_dprintf("Found the bridge %u[0x%02lx-0x%02lx] containing bus 0x%02x\n", i, dev_res->min_addr, dev_res->max_addr, pci_bus);
                     return i;
                 }
 
             }
         }
     }
+
+    // TODO: if it's not found
+    return 0;
 }
 
 void bind_irq(struct pci_config_space *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
