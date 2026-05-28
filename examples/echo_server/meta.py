@@ -280,6 +280,7 @@ def generate(
     )
 
     if board.arch == SystemDescription.Arch.X86_64:
+        print("board: ", board)
         serial_port = SystemDescription.IoPort(board.serial, 8, 0)
         uart_driver.add_ioport(serial_port)
 

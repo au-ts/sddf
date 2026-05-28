@@ -198,8 +198,9 @@ BOARDS: List[Board] = [
         name="qemu_virt_x86",
         arch=SystemDescription.Arch.X86_64,
         paddr_top=0x70000000,
-        timer=None,
-        serial=None,
+        serial=0x3F8,
+        timer=0xFED00000,
+        ethernet=0xFE000000,
     ),
     Board(
         name="x86_64_generic_vtx",
@@ -207,14 +208,6 @@ BOARDS: List[Board] = [
         paddr_top=0x7FFDF000,
         timer=None,
         serial=None,
-    ),
-    Board(
-        name="qemu_virt_x86",
-        arch=SystemDescription.Arch.X86_64,
-        paddr_top=0x70000000,
-        serial=0x3F8,
-        timer=0xFED00000,
-        ethernet=0xFE000000,
     ),
     Board(
         name="makatea",
