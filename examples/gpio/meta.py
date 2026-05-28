@@ -36,7 +36,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
     # We need a timer driver for the example
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254, passive=True)
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
