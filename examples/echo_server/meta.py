@@ -205,22 +205,23 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-    print("start cnode")
     acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200)
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
 
-    acpi_driver.add_bootinfo(BootInfo("remaining_untypeds"))
-    acpi_driver.add_bootinfo(BootInfo("rsdp"))
+    acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
+    acpi_driver.add_boot_info(BootInfo("rsdp"))
 
-    cnode_remaining_untypeds = CNode(sdf, "remaining_untypeds", True, 8)
+    print("start cnode")
+    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 8)
     sdf.add_cnode(cnode_remaining_untypeds)
-    acpi_driver.add_capmap(CapMap("cnode", None, cnode_remaining_untypeds, 1))
-    acpi_driver.add_capmap(CapMap("vspace", pci_driver, None, 2))
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
+    print("end")
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
 
-    cnode_pci_resources = CNode(sdf, "pci_resources", False, 8)
+    cnode_pci_resources = CNode("pci_resources", False, 8)
     sdf.add_cnode(cnode_pci_resources)
-    acpi_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 3))
-    pci_driver.add_capmap(CapMap("cnode", None, cnode_pci_resources, 1))
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
 
     mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x10000)
     sdf.add_mr(mr_aml_object_poool)
@@ -345,8 +346,8 @@ def generate(
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
 
-    pci_driver.add_capmap(CapMap("vspace", ethernet_driver, None, 2))
-    pci_driver.add_capmap(CapMap("cnode", ethernet_driver, None, 3))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, ethernet_driver, None, 2))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, ethernet_driver, None, 3))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     net_virt_tx = ProtectionDomain(

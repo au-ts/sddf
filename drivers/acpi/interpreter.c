@@ -470,7 +470,7 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
 
         // TODO: remove this
         /* element_4 += (element_1 + element_2 + ext_irq->irq_num); */
-        /* (void)element_4; */
+        (void)element_4;
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
         pci_prt->address = element_1;
         pci_prt->pin = element_2;
