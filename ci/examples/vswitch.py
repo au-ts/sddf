@@ -40,9 +40,7 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
         backend.invocation_args.extend([
 			"-global", "virtio-mmio.force-legacy=false",
 			"-device",  virtio_device,
-			"-netdev", "user,id=netdev0," +
-                       "hostfwd=udp::1235-10.0.2.15:1235,hostfwd=tcp::1236-10.0.2.15:1236,hostfwd=tcp::1237-10.0.2.15:1237," +
-                       "hostfwd=udp::1238-10.0.2.16:1235,hostfwd=tcp::1239-10.0.2.16:1236,hostfwd=tcp::1240-10.0.2.16:1237",
+			"-netdev", "user,id=netdev0"
         ])
         # fmt: on
 
@@ -58,14 +56,12 @@ ICMP_RE = re.compile(
 
 @dataclass(frozen=True)
 class DhcpEvent:
-    client: str
     ip: str
 
 @dataclass(frozen=True)
 class IcmpEvent:
-    client: str
-    peer: str
-    ip: str
+    peer: list[str]
+    ip: list[str]
 
 class EventCollector:
     def __init__(self):
@@ -77,7 +73,7 @@ class EventCollector:
         if match:
             client = match.group(1).decode()
             ip = match.group(2).decode()
-            self.dhcp[client] = DhcpEvent(client, ip)
+            self.dhcp[client] = DhcpEvent(ip)
 
             reset_terminal()
             log.info(f"{client} IP: {ip}")
@@ -88,11 +84,20 @@ class EventCollector:
             client = match.group(1).decode()
             peer = match.group(2).decode()
             ip = match.group(4).decode()
-            self.icmp[client] = IcmpEvent(client, peer, ip)
+            if client in self.icmp.keys():
+                self.icmp[client].peer.append(peer)
+                self.icmp[client].ip.append(ip)
+            else:
+                self.icmp[client] = IcmpEvent([peer], [ip])
             return
 
     def done(self) -> bool:
-        return {"client0", "client1"} <= self.dhcp.keys() and {"client0", "client1"} <= self.icmp.keys()
+        return {"client0", "client1", "client2", "client3"} <= self.dhcp.keys() and \
+               {"client0", "client1", "client2", "client3"} <= self.icmp.keys() and \
+               len(self.icmp["client0"].peer == 3) and \
+               len(self.icmp["client1"].peer == 2) and \
+               len(self.icmp["client2"].peer == 2) and \
+               len(self.icmp["client3"].peer == 1)
 
 
 async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> EventCollector:
@@ -110,21 +115,33 @@ async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> Even
 async def test(backend: HardwareBackend, test_config: TestConfig):
     collector = await collect_until_done(backend, 20.0)
 
-    dhcp0 = collector.dhcp["client0"].ip
-    dhcp1 = collector.dhcp["client1"].ip
+    ACL_MATRIX = [
+        [0, 1, 1, 1],
+        [1, 0, 1, 0],
+        [1, 1, 0, 0],
+        [1, 0, 0, 0]
+    ]
 
-    icmp0 = collector.icmp["client0"].ip
-    icmp1 = collector.icmp["client1"].ip
+    for i in range(4):
 
-    if icmp0 != dhcp1:
-        raise TestFailureException(
-            f"client0 should report peer client1 IP {dhcp1}, got {icmp0}"
-        )
+        tx_client = "client" + str(i)
+        for j in range(4):
+            if not ACL_MATRIX[i][j]:
+                continue
 
-    if icmp1 != dhcp0:
-        raise TestFailureException(
-            f"client1 should report peer client0 IP {dhcp0}, got {icmp1}"
-        )
+            rx_client = "client" + str(j)
+
+            if rx_client not in collector.icmp[tx_client].peer:
+                raise TestFailureException(
+                    f"{tx_client} should receive ping reply from peer {rx_client}, nothing reported"
+                )
+
+            idx = collector.icmp[tx_client].peer.index(rx_client)
+
+            if collector.icmp[tx_client].ip[idx] != collector.dhcp[rx_client].ip:
+                raise TestFailureException(
+                    f"{tx_client} should report peer {rx_client} IP {collector.dhcp[rx_client].ip}, got {collector.icmp[tx_client].ip[idx]}"
+                )
 
 if __name__ == "__main__":
     run_single_example(

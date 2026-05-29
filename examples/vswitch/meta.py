@@ -166,15 +166,45 @@ def generate(
         budget=20000,
     )
 
+    client2_elf = copy_elf("client", "client", 2)
+    client2 = ProtectionDomain(
+        "client2", client2_elf, priority=96, budget=20000
+    )
+    client2_net_copier = ProtectionDomain(
+        "client2_net_copier",
+        "network_copy2.elf",
+        priority=98,
+        budget=20000
+    )
+
+    client3_elf = copy_elf("client", "client", 3)
+    client3 = ProtectionDomain(
+        "client3", client3_elf, priority=96, budget=20000
+    )
+    client3_net_copier = ProtectionDomain(
+        "client3_net_copier",
+        "network_copy3.elf",
+        priority=98,
+        budget=20000
+    )
+
     serial_system.add_client(client0)
     serial_system.add_client(client1)
+    serial_system.add_client(client2)
+    serial_system.add_client(client3)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
+    timer_system.add_client(client2)
+    timer_system.add_client(client3)
     net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
     net_system.add_client_with_copier(client1, client1_net_copier, vswitch=True)
+    net_system.add_client_with_copier(client2, client2_net_copier, vswitch=True)
+    net_system.add_client_with_copier(client3, client3_net_copier, vswitch=True)
 
     client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
     client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
+    client2_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client2)
+    client3_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client3)
 
     # Echo server protection domains
     pds = [
@@ -188,6 +218,10 @@ def generate(
         client0_net_copier,
         client1,
         client1_net_copier,
+        client2,
+        client2_net_copier,
+        client3,
+        client3_net_copier,
         timer_driver,
     ]
     for pd in pds:
@@ -198,11 +232,18 @@ def generate(
     assert net_system.connect()
 
     # ACLs
-    # 0 -> 1, V
-    # 1 -> 0, V
+    # 0 -> 1, 2, 3, V
+    # 1 -> 0, 2, V
+    # 2 -> 0, 1, V
+    # 3 -> 0, V
     net_system.add_acl_rule(client0, client1, True, True)
+    net_system.add_acl_rule(client0, client2, True, True)
+    net_system.add_acl_rule(client0, client3, True, True)
     net_system.add_acl_rule(client0, net_virt_tx, True, True)
+    net_system.add_acl_rule(client1, client2, True, True)
     net_system.add_acl_rule(client1, net_virt_tx, True, True)
+    net_system.add_acl_rule(client2, net_virt_tx, True, True)
+    net_system.add_acl_rule(client3, net_virt_tx, True, True)
 
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
@@ -211,6 +252,10 @@ def generate(
     assert client0_lib_sddf_lwip.serialise_config(output_dir)
     assert client1_lib_sddf_lwip.connect()
     assert client1_lib_sddf_lwip.serialise_config(output_dir)
+    assert client2_lib_sddf_lwip.connect()
+    assert client2_lib_sddf_lwip.serialise_config(output_dir)
+    assert client3_lib_sddf_lwip.connect()
+    assert client3_lib_sddf_lwip.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
