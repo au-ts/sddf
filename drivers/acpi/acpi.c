@@ -44,7 +44,7 @@ scanner_t scanner;
 aml_object_pool_t object_pool;
 aml_object_t object_root;
 pci_resources_t *pci_resources;
-aml_object_t *lookup_results[50];
+aml_object_t *lookup_results[100];
 uint32_t lookup_cnt;
 
 // TODO: let capDL initialiser create the PTs for ACPI
@@ -60,7 +60,7 @@ uintptr_t acpi_dsdt_addr = 0x0;
 #define MAX_NUM_RSDT_ENTRIES 2048
 uint32_t acpi_rsdt_entries[MAX_NUM_RSDT_ENTRIES];
 
-cap_desc_t cap_list[256];
+cap_desc_t cap_list[512];
 uint32_t cap_list_start;
 uint32_t cap_list_end;
 cnode_caps_t *cnode_caps_pci_resources;
@@ -101,6 +101,7 @@ seL4_Error untyped_retype(uint32_t ut_idx,
                           seL4_Word size_bits,
                           uint32_t *retyped_cptr_idx)
 {
+    sddf_dprintf("Try retyping an object\n");
     seL4_Error error = seL4_Untyped_Retype(cnode_cptr_remaining_untypeds + ut_idx,
                                 object_type,
                                 size_bits,
@@ -111,7 +112,7 @@ seL4_Error untyped_retype(uint32_t ut_idx,
         return error;
     }
 
-    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx\n", object_type, size_bits, cap_list[ut_idx].base_addr); */
+    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx to destination %d\n", object_type, size_bits, cap_list[ut_idx].base_addr, cap_list_end); */
 
     cap_list[cap_list_end].base_addr = cap_list[ut_idx].base_addr;
     cap_list[cap_list_end].end_addr = cap_list[ut_idx].base_addr + (1ULL << get_object_size(object_type, size_bits));
@@ -214,7 +215,6 @@ seL4_Error retype_at_paddr(seL4_Word target_paddr,
     }
 
     // Retype the target object
-    /* sddf_dprintf("Retype object type: %lu\n", object_type); */
     return untyped_retype(target_ut_idx, object_type, size_bits, retyped_cptr_idx);
 }
 
@@ -331,7 +331,7 @@ seL4_Error pass_ut_with_range(uintptr_t min_addr, uintptr_t max_addr)
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
-    sddf_dprintf("copy ut to slot %lu, start: %u, end: %u\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end);
+    /* sddf_dprintf("copy ut to slot %lu, start: %u, end: %u\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end); */
 
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].base_addr = min_addr;
     cnode_caps_pci_resources->desc[cnode_caps_pci_resources->end].end_addr = min_addr + new_ut_size;
@@ -493,6 +493,7 @@ seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspa
         return error;
     }
 
+    /* sddf_dprintf("retyped and try mapping at vaddr: 0x%lx with ut idx: %u, 0x%lx\n", vaddr, retyped_cptr_idx, IDX_TO_CPTR(retyped_cptr_idx)); */
     error = map_frame(IDX_TO_CPTR(retyped_cptr_idx), vspace, vaddr, rights);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", vaddr, error);
@@ -511,6 +512,9 @@ void init(void)
     bootinfo_rsdp_t *bi_rsdp = (bootinfo_rsdp_t *)bootinfo_rsdp;
     sddf_dprintf("revision: %d, rsdt_addr: 0x%x, xsdt_addr: 0x%lx\n", bi_rsdp->content.revision, bi_rsdp->content.rsdt_address, bi_rsdp->content.xsdt_address);
     uintptr_t rsdt_addr = bi_rsdp->content.rsdt_address;
+    if (bi_rsdp->content.revision > 1) {
+        rsdt_addr = bi_rsdp->content.xsdt_address;
+    }
 
     capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds;
     cap_list_start = capDLBootInfo->untypeds.start;
@@ -641,7 +645,7 @@ void init(void)
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     object_pool.next = aml_object_pool_start;
-    object_pool.end = aml_object_pool_start + 0x10000;
+    object_pool.end = aml_object_pool_start + 0x20000;
     sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current);
 
     uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t);
@@ -650,7 +654,6 @@ void init(void)
     object_root.name[0] = '\\';
     scan_objects(&object_root, dsdt_end);
     /* print_object_tree(&object_root, 0); */
-
 
     sddf_dprintf("===========Pass IRQControl capability======\n");
     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
@@ -685,10 +688,12 @@ void init(void)
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
     query_all_objects_by_name(&object_root, acpi_str_hid);
+    sddf_dprintf("num of PCIe: %d\n", lookup_cnt);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
         aml_object_t *node = lookup_results[i];
         char eisa_id[10];
+        sddf_dprintf("node %d: 0x%lx\n", i, node);
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
             sddf_dprintf("Found PCIe Bus\n");

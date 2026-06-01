@@ -59,6 +59,8 @@ uint8_t *get_data_end()
             return scanner.current + 2;
         case DATA_OBJ_DWORD:
             return scanner.current + 4;
+        case DATA_OBJ_QWORD:
+            return scanner.current + 8;
         case DATA_OBJ_STRING: {
             uint32_t i = 0;
             while (advance());
@@ -163,7 +165,7 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
             return existing_object;
         }
 
-        /* sddf_dprintf("Create a type 0x%02X object: %s\n", op_code, name_segment); */
+        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current);
         return insert_child_object(parent, name_segment, op_code);
     }
 
@@ -184,6 +186,110 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
     return make_object_if_not_exist(parent, op_code);
 }
 
+bool skip_if_name_string(uint8_t c)
+{
+    if ((c >= 'A' && c <= 'Z') || (c == 0x2E) || (c == 0x2F) || (c == '_') || (c == '\\')) {
+        scanner.current--;
+        skip_name_string();
+        sddf_dprintf("Warning: ref data object at 0x%lx is skipped\n", (uintptr_t)scanner.current);
+        return true;
+    }
+
+    return false;
+}
+
+uint32_t read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segments)
+{
+    char name_segment[5];
+    uint8_t name_type = advance();
+    aml_object_t *node = NULL;
+
+    if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
+        // Name Segment
+        scanner.current--;
+        read_name_segment(name_segment);
+        node = query_child_object_by_name(parent_node, name_segment);
+        left_num_segments--;
+    } else if (name_type == '\\') {
+        // Root Path
+        node = &object_root;
+    } else if (name_type == 0x2E) {
+        // Dual Name Segment
+        left_num_segments = 2;
+        node = parent_node;
+    } else if (name_type == 0x2F) {
+        // Multiple Name Segment
+        uint8_t seg_cnt = advance();
+        left_num_segments = seg_cnt;
+        node = parent_node;
+    } else {
+        sddf_dprintf("Not a NameString at 0x%lx\n", (uintptr_t)scanner.current);
+        scanner.current--;
+        return 0;
+    }
+
+    if (left_num_segments > 0) {
+        return read_if_name_string(node, left_num_segments);
+    }
+
+    if (node != NULL && (node->op_code == NAME_OP || node->op_code == METHOD_OP)) {
+        // TODO: read the actual value?
+        return 0;
+    } else if (node != NULL){
+        sddf_dprintf("Object \'%s\' is not \'METHOD\' or \'NAME\', try parsing the following name segment at 0x%lx\n", node->name, (uintptr_t)scanner.current);
+        return read_if_name_string(node, 1);
+    }
+
+    return 0;
+}
+
+uint32_t get_integer_data();
+
+uint32_t aml_eval_add()
+{
+    uint32_t operand1 = get_integer_data();
+    uint32_t operand2 = get_integer_data();
+    advance();
+
+    return operand1 + operand2;
+}
+
+// scanner.current needs to be at start of data
+uint32_t get_integer_data()
+{
+    uint8_t data_len = advance();
+
+    switch (data_len) {
+        case DATA_OBJ_ZERO:
+            return 0;
+        case DATA_OBJ_ONE:
+            return 1;
+        case DATA_OBJ_BYTE:
+            return advance();
+        case DATA_OBJ_WORD: {
+            uint16_t data = advance();
+            data |= (advance() << 8);
+            return data;
+        }
+        case DATA_OBJ_DWORD: {
+            uint32_t data = advance();
+            data |= (advance() << 8);
+            data |= (advance() << 16);
+            data |= (advance() << 24);
+            return data;
+        }
+        case ADD_OP: {
+            return aml_eval_add();
+        }
+        default: {
+            scanner.current--;
+            read_if_name_string(&object_root, 1);
+            sddf_dprintf("Not implemented data type: 0x%x\n", data_len);
+        }
+    }
+    return 0;
+}
+
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
 {
     scanner.start = scanner.current;
@@ -199,6 +305,13 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
         ext_op_prefix = 0;
 
         switch (op_code) {
+            case ALIAS_OP: {
+                skip_name_string();
+                skip_name_string();
+
+                next_obj_start = scanner.current;
+                break;
+            }
             case SCOPE_OP: {
                 next_obj_start = get_pkt_end(); // By reading pktLen
                 aml_object_t *node = make_object_if_not_exist(parent, SCOPE_OP);
@@ -225,6 +338,48 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
                 scan_objects(node, next_obj_start);
                 break;
             }
+            case MUTEX_OP: {
+                skip_name_string(); // Name String
+                advance();          // 1 byte for SyncFlags
+
+                next_obj_start = scanner.current;
+                break;
+            }
+            case EVENT_OP: {
+                skip_name_string(); // Name String
+                next_obj_start = scanner.current;
+                break;
+            }
+            case INDEX_FIELD_OP: {
+                next_obj_start = get_pkt_end(); // By reading pktLen
+                break;
+            }
+            case IF_OP: {
+                next_obj_start = get_pkt_end();
+                break;
+            }
+            case OP_REGION_OP: {
+                skip_name_string(); // Name String
+                advance();          // 1 byte for Region Space ID
+                get_integer_data(); // Region offset
+                get_integer_data(); // Region length
+
+                next_obj_start = scanner.current;
+                break;
+            }
+            case FIELD_OP: {
+                next_obj_start = get_pkt_end(); // By reading pktLen
+                break;
+            }
+            case CREATE_WORD_FIELD_OP:
+            case CREATE_DWORD_FIELD_OP: {
+                get_integer_data();
+                advance(); // 1 byte for ByteIndex
+                skip_name_string();
+
+                next_obj_start = scanner.current;
+                break;
+            }
             default: {
                 sddf_dprintf("Op code 0x%04X is not implemented (at 0x%lx), so jump to the end\n", op_code, (uintptr_t)scanner.current);
                 return;
@@ -234,36 +389,6 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
         scanner.start = next_obj_start;
         scanner.current = scanner.start;
     }
-}
-
-// scanner.current needs to be at start of data
-uint32_t get_integer_data()
-{
-    uint8_t data_len = advance();
-    switch (data_len) {
-        case DATA_OBJ_ZERO:
-            return 0;
-        case DATA_OBJ_ONE:
-            return 1;
-        case DATA_OBJ_BYTE:
-            return advance();
-        case DATA_OBJ_WORD: {
-            uint16_t data = advance();
-            data |= (advance() << 8);
-            return data;
-        }
-        case DATA_OBJ_DWORD: {
-            uint32_t data = advance();
-            data |= (advance() << 8);
-            data |= (advance() << 16);
-            data |= (advance() << 24);
-            return data;
-        }
-        default: {
-            sddf_dprintf("Not implemented data type: 0x%x\n", data_len);
-        }
-    }
-    return 0;
 }
 
 // Parse the compressed EISA ID to readable characters

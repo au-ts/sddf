@@ -206,17 +206,15 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200)
+    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200, stack_size=0x5000)
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
 
     acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
     acpi_driver.add_boot_info(BootInfo("rsdp"))
 
-    print("start cnode")
-    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 8)
+    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 9)
     sdf.add_cnode(cnode_remaining_untypeds)
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
-    print("end")
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
 
     cnode_pci_resources = CNode("pci_resources", False, 8)
@@ -224,7 +222,7 @@ def generate(
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
 
-    mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x10000)
+    mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x20000)
     sdf.add_mr(mr_aml_object_poool)
     acpi_driver.add_map(Map(mr_aml_object_poool, 0x30000000, "rw"))
 
@@ -350,17 +348,17 @@ def generate(
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     if board.name == "vb_105":
-        ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
-        sdf.add_mr(ecam_mr)
-        ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
+        # ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
+        # sdf.add_mr(ecam_mr)
+        # ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
 
-        eth_region_0 = MemoryRegion(
-            sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
-        )
-        sdf.add_mr(eth_region_0)
-        ethernet_driver.add_map(
-            Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
-        )
+        # eth_region_0 = MemoryRegion(
+        #     sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
+        # )
+        # sdf.add_mr(eth_region_0)
+        # ethernet_driver.add_map(
+        #     Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
+        # )
 
         hw_rx_ring_buffer = MemoryRegion(
             sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000

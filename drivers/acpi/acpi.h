@@ -92,8 +92,16 @@ enum aml_encoding_value {
     PACKAGE_OP = 0x12,
     METHOD_OP = 0x14,
     EXT_OP_PREFIX = 0x5B,
+    MUTEX_OP = 0x5B01,
+    EVENT_OP = 0x5B02,
+    OP_REGION_OP = 0x5B80,
+    FIELD_OP = 0x5B81,
     DEVICE_OP = 0x5B82,
+    INDEX_FIELD_OP = 0x5B86,
     // Something more
+    ADD_OP = 0x72,
+    CREATE_WORD_FIELD_OP = 0x8B,
+    CREATE_DWORD_FIELD_OP = 0x8A,
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
     RETURN_OP = 0xA4,
@@ -107,6 +115,7 @@ enum aml_data_object_type {
     DATA_OBJ_WORD = 0x0B,
     DATA_OBJ_DWORD = 0x0C,
     DATA_OBJ_STRING = 0x0D,
+    DATA_OBJ_QWORD = 0x0E,
     DATA_OBJ_BUFFER = 0x11,
     DATA_OBJ_PACKAGE = 0x12,
 };
@@ -298,7 +307,7 @@ extern scanner_t scanner;
 extern aml_object_pool_t object_pool;
 extern aml_object_t object_root;
 extern pci_resources_t *pci_resources;
-extern aml_object_t *lookup_results[50];
+extern aml_object_t *lookup_results[100];
 extern uint32_t lookup_cnt;
 
 extern const char acpi_str_fadt[];

@@ -488,10 +488,10 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                 }
 
                 // TODO: convert it to general solution
-                if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
-                    map_pci_bar(pci_header, 4);
-                    bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16);
-                }
+                /* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { */
+                /*     map_pci_bar(pci_header, 4); */
+                /*     bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
+                /* } */
             }
         }
     }
