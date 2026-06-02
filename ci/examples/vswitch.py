@@ -10,25 +10,17 @@ from dataclasses import dataclass
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
-from ci.lib.backends import *
-from ci.lib.runner import run_single_example, matrix_product
-from ci.common import TestConfig
-from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
-from ci.lib import log
-from ci import common, matrix
-
-TEST_MATRIX = matrix_product(
-    example=["vswitch"],
-    board=matrix.EXAMPLES["vswitch"]["boards_test"],
-    config=matrix.EXAMPLES["vswitch"]["configs"],
-    build_system=matrix.EXAMPLES["vswitch"]["build_systems"],
-    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
+from ts_ci import (
+    log,
+    reset_terminal,
+    HardwareBackend,
+    QemuBackend,
+    TestFailureException,
 )
 
+from ci import common, matrix
 
-#TODO: share this code with echo server?
-## Also we can share parts of it with echo_server as it extends it
-def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
+def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
@@ -89,15 +81,16 @@ class EventCollector:
                 self.icmp[client].ip.append(ip)
             else:
                 self.icmp[client] = IcmpEvent([peer], [ip])
+            log.info(f"{client} ({self.dhcp[client].ip}) pinged client{peer} ({ip}) and received response")
             return
 
     def done(self) -> bool:
         return {"client0", "client1", "client2", "client3"} <= self.dhcp.keys() and \
                {"client0", "client1", "client2", "client3"} <= self.icmp.keys() and \
-               len(self.icmp["client0"].peer == 3) and \
-               len(self.icmp["client1"].peer == 2) and \
-               len(self.icmp["client2"].peer == 2) and \
-               len(self.icmp["client3"].peer == 1)
+               len(self.icmp["client0"].peer) == 3 and \
+               len(self.icmp["client1"].peer) == 2 and \
+               len(self.icmp["client2"].peer) == 2 and \
+               len(self.icmp["client3"].peer) == 1
 
 
 async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> EventCollector:
@@ -106,7 +99,6 @@ async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> Even
     async with asyncio.timeout(timeout_s):
         while not collector.done():
             line = await backend.output_stream.readline()
-            OUTPUT.write(line)
             collector.feed_line(line)
 
     return collector
@@ -129,23 +121,53 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             if not ACL_MATRIX[i][j]:
                 continue
 
-            rx_client = "client" + str(j)
+            rx_peer = str(j)
+            rx_client = "client" + rx_peer
 
-            if rx_client not in collector.icmp[tx_client].peer:
+            if rx_peer not in collector.icmp[tx_client].peer:
                 raise TestFailureException(
                     f"{tx_client} should receive ping reply from peer {rx_client}, nothing reported"
                 )
 
-            idx = collector.icmp[tx_client].peer.index(rx_client)
+            idx = collector.icmp[tx_client].peer.index(rx_peer)
 
             if collector.icmp[tx_client].ip[idx] != collector.dhcp[rx_client].ip:
                 raise TestFailureException(
                     f"{tx_client} should report peer {rx_client} IP {collector.dhcp[rx_client].ip}, got {collector.icmp[tx_client].ip[idx]}"
                 )
 
+# export
+TEST_CASES = matrix.generate_example_test_cases(
+    "vswitch",
+    {
+        "configs": ["release"],
+        "build_systems": ["make"],
+        # One for each driver
+        "boards": [
+            "imx8mm_evk",
+            "imx8mq_evk",
+            "imx8mp_evk",
+            "imx8mp_iotgate",
+            "maaxboard",
+            "odroidc2",
+            "odroidc4",
+            "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "rock3b",
+            "rpi4b_1gb",
+            "star64",
+            "x86_64_generic",
+        ],
+        "tests_exclude": [
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
+        ],
+    },
+    test_fn=test,
+    backend_fn=backend_fn,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    run_single_example(
-        test,
-        TEST_MATRIX,
-        backend_fn,
-    )
+    common.run_tests(TEST_CASES)

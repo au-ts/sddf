@@ -174,15 +174,29 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         ],
     },
     "vswitch": {
-        "configs": ["debug", "release", "benchmark"],
+        "configs": ["debug", "release"],
         "build_systems": ["make"],
-        "boards_build": [
+        "boards": [
+            "imx8mm_evk",
+            "imx8mq_evk",
+            "imx8mp_evk",
+            "imx8mp_iotgate",
             "maaxboard",
+            "odroidc2",
+            "odroidc4",
             "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "rock3b",
+            "rpi4b_1gb",
+            "star64",
+            "x86_64_generic",
         ],
-        "boards_test": [
-            "maaxboard",
-            "qemu_virt_aarch64",
+        "tests_exclude": [
+            # too much printing in debug mode, results in garbled output
+            {"config": "debug"},
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
         ],
     },
 }
