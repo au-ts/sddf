@@ -1,3 +1,7 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 #include "icmp.h"
 #include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/network/config.h>
