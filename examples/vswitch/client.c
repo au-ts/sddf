@@ -169,4 +169,3 @@ void notified(sddf_channel ch)
 
     sddf_lwip_maybe_notify();
 }
-

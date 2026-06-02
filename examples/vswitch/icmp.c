@@ -43,12 +43,12 @@ static void ping_prepare_echo(struct icmp_echo_hdr *iecho, uint16_t len, uint16_
     ICMPH_TYPE_SET(iecho, ICMP_ECHO);
     ICMPH_CODE_SET(iecho, 0);
     iecho->chksum = 0;
-    iecho->id     = lwip_htons(client_id_to_ping_id(client_id));
-    iecho->seqno  = lwip_htons(++(*seq_num));
+    iecho->id = lwip_htons(client_id_to_ping_id(client_id));
+    iecho->seqno = lwip_htons(++(*seq_num));
 
     /* fill the additional data buffer with some data */
     for (i = 0; i < data_len; i++) {
-        ((char*)iecho)[sizeof(struct icmp_echo_hdr) + i] = (char)i;
+        ((char *)iecho)[sizeof(struct icmp_echo_hdr) + i] = (char)i;
     }
 
     iecho->chksum = inet_chksum(iecho, len);
@@ -95,8 +95,7 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
     }
 
     ping_id_host = lwip_ntohs(iecho->id);
-    if (ping_id_host < PING_ID_BASE ||
-        ping_id_host >= PING_ID_BASE + SDDF_NET_MAX_CLIENTS) {
+    if (ping_id_host < PING_ID_BASE || ping_id_host >= PING_ID_BASE + SDDF_NET_MAX_CLIENTS) {
         return 0;
     }
 
@@ -110,8 +109,8 @@ static uint8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
         return 0;
     }
 
-    sddf_printf("ICMP reply matched on netif %s peer=%u seq=%u from %s\n",
-                 sddf_get_pd_name(), client_id, contexts[client_id]->seq_num, ipaddr_ntoa(addr));
+    sddf_printf("ICMP reply matched on netif %s peer=%u seq=%u from %s\n", sddf_get_pd_name(), client_id,
+                contexts[client_id]->seq_num, ipaddr_ntoa(addr));
 
     contexts[client_id]->reply_received = true;
 

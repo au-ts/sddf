@@ -424,7 +424,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_SET_RET_NUM_ARGS);
     }
     case VSWITCH_QUERY_STATE: {
-        sddf_dprintf("VSWITCH|LOG: Client %u queried vswitch state, returning 0x%lx\n", ppc_client, state.allow_list[ppc_client]);
+        sddf_dprintf("VSWITCH|LOG: Client %u queried vswitch state, returning 0x%lx\n", ppc_client,
+                     state.allow_list[ppc_client]);
         sddf_set_mr(VSWITCH_QUERY_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, ppc_client);
         sddf_set_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP, state.allow_list[ppc_client]);
@@ -445,7 +446,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
             return seL4_MessageInfo_new(0, 0, 0, 1);
         }
         uint32_t ip_addr = state.client_ip_addrs[req_client];
-        sddf_dprintf("VSWITCH|LOG: Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client, ip_addr);
+        sddf_dprintf("VSWITCH|LOG: Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client,
+                     ip_addr);
         sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_REQ_RET_IP_ADDR, ip_addr);
 
