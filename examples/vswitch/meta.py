@@ -20,6 +20,7 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
+
 # Adds ".elf" to elf strings
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     source_elf += ".elf"
@@ -28,6 +29,7 @@ def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     new_elf += ".elf"
     assert os.path.isfile(source_elf)
     return shutil.copyfile(source_elf, new_elf)
+
 
 def generate(
     sdf_file: str,
@@ -45,9 +47,7 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-    timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=101
-    )
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     if board.arch == SystemDescription.Arch.X86_64:
@@ -124,29 +124,22 @@ def generate(
         priority=100,
         budget=20000,
     )
-    net_virt_rx = ProtectionDomain(
-        "net_virt_rx", "network_virt_rx.elf", priority=99
-    )
+    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
 
     vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
 
-    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch)
+    net_system = Sddf.Net(
+        sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch
+    )
 
     client0_elf = copy_elf("client", "client", 0)
-    client0 = ProtectionDomain(
-        "client0", client0_elf, priority=96, budget=20000
-    )
+    client0 = ProtectionDomain("client0", client0_elf, priority=96, budget=20000)
     client0_net_copier = ProtectionDomain(
-        "client0_net_copier",
-        "network_copy0.elf",
-        priority=98,
-        budget=20000
+        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
     )
 
     client1_elf = copy_elf("client", "client", 1)
-    client1 = ProtectionDomain(
-        "client1", client1_elf, priority=96, budget=20000
-    )
+    client1 = ProtectionDomain("client1", client1_elf, priority=96, budget=20000)
     client1_net_copier = ProtectionDomain(
         "client1_net_copier",
         "network_copy1.elf",
@@ -155,25 +148,15 @@ def generate(
     )
 
     client2_elf = copy_elf("client", "client", 2)
-    client2 = ProtectionDomain(
-        "client2", client2_elf, priority=96, budget=20000
-    )
+    client2 = ProtectionDomain("client2", client2_elf, priority=96, budget=20000)
     client2_net_copier = ProtectionDomain(
-        "client2_net_copier",
-        "network_copy2.elf",
-        priority=98,
-        budget=20000
+        "client2_net_copier", "network_copy2.elf", priority=98, budget=20000
     )
 
     client3_elf = copy_elf("client", "client", 3)
-    client3 = ProtectionDomain(
-        "client3", client3_elf, priority=96, budget=20000
-    )
+    client3 = ProtectionDomain("client3", client3_elf, priority=96, budget=20000)
     client3_net_copier = ProtectionDomain(
-        "client3_net_copier",
-        "network_copy3.elf",
-        priority=98,
-        budget=20000
+        "client3_net_copier", "network_copy3.elf", priority=98, budget=20000
     )
 
     serial_system.add_client(client0)
@@ -263,7 +246,6 @@ if __name__ == "__main__":
 
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
-
 
     dtb = None
     if board.arch != SystemDescription.Arch.X86_64:

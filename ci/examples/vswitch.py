@@ -20,6 +20,7 @@ from ts_ci import (
 
 from ci import common, matrix
 
+
 def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
@@ -38,6 +39,7 @@ def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBack
 
     return backend
 
+
 DHCP_RE = re.compile(
     rb"DHCP request finished, IP address for netif (client[0-9]+) is: (\d{1,3}(?:\.\d{1,3}){3})"
 )
@@ -46,14 +48,17 @@ ICMP_RE = re.compile(
     rb"ICMP reply matched on netif (client[0-9]+) peer=([0-9]+) seq=([0-9]+) from (\d{1,3}(?:\.\d{1,3}){3})"
 )
 
+
 @dataclass(frozen=True)
 class DhcpEvent:
     ip: str
+
 
 @dataclass(frozen=True)
 class IcmpEvent:
     peer: list[str]
     ip: list[str]
+
 
 class EventCollector:
     def __init__(self):
@@ -81,19 +86,25 @@ class EventCollector:
                 self.icmp[client].ip.append(ip)
             else:
                 self.icmp[client] = IcmpEvent([peer], [ip])
-            log.info(f"{client} ({self.dhcp[client].ip}) pinged client{peer} ({ip}) and received response")
+            log.info(
+                f"{client} ({self.dhcp[client].ip}) pinged client{peer} ({ip}) and received response"
+            )
             return
 
     def done(self) -> bool:
-        return {"client0", "client1", "client2", "client3"} <= self.dhcp.keys() and \
-               {"client0", "client1", "client2", "client3"} <= self.icmp.keys() and \
-               len(self.icmp["client0"].peer) == 3 and \
-               len(self.icmp["client1"].peer) == 2 and \
-               len(self.icmp["client2"].peer) == 2 and \
-               len(self.icmp["client3"].peer) == 1
+        return (
+            {"client0", "client1", "client2", "client3"} <= self.dhcp.keys()
+            and {"client0", "client1", "client2", "client3"} <= self.icmp.keys()
+            and len(self.icmp["client0"].peer) == 3
+            and len(self.icmp["client1"].peer) == 2
+            and len(self.icmp["client2"].peer) == 2
+            and len(self.icmp["client3"].peer) == 1
+        )
 
 
-async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> EventCollector:
+async def collect_until_done(
+    backend: HardwareBackend, timeout_s: float
+) -> EventCollector:
     collector = EventCollector()
 
     async with asyncio.timeout(timeout_s):
@@ -107,12 +118,7 @@ async def collect_until_done(backend: HardwareBackend, timeout_s: float) -> Even
 async def test(backend: HardwareBackend, test_config: TestConfig):
     collector = await collect_until_done(backend, 20.0)
 
-    ACL_MATRIX = [
-        [0, 1, 1, 1],
-        [1, 0, 1, 0],
-        [1, 1, 0, 0],
-        [1, 0, 0, 0]
-    ]
+    ACL_MATRIX = [[0, 1, 1, 1], [1, 0, 1, 0], [1, 1, 0, 0], [1, 0, 0, 0]]
 
     for i in range(4):
 
@@ -135,6 +141,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
                 raise TestFailureException(
                     f"{tx_client} should report peer {rx_client} IP {collector.dhcp[rx_client].ip}, got {collector.icmp[tx_client].ip[idx]}"
                 )
+
 
 # export
 TEST_CASES = matrix.generate_example_test_cases(
