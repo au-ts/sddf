@@ -9,7 +9,6 @@ import sys
 
 from ts_ci import (
     log,
-    matrix_product,
     reset_terminal,
     wait_for_output,
     HardwareBackend,

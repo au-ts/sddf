@@ -7,7 +7,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.29.0";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.33.0";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;

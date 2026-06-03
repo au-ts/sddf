@@ -48,7 +48,7 @@ typedef uintptr_t mem_ptr_t;
 #elif defined(__LITTLE_ENDIAN)
 #  define BYTE_ORDER LITTLE_ENDIAN
 #else
-#  error Unable to detemine system endianess
+#error Unable to determine system endianess
 #endif
 #endif
 

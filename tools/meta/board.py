@@ -9,7 +9,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 # This file is imported by most of our meta.py scripts, so add this check
 # here so that we can catch this error consistently.
-assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "33", "Unexpected sdfgen version"
 
 
 def add_x86_hpet(sdf: SystemDescription, timer_driver: ProtectionDomain):
@@ -195,7 +195,7 @@ BOARDS: List[Board] = [
     Board(
         name="x86_64_generic",
         arch=SystemDescription.Arch.X86_64,
-        paddr_top=0x7FFDF000,
+        paddr_top=0x70000000,
         timer=None,
         serial=None,
     ),
