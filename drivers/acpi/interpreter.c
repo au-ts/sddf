@@ -6,6 +6,9 @@
 
 #include "acpi.h"
 
+
+aml_object_t object_current;
+
 uintptr_t alloc_mem(uint32_t mem_size)
 {
     if ((uintptr_t)object_pool.next + mem_size >= (uintptr_t)object_pool.end) {
@@ -198,7 +201,7 @@ bool skip_if_name_string(uint8_t c)
     return false;
 }
 
-uint32_t read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segments)
+aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segments)
 {
     char name_segment[5];
     uint8_t name_type = advance();
@@ -208,8 +211,12 @@ uint32_t read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segment
         // Name Segment
         scanner.current--;
         read_name_segment(name_segment);
-        node = query_child_object_by_name(parent_node, name_segment);
+        /* node = query_child_object_by_name(parent_node, name_segment); */
+        node = query_same_domain_object_by_name(&object_current, name_segment);
         left_num_segments--;
+
+        sddf_dprintf("  Parent: %s, Name segment: %s\n", object_current.parent->name, name_segment);
+        sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
     } else if (name_type == '\\') {
         // Root Path
         node = &object_root;
@@ -225,7 +232,7 @@ uint32_t read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segment
     } else {
         sddf_dprintf("Not a NameString at 0x%lx\n", (uintptr_t)scanner.current);
         scanner.current--;
-        return 0;
+        return NULL;
     }
 
     if (left_num_segments > 0) {
@@ -234,13 +241,13 @@ uint32_t read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segment
 
     if (node != NULL && (node->op_code == NAME_OP || node->op_code == METHOD_OP)) {
         // TODO: read the actual value?
-        return 0;
+        return node;
     } else if (node != NULL){
         sddf_dprintf("Object \'%s\' is not \'METHOD\' or \'NAME\', try parsing the following name segment at 0x%lx\n", node->name, (uintptr_t)scanner.current);
         return read_if_name_string(node, 1);
     }
 
-    return 0;
+    return NULL;
 }
 
 uint32_t get_integer_data();
@@ -281,10 +288,23 @@ uint32_t get_integer_data()
         case ADD_OP: {
             return aml_eval_add();
         }
+        case LEQUAL_OP: {
+            uint32_t operand_a = get_integer_data();
+            uint32_t operand_b = get_integer_data();
+            if (operand_a == operand_b) {
+                return 1;
+            }
+            return 0;
+        }
         default: {
             scanner.current--;
-            read_if_name_string(&object_root, 1);
-            sddf_dprintf("Not implemented data type: 0x%x\n", data_len);
+            aml_object_t *node = read_if_name_string(&object_root, 1);
+            if (node) {
+                sddf_dprintf("Found object with value: %u\n", node->value);
+                return node->value;
+            } else {
+                sddf_dprintf("Error: not implemented data type: 0x%x\n", data_len);
+            }
         }
     }
     return 0;
@@ -297,6 +317,7 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
     uint16_t ext_op_prefix = 0;
 
     while (scanner.start < next_parent_start) {
+        object_current.parent = parent;
         uint16_t op_code = advance() | ext_op_prefix;
         if (op_code == EXT_OP_PREFIX) {
             ext_op_prefix = EXT_OP_PREFIX << 8;
@@ -503,6 +524,101 @@ void print_crs_list(acpi_crs_list_t *crs_list)
         }
 
         crs_list = crs_list->next;
+    }
+}
+
+// return true if find RETURN_OP or finish all the term list
+bool execute_term_list()
+{
+    uint8_t byte = advance();
+
+    while (true) {
+        switch (byte) {
+            case RETURN_OP: {
+                sddf_dprintf("RETURN_OP\n");
+                return true;
+            }
+            default: {
+                sddf_dprintf("Op %u is not implemneted, exit from term list parsing\n", byte);
+                return false;
+            }
+        }
+        byte = advance();
+    }
+
+    return false;
+}
+
+bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type)
+{
+    if (node->op_code != METHOD_OP) {
+        sddf_dprintf("Error: non-METHOD OP passed\n");
+        return false;
+    }
+
+    scanner.current = node->start;
+    sddf_dprintf("EXECUTE method\n");
+
+    advance();
+    uint8_t *pkt_end = get_pkt_end();
+    skip_name_string();
+    advance(); // Get MethodFlags
+
+    object_current.parent = node;
+
+    uint8_t byte = advance();
+    sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", scanner.current, pkt_end);
+    while (scanner.current < pkt_end) {
+        switch (byte) {
+            case IF_OP: {
+                sddf_dprintf("Found IF_OP\n");
+                get_pkt_end();
+
+                uint32_t predicate = get_integer_data();
+                sddf_dprintf("Predicate: %u\n", predicate);
+                if (predicate && execute_term_list()) {
+                    if (ret_type == RET_TYPE_INTEGER) {
+                        uint32_t ret_value = get_integer_data();
+                        sddf_dprintf("Found return value %u\n", ret_value);
+                    } else if (ret_type == RET_TYPE_OBJECT) {
+                        aml_object_t *node = read_if_name_string(&object_root, 1);
+                        if (node) {
+                            /* scanner.current = node->start; */
+                            sddf_dprintf("Found return object at 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
+                        } else {
+                            sddf_dprintf("Error: no object returned\n");
+                        }
+                    }
+                }
+                break;
+            }
+            case ELSE_OP: {
+                sddf_dprintf("Found ELSE_OP\n");
+                get_pkt_end();
+
+                if (execute_term_list()) {
+                    if (ret_type == RET_TYPE_INTEGER) {
+                        uint32_t ret_value = get_integer_data();
+                        sddf_dprintf("Found return value %u\n", ret_value);
+                    } else if (ret_type == RET_TYPE_OBJECT) {
+                        aml_object_t *node = read_if_name_string(&object_root, 1);
+                        if (node) {
+                            /* scanner.current = node->start; */
+                            sddf_dprintf("Found return object at 0x%lx\n", (uintptr_t)node);
+                        } else {
+                            sddf_dprintf("Error: no object returned\n");
+                        }
+                    }
+                }
+
+                break;
+            }
+            default: {
+                sddf_dprintf("Op 0x%x is not implemented\n", byte);
+                break;
+            }
+        }
+        byte = advance();
     }
 }
 
