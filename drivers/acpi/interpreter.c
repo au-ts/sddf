@@ -549,7 +549,7 @@ bool execute_term_list()
     return false;
 }
 
-bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type)
+bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0)
 {
     if (node->op_code != METHOD_OP) {
         sddf_dprintf("Error: non-METHOD OP passed\n");
@@ -562,12 +562,12 @@ bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type)
     advance();
     uint8_t *pkt_end = get_pkt_end();
     skip_name_string();
-    advance(); // Get MethodFlags
+    uint8_t method_flags = advance(); // Get MethodFlags
 
     object_current.parent = node;
 
     uint8_t byte = advance();
-    sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", scanner.current, pkt_end);
+    sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)pkt_end);
     while (scanner.current < pkt_end) {
         switch (byte) {
             case IF_OP: {
@@ -611,6 +611,24 @@ bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type)
                     }
                 }
 
+                break;
+            }
+            case STORE_OP: {
+                // Assume there is only one term arg
+                uint32_t term_arg = advance();
+                if (term_arg == ARG0_OP) {
+                    term_arg = argv_0;
+                } else {
+                    scanner.current--;
+                    term_arg = get_integer_data();
+                }
+                aml_object_t *node = read_if_name_string(&object_root, 1);
+                if (node) {
+                    sddf_dprintf("Found SuperName object: %s\n", node->name);
+                    node->value = term_arg;
+                } else {
+                    sddf_dprintf("SuperName is not found\n");
+                }
                 break;
             }
             default: {
