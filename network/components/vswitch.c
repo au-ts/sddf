@@ -23,6 +23,16 @@
 
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
+/* Uncomment this to enable debug logging */
+// #define DEBUG_VSWITCH
+
+#if defined(DEBUG_VSWITCH)
+#define LOG_VSWITCH(...) do{ sddf_dprintf("VSWITCH|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_VSWITCH(...) do{}while(0)
+#endif
+#define LOG_VSWITCH_ERR(...) do{ sddf_dprintf("VSWITCH|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
+
 typedef struct vswitch_state {
     /**
      * Rx and Tx queues are shared with both the virtualisers and vswitch
@@ -130,8 +140,7 @@ static void clear_checksums(ether_hdr_t *eth_frame)
         break;
     }
     default: {
-        sddf_dprintf("VSWITCH|ERR: Unsupported IP protocol %u received checksums may not be cleared!\n",
-                     ip_header->protocol);
+        LOG_VSWITCH_ERR("Unsupported IP protocol %u received, checksums may not be cleared!\n", ip_header->protocol);
         break;
     }
     }
@@ -309,9 +318,8 @@ static void forward_traffic_from(uint8_t port_id)
 
             if (buffer.io_or_offset % NET_BUFFER_SIZE
                 || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.num_buffers) {
-                sddf_dprintf(
-                    "VSWITCH|LOG: Port provided offset %lx which is not buffer aligned or outside of buffer region\n",
-                    buffer.io_or_offset);
+                LOG_VSWITCH_ERR("Port %u provided offset %lx which is not buffer aligned or outside of buffer region\n",
+                    port_id, buffer.io_or_offset);
                 err = net_enqueue_free(src, buffer);
                 assert(!err);
                 continue;
@@ -405,7 +413,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     }
 
     if (ppc_client == config.num_ports) {
-        sddf_dprintf("VSWITCH|ERR: Received PPC from unknown channel %u\n", ch);
+        LOG_VSWITCH_ERR("Received PPC from unknown channel %u\n", ch);
         sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
@@ -413,7 +421,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     switch (microkit_msginfo_get_label(msginfo)) {
     case VSWITCH_SET_IP_ADDR: {
         uint32_t ip_addr = sddf_get_mr(VSWITCH_SET_IP_ADDR_ARG);
-        sddf_dprintf("VSWITCH|LOG: Client %u registered IP address 0x%08x\n", ppc_client, ip_addr);
+        LOG_VSWITCH("Client %u registered IP address 0x%08x\n", ppc_client, ip_addr);
         if (ip_addr == 0) {
             sddf_set_mr(VSWITCH_SET_RET_ERR, VSWITCH_ERR_INVALID_IP);
             return seL4_MessageInfo_new(0, 0, 0, 1);
@@ -424,7 +432,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_SET_RET_NUM_ARGS);
     }
     case VSWITCH_QUERY_STATE: {
-        sddf_dprintf("VSWITCH|LOG: Client %u queried vswitch state, returning 0x%lx\n", ppc_client,
+        LOG_VSWITCH("Client %u queried vswitch state, returning 0x%lx\n", ppc_client,
                      state.allow_list[ppc_client]);
         sddf_set_mr(VSWITCH_QUERY_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, ppc_client);
@@ -434,7 +442,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     }
     case VSWITCH_REQ_CLIENT: {
         uint8_t req_client = sddf_get_mr(VSWITCH_REQ_CLIENT_ID);
-        sddf_dprintf("VSWITCH|LOG: Client %u requested client %u's IP address\n", ppc_client, req_client);
+        LOG_VSWITCH("Client %u requested client %u's IP address\n", ppc_client, req_client);
         if (!vswitch_can_send_to(ppc_client, req_client)) {
             sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OPERATION_DENIED);
             return seL4_MessageInfo_new(0, 0, 0, 1);
@@ -446,15 +454,14 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
             return seL4_MessageInfo_new(0, 0, 0, 1);
         }
         uint32_t ip_addr = state.client_ip_addrs[req_client];
-        sddf_dprintf("VSWITCH|LOG: Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client,
-                     ip_addr);
+        LOG_VSWITCH("Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client, ip_addr);
         sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_REQ_RET_IP_ADDR, ip_addr);
 
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_REQ_RET_NUM_ARGS);
     }
     default: {
-        sddf_dprintf("VSWITCH|ERR: Received PPC from client %u with invalid label\n", ppc_client);
+        LOG_VSWITCH_ERR("Received PPC from client %u with invalid label\n", ppc_client);
         sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
