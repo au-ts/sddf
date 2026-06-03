@@ -549,7 +549,7 @@ bool execute_term_list()
     return false;
 }
 
-bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0)
+uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0)
 {
     if (node->op_code != METHOD_OP) {
         sddf_dprintf("Error: non-METHOD OP passed\n");
@@ -575,19 +575,24 @@ bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint3
                 get_pkt_end();
 
                 uint32_t predicate = get_integer_data();
-                sddf_dprintf("Predicate: %u\n", predicate);
-                if (predicate && execute_term_list()) {
+                uintptr_t ret_val = 0;
+                if (execute_term_list()) {
                     if (ret_type == RET_TYPE_INTEGER) {
                         uint32_t ret_value = get_integer_data();
                         sddf_dprintf("Found return value %u\n", ret_value);
+                        ret_val = (uintptr_t)ret_value;
                     } else if (ret_type == RET_TYPE_OBJECT) {
                         aml_object_t *node = read_if_name_string(&object_root, 1);
                         if (node) {
-                            /* scanner.current = node->start; */
                             sddf_dprintf("Found return object at 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
+                            ret_val = (uintptr_t)node;
                         } else {
                             sddf_dprintf("Error: no object returned\n");
                         }
+                    }
+
+                    if (predicate) {
+                        return ret_val;
                     }
                 }
                 break;
@@ -600,13 +605,16 @@ bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint3
                     if (ret_type == RET_TYPE_INTEGER) {
                         uint32_t ret_value = get_integer_data();
                         sddf_dprintf("Found return value %u\n", ret_value);
+                        return (uintptr_t)ret_value;
                     } else if (ret_type == RET_TYPE_OBJECT) {
                         aml_object_t *node = read_if_name_string(&object_root, 1);
                         if (node) {
                             /* scanner.current = node->start; */
                             sddf_dprintf("Found return object at 0x%lx\n", (uintptr_t)node);
+                            return (uintptr_t)node;
                         } else {
                             sddf_dprintf("Error: no object returned\n");
+                            return 0;
                         }
                     }
                 }
@@ -633,11 +641,13 @@ bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint3
             }
             default: {
                 sddf_dprintf("Op 0x%x is not implemented\n", byte);
-                break;
+                return 0;
             }
         }
         byte = advance();
     }
+
+    return 0;
 }
 
 // Section 6.4

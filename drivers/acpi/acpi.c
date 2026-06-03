@@ -691,8 +691,6 @@ void init(void)
     // There should be only one PIC method
     aml_object_t *pic_method = lookup_results[0];
     execute_method(pic_method, RET_TYPE_NONE, 1);
-    return;
-
 
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
@@ -719,20 +717,21 @@ void init(void)
                 sddf_dprintf("_PRT node is not found\n");
                 return;
             }
-            execute_method(prt_node, RET_TYPE_OBJECT, 0);
-            char package_name[5];
-            if (extract_pcie_prt(prt_node, package_name)) {
-                sddf_dprintf("Routing table package \'%s'\n", package_name);
-                aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name);
-                if (prt_package) {
-                    sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start);
-                    extract_prt_package(prt_package, &pci_resources->bridges[pci_resources->num_bridges]);
-                } else {
-                    sddf_dprintf("PRT package is not found\n");
-                }
-            } else {
-                sddf_dprintf("Failed to parse the package name for routing tables\n");
-            }
+            aml_object_t *prt_package = (aml_object_t *)execute_method(prt_node, RET_TYPE_OBJECT, 0);
+            /* char package_name[5]; */
+            /* if (extract_pcie_prt(prt_node, package_name)) { */
+            /*     sddf_dprintf("Routing table package \'%s'\n", package_name); */
+            /*     aml_object_t *prt_package = query_same_domain_object_by_name(node, package_name); */
+            /*     if (prt_package) { */
+            /*         sddf_dprintf("Found PRT package location: 0x%lx\n", (uintptr_t)prt_package->start); */
+            /*         extract_prt_package(prt_package, &pci_resources->bridges[pci_resources->num_bridges]); */
+            /*     } else { */
+            /*         sddf_dprintf("PRT package is not found\n"); */
+            /*     } */
+            /* } else { */
+            /*     sddf_dprintf("Failed to parse the package name for routing tables\n"); */
+            /* } */
+            extract_prt_package(prt_package, &pci_resources->bridges[pci_resources->num_bridges]);
             pci_resources->num_bridges++;
         }
     }
