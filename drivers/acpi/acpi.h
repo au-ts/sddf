@@ -311,7 +311,7 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);
-bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0);
+uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0);
 
 extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
