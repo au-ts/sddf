@@ -195,7 +195,7 @@ BOARDS: List[Board] = [
     Board(
         name="x86_64_generic",
         arch=SystemDescription.Arch.X86_64,
-        paddr_top=0x7FFDF000,
+        paddr_top=0x70000000,
         timer=None,
         serial=None,
     ),
