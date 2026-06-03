@@ -115,6 +115,17 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             {"board": "rock3b"},
         ],
     },
+    "gpio": {
+        "configs": ["debug", "release"],
+        "build_systems": ["make", "zig"],
+        "boards": [
+            "maaxboard",
+        ],
+        "tests_exclude": [
+            # machine queue not setup for GPIO testing
+            {"board": "maaxboard"},
+        ],
+    },
     "serial": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
