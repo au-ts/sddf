@@ -50,29 +50,6 @@ You can enable blob resources by specifying `BLOB=1`. It is off by default.
 You can optionally provide `FB_IMG=<path/to/your/image>` to scanout your own
 image to the display. Otherwise the default image `fb_img.jpeg` is used.
 
-### Zig
-
-You can also build this example with the Zig build system:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=<board>
-```
-
-If `-Dboard` is not specified, the default board is `qemu_virt_aarch64`.
-
-The options for `<board>` are the same as the Makefile.
-
-You can simulate QEMU with:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
-```
-
-You cannot specify your own `FB_IMG` image when building with zig. The default
-image `fb_img.jpeg` is used.
-
-You cannot enable blob resources when building with zig. It is off by default.
-
-The final bootable image will be in `zig-out/bin/loader.img`.
-
 ## Running
 
 This example takes in an image 'fb_img.jpeg', and scans out different sections

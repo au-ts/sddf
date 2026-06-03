@@ -43,22 +43,6 @@ If you wish to simulate on one of the QEMU platforms (qemu_virt_aarch64 or
 qemu_virt_riscv64), you can append `qemu` to your make command to start QEMU
 after everything compiles.
 
-### Zig
-
-You can also build this example with the Zig build system:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=<board>
-```
-
-The options for `<board>` are the same as the Makefile.
-
-You can simulate QEMU with:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
-```
-
-The final bootable image will be in `zig-out/bin/loader.img`.
-
 ## Running/using
 
 When running the example in debug mode you should see the following output from

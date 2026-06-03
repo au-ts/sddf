@@ -29,15 +29,6 @@ make MICROKIT_SDK=/path/to/sdk
 
 The final bootable image will be in `build/loader.img`.
 
-### Zig
-
-You can also build this example with the Zig build system:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=odroidc4
-```
-
-The final bootable image will be in `zig-out/bin/loader.img`.
-
 ## Running PN532
 Make sure PN_532_ON is defined.
 

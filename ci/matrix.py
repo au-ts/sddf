@@ -62,7 +62,7 @@ def generate_example_test_cases(
 EXAMPLES: dict[str, _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": [
             "maaxboard",
             "qemu_virt_aarch64",
@@ -73,7 +73,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     },
     "i2c": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": ["odroidc4"],
         "tests_exclude": [],
     },
@@ -81,7 +81,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     # attached.
     "i2c_bus_scan": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": ["serengeti"],
         "tests_exclude": [],
     },
@@ -117,7 +117,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     },
     "serial": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": [
             "cheshire",
             "hifive_p550",
@@ -147,7 +147,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     },
     "timer": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": [
             "imx8mq_evk",
             "imx8mp_evk",
@@ -221,6 +221,6 @@ for ex in EXAMPLES.values():
 
 class _ExampleMatrixType(TypedDict):
     configs: list[Literal["debug", "release", "benchmark"]]
-    build_systems: list[Literal["make", "zig"]]
+    build_systems: list[Literal["make"]]
     boards: list[_BoardNames]
     tests_exclude: list[dict[str, str]]
