@@ -26,6 +26,7 @@ const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
 const char acpi_str_hid[] = {'_', 'H', 'I', 'D', 0};  // Hardware ID
 const char acpi_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
 const char acpi_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
+const char acpi_str_pic[] = {'_', 'P', 'I', 'C', 0};  // PIC mode method
 const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI Express Bus
 
 capDLBootInfo_t *capDLBootInfo;
@@ -684,6 +685,15 @@ void init(void)
         pass_ut_with_range(cap_list[pci_kernel_objects_ut_idx].base_addr, cap_list[pci_kernel_objects_ut_idx].end_addr);
     }
 
+    sddf_dprintf("===========Adjust PIC mode=========\n");
+    lookup_cnt = 0;
+    query_all_objects_by_name(&object_root, acpi_str_pic);
+    // There should be only one PIC method
+    aml_object_t *pic_method = lookup_results[0];
+    execute_method(pic_method, RET_TYPE_NONE, 1);
+    return;
+
+
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
     query_all_objects_by_name(&object_root, acpi_str_hid);
@@ -709,7 +719,7 @@ void init(void)
                 sddf_dprintf("_PRT node is not found\n");
                 return;
             }
-            execute_method(prt_node, RET_TYPE_OBJECT);
+            execute_method(prt_node, RET_TYPE_OBJECT, 0);
             char package_name[5];
             if (extract_pcie_prt(prt_node, package_name)) {
                 sddf_dprintf("Routing table package \'%s'\n", package_name);
