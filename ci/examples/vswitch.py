@@ -52,6 +52,7 @@ ICMP_RE = re.compile(
 # Client x can communicate with client y if ACL_MATRIX[x][y] == 1
 ACL_MATRIX = [[0, 1, 1, 1], [1, 0, 1, 0], [1, 1, 0, 0], [1, 0, 0, 0]]
 
+
 def output_complete(client_dhcp: dict[int, str], client_pings: dict[int, list[int]]):
     for i in range(4):
         # Check DHCP has completed
@@ -66,6 +67,7 @@ def output_complete(client_dhcp: dict[int, str], client_pings: dict[int, list[in
                 return False
 
     return True
+
 
 async def test(backend: HardwareBackend, test_config: common.TestConfig):
 
@@ -128,6 +130,7 @@ async def test(backend: HardwareBackend, test_config: common.TestConfig):
                 )
 
             continue
+
 
 # export
 TEST_CASES = matrix.generate_example_test_cases(
