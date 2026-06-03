@@ -55,7 +55,7 @@ ACL_MATRIX = [[0, 1, 1, 1], [1, 0, 1, 0], [1, 1, 0, 0], [1, 0, 0, 0]]
 def output_complete(client_dhcp: dict[int, str], client_pings: dict[int, list[int]]):
     for i in range(4):
         # Check DHCP has completed
-        if i not in client_dhcp:
+        if i not in client_dhcp or i not in client_pings:
             return False
 
         # Check the client has pinged all reachable neighbours
@@ -70,19 +70,20 @@ def output_complete(client_dhcp: dict[int, str], client_pings: dict[int, list[in
 async def test(backend: HardwareBackend, test_config: common.TestConfig):
 
     # Client x's IP = client_dhcp[x]
-    client_dhcp = dict[int, str]
+    client_dhcp = dict()
     # Client x has successfully pinged client_pings[x]
-    client_pings = dict[int, list[int]]
+    client_pings = dict()
 
     async with asyncio.timeout(30):
         while not output_complete(client_dhcp, client_pings):
             line = await wait_for_output(backend, b"\n")
+            reset_terminal()
 
             dhcp_match = DHCP_RE.search(line)
             icmp_match = ICMP_RE.search(line)
 
             if dhcp_match:
-                client_id = dhcp_match.group(1).decode()
+                client_id = int(dhcp_match.group(1).decode())
                 client_ip = dhcp_match.group(2).decode()
 
                 if client_id in client_dhcp:
@@ -94,8 +95,8 @@ async def test(backend: HardwareBackend, test_config: common.TestConfig):
                 log.info(f"client{client_id} IP: {client_ip}")
 
             elif icmp_match:
-                client_id = icmp_match.group(1).decode()
-                peer_id = icmp_match.group(2).decode()
+                client_id = int(icmp_match.group(1).decode())
+                peer_id = int(icmp_match.group(2).decode())
                 peer_ip = icmp_match.group(4).decode()
 
                 # Sanity check IP addresses
@@ -126,7 +127,6 @@ async def test(backend: HardwareBackend, test_config: common.TestConfig):
                     f"client{client_id} ({client_dhcp[client_id]}) pinged client{peer_id} ({peer_ip}) and received response"
                 )
 
-            reset_terminal()
             continue
 
 # export

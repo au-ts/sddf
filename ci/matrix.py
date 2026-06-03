@@ -192,8 +192,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
         ],
         "tests_exclude": [
-            # too much printing in debug mode, results in garbled output
-            {"config": "debug"},
             # not in machine queue
             {"board": "imx8mp_evk"},
             {"board": "rock3b"},
