@@ -13,6 +13,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ts_ci import (
     log,
     reset_terminal,
+    wait_for_output,
     HardwareBackend,
     QemuBackend,
     TestFailureException,
@@ -41,136 +42,97 @@ def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBack
 
 
 DHCP_RE = re.compile(
-    rb"DHCP request finished, IP address for netif (client[0-9]+) is: (\d{1,3}(?:\.\d{1,3}){3})"
+    rb"DHCP request finished, IP address for netif client([0-9]+) is: (\d{1,3}(?:\.\d{1,3}){3})"
 )
 
 ICMP_RE = re.compile(
-    rb"ICMP reply matched on netif (client[0-9]+) peer=([0-9]+) seq=([0-9]+) from (\d{1,3}(?:\.\d{1,3}){3})"
+    rb"ICMP reply matched on netif client([0-9]+) peer=([0-9]+) seq=([0-9]+) from (\d{1,3}(?:\.\d{1,3}){3})"
 )
 
+# Client x can communicate with client y if ACL_MATRIX[x][y] == 1
+ACL_MATRIX = [[0, 1, 1, 1], [1, 0, 1, 0], [1, 1, 0, 0], [1, 0, 0, 0]]
 
-@dataclass(frozen=True)
-class DhcpEvent:
-    ip: str
-
-
-@dataclass(frozen=True)
-class IcmpEvent:
-    peer: list[str]
-    ip: list[str]
-
-
-class EventCollector:
-    def __init__(self):
-        self.dhcp: dict[str, DhcpEvent] = {}
-        self.icmp: dict[str, IcmpEvent] = {}
-
-    def feed_line(self, line: bytes) -> None:
-        match = DHCP_RE.search(line)
-        if match:
-            client = match.group(1).decode()
-            ip = match.group(2).decode()
-            self.dhcp[client] = DhcpEvent(ip)
-
-            reset_terminal()
-            log.info(f"{client} IP: {ip}")
-            return
-
-        match = ICMP_RE.search(line)
-        if match:
-            client = match.group(1).decode()
-            peer = match.group(2).decode()
-            ip = match.group(4).decode()
-            if client in self.icmp.keys():
-                self.icmp[client].peer.append(peer)
-                self.icmp[client].ip.append(ip)
-            else:
-                self.icmp[client] = IcmpEvent([peer], [ip])
-            log.info(
-                f"{client} ({self.dhcp[client].ip}) pinged client{peer} ({ip}) and received response"
-            )
-            return
-
-    def done(self) -> bool:
-        return (
-            {"client0", "client1", "client2", "client3"} <= self.dhcp.keys()
-            and {"client0", "client1", "client2", "client3"} <= self.icmp.keys()
-            and len(self.icmp["client0"].peer) == 3
-            and len(self.icmp["client1"].peer) == 2
-            and len(self.icmp["client2"].peer) == 2
-            and len(self.icmp["client3"].peer) == 1
-        )
-
-
-async def collect_until_done(
-    backend: HardwareBackend, timeout_s: float
-) -> EventCollector:
-    collector = EventCollector()
-
-    async with asyncio.timeout(timeout_s):
-        while not collector.done():
-            line = await backend.output_stream.readline()
-            collector.feed_line(line)
-
-    return collector
-
-
-async def test(backend: HardwareBackend, test_config: TestConfig):
-    collector = await collect_until_done(backend, 20.0)
-
-    ACL_MATRIX = [[0, 1, 1, 1], [1, 0, 1, 0], [1, 1, 0, 0], [1, 0, 0, 0]]
-
+def output_complete(client_dhcp: dict[int, str], client_pings: dict[int, list[int]]):
     for i in range(4):
+        # Check DHCP has completed
+        if i not in client_dhcp:
+            return False
 
-        tx_client = "client" + str(i)
+        # Check the client has pinged all reachable neighbours
         for j in range(4):
             if not ACL_MATRIX[i][j]:
                 continue
+            if j not in client_pings[i]:
+                return False
 
-            rx_peer = str(j)
-            rx_client = "client" + rx_peer
+    return True
 
-            if rx_peer not in collector.icmp[tx_client].peer:
-                raise TestFailureException(
-                    f"{tx_client} should receive ping reply from peer {rx_client}, nothing reported"
+async def test(backend: HardwareBackend, test_config: common.TestConfig):
+
+    # Client x's IP = client_dhcp[x]
+    client_dhcp = dict[int, str]
+    # Client x has successfully pinged client_pings[x]
+    client_pings = dict[int, list[int]]
+
+    async with asyncio.timeout(30):
+        while not output_complete(client_dhcp, client_pings):
+            line = await wait_for_output(backend, b"\n")
+
+            dhcp_match = DHCP_RE.search(line)
+            icmp_match = ICMP_RE.search(line)
+
+            if dhcp_match:
+                client_id = dhcp_match.group(1).decode()
+                client_ip = dhcp_match.group(2).decode()
+
+                if client_id in client_dhcp:
+                    raise TestFailureException(
+                        f"client{client_id} reported receiving an IP address twice: IP1 = {client_dhcp[client_id]}, IP2 = {client_ip}"
+                    )
+
+                client_dhcp[client_id] = client_ip
+                log.info(f"client{client_id} IP: {client_ip}")
+
+            elif icmp_match:
+                client_id = icmp_match.group(1).decode()
+                peer_id = icmp_match.group(2).decode()
+                peer_ip = icmp_match.group(4).decode()
+
+                # Sanity check IP addresses
+                if client_id not in client_dhcp:
+                    raise TestFailureException(
+                        f"client{client_id} reported pinging peer{peer_id} before receiving an IP address"
+                    )
+                elif peer_id not in client_dhcp:
+                    raise TestFailureException(
+                        f"client{client_id} reported pinging peer{peer_id} on ip {peer_ip} before the peer received an IP address"
+                    )
+                elif peer_ip != client_dhcp[peer_id]:
+                    raise TestFailureException(
+                        f"client{client_id} reported peer{peer_id} IP = {peer_ip}, should be {client_dhcp[peer_id]}"
+                    )
+
+                # Log successful ping echo
+                if client_id not in client_pings:
+                    client_pings[client_id] = [peer_id]
+                else:
+                    if peer_id in client_pings[client_id]:
+                        raise TestFailureException(
+                            f"client{client_id} reported pinging peer{peer_id} twice"
+                        )
+                    client_pings[client_id].append(peer_id)
+
+                log.info(
+                    f"client{client_id} ({client_dhcp[client_id]}) pinged client{peer_id} ({peer_ip}) and received response"
                 )
 
-            idx = collector.icmp[tx_client].peer.index(rx_peer)
-
-            if collector.icmp[tx_client].ip[idx] != collector.dhcp[rx_client].ip:
-                raise TestFailureException(
-                    f"{tx_client} should report peer {rx_client} IP {collector.dhcp[rx_client].ip}, got {collector.icmp[tx_client].ip[idx]}"
-                )
-
+            reset_terminal()
+            continue
 
 # export
 TEST_CASES = matrix.generate_example_test_cases(
     "vswitch",
-    {
-        "configs": ["release"],
-        "build_systems": ["make"],
-        # One for each driver
-        "boards": [
-            "imx8mm_evk",
-            "imx8mq_evk",
-            "imx8mp_evk",
-            "imx8mp_iotgate",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "rock3b",
-            "rpi4b_1gb",
-            "star64",
-            "x86_64_generic",
-        ],
-        "tests_exclude": [
-            # not in machine queue
-            {"board": "imx8mp_evk"},
-            {"board": "rock3b"},
-        ],
-    },
+    matrix.EXAMPLES["vswitch"],
     test_fn=test,
     backend_fn=backend_fn,
     no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
