@@ -319,7 +319,7 @@ static void forward_traffic_from(uint8_t port_id)
             if (buffer.io_or_offset % NET_BUFFER_SIZE
                 || buffer.io_or_offset >= NET_BUFFER_SIZE * config.ports[port_id].tx.num_buffers) {
                 LOG_VSWITCH_ERR("Port %u provided offset %lx which is not buffer aligned or outside of buffer region\n",
-                    port_id, buffer.io_or_offset);
+                                port_id, buffer.io_or_offset);
                 err = net_enqueue_free(src, buffer);
                 assert(!err);
                 continue;
@@ -432,8 +432,7 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_SET_RET_NUM_ARGS);
     }
     case VSWITCH_QUERY_STATE: {
-        LOG_VSWITCH("Client %u queried vswitch state, returning 0x%lx\n", ppc_client,
-                     state.allow_list[ppc_client]);
+        LOG_VSWITCH("Client %u queried vswitch state, returning 0x%lx\n", ppc_client, state.allow_list[ppc_client]);
         sddf_set_mr(VSWITCH_QUERY_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, ppc_client);
         sddf_set_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP, state.allow_list[ppc_client]);
