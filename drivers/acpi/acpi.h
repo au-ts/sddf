@@ -102,6 +102,7 @@ enum aml_encoding_value {
     ADD_OP = 0x72,
     CREATE_WORD_FIELD_OP = 0x8B,
     CREATE_DWORD_FIELD_OP = 0x8A,
+    LEQUAL_OP = 0x93,
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
     RETURN_OP = 0xA4,
@@ -272,13 +273,20 @@ typedef struct {
     uint8_t* current;
 } scanner_t;
 
+enum aml_method_ret_type {
+    RET_TYPE_NONE = 0,
+    RET_TYPE_INTEGER = 1,
+    RET_TYPE_OBJECT = 2,
+};
+
 typedef struct aml_object {
     uint8_t *start;
     struct aml_object *parent;  // parent
     struct aml_object *child;   // first child object
     struct aml_object *next;    // siblings
-    char name[5];    // Name Segment
+    char name[5];               // Name Segment
     enum aml_encoding_value op_code;
+    uint32_t value;             // Only used for NameObject
 } aml_object_t;
 
 typedef struct aml_object_pool {
@@ -301,11 +309,13 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource);
 void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
 aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);
+bool execute_method(aml_object_t *node, enum aml_method_ret_type ret_type);
 
 extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
 extern aml_object_pool_t object_pool;
 extern aml_object_t object_root;
+extern aml_object_t object_current;
 extern pci_resources_t *pci_resources;
 extern aml_object_t *lookup_results[100];
 extern uint32_t lookup_cnt;

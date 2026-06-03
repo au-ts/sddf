@@ -101,7 +101,6 @@ seL4_Error untyped_retype(uint32_t ut_idx,
                           seL4_Word size_bits,
                           uint32_t *retyped_cptr_idx)
 {
-    sddf_dprintf("Try retyping an object\n");
     seL4_Error error = seL4_Untyped_Retype(cnode_cptr_remaining_untypeds + ut_idx,
                                 object_type,
                                 size_bits,
@@ -688,12 +687,10 @@ void init(void)
     sddf_dprintf("===========Lookup Results=========\n");
     lookup_cnt = 0;
     query_all_objects_by_name(&object_root, acpi_str_hid);
-    sddf_dprintf("num of PCIe: %d\n", lookup_cnt);
     // TODO: get rid of lookup_list and return a list with all the parsed resources
     for (uint32_t i = 0; i < lookup_cnt; i++) {
         aml_object_t *node = lookup_results[i];
         char eisa_id[10];
-        sddf_dprintf("node %d: 0x%lx\n", i, node);
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
             sddf_dprintf("Found PCIe Bus\n");
@@ -712,6 +709,7 @@ void init(void)
                 sddf_dprintf("_PRT node is not found\n");
                 return;
             }
+            execute_method(prt_node, RET_TYPE_OBJECT);
             char package_name[5];
             if (extract_pcie_prt(prt_node, package_name)) {
                 sddf_dprintf("Routing table package \'%s'\n", package_name);
