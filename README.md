@@ -37,10 +37,6 @@ website [here](https://trustworthy.systems/projects/drivers/).
 * Device Tree Compiler
 * Python (3.9 or higher)
 
-sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org)
-build system is also available. If you are intending on using Zig instead of
-Make, please see https://ziglang.org/download/.
-
 See the instructions below for installing the rest of the dependencies based on
 your machine:
 

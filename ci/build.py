@@ -40,6 +40,10 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
 
 
 def build_zig(args: argparse.Namespace, test_config: common.TestConfig):
+    """
+    NOTE: Zig as a build system support in the sDDF is deprecated.
+          This code remains for future reference.
+    """
     build_dir = common.example_build_path(test_config)
     example_dir = get_example_dir(test_config.example)
 

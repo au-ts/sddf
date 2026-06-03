@@ -49,22 +49,6 @@ append `qemu` to your make command like so:
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> qemu
 ```
 
-### Zig
-
-You can also build this example with the Zig build system:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=<board> [-Dpartition=<partition>]
-```
-
-The options for `<board>` are the same as the Makefile.
-
-You can simulate QEMU with:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
-```
-
-The final bootable image will be in `zig-out/bin/loader.img`.
-
 ## Running
 
 The example uses a generated C header that contains bytes for an ASCII image of
@@ -113,7 +97,7 @@ xxd -n basic_data -i basic_data.txt > basic_data.h
 ## Using other drivers
 
 We support NVMe (only on x86-64 QEMU right now) which can be used by specifying
-`NVME=1` in your Make command (`-Dnvme=true` with Zig).
+`NVME=1` in your Make command
 
 When running with QEMU the block client will be talking to an NVMe drive instead of
 the usual virtIO block device.

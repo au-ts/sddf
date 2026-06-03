@@ -7,8 +7,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    zig-overlay.url = "github:mitchellh/zig-overlay";
-    zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
     sdfgen.url = "github:au-ts/microkit_sdf_gen/0.29.0";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
@@ -18,7 +16,6 @@
   outputs =
     {
       nixpkgs,
-      zig-overlay,
       sdfgen,
       systems-ci,
       ...
@@ -44,10 +41,8 @@
           };
 
           llvm = pkgs.llvmPackages_18;
-          zig = zig-overlay.packages.${system}."0.15.1";
 
           pysdfgen = sdfgen.packages.${system}.pysdfgen.override {
-            zig = zig;
             pythonPackages = pkgs.python312Packages;
           };
 
@@ -123,7 +118,6 @@
             };
 
             nativeBuildInputs = with pkgs; [
-              zig
               qemu
               gnumake
               dosfstools

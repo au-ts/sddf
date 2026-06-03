@@ -191,7 +191,7 @@ config from being run in tests.
 EXAMPLES: dict[str, _ExampleMatrixType] = {
    "serial": {
         "configs": ["debug", "release"],
-        "build_systems": ["make", "zig"],
+        "build_systems": ["make"],
         "boards": [
             "maaxboard",
             "qemu_virt_aarch64",

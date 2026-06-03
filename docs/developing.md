@@ -365,11 +365,7 @@ other driver code.
 
 ### Build system
 
-sDDF works with two build systems, GNU Make and Zig.
-
-Make is the primary build-system, if you are unfamiliar with Zig you won't lose
-out on anything. We do however aim to keep both the Makefiles and Zig builds
-capable of building all the parts of sDDF.
+sDDF works with GNU Make.
 
 There is a snippet system for the Makefiles and so each driver will have its own
 `.mk` file for building itself. You can base your driver's snippet on other ones
