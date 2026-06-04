@@ -215,8 +215,8 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
         node = query_same_domain_object_by_name(&object_current, name_segment);
         left_num_segments--;
 
-        sddf_dprintf("  Parent: %s, Name segment: %s\n", object_current.parent->name, name_segment);
-        sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
+        /* sddf_dprintf("  Parent: %s, Name segment: %s\n", object_current.parent->name, name_segment); */
+        /* sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current); */
     } else if (name_type == '\\') {
         // Root Path
         node = &object_root;
@@ -239,10 +239,13 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
         return read_if_name_string(node, left_num_segments);
     }
 
-    if (node != NULL && (node->op_code == NAME_OP || node->op_code == METHOD_OP)) {
-        // TODO: read the actual value?
+    if (node == NULL) {
+        return NULL;
+    }
+
+    if (node->op_code == NAME_OP || node->op_code == METHOD_OP || node->op_code == DEVICE_OP) {
         return node;
-    } else if (node != NULL){
+    } else {
         sddf_dprintf("Object \'%s\' is not \'METHOD\' or \'NAME\', try parsing the following name segment at 0x%lx\n", node->name, (uintptr_t)scanner.current);
         return read_if_name_string(node, 1);
     }
@@ -300,8 +303,29 @@ uint32_t get_integer_data()
             scanner.current--;
             aml_object_t *node = read_if_name_string(&object_root, 1);
             if (node) {
-                sddf_dprintf("Found object with value: %u\n", node->value);
-                return node->value;
+                if (node->op_code == NAME_OP) {
+                    sddf_dprintf("Found object with value: %u\n", node->value);
+                    return node->value;
+                } else if (node->op_code == METHOD_OP) {
+                    // No need to get integer from MethodObject in our case
+                    return 0;
+                } else if (node->op_code == DEVICE_OP) {
+                    // Assume that we want to extract IRQ number
+                    aml_object_t *irq_crs = query_child_object_by_name(node, acpi_str_crs);
+                    if (irq_crs == NULL) {
+                        sddf_dprintf("_CRS of IRQ Name Object \'%s\' is not found\n", node->name);
+                    }
+                    uint8_t *saved_current = scanner.current;
+                    acpi_crs_list_t *crs_list = extract_pcie_crs(irq_crs);
+                    scanner.current = saved_current;
+                    if (crs_list && crs_list->resource_type != EXTENDED_IRQ_DESCRIPTOR) {
+                        sddf_dprintf("No IRQ is extracted\n");
+                        return 0;
+                    }
+
+                    acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
+                    return ext_irq->irq_num;
+                }
             } else {
                 sddf_dprintf("Error: not implemented data type: 0x%x\n", data_len);
             }
@@ -712,28 +736,7 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
         // Parse PIN
         uint32_t element_2 = get_integer_data();
         // Parse Source, i.e. GSI number
-        // @terryb: we assume this is a 4-bytes name segment
-        //   but it's an integer on makatea
-        char irq_node_name[5];
-        read_name_segment(irq_node_name);
-        aml_object_t *irq_node = query_same_domain_object_by_name(node, irq_node_name);
-        if (irq_node == NULL) {
-            sddf_dprintf("IRQ Name Object \'%s\' is not found\n", irq_node_name);
-        }
-        aml_object_t *irq_crs = query_child_object_by_name(irq_node, acpi_str_crs);
-        if (irq_crs == NULL) {
-            sddf_dprintf("_CRS of IRQ Name Object \'%s\' is not found\n", irq_node_name);
-        }
-        uint8_t *saved_current = scanner.current;
-        acpi_crs_list_t *crs_list = extract_pcie_crs(irq_crs);
-        scanner.current = saved_current;
-        if (crs_list && crs_list->resource_type != EXTENDED_IRQ_DESCRIPTOR) {
-            sddf_dprintf("No IRQ is extracted\n");
-            return;
-        }
-
-        acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
-
+        uint32_t element_3 = get_integer_data();
         // Parse Source Index, i.e. index in I/O APIC
         uint32_t element_4 = get_integer_data();
 
@@ -743,9 +746,9 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
         pci_prt->address = element_1;
         pci_prt->pin = element_2;
-        pci_prt->gsi = ext_irq->irq_num;
+        pci_prt->gsi = element_3;
         pci_bridge_resource->num_prt_entries++;
-        /* sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, ext_irq->irq_num, element_4); */
+        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, element_3, element_4);
     }
 }
 
