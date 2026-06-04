@@ -731,24 +731,26 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
         // Check if num of elements is 4
         if (element_num_elements != 4) return;
 
-        // Parse address, i.e. PCI slot
-        uint32_t element_1 = get_integer_data();
-        // Parse PIN
-        uint32_t element_2 = get_integer_data();
-        // Parse Source, i.e. GSI number
-        uint32_t element_3 = get_integer_data();
-        // Parse Source Index, i.e. index in I/O APIC
-        uint32_t element_4 = get_integer_data();
-
-        // TODO: remove this
-        /* element_4 += (element_1 + element_2 + ext_irq->irq_num); */
-        (void)element_4;
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
-        pci_prt->address = element_1;
-        pci_prt->pin = element_2;
-        pci_prt->gsi = element_3;
+        // Parse address, i.e. PCI slot
+        pci_prt->address = get_integer_data();
+        // Parse PIN
+        pci_prt->pin = get_integer_data();
+        // Parse Source, i.e. GSI number
+        uint32_t source = get_integer_data();
+        // Parse Source Index, i.e. index in I/O APIC
+        uint32_t source_index = get_integer_data();
+
+        if (source == 0) {
+            pci_prt->gsi = source_index;
+        } else if (source_index == 0) {
+            pci_prt->gsi = source;
+        } else {
+            sddf_dprintf("Error: there might be multiple interrupts in _CRS, need to fix this case\n");
+        }
+
         pci_bridge_resource->num_prt_entries++;
-        sddf_dprintf("{ 0x%X, 0x%x, 0x%x, 0x%x}\n", element_1, element_2, element_3, element_4);
+        sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
     }
 }
 
