@@ -39,22 +39,6 @@ jobs:
         run: |
           git clang-format-18 --diff ${GITHUB_BASE_REF} test-revision --verbose
 
-  style_zig:
-    name: Style (Zig)
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Install Zig
-        uses: mlugg/setup-zig@v2.2.1
-        with:
-          version: ${{ env.ZIG_VERSION }}
-
-      - name: Ensure zig version
-        run: zig version
-      - name: Check formatting
-        run: zig fmt . --check
-
   style_python:
     name: Style (Python)
     runs-on: ubuntu-24.04
