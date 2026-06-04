@@ -3,8 +3,7 @@
 The active example is **`examples/iperf3_client/`**. It implements an iperf3
 *client* that runs as an sDDF/Microkit application and talks to a standard
 `iperf3 -s` server. It supports **TCP or UDP** selected at compile time
-(`PROTOCOL=tcp|udp`). (`iperf3_udp/` is the older UDP-only version, kept only for
-comparison.)
+(`PROTOCOL=tcp|udp`).
 
 > **Hardware numbers are what matter.** QEMU validates correctness only — its
 > throughput is capped by the single-threaded slirp NIC and its CPU-util / PMU /
