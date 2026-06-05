@@ -91,6 +91,20 @@ aml_object_t *object_exists(aml_object_t *parent, const char *name_segment)
     return NULL;
 }
 
+// Return object pointer if already exists
+aml_object_t *local_object_exists(aml_object_t *parent, uint8_t op_code)
+{
+    if (parent->child == NULL) return false;
+
+    aml_object_t *child = parent->child;
+    while (child) {
+        if (child->op_code == op_code) return child;
+        child = child->next;
+    }
+
+    return NULL;
+}
+
 aml_object_t *insert_child_object(aml_object_t *parent, const char *name_segment, enum aml_encoding_value op_code)
 {
     aml_object_t *new_object = alloc_object();
@@ -157,6 +171,16 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
 
     if (name_type == 0x00) {
         return parent;
+    }
+
+    if (op_code >= LOCAL0_OP && op_code <= LOCAL7_OP) {
+        char name_segment[5]; // Not used for local objects
+        aml_object_t *existing_object = local_object_exists(parent, op_code);
+        if (existing_object) {
+            return existing_object;
+        }
+        sddf_dprintf("Create a type 0x%02X object\n", op_code);
+        return insert_child_object(parent, name_segment, op_code);
     }
 
     if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
@@ -253,19 +277,31 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
     return NULL;
 }
 
-uint32_t get_integer_data();
+uint32_t get_integer_data(bool if_execute_method);
 
-uint32_t aml_eval_add()
+uint32_t aml_alg_eval(uint8_t op)
 {
-    uint32_t operand1 = get_integer_data();
-    uint32_t operand2 = get_integer_data();
+    uint32_t operand1 = get_integer_data(true);
+    uint32_t operand2 = get_integer_data(true);
     advance();
 
-    return operand1 + operand2;
+    sddf_dprintf("operand1: %u, op: 0x%x, operand2: %u\n", operand1, op, operand2);
+    switch (op) {
+        case SHIFT_RIGHT_OP:
+            return operand1 >> operand2;
+        case ADD_OP:
+            return operand1 + operand2;
+        case SUBTRACT_OP:
+            return operand1 - operand2;
+        default: {
+            sddf_dprintf("Error: Algorithmic operator %u is not supported yet\n", op);
+        }
+    }
+    return 0;
 }
 
 // scanner.current needs to be at start of data
-uint32_t get_integer_data()
+uint32_t get_integer_data(bool if_execute_method)
 {
     uint8_t data_len = advance();
 
@@ -288,12 +324,14 @@ uint32_t get_integer_data()
             data |= (advance() << 24);
             return data;
         }
-        case ADD_OP: {
-            return aml_eval_add();
+        case SHIFT_RIGHT_OP:
+        case ADD_OP:
+        case SUBTRACT_OP: {
+            return aml_alg_eval(data_len);
         }
         case LEQUAL_OP: {
-            uint32_t operand_a = get_integer_data();
-            uint32_t operand_b = get_integer_data();
+            uint32_t operand_a = get_integer_data(if_execute_method);
+            uint32_t operand_b = get_integer_data(if_execute_method);
             if (operand_a == operand_b) {
                 return 1;
             }
@@ -308,6 +346,11 @@ uint32_t get_integer_data()
                     return node->value;
                 } else if (node->op_code == METHOD_OP) {
                     // No need to get integer from MethodObject in our case
+                    /* sddf_dprintf("Warning: method is not executed yet\n"); */
+                    if (if_execute_method) {
+                        return (uint32_t)execute_method(node, RET_TYPE_INTEGER, 0);
+                    }
+                    sddf_dprintf("Warning: method is not executed yet\n");
                     return 0;
                 } else if (node->op_code == DEVICE_OP) {
                     // Assume that we want to extract IRQ number
@@ -406,8 +449,8 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
             case OP_REGION_OP: {
                 skip_name_string(); // Name String
                 advance();          // 1 byte for Region Space ID
-                get_integer_data(); // Region offset
-                get_integer_data(); // Region length
+                get_integer_data(false); // Region offset
+                get_integer_data(false); // Region length
 
                 next_obj_start = scanner.current;
                 break;
@@ -418,7 +461,7 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
             }
             case CREATE_WORD_FIELD_OP:
             case CREATE_DWORD_FIELD_OP: {
-                get_integer_data();
+                get_integer_data(false);
                 advance(); // 1 byte for ByteIndex
                 skip_name_string();
 
@@ -573,6 +616,36 @@ bool execute_term_list()
     return false;
 }
 
+void buffer_copy(uint8_t *dst_buf, uint32_t dst_buf_size, aml_object_t *src_node)
+{
+    scanner.current = src_node->start;
+    uint8_t op = advance();
+    if (op != NAME_OP) {
+        sddf_dprintf("Error: source buffer node is not a Name Object\n");
+        return;
+    }
+
+    skip_name_string();
+    uint8_t data_type = advance();
+    sddf_dprintf("data type: 0x%x\n", data_type);
+    if (data_type != DATA_OBJ_BUFFER) {
+        sddf_dprintf("Error: source buffer node does not contain Buffer-type data\n");
+        return;
+    }
+
+    get_pkt_end();
+    uint32_t buffer_size = get_integer_data(true);
+
+    if (buffer_size > dst_buf_size) {
+        sddf_dprintf("Error: no sufficient memory in destination buffer - %u > %u\n", buffer_size, dst_buf_size);
+        return;
+    }
+
+    for (int i = 0; i < buffer_size; i++) {
+        dst_buf[i] = advance();
+    }
+}
+
 uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0)
 {
     if (node->op_code != METHOD_OP) {
@@ -586,9 +659,12 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
     advance();
     uint8_t *pkt_end = get_pkt_end();
     skip_name_string();
-    uint8_t method_flags = advance(); // Get MethodFlags
+    advance(); // Get MethodFlags
 
     object_current.parent = node;
+
+    bool if_condition = false; // Assume that there is only one layer of condition statements
+    uint8_t buffer[1024];
 
     uint8_t byte = advance();
     sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)pkt_end);
@@ -596,71 +672,86 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
         switch (byte) {
             case IF_OP: {
                 sddf_dprintf("Found IF_OP\n");
-                get_pkt_end();
+                uint8_t *pkt_end = get_pkt_end();
+                uint32_t predicate = get_integer_data(true);
+                if_condition = true;
 
-                uint32_t predicate = get_integer_data();
-                uintptr_t ret_val = 0;
-                if (execute_term_list()) {
-                    if (ret_type == RET_TYPE_INTEGER) {
-                        uint32_t ret_value = get_integer_data();
-                        sddf_dprintf("Found return value %u\n", ret_value);
-                        ret_val = (uintptr_t)ret_value;
-                    } else if (ret_type == RET_TYPE_OBJECT) {
-                        aml_object_t *node = read_if_name_string(&object_root, 1);
-                        if (node) {
-                            sddf_dprintf("Found return object at 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
-                            ret_val = (uintptr_t)node;
-                        } else {
-                            sddf_dprintf("Error: no object returned\n");
-                        }
-                    }
-
-                    if (predicate) {
-                        return ret_val;
-                    }
+                if (predicate == 0) {
+                    scanner.current = pkt_end;
+                    if_condition = false;
                 }
                 break;
             }
             case ELSE_OP: {
                 sddf_dprintf("Found ELSE_OP\n");
-                get_pkt_end();
+                uint8_t *pkt_end = get_pkt_end();
 
-                if (execute_term_list()) {
-                    if (ret_type == RET_TYPE_INTEGER) {
-                        uint32_t ret_value = get_integer_data();
-                        sddf_dprintf("Found return value %u\n", ret_value);
-                        return (uintptr_t)ret_value;
-                    } else if (ret_type == RET_TYPE_OBJECT) {
-                        aml_object_t *node = read_if_name_string(&object_root, 1);
-                        if (node) {
-                            /* scanner.current = node->start; */
-                            sddf_dprintf("Found return object at 0x%lx\n", (uintptr_t)node);
-                            return (uintptr_t)node;
-                        } else {
-                            sddf_dprintf("Error: no object returned\n");
-                            return 0;
-                        }
-                    }
+                if (if_condition) {
+                    scanner.current = pkt_end;
                 }
-
                 break;
             }
             case STORE_OP: {
-                // Assume there is only one term arg
+                sddf_dprintf("StoreOp\n");
+                // Assume there is only one argument
                 uint32_t term_arg = advance();
                 if (term_arg == ARG0_OP) {
                     term_arg = argv_0;
                 } else {
                     scanner.current--;
-                    term_arg = get_integer_data();
+                    term_arg = get_integer_data(true);
                 }
-                aml_object_t *node = read_if_name_string(&object_root, 1);
-                if (node) {
-                    sddf_dprintf("Found SuperName object: %s\n", node->name);
-                    node->value = term_arg;
+
+                uint8_t byte = advance();
+                aml_object_t *supername_node;
+                sddf_dprintf("byte: 0x%x\n", byte);
+                if (byte >= LOCAL0_OP && byte <= LOCAL7_OP) {
+                    sddf_dprintf("StoreOp: local0 = 0x%x\n", term_arg);
+                    supername_node = make_object_if_not_exist(node, byte);
                 } else {
-                    sddf_dprintf("SuperName is not found\n");
+                    scanner.current--;
+                    supername_node = read_if_name_string(&object_root, 1);
                 }
+
+                if (supername_node) {
+                    sddf_dprintf("Found SuperName object: %s\n", supername_node->name);
+                    supername_node->value = term_arg;
+                } else {
+                    sddf_dprintf("Warning: SuperName is not found, skip this StoreOp\n");
+                }
+                break;
+            }
+            case RETURN_OP: {
+                if (ret_type == RET_TYPE_INTEGER) {
+                    uint32_t ret_val = get_integer_data(true);
+                    sddf_dprintf("Found return value %u\n", ret_val);
+                    return (uintptr_t)ret_val;
+                } else if (ret_type == RET_TYPE_OBJECT) {
+                    aml_object_t *node = read_if_name_string(&object_root, 1);
+                    if (node) {
+                        sddf_dprintf("Found return object at 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
+                        return (uintptr_t)node;
+                    } else {
+                        sddf_dprintf("Error: no object returned\n");
+                        return 0;
+                    }
+                }
+
+                return 0;
+            }
+            case CREATE_WORD_FIELD_OP: {
+                aml_object_t *source_buffer = read_if_name_string(node, 1);
+                sddf_dprintf("source buffer: %s\n", source_buffer->name);
+                uint32_t byte_index = get_integer_data(true);
+                sddf_dprintf("byte index: 0x%x\n", byte_index);
+                aml_object_t *var_obj = make_object_if_not_exist(node, NAME_OP);
+                var_obj->value = byte_index;
+
+                uint8_t *save_location = scanner.current;
+                // TODO: no way to copy it everytime
+                buffer_copy(buffer, 1024, source_buffer);
+                scanner.current = save_location;
+
                 break;
             }
             default: {
@@ -677,29 +768,42 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
 // Section 6.4
 acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
 {
-    scanner.current = node->start + 1; // First byte for NAME_OP
-    skip_name_string();
+    scanner.current = node->start; // First byte for NAME_OP
+    uint8_t op = advance();
+    if (op == NAME_OP) {
+        skip_name_string();
 
-    get_data_end();
-    uint8_t *buffer_start = scanner.current;
-    uint32_t buffer_size = get_integer_data();
-    uint8_t *buffer_end = buffer_start + buffer_size;
-    acpi_crs_list_t *crs_list = NULL;
+        get_data_end();
+        uint8_t *buffer_start = scanner.current;
+        uint32_t buffer_size = get_integer_data(true);
+        uint8_t *buffer_end = buffer_start + buffer_size;
+        acpi_crs_list_t *crs_list = NULL;
 
-    while (scanner.current < buffer_end) {
-        uint32_t descriptor_type = scanner.current[0];
-        uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
+        while (scanner.current < buffer_end) {
+            uint32_t descriptor_type = scanner.current[0];
+            uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
 
-        acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
-        new_entry->resource_type = descriptor_type;
-        new_entry->data_addr = (uintptr_t)scanner.current;
-        new_entry->next = crs_list;
-        crs_list = new_entry;
+            acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
+            new_entry->resource_type = descriptor_type;
+            new_entry->data_addr = (uintptr_t)scanner.current;
+            new_entry->next = crs_list;
+            crs_list = new_entry;
 
-        scanner.current += descriptor_len;
+            scanner.current += descriptor_len;
+        }
+
+        return crs_list;
+    } else if (op == METHOD_OP) {
+        execute_method(node, RET_TYPE_NONE, 0);
+        /* get_pkt_end(); */
+        /* skip_name_string(); */
+        /* advance(); // MethodFlags */
+
+        /* uint8_t byte = advance(); */
+        /* sddf_dprintf("Byte: 0x%x, current: 0x%lx\n", byte, (uintptr_t)scanner.current); */
     }
 
-    return crs_list;
+    return NULL;
 }
 
 void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
@@ -733,13 +837,13 @@ void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
 
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
         // Parse address, i.e. PCI slot
-        pci_prt->address = get_integer_data();
+        pci_prt->address = get_integer_data(true);
         // Parse PIN
-        pci_prt->pin = get_integer_data();
+        pci_prt->pin = get_integer_data(true);
         // Parse Source, i.e. GSI number
-        uint32_t source = get_integer_data();
+        uint32_t source = get_integer_data(true);
         // Parse Source Index, i.e. index in I/O APIC
-        uint32_t source_index = get_integer_data();
+        uint32_t source_index = get_integer_data(true);
 
         if (source == 0) {
             pci_prt->gsi = source_index;
