@@ -31,13 +31,9 @@ def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     return shutil.copyfile(source_elf, new_elf)
 
 
-# Assumes elf string has ".elf" suffix, and ".data" to data string
-def update_elf_section(
-    elf_name: str, section_name: str, data_name: str, data_number=None
-):
+# Assumes elf string has ".elf" suffix, adds ".data" to data string
+def update_elf_section(elf_name: str, section_name: str, data_name: str):
     assert os.path.isfile(elf_name)
-    if data_number != None:
-        data_name += str(data_number)
     data_name += ".data"
     assert os.path.isfile(data_name)
     assert (
