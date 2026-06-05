@@ -31,6 +31,24 @@ def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     return shutil.copyfile(source_elf, new_elf)
 
 
+# Assumes elf string has ".elf" suffix, adds ".data" to data string
+def update_elf_section(elf_name: str, section_name: str, data_name: str):
+    assert os.path.isfile(elf_name)
+    data_name += ".data"
+    assert os.path.isfile(data_name)
+    assert (
+        subprocess.run(
+            [
+                obj_copy,
+                "--update-section",
+                "." + section_name + "=" + data_name,
+                elf_name,
+            ]
+        ).returncode
+        == 0
+    )
+
+
 def generate(
     sdf_file: str,
     output_dir: str,
@@ -47,7 +65,7 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=102)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     if board.arch == SystemDescription.Arch.X86_64:
@@ -89,6 +107,13 @@ def generate(
         )
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
+    elif board.name == "rpi4b_1gb":
+        # Ethernet driver requires timer access to wait for reconfiguration
+        timer_system.add_client(ethernet_driver)
+
+        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000)
+        sdf.add_mr(mbox)
+        ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
     if board.arch == SystemDescription.Arch.X86_64:
         hw_net_rings = SystemDescription.MemoryRegion(
@@ -228,6 +253,11 @@ def generate(
     assert client3_lib_sddf_lwip.connect()
     assert client3_lib_sddf_lwip.serialise_config(output_dir)
 
+    if board.name == "rpi4b_1gb":
+        update_elf_section(
+            "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
+        )
+
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
 
@@ -239,8 +269,12 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--objcopy", required=True)
 
     args = parser.parse_args()
+
+    global obj_copy
+    obj_copy = args.objcopy
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
