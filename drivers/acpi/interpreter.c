@@ -287,8 +287,6 @@ uint32_t aml_alg_eval(uint8_t op)
 
     sddf_dprintf("operand1: %u, op: 0x%x, operand2: %u\n", operand1, op, operand2);
     switch (op) {
-        case SHIFT_RIGHT_OP:
-            return operand1 >> operand2;
         case ADD_OP:
             return operand1 + operand2;
         case SUBTRACT_OP:
@@ -324,7 +322,6 @@ uint32_t get_integer_data(bool if_execute_method)
             data |= (advance() << 24);
             return data;
         }
-        case SHIFT_RIGHT_OP:
         case ADD_OP:
         case SUBTRACT_OP: {
             return aml_alg_eval(data_len);
@@ -342,7 +339,8 @@ uint32_t get_integer_data(bool if_execute_method)
             aml_object_t *node = read_if_name_string(&object_root, 1);
             if (node) {
                 if (node->op_code == NAME_OP) {
-                    sddf_dprintf("Found object with value: %u\n", node->value);
+                    node->value = get_integer_data(false);
+                    sddf_dprintf("Found object \'%s\' with value: %u\n", node->name, node->value);
                     return node->value;
                 } else if (node->op_code == METHOD_OP) {
                     // No need to get integer from MethodObject in our case
@@ -697,13 +695,15 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
                 uint32_t term_arg = advance();
                 if (term_arg == ARG0_OP) {
                     term_arg = argv_0;
+                    sddf_dprintf("term_arg = argv_0: %u\n", argv_0);
                 } else {
                     scanner.current--;
                     term_arg = get_integer_data(true);
+                    sddf_dprintf("term_arg = %u\n", term_arg);
                 }
 
                 uint8_t byte = advance();
-                aml_object_t *supername_node;
+                aml_object_t *supername_node = NULL;
                 sddf_dprintf("byte: 0x%x\n", byte);
                 if (byte >= LOCAL0_OP && byte <= LOCAL7_OP) {
                     sddf_dprintf("StoreOp: local0 = 0x%x\n", term_arg);
@@ -719,6 +719,32 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
                 } else {
                     sddf_dprintf("Warning: SuperName is not found, skip this StoreOp\n");
                 }
+                break;
+            }
+            case SHIFT_RIGHT_OP: {
+                sddf_dprintf("ShiftRightOp\n");
+                uint32_t operand = get_integer_data(true);
+                sddf_dprintf("operand: %u\n", operand);
+                uint32_t shift_count = get_integer_data(true);
+                sddf_dprintf("shift_count: %u\n", shift_count);
+                uint8_t byte = advance();
+                aml_object_t *supername_node = NULL;
+                sddf_dprintf("byte: 0x%x\n", byte);
+                if (byte >= LOCAL0_OP && byte <= LOCAL7_OP) {
+                    sddf_dprintf("ShiftRightOp: local0 = 0x%x >> 0x%x\n", operand, shift_count);
+                    supername_node = make_object_if_not_exist(node, byte);
+                } else {
+                    scanner.current--;
+                    supername_node = read_if_name_string(&object_root, 1);
+                }
+
+                if (supername_node) {
+                    sddf_dprintf("Found SuperName object: %s\n", supername_node->name);
+                    supername_node->value = operand >> shift_count;
+                } else {
+                    sddf_dprintf("Warning: SuperName is not found, skip this StoreOp\n");
+                }
+
                 break;
             }
             case RETURN_OP: {
