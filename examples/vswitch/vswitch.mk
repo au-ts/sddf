@@ -91,11 +91,11 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
 else
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE)
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
