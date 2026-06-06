@@ -174,8 +174,7 @@ Built image: **`build/loader.img`**.
 | `two_core` | client0+timer c0; eth+virt_tx c1 | `smp-benchmark` | 1 | 5202 |
 | `four_core` | virt_rx+timer c0; eth+virt_tx c1; client0+copier c2; client1+copier c3 | `smp-benchmark` | 2 | 5202 **and** 5203 |
 
-**N clients need N servers** - client *i* targets port `5202+i`. 
-```
+**N clients need N servers** - client *i* targets port `5202+i`.
 
 ### Rebuild rules (flag changes don't always recompile)
 
@@ -187,51 +186,106 @@ Built image: **`build/loader.img`**.
 
 ---
 
-## Running on SSH boards (the machine queue)
+## Running a test on the hardware (the machine queue)
 
-Because the client now waits for a typed `start` command, the headless
-`mq.sh run ... -c 'MQ_EXIT'` flow (which only *reads* the console) is no longer
-enough — you must **drive the serial console**. `mq.sh`'s keep-alive flag `-a`
-puts the console into interactive mode (it forwards your stdin to the board's
-UART) once a completion regex matches. Match on the flushed `Ready` line (the
-`iperf3>` prompt is emitted unbuffered + per-char colour-wrapped, so it is not a
-greppable contiguous string), then send the `start` command.
+### The three machines (who's who)
 
-### Build, copy, run one test
+| machine | role | how you reach it |
+|---|---|---|
+| **vb01** | runs the `iperf3 -s` server(s); the board reaches it at **172.16.0.101** | `ssh vb01` |
+| **tftp.keg.cse.unsw.edu.au** | the machine-queue host — `mq.sh` runs *here*, the board netboots its image from *here*, and this is where you upload `loader.img` | `ssh lukez@tftp.keg.cse.unsw.edu.au` |
+| **odroidc4_1** | the board under test — `mq.sh` power-cycles it, netboots the image, and bridges its serial console back to you | (via `mq.sh`, not directly) |
+
+Key point: the client waits for a typed `start`, so the old headless
+`mq.sh run ... -c 'MQ_EXIT'` (read-only console) can't drive it. You boot with
+`mq.sh run -a` (keep-alive), which **forwards your stdin to the board's UART**
+once the `-c` regex matches — then you type/pipe the `start` command.
+
+### Step 1 — start the server(s) on vb01
+
+One `iperf3 -s -p P` serves both TCP and UDP tests on that port. N clients need N
+servers on consecutive ports (`5202`, `5203`, …).
+
+```sh
+ssh vb01 'setsid sh -c "iperf3 -s -p 5202 --json --forceflush >/tmp/iperf3_5202.log 2>&1 </dev/null" &'
+# four_core also needs :5203
+ssh vb01 'ss -tlnp | grep :5202'    # confirm it is LISTENing
+```
+
+### Step 2 — build the image (on your machine)
 
 ```sh
 cd examples/iperf3_client
-
-# single-core TCP image (no SERVER_IP needed — it's a runtime arg now)
-make MICROKIT_BOARD=odroidc4 MICROKIT_SDK=/Users/lululululluke/sddf/microkit-sdk-2.1.0 \
-     MICROKIT_CONFIG=benchmark PROTOCOL=tcp SMP_CONFIG=core_config/single_core.json
-
-scp build/loader.img lukez@tftp.keg.cse.unsw.edu.au:~/luke_iperf.img
-
-# Boot interactively; when the 'Ready' line appears, type:  start 172.16.0.101 5202 10 1 0
-ssh -tt tftp.keg.cse.unsw.edu.au \
-  "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 200"
+make MICROKIT_BOARD=odroidc4 MICROKIT_SDK=/path/to/microkit-sdk-2.1.0 \
+     MICROKIT_CONFIG=benchmark SMP_CONFIG=core_config/single_core.json
+# -> build/loader.img   (no SERVER_IP / PROTOCOL needed — both are runtime now)
 ```
 
-To script it, pipe the command in (it gets forwarded when interact starts, right
-after the `Ready` line), watch the log for `MQ_EXIT`, then `kill` the run to
-release the board lock:
+### Step 3 — upload the image to the tftp host
+
+`mq.sh` netboots from the tftp host, so the image must live there. Put it in your
+**home dir** — the tftp host wipes `/tmp`.
 
 ```sh
+scp build/loader.img lukez@tftp.keg.cse.unsw.edu.au:luke_iperf.img
+```
+
+### Step 4 — boot and drive the console
+
+**Interactive** (you watch and type). Match the completion regex on the flushed
+`Ready` line — the `iperf3>` prompt is emitted per-char colour-wrapped and isn't a
+greppable contiguous string:
+
+```sh
+ssh -tt lukez@tftp.keg.cse.unsw.edu.au \
+  "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 250"
+# wait for:  Ready. Type 'start [tcp|udp] <server_ip> [opts]' ...
+# then type: start tcp 172.16.0.101 5202 10 1 0
+```
+
+**Scripted** (pipe the command in — it's forwarded the moment interact starts,
+right after the `Ready` line — capture the console, stop on `MQ_EXIT`):
+
+```sh
+: > /tmp/hw.log
 ( until grep -aq 'run an iperf3' /tmp/hw.log; do sleep 2; done
-  sleep 3; printf 'start 172.16.0.101 5202 10 1 0\r'; sleep 200 ) \
-| ssh -tt tftp.keg.cse.unsw.edu.au \
-    "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 200" \
+  sleep 3; printf 'start tcp 172.16.0.101 5202 10 1 0\r'
+  until grep -aq MQ_EXIT /tmp/hw.log; do sleep 2; done; sleep 3 ) \
+| ssh -tt lukez@tftp.keg.cse.unsw.edu.au \
+    "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 250" \
     >/tmp/hw.log 2>&1
 ```
 
-For a four-core TCP run: `make clean` first, then
-`MICROKIT_CONFIG=smp-benchmark PROTOCOL=tcp SMP_CONFIG=core_config/four_core.json`,
-make sure both servers (5202 and 5203) are up, and type one `start` on client0 —
-client1 runs the same params automatically.
+To sweep, just send more `start` lines on the same boot (wait for each `MQ_EXIT`):
+`start udp 172.16.0.101 5202 5 1 200`, `start tcp 172.16.0.101 5202 10 4 1000`, …
 
-For TCP, throughput is `end.sum_received.bits_per_second` (no loss/jitter);
-RTT/packets come from the board's `[rtt]` / `[pkts]` serial lines.
+### Step 5 — read the results
+
+- **board serial** (in `/tmp/hw.log`): `[cpu_util]`, `[rtt]`, `[pkts]`, `MQ_EXIT`.
+- **server throughput**: `ssh vb01 cat /tmp/iperf3_5202.log` → parse
+  `end.sum_received.bits_per_second` (UDP also has `jitter_ms` / `lost_percent`).
+
+### four_core (two concurrent clients)
+
+```sh
+make clean MICROKIT_BOARD=odroidc4 MICROKIT_SDK=/path/...
+make  MICROKIT_BOARD=odroidc4 MICROKIT_SDK=/path/... \
+      MICROKIT_CONFIG=smp-benchmark SMP_CONFIG=core_config/four_core.json
+```
+Start servers on **5202 and 5203**, then type **one** `start` on client0 — client1
+runs the same params against `base_port + 1` automatically.
+
+### Gotchas (learned running these)
+
+- **Free the board lock if a run is interrupted.** Killing the interactive run
+  doesn't always release it; a later run then says *"lock held by lukez"*. Free it:
+  `ssh lukez@tftp... "cd ~/machine_queue && ./mq.sh sem -signal odroidc4_1"`
+  (check with `./mq.sh sem -info odroidc4_1`).
+- **Match `run an iperf3`, not `iperf3>`** — the prompt isn't a contiguous string.
+- **Upload to your home dir, not `/tmp`** — the tftp host cleans `/tmp` between runs.
+- **Boot PHY timeouts auto-retry** (`N tries remaining…`) — harmless, just wait.
+- The old `bench.sh` uses the read-only `-c 'MQ_EXIT'` flow and **won't drive** the
+  runtime client; use the `-a` interactive flow above instead.
 
 ### Verified hardware result (odroidc4, single_core, TCP)
 
