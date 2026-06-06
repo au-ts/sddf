@@ -13,9 +13,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
-#ifdef IPERF3_UDP
 #include <lwip/udp.h>
-#endif
 
 #include "iperf3_ctrl.h"
 
@@ -28,9 +26,7 @@
 #define DISPLAY_RESULTS  14
 #define IPERF_DONE       16
 
-#ifdef IPERF3_UDP
 #define UDP_CONNECT_MSG 0x36373839
-#endif
 
 extern timer_client_config_t timer_config;
 
@@ -93,11 +89,8 @@ void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     ctrl->num_streams = 1;
     ctrl->target_bw_mbps = 0;
     ctrl->payload_len = 1460;
-#ifdef IPERF3_UDP
-    ctrl->duration_s = 5;
-#else
+    ctrl->is_udp = false;
     ctrl->duration_s = 10;
-#endif
     ctrl->omit_s = 5;
     for (int i = 0; i < MAX_STREAMS; i++) {
         ctrl->streams[i].pcb = NULL;
@@ -153,29 +146,29 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                      * parameters supplied by the serial `start` command. The
                      * "%u000000" prints the bitrate in bits/sec (Mbps * 1e6). */
                     char *json = ctrl->param_json;
-#ifdef IPERF3_UDP
-                    if (ctrl->target_bw_mbps) {
-                        sddf_snprintf(json, sizeof(ctrl->param_json),
-                            "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u,\"bitrate\":%u000000}",
-                            ctrl->duration_s, ctrl->num_streams, ctrl->payload_len,
-                            ctrl->target_bw_mbps);
+                    if (ctrl->is_udp) {
+                        if (ctrl->target_bw_mbps) {
+                            sddf_snprintf(json, sizeof(ctrl->param_json),
+                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u,\"bitrate\":%u000000}",
+                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len,
+                                ctrl->target_bw_mbps);
+                        } else {
+                            sddf_snprintf(json, sizeof(ctrl->param_json),
+                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u}",
+                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len);
+                        }
                     } else {
-                        sddf_snprintf(json, sizeof(ctrl->param_json),
-                            "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u}",
-                            ctrl->duration_s, ctrl->num_streams, ctrl->payload_len);
+                        if (ctrl->target_bw_mbps) {
+                            sddf_snprintf(json, sizeof(ctrl->param_json),
+                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"bitrate\":%u000000}",
+                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
+                                ctrl->target_bw_mbps);
+                        } else {
+                            sddf_snprintf(json, sizeof(ctrl->param_json),
+                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u}",
+                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams);
+                        }
                     }
-#else /* IPERF3_TCP */
-                    if (ctrl->target_bw_mbps) {
-                        sddf_snprintf(json, sizeof(ctrl->param_json),
-                            "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"bitrate\":%u000000}",
-                            ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
-                            ctrl->target_bw_mbps);
-                    } else {
-                        sddf_snprintf(json, sizeof(ctrl->param_json),
-                            "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u}",
-                            ctrl->duration_s, ctrl->omit_s, ctrl->num_streams);
-                    }
-#endif
                     ctrl->duration_ms = ctrl->duration_s * 1000;
                     ctrl->omit_ms = ctrl->omit_s * 1000;
                     uint32_t json_length = strlen(json);
@@ -192,7 +185,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
 
                 } else if (st == CREATE_STREAMS) {
                     /* ctrl->num_streams was set by the serial `start` command. */
-#ifdef IPERF3_UDP
+                  if (ctrl->is_udp) {
                     for (int s = 0; s < ctrl->num_streams; s++) {
                         iperf3_udp_stream_t *udp_stream = &ctrl->udp_streams[s];
                         udp_stream->pcb = udp_new();
@@ -221,7 +214,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         sddf_printf("udp cookie send stream=%d err=%d\n", s, serr);
                         pbuf_free(pb);
                     }
-#else /* IPERF3_TCP */
+                  } else {
                     for (int s = 0; s < ctrl->num_streams; s++) {
                         struct tcp_pcb *stream_pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
                         if (stream_pcb == NULL) {
@@ -247,7 +240,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                             continue;
                         }
                     }
-#endif
+                  }
 
                 } else if (st == TEST_START) {
                     ctrl->omit_end_ms = (sddf_timer_time_now(timer_config.driver_id) / 1000000) + ctrl->omit_ms;
@@ -257,7 +250,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                     for (int k = 0; k < PAYLOAD_SIZE; k++) {
                         ctrl->payload[k] = (uint8_t)(k & 0xFF);
                     }
-#ifdef IPERF3_UDP
+                  if (ctrl->is_udp) {
                     for (int s = 0; s < MAX_STREAMS; s++) {
                         iperf3_udp_stream_t *stream = &ctrl->udp_streams[s];
                         if (stream->pcb == NULL) continue;
@@ -275,7 +268,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         stream->payload_len = ctrl->payload_len;
                         stream->ctrl = ctrl;
                     }
-#else /* IPERF3_TCP */
+                  } else {
                     for (int s = 0; s < MAX_STREAMS; s++) {
                         iperf3_stream_t *stream = &ctrl->streams[s];
                         if (stream->pcb == NULL) break;
@@ -291,14 +284,14 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                             : 0;
                         iperf3_stream_maybe_tx(stream);
                     }
-#endif
+                  }
 
                 } else if (st == TEST_RUNNING) {
                     /* nothing */
 
                 } else if (st == EXCHANGE_RESULTS) {
                     ctrl->rx_phase = CTRL_WAIT_JSON_LEN;
-#ifdef IPERF3_UDP
+                  if (ctrl->is_udp) {
                     /* UDP: send stub results JSON */
                     const char *json =
                         "{\"cpu_util_total\":0.00,\"cpu_util_user\":0.00,"
@@ -320,7 +313,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                     ctrl->tx_len = json_length;
                     ctrl->tx_off = 0;
                     iperf3_ctrl_maybe_tx(ctrl);
-#else /* IPERF3_TCP */
+                  } else {
                     uint64_t total_bytes = 0;
                     for (int s = 0; s < ctrl->num_streams; s++) {
                         total_bytes += ctrl->streams[s].bytes;
@@ -353,7 +346,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                     ctrl->tx_len = json_length;
                     ctrl->tx_off = 0;
                     iperf3_ctrl_maybe_tx(ctrl);
-#endif
+                  }
                 } else if (st == DISPLAY_RESULTS) {
                     sddf_printf("[iperf3] BENCHMARK_COMPLETE\n");
                     iperf_set_send_state(ctrl, IPERF_DONE);
@@ -413,7 +406,9 @@ static void iperf_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
         ctrl->omitting = false;
 }
 
-#ifdef IPERF3_UDP
+/* UDP data path: pump datagrams each tick and, past the deadline, tear down the
+ * UDP streams and send TEST_END. Called (for UDP tests only) from the timer /
+ * net_tx branches in iperf3_client.c notified(). */
 void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
     iperf_timer_tick(ctrl, now_ms);
 
@@ -440,12 +435,14 @@ void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
         iperf_set_send_state(ctrl, TEST_END);
     }
 }
-#else /* IPERF3_TCP */
-/* Evaluate the test-duration deadline and, once past it, stop the streams and
- * send TEST_END. Called both from lwIP's poll callback (when the timer works,
- * e.g. single-core) and from the data path in notified() (the only thing that
- * runs on a client placed on a non-timer core — see iperf3_client.c). */
+
+/* TCP data path: evaluate the test-duration deadline and, once past it, stop the
+ * streams and send TEST_END. Called both from lwIP's poll callback (when the
+ * timer works, e.g. single-core) and from the data path in notified() (the only
+ * thing that runs on a client placed on a non-timer core — see iperf3_client.c).
+ * No-op for UDP tests (their termination is in iperf3_on_timer_tick). */
 void iperf3_tcp_check_deadline(iperf_ctrl_t *ctrl, uint32_t now_ms) {
+    if (ctrl->is_udp) return;
     iperf_timer_tick(ctrl, now_ms);
     if (ctrl->test_done && !ctrl->sent_test_end) {
         for (int i = 0; i < MAX_STREAMS; i++) {
@@ -464,7 +461,6 @@ static err_t iperf_poll(void *arg, struct tcp_pcb *tpcb) {
     iperf3_tcp_check_deadline(ctrl, now);
     return ERR_OK;
 }
-#endif
 
 err_t iperf_ctrl_connect(void *arg, struct tcp_pcb *pcb, err_t err) {
     iperf_ctrl_t *ctrl = arg;
@@ -476,9 +472,8 @@ err_t iperf_ctrl_connect(void *arg, struct tcp_pcb *pcb, err_t err) {
     tcp_recv(pcb, iperf_ctrl_recv);
     tcp_sent(pcb, iperf_ctrl_sent);
     tcp_err(pcb, iperf3_ctrl_err);
-#ifndef IPERF3_UDP
+    /* Drives the TCP deadline check; iperf3_tcp_check_deadline no-ops for UDP. */
     tcp_poll(pcb, iperf_poll, 1);
-#endif
 
     ctrl->tx_buf = (const int8_t *)ctrl->cookie;
     ctrl->tx_len = IPERF3_COOKIE_LEN;

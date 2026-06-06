@@ -43,7 +43,8 @@ typedef struct iperf3_shared_params {
     uint32_t generation;     /* bumped by controller per new test */
     uint8_t  server_ip[4];   /* server IPv4 */
     uint16_t base_port;      /* client i targets base_port + i */
-    uint16_t _pad;
+    uint8_t  is_udp;         /* protocol for this test (0 = TCP, 1 = UDP) */
+    uint8_t  _pad;
     uint32_t duration_s;
     uint32_t num_streams;
     uint32_t bw_mbps;        /* 0 = unlimited */

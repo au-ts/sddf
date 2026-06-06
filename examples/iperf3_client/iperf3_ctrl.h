@@ -69,6 +69,7 @@ typedef struct iperf_ctrl {
      * control connection is opened (see iperf3_begin_test in iperf3_client.c).
      * These drive the param-exchange JSON and the per-stream rate limiting,
      * replacing the old compile-time NUM_STREAMS / TARGET_BW_MBPS macros. */
+    bool is_udp;             /* protocol for THIS test (runtime, from `start`) */
     uint32_t duration_s;     /* test duration in seconds */
     uint32_t omit_s;         /* warm-up (omit) seconds, excluded from results */
     uint32_t target_bw_mbps; /* per-test rate target, 0 = unlimited */

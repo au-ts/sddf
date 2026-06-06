@@ -80,13 +80,16 @@ static void make_cookie(uint8_t *cookie) {
 
 static bool netif_ready = false;
 
-#ifdef IPERF3_UDP
-#define PROTO_STR "UDP"
-#define DEFAULT_DURATION_S 5
+/* Protocol is chosen per-test at runtime (the `start [tcp|udp] ...` command).
+ * The build's PROTOCOL= only sets the default when the token is omitted. */
+#ifdef IPERF3_DEFAULT_UDP
+#define DEFAULT_IS_UDP true
 #else
-#define PROTO_STR "TCP"
-#define DEFAULT_DURATION_S 10
+#define DEFAULT_IS_UDP false
 #endif
+
+static const char *proto_str(bool is_udp) { return is_udp ? "UDP" : "TCP"; }
+static uint32_t default_duration_s(bool is_udp) { return is_udp ? 5 : 10; }
 
 /* Emit a string with sddf_putchar_unbuffered so it is flushed immediately.
  * sddf_printf is line-buffered (flushes only on '\n'), so a prompt with no
@@ -109,7 +112,7 @@ static void print_prompt(void)
 static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
                               uint16_t port, uint32_t duration_s,
                               uint8_t num_streams, uint32_t bw_mbps,
-                              uint16_t payload_len)
+                              uint16_t payload_len, bool is_udp)
 {
     if (!netif_ready) {
         sddf_printf("network is not up yet — wait for the DHCP message\n");
@@ -136,15 +139,12 @@ static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
 
     iperf3_ctrl_init(&ctrl);
     ctrl.server_port = port;
+    ctrl.is_udp = is_udp;
     ctrl.duration_s = duration_s;
     ctrl.num_streams = num_streams;
     ctrl.target_bw_mbps = bw_mbps;
     ctrl.payload_len = payload_len;
-#ifdef IPERF3_UDP
-    ctrl.omit_s = 0;
-#else
-    ctrl.omit_s = 5;
-#endif
+    ctrl.omit_s = is_udp ? 0 : 5;
 
     /* Allow a fresh CPU-util / packet-count measurement for each run. */
     bench_snapshotted = bench_reported = false;
@@ -154,7 +154,7 @@ static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
     make_cookie(ctrl.cookie);
 
     sddf_printf("Starting iperf3 (%s) -> %u.%u.%u.%u:%u  dur=%us streams=%u bw=%uM len=%u\n",
-                PROTO_STR, a, b, c, d, port, duration_s, num_streams, bw_mbps, payload_len);
+                proto_str(is_udp), a, b, c, d, port, duration_s, num_streams, bw_mbps, payload_len);
 
     error = tcp_connect(pcb, &server_addr, port, iperf_ctrl_connect);
     if (error) {
@@ -214,17 +214,18 @@ static void print_help(void)
 {
     sddf_printf(
         "commands:\n"
-        "  start <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n"
-        "        run a %s test against <ip>. optional args (left to right):\n"
-        "          port      iperf3 server port           (default 5202)\n"
-        "          dur_s     test duration in seconds      (default %u)\n"
-        "          streams   parallel streams (1..%u)      (default 1)\n"
-        "          bw_mbps   rate target, 0 = unlimited    (default 0)\n"
-        "          len       UDP payload bytes             (default 1460)\n"
+        "  start [tcp|udp] <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n"
+        "        run a test against <ip>. optional args (left to right):\n"
+        "          tcp|udp   protocol                      (default %s)\n"
+        "          port      iperf3 server port            (default 5202)\n"
+        "          dur_s     test duration in seconds       (default 10 tcp / 5 udp)\n"
+        "          streams   parallel streams (1..%u)       (default 1)\n"
+        "          bw_mbps   rate target, 0 = unlimited     (default 0)\n"
+        "          len       UDP payload bytes              (default 1460, udp only)\n"
         "  status   show whether a test is running\n"
         "  help     show this message\n"
-        "example: start 172.16.0.101 5202 10 4 1000\n",
-        PROTO_STR, (unsigned)DEFAULT_DURATION_S, (unsigned)MAX_STREAMS);
+        "example: start udp 172.16.0.101 5202 10 4 1000\n",
+        proto_str(DEFAULT_IS_UDP), (unsigned)MAX_STREAMS);
 }
 
 static void handle_command(char *line)
@@ -238,19 +239,26 @@ static void handle_command(char *line)
         print_help();
     } else if ((rest = match_word(p, "status"))) {
         if (ctrl.test_active && !ctrl.sent_test_end) {
-            sddf_printf("a test is running\n");
+            sddf_printf("a test is running (%s)\n", proto_str(ctrl.is_udp));
         } else {
-            sddf_printf("idle — %s, network %s\n", PROTO_STR,
-                        netif_ready ? "up" : "down");
+            sddf_printf("idle — network %s\n", netif_ready ? "up" : "down");
         }
     } else if ((rest = match_word(p, "start"))) {
+        /* Optional leading protocol token: `start tcp ...` / `start udp ...`. */
+        bool is_udp = DEFAULT_IS_UDP;
+        char *tok = rest;
+        while (*tok == ' ') tok++;
+        char *after;
+        if ((after = match_word(tok, "udp"))) { is_udp = true; rest = after; }
+        else if ((after = match_word(tok, "tcp"))) { is_udp = false; rest = after; }
+
         uint8_t ip[4];
         if (!parse_ip(&rest, ip)) {
-            sddf_printf("usage: start <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n");
+            sddf_printf("usage: start [tcp|udp] <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n");
             return;
         }
         uint16_t port = 5202;
-        uint32_t dur = DEFAULT_DURATION_S;
+        uint32_t dur = default_duration_s(is_udp);
         uint8_t streams = 1;
         uint32_t bw = 0;
         uint16_t len = 1460;
@@ -280,6 +288,7 @@ static void handle_command(char *line)
             shared_params->num_streams = streams;
             shared_params->bw_mbps = bw;
             shared_params->payload_len = len;
+            shared_params->is_udp = is_udp ? 1 : 0;
             __atomic_store_n(&shared_params->generation, ++shared_gen_local, __ATOMIC_RELEASE);
             for (uint8_t pi = 0; pi < multi_config.num_peers; pi++) {
                 microkit_notify(multi_config.peer_channels[pi]);
@@ -289,7 +298,7 @@ static void handle_command(char *line)
 
         /* This client targets base_port + its own id (controller id 0 => port). */
         iperf3_begin_test(ip[0], ip[1], ip[2], ip[3],
-                          port + app_config.client_id, dur, streams, bw, len);
+                          port + app_config.client_id, dur, streams, bw, len, is_udp);
     } else {
         sddf_printf("unknown command — type 'help'\n");
     }
@@ -328,12 +337,12 @@ void netif_status_callback(char *ip_addr)
                 sddf_get_pd_name(), ip_addr);
     netif_ready = true;
     if (multi_config.is_controller) {
-        sddf_printf("Ready. Type 'start <server_ip> [opts]' to run an iperf3 %s test "
-                    "(or 'help').\n", PROTO_STR);
+        sddf_printf("Ready. Type 'start [tcp|udp] <server_ip> [opts]' to run an iperf3 test "
+                    "(or 'help').\n");
         print_prompt();
     } else {
-        sddf_printf("client %u ready (%s) — waiting for the controller to start a test\n",
-                    app_config.client_id, PROTO_STR);
+        sddf_printf("client %u ready — waiting for the controller to start a test\n",
+                    app_config.client_id);
     }
 }
 
@@ -364,9 +373,8 @@ void init(void)
     set_timeout();
     /* ipbench-compatible CPU-utilisation socket - works for both TCP and UDP */
     setup_utilization_socket(&benchmark_config);
-#ifdef IPERF3_UDP
-    sddf_printf("MEMP_NUM_UDP_PCB = %d\n", MEMP_NUM_UDP_PCB);
-#endif
+    sddf_printf("MEMP_NUM_UDP_PCB = %d (both TCP and UDP available at runtime)\n",
+                MEMP_NUM_UDP_PCB);
     sddf_lwip_maybe_notify();
 }
 
@@ -377,23 +385,22 @@ void notified(sddf_channel ch)
     } else if (ch == timer_config.driver_id) {
         sddf_lwip_process_timeout();
         uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
-#ifdef IPERF3_UDP
-        for (int s = 0; s < MAX_STREAMS; s++) {
-            ctrl.udp_streams[s].packets_this_tick = 0;
-        }
-        iperf3_on_timer_tick(&ctrl, now_ms);
-        if (ctrl.test_active && !ctrl.test_done) {
-            net_request_signal_free(&net_tx_handle);
-        }
-#else /* IPERF3_TCP */
-        for (int s = 0; s < MAX_STREAMS; s++) {
-            if (ctrl.streams[s].pcb != NULL && ctrl.streams[s].phase == SEND_PAYLOAD) {
-                ctrl.streams[s].bytes_this_tick = 0;
-                iperf3_stream_maybe_tx(&ctrl.streams[s]);
+        if (ctrl.is_udp) {
+            for (int s = 0; s < MAX_STREAMS; s++) {
+                ctrl.udp_streams[s].packets_this_tick = 0;
+            }
+            iperf3_on_timer_tick(&ctrl, now_ms);
+            if (ctrl.test_active && !ctrl.test_done) {
+                net_request_signal_free(&net_tx_handle);
+            }
+        } else {
+            for (int s = 0; s < MAX_STREAMS; s++) {
+                if (ctrl.streams[s].pcb != NULL && ctrl.streams[s].phase == SEND_PAYLOAD) {
+                    ctrl.streams[s].bytes_this_tick = 0;
+                    iperf3_stream_maybe_tx(&ctrl.streams[s]);
+                }
             }
         }
-        (void)now_ms;
-#endif
         set_timeout();
     } else if (ch == serial_config.rx.id) {
         /* Keyboard input arrived — read commands (start/status/help). */
@@ -409,39 +416,39 @@ void notified(sddf_channel ch)
                               shared_params->server_ip[2], shared_params->server_ip[3],
                               shared_params->base_port + app_config.client_id,
                               shared_params->duration_s, shared_params->num_streams,
-                              shared_params->bw_mbps, shared_params->payload_len);
+                              shared_params->bw_mbps, shared_params->payload_len,
+                              shared_params->is_udp != 0);
         }
     } else if (ch == serial_config.tx.id) {
         /* TX free notification — nothing to do */
-#ifdef IPERF3_UDP
     } else if (ch == net_config.tx.id) {
-        /* TX buffers freed — continue pumping remaining tick budget */
-        uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
-        iperf3_on_timer_tick(&ctrl, now_ms);
-        if (ctrl.test_active && !ctrl.test_done) {
-            net_request_signal_free(&net_tx_handle);
+        /* TX buffers freed — UDP continues pumping its remaining tick budget.
+         * (TCP is ACK-clocked and ignores this.) */
+        if (ctrl.is_udp) {
+            uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+            iperf3_on_timer_tick(&ctrl, now_ms);
+            if (ctrl.test_active && !ctrl.test_done) {
+                net_request_signal_free(&net_tx_handle);
+            }
         }
-#endif
     } else {
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
     }
 
-#ifndef IPERF3_UDP
-    /* A client placed on a non-timer core never receives timer notifications
-     * (the passive timer driver's signal does not cross cores), so the
-     * timer-driven deadline check (iperf_poll) never runs there and the test
+    /* TCP only: a client placed on a non-timer core never receives timer
+     * notifications (the passive timer driver's signal does not cross cores), so
+     * the timer-driven deadline check (iperf_poll) never runs there and the test
      * would never end. Evaluate the deadline from the data path instead: network
      * notifications keep arriving while the streams send, and the GET_TIME PPC
      * works cross-core. Throttled so the PPC cost stays off the CPU-util window.
-     * (UDP already gets this via its net_tx branch above.) */
-    if (ctrl.test_active && !ctrl.sent_test_end) {
+     * (UDP gets this via its net_tx branch above.) */
+    if (!ctrl.is_udp && ctrl.test_active && !ctrl.sent_test_end) {
         static uint32_t deadline_throttle = 0;
         if ((deadline_throttle++ & 0x3F) == 0) {
             uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
             iperf3_tcp_check_deadline(&ctrl, now_ms);
         }
     }
-#endif
 
     sddf_lwip_maybe_notify();
 
@@ -491,25 +498,22 @@ void notified(sddf_channel ch)
                     (unsigned long long)(total - idle),
                     (unsigned long long)idle,
                     (unsigned long long)total);
-#ifndef IPERF3_UDP
-                /* TCP stores it so EXCHANGE_RESULTS JSON can report it */
+                /* TCP's EXCHANGE_RESULTS JSON reports it; harmless for UDP. */
                 ctrl.cpu_util_percent = util;
-#endif
             } else {
                 sddf_printf("[cpu_util] no data — build with MICROKIT_CONFIG=benchmark/smp-benchmark\n");
             }
         }
-#ifndef IPERF3_UDP
-        /* Print RTT before MQ_EXIT so the machine queue (which stops capturing at
-         * the MQ_EXIT completion string) records it. RTT is fully accumulated by
-         * TEST_END. (UDP has no ACK round-trips, so no RTT — jitter is its metric.) */
-        {
+        /* TCP only: print RTT before MQ_EXIT so the machine queue (which stops
+         * capturing at the MQ_EXIT completion string) records it. RTT is fully
+         * accumulated by TEST_END. (UDP has no ACK round-trips — jitter is its
+         * metric instead.) */
+        if (!ctrl.is_udp) {
             uint32_t mn, mean, mx, sd; uint64_t n;
             iperf3_tcp_rtt_aggregate(&ctrl, &mn, &mean, &mx, &sd, &n);
             sddf_printf("[rtt] min=%u mean=%u max=%u sd=%u us (n=%llu)\n",
                         mn, mean, mx, sd, (unsigned long long)n);
         }
-#endif
         sddf_printf("MQ_EXIT\n");
     }
 

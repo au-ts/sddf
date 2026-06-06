@@ -52,13 +52,12 @@ CFLAGS += -Wno-tautological-constant-out-of-range-compare
 # arguments to the serial `start` command (ctrl.num_streams / ctrl.target_bw_mbps),
 # so no -D flags are needed for them anymore.
 
+# Both protocols are compiled into every image; the protocol is chosen at runtime
+# by the serial `start [tcp|udp] ...` command. PROTOCOL= only sets the default
+# used when the token is omitted (udp => -DIPERF3_DEFAULT_UDP).
 PROTOCOL ?= udp
 ifeq ($(PROTOCOL),udp)
-CFLAGS += -DIPERF3_UDP
-STREAM_OBJ := iperf3_stream_udp.o
-else
-CFLAGS += -DIPERF3_TCP
-STREAM_OBJ := iperf3_stream_tcp.o
+CFLAGS += -DIPERF3_DEFAULT_UDP
 endif
 
 # Note: SERVER_IP is still forwarded to meta.py (it injects per-client
@@ -69,7 +68,7 @@ LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
-IPERF_OBJS := iperf3_client.o iperf3_ctrl.o $(STREAM_OBJ) utilization_socket.o
+IPERF_OBJS := iperf3_client.o iperf3_ctrl.o iperf3_stream_tcp.o iperf3_stream_udp.o utilization_socket.o
 
 DEPS := $(IPERF_OBJS:.o=.d)
 

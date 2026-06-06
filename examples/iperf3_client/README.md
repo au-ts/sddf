@@ -17,13 +17,14 @@ iperf3>
 Commands:
 
 ```
-start <ip> [port] [dur_s] [streams] [bw_mbps] [len]
+start [tcp|udp] <ip> [port] [dur_s] [streams] [bw_mbps] [len]
 status
 help
 ```
 
 | `start` arg | default | meaning |
 |---|---|---|
+| `tcp\|udp` | build `PROTOCOL=` | **protocol for this test** (both are in the image) |
 | `ip` | — | server IPv4 (**required**) |
 | `port` | 5202 | iperf3 server port |
 | `dur_s` | 10 (TCP) / 5 (UDP) | test duration, seconds |
@@ -31,9 +32,11 @@ help
 | `bw_mbps` | 0 | rate target; 0 = unlimited |
 | `len` | 1460 | UDP datagram bytes (**ignored for TCP** — it writes 16 KB chunks) |
 
-Example: `start 172.16.0.101 5202 10 4 1000` (TCP, 10 s, 4 streams, 1 Gbit target).
-Protocol (TCP vs UDP) is still a **build-time** choice (`PROTOCOL=`); a TCP image
-always runs TCP. After a test finishes you return to `iperf3>` for the next run.
+Example: `start tcp 172.16.0.101 5202 10 4 1000` (TCP, 10 s, 4 streams, 1 Gbit target).
+**Protocol is now runtime too** — both TCP and UDP are compiled into every image, so
+the same binary can run `start tcp ...` and then `start udp ...`. `PROTOCOL=` only
+sets the default used when the token is omitted. After a test finishes you return to
+`iperf3>` for the next run.
 
 **Multi-client (four_core):** only client0 receives serial input, so it acts as
 *controller* — it writes the typed params to a shared memory region and notifies
@@ -151,7 +154,7 @@ system-total-per-core and per-PD. User cycles = Total − Kernel.
 |---|---|---|
 | `MICROKIT_BOARD` | e.g. `odroidc4`, `qemu_virt_aarch64` | **required** |
 | `MICROKIT_SDK` | path | **required** |
-| `PROTOCOL` | `tcp` \| `udp` | default `udp`; one protocol per image |
+| `PROTOCOL` | `tcp` \| `udp` | **default** protocol only (both compiled in); runtime `start [tcp\|udp]` overrides |
 | `MICROKIT_CONFIG` | `benchmark` (single_core) \| `smp-benchmark` (two/four core) | needed for cpu_util/PMU data |
 | `SMP_CONFIG` | `core_config/{single,two,four}_core.json` | core layout (default `single_core`) |
 
@@ -240,6 +243,15 @@ RTT/packets come from the board's `[rtt]` / `[pkts]` serial lines.
 [rtt] min=101 mean=2221 max=2464 sd=129 us (n=4475)
 ```
 server-side: **938 Mbps** received (single TCP stream ≈ line rate) at **80.6% of one core**.
+
+### Verified runtime protocol switch (odroidc4, single_core, one image)
+
+From a **single image**, `start tcp ...` then `start udp ...` on one boot:
+```
+start tcp 172.16.0.101 5202 5 1 0    -> server: 938.1 Mbps, [cpu_util] 81.9%
+start udp 172.16.0.101 5202 5 1 200  -> server: 92.2 Mbps, jitter 0.011ms (UDP path: connect reply -> SEND_PAYLOAD)
+```
+Both protocols run from the same binary — `PROTOCOL=` is only the default.
 
 ### Verified multi-client (odroidc4, four_core, TCP)
 
