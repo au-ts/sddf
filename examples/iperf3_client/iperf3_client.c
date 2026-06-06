@@ -23,13 +23,21 @@
 
 #include "iperf3_ctrl.h"
 #include "iperf3_app.h"
+#include "iperf3_multi.h"
 /* iperf3_util.h declares the ipbench utilization socket + port (protocol
  * agnostic), wanted for both TCP and UDP builds. */
 #include "iperf3_util.h"
 
 __attribute__((__section__(".iperf3_app_config"))) iperf3_app_config_t app_config;
 
-static bool iperf3_started = false;
+/* Multi-client coordination: in a multi-client build only client0 (the
+ * controller) gets serial input; it broadcasts the parsed test params to the
+ * other clients via the shared region + per-peer notifications. */
+__attribute__((__section__(".iperf3_multi_config"))) iperf3_multi_config_t multi_config;
+static volatile iperf3_shared_params_t *shared_params =
+    (volatile iperf3_shared_params_t *)IPERF3_SHARED_PARAMS_VADDR;
+static uint32_t shared_gen_local;   /* controller: last generation it published */
+static uint32_t shared_gen_seen;    /* peer: last generation it acted on */
 
 static uint64_t bench_core_start[CONFIG_MAX_NUM_NODES];
 static uint64_t bench_idle_start[CONFIG_MAX_NUM_NODES];
@@ -48,6 +56,7 @@ __attribute__((__section__(".benchmark_client_config"))) benchmark_client_config
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lib_sddf_lwip_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
+serial_queue_handle_t serial_rx_queue_handle;
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
 
@@ -69,60 +78,262 @@ static void make_cookie(uint8_t *cookie) {
     }
 }
 
+static bool netif_ready = false;
+
+#ifdef IPERF3_UDP
+#define PROTO_STR "UDP"
+#define DEFAULT_DURATION_S 5
+#else
+#define PROTO_STR "TCP"
+#define DEFAULT_DURATION_S 10
+#endif
+
+/* Emit a string with sddf_putchar_unbuffered so it is flushed immediately.
+ * sddf_printf is line-buffered (flushes only on '\n'), so a prompt with no
+ * trailing newline would otherwise never reach the console. */
+static void serial_write_unbuffered(const char *s)
+{
+    while (*s) {
+        sddf_putchar_unbuffered(*s++);
+    }
+}
+
+static void print_prompt(void)
+{
+    serial_write_unbuffered("\niperf3> ");
+}
+
+/* Open the control connection and kick off a test against server a.b.c.d:port
+ * with the given runtime parameters. Replaces the old auto-start path; called
+ * from the serial `start` command handler. */
+static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
+                              uint16_t port, uint32_t duration_s,
+                              uint8_t num_streams, uint32_t bw_mbps,
+                              uint16_t payload_len)
+{
+    if (!netif_ready) {
+        sddf_printf("network is not up yet — wait for the DHCP message\n");
+        return;
+    }
+    if (ctrl.test_active && !ctrl.sent_test_end) {
+        sddf_printf("a test is already running — wait for it to finish\n");
+        return;
+    }
+
+    ip_addr_t server_addr;
+    IP_ADDR4(&server_addr, a, b, c, d);
+
+    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+    if (pcb == NULL) {
+        sddf_printf("iperf3_client: failed to create PCB\n");
+        return;
+    }
+    err_t error = tcp_bind(pcb, IP_ANY_TYPE, 0);
+    if (error) {
+        sddf_printf("Failed to bind TCP socket: %s\n", lwip_strerr(error));
+        return;
+    }
+
+    iperf3_ctrl_init(&ctrl);
+    ctrl.server_port = port;
+    ctrl.duration_s = duration_s;
+    ctrl.num_streams = num_streams;
+    ctrl.target_bw_mbps = bw_mbps;
+    ctrl.payload_len = payload_len;
+#ifdef IPERF3_UDP
+    ctrl.omit_s = 0;
+#else
+    ctrl.omit_s = 5;
+#endif
+
+    /* Allow a fresh CPU-util / packet-count measurement for each run. */
+    bench_snapshotted = bench_reported = false;
+    pkts_snapshotted = pkts_reported = false;
+
+    tcp_arg(pcb, &ctrl);
+    make_cookie(ctrl.cookie);
+
+    sddf_printf("Starting iperf3 (%s) -> %u.%u.%u.%u:%u  dur=%us streams=%u bw=%uM len=%u\n",
+                PROTO_STR, a, b, c, d, port, duration_s, num_streams, bw_mbps, payload_len);
+
+    error = tcp_connect(pcb, &server_addr, port, iperf_ctrl_connect);
+    if (error) {
+        sddf_printf("Failed to connect TCP control socket: %s\n", lwip_strerr(error));
+        return;
+    }
+}
+
+/* ---- tiny command-line parsing (no libc strtok/atoi) ---- */
+
+/* If `line` begins with `word` followed by a space or end-of-string, return a
+ * pointer just past the word; otherwise NULL. */
+static char *match_word(char *line, const char *word)
+{
+    int i = 0;
+    while (word[i]) {
+        if (line[i] != word[i]) return NULL;
+        i++;
+    }
+    if (line[i] != '\0' && line[i] != ' ') return NULL;
+    return line + i;
+}
+
+/* Parse a decimal uint, skipping leading spaces. *ok is false if no digit. */
+static char *parse_uint(char *p, uint32_t *out, bool *ok)
+{
+    while (*p == ' ') p++;
+    if (*p < '0' || *p > '9') { *ok = false; return p; }
+    uint32_t v = 0;
+    while (*p >= '0' && *p <= '9') { v = v * 10 + (uint32_t)(*p - '0'); p++; }
+    *out = v;
+    *ok = true;
+    return p;
+}
+
+/* Parse a dotted-quad IPv4 address. Returns false on malformed input. */
+static bool parse_ip(char **pp, uint8_t ip[4])
+{
+    char *p = *pp;
+    while (*p == ' ') p++;
+    for (int i = 0; i < 4; i++) {
+        bool ok;
+        uint32_t oct;
+        p = parse_uint(p, &oct, &ok);
+        if (!ok || oct > 255) return false;
+        ip[i] = (uint8_t)oct;
+        if (i < 3) {
+            if (*p != '.') return false;
+            p++;
+        }
+    }
+    *pp = p;
+    return true;
+}
+
+static void print_help(void)
+{
+    sddf_printf(
+        "commands:\n"
+        "  start <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n"
+        "        run a %s test against <ip>. optional args (left to right):\n"
+        "          port      iperf3 server port           (default 5202)\n"
+        "          dur_s     test duration in seconds      (default %u)\n"
+        "          streams   parallel streams (1..%u)      (default 1)\n"
+        "          bw_mbps   rate target, 0 = unlimited    (default 0)\n"
+        "          len       UDP payload bytes             (default 1460)\n"
+        "  status   show whether a test is running\n"
+        "  help     show this message\n"
+        "example: start 172.16.0.101 5202 10 4 1000\n",
+        PROTO_STR, (unsigned)DEFAULT_DURATION_S, (unsigned)MAX_STREAMS);
+}
+
+static void handle_command(char *line)
+{
+    char *p = line;
+    while (*p == ' ') p++;
+    if (*p == '\0') return;
+
+    char *rest;
+    if ((rest = match_word(p, "help")) || (rest = match_word(p, "?"))) {
+        print_help();
+    } else if ((rest = match_word(p, "status"))) {
+        if (ctrl.test_active && !ctrl.sent_test_end) {
+            sddf_printf("a test is running\n");
+        } else {
+            sddf_printf("idle — %s, network %s\n", PROTO_STR,
+                        netif_ready ? "up" : "down");
+        }
+    } else if ((rest = match_word(p, "start"))) {
+        uint8_t ip[4];
+        if (!parse_ip(&rest, ip)) {
+            sddf_printf("usage: start <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n");
+            return;
+        }
+        uint16_t port = 5202;
+        uint32_t dur = DEFAULT_DURATION_S;
+        uint8_t streams = 1;
+        uint32_t bw = 0;
+        uint16_t len = 1460;
+        bool ok;
+        uint32_t v;
+        char *q;
+        if ((q = parse_uint(rest, &v, &ok)), ok) { port = (uint16_t)v; rest = q; }
+        if ((q = parse_uint(rest, &v, &ok)), ok) { dur = v; rest = q; }
+        if ((q = parse_uint(rest, &v, &ok)), ok) { streams = (uint8_t)v; rest = q; }
+        if ((q = parse_uint(rest, &v, &ok)), ok) { bw = v; rest = q; }
+        if ((q = parse_uint(rest, &v, &ok)), ok) { len = (uint16_t)v; rest = q; }
+        if (streams < 1) streams = 1;
+        if (streams > MAX_STREAMS) streams = MAX_STREAMS;
+        if (len < 1) len = 1;
+        if (len > 1460) len = 1460;
+
+        /* Controller: publish the params and poke every peer so they run the
+         * same test concurrently (each against base_port + its own client_id).
+         * Writes the params first, then bumps `generation` last as the signal. */
+        if (multi_config.is_controller && multi_config.num_peers > 0) {
+            shared_params->server_ip[0] = ip[0];
+            shared_params->server_ip[1] = ip[1];
+            shared_params->server_ip[2] = ip[2];
+            shared_params->server_ip[3] = ip[3];
+            shared_params->base_port = port;
+            shared_params->duration_s = dur;
+            shared_params->num_streams = streams;
+            shared_params->bw_mbps = bw;
+            shared_params->payload_len = len;
+            __atomic_store_n(&shared_params->generation, ++shared_gen_local, __ATOMIC_RELEASE);
+            for (uint8_t pi = 0; pi < multi_config.num_peers; pi++) {
+                microkit_notify(multi_config.peer_channels[pi]);
+            }
+            sddf_printf("[multi] broadcast test to %u peer(s)\n", multi_config.num_peers);
+        }
+
+        /* This client targets base_port + its own id (controller id 0 => port). */
+        iperf3_begin_test(ip[0], ip[1], ip[2], ip[3],
+                          port + app_config.client_id, dur, streams, bw, len);
+    } else {
+        sddf_printf("unknown command — type 'help'\n");
+    }
+}
+
+/* Accumulate serial RX into a line buffer; dispatch on CR/LF. */
+#define CMD_BUF_SIZE 128
+static char cmd_buf[CMD_BUF_SIZE];
+static uint32_t cmd_len = 0;
+
+static void serial_rx_poll(void)
+{
+    char ch;
+    while (!serial_dequeue(&serial_rx_queue_handle, &ch)) {
+        if (ch == '\r' || ch == '\n') {
+            sddf_printf("\n");
+            cmd_buf[cmd_len] = '\0';
+            handle_command(cmd_buf);
+            cmd_len = 0;
+            print_prompt();
+        } else if (ch == 0x7f || ch == '\b') {      /* DEL / backspace */
+            if (cmd_len > 0) {
+                cmd_len--;
+                sddf_printf("\b \b");
+            }
+        } else if (cmd_len < CMD_BUF_SIZE - 1) {
+            cmd_buf[cmd_len++] = ch;
+            sddf_putchar_unbuffered(ch);            /* echo */
+        }
+    }
+}
+
 void netif_status_callback(char *ip_addr)
 {
     sddf_printf("DHCP request finished, IP address for netif %s is: %s\n",
                 sddf_get_pd_name(), ip_addr);
-
-    if (!iperf3_started) {
-        iperf3_started = true;
-
-        /* Server address/port come from the injected per-client app config so
-         * that each copied client ELF (client0, client1, ...) can target a
-         * different iperf3 server. Fall back to 10.0.2.2:5202 when unset
-         * (e.g. SERVER_IP_x compile defaults still honoured for the address). */
-#ifndef SERVER_IP_A
-#define SERVER_IP_A 10
-#define SERVER_IP_B 0
-#define SERVER_IP_C 2
-#define SERVER_IP_D 2
-#endif
-        ip_addr_t server_addr;
-        uint16_t server_port = app_config.server_port ? app_config.server_port : 5202;
-        if (app_config.server_ip[0] || app_config.server_ip[1] ||
-            app_config.server_ip[2] || app_config.server_ip[3]) {
-            IP_ADDR4(&server_addr, app_config.server_ip[0], app_config.server_ip[1],
-                     app_config.server_ip[2], app_config.server_ip[3]);
-        } else {
-            IP_ADDR4(&server_addr, SERVER_IP_A, SERVER_IP_B, SERVER_IP_C, SERVER_IP_D);
-        }
-        sddf_printf("Starting iperf3 (%s) client %u now — server %s:%u\n",
-#ifdef IPERF3_UDP
-                    "UDP",
-#else
-                    "TCP",
-#endif
-                    app_config.client_id, ip4addr_ntoa(&server_addr), server_port);
-
-        struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
-        if (pcb == NULL) {
-            sddf_printf("iperf3_client: failed to create PCB\n");
-            return;
-        }
-        err_t error = tcp_bind(pcb, IP_ANY_TYPE, 0);
-        if (error) {
-            sddf_printf("Failed to bind TCP socket: %s\n", lwip_strerr(error));
-            return;
-        }
-        iperf3_ctrl_init(&ctrl);
-        ctrl.server_port = server_port;
-        tcp_arg(pcb, &ctrl);
-        make_cookie(ctrl.cookie);
-        error = tcp_connect(pcb, &server_addr, server_port, iperf_ctrl_connect);
-        if (error) {
-            sddf_printf("Failed to connect TCP control socket: %s\n", lwip_strerr(error));
-            return;
-        }
+    netif_ready = true;
+    if (multi_config.is_controller) {
+        sddf_printf("Ready. Type 'start <server_ip> [opts]' to run an iperf3 %s test "
+                    "(or 'help').\n", PROTO_STR);
+        print_prompt();
+    } else {
+        sddf_printf("client %u ready (%s) — waiting for the controller to start a test\n",
+                    app_config.client_id, PROTO_STR);
     }
 }
 
@@ -136,6 +347,10 @@ void init(void)
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr,
                       serial_config.tx.data.size, serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    /* RX queue carries keyboard input from serial_virt_rx so a test can be
+     * started at runtime (see serial_rx_poll / handle_command). */
+    serial_queue_init(&serial_rx_queue_handle, serial_config.rx.queue.vaddr,
+                      serial_config.rx.data.size, serial_config.rx.data.vaddr);
 
     net_queue_init(&net_rx_handle, net_config.rx.free_queue.vaddr,
                    net_config.rx.active_queue.vaddr, net_config.rx.num_buffers);
@@ -180,8 +395,24 @@ void notified(sddf_channel ch)
         (void)now_ms;
 #endif
         set_timeout();
+    } else if (ch == serial_config.rx.id) {
+        /* Keyboard input arrived — read commands (start/status/help). */
+        serial_rx_poll();
+    } else if (!multi_config.is_controller && ch == multi_config.listen_channel) {
+        /* Peer client: controller published a test. Run the same params against
+         * our own server port (base_port + client_id). Acquire-load pairs with
+         * the controller's release-store so the params are visible. */
+        uint32_t g = __atomic_load_n(&shared_params->generation, __ATOMIC_ACQUIRE);
+        if (g != shared_gen_seen) {
+            shared_gen_seen = g;
+            iperf3_begin_test(shared_params->server_ip[0], shared_params->server_ip[1],
+                              shared_params->server_ip[2], shared_params->server_ip[3],
+                              shared_params->base_port + app_config.client_id,
+                              shared_params->duration_s, shared_params->num_streams,
+                              shared_params->bw_mbps, shared_params->payload_len);
+        }
     } else if (ch == serial_config.tx.id) {
-        /* nothing */
+        /* TX free notification — nothing to do */
 #ifdef IPERF3_UDP
     } else if (ch == net_config.tx.id) {
         /* TX buffers freed — continue pumping remaining tick budget */

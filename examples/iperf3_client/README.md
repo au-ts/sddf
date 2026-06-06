@@ -1,18 +1,61 @@
 # iperf3 Client - Usage
 
+## Runtime control (serial `start` command)
+
+The client is driven **at runtime over the serial console** — server IP,
+duration, streams, bandwidth and payload are typed in, not baked in at compile
+time. One boot can run many tests.
+
+After DHCP the client prints a prompt and waits:
+
+```
+DHCP request finished, IP address for netif client0 is: 172.16.4.4
+Ready. Type 'start <server_ip> [opts]' to run an iperf3 TCP test (or 'help').
+iperf3>
+```
+
+Commands:
+
+```
+start <ip> [port] [dur_s] [streams] [bw_mbps] [len]
+status
+help
+```
+
+| `start` arg | default | meaning |
+|---|---|---|
+| `ip` | — | server IPv4 (**required**) |
+| `port` | 5202 | iperf3 server port |
+| `dur_s` | 10 (TCP) / 5 (UDP) | test duration, seconds |
+| `streams` | 1 | parallel streams (1–15) |
+| `bw_mbps` | 0 | rate target; 0 = unlimited |
+| `len` | 1460 | UDP datagram bytes (**ignored for TCP** — it writes 16 KB chunks) |
+
+Example: `start 172.16.0.101 5202 10 4 1000` (TCP, 10 s, 4 streams, 1 Gbit target).
+Protocol (TCP vs UDP) is still a **build-time** choice (`PROTOCOL=`); a TCP image
+always runs TCP. After a test finishes you return to `iperf3>` for the next run.
+
+**Multi-client (four_core):** only client0 receives serial input, so it acts as
+*controller* — it writes the typed params to a shared memory region and notifies
+the other client(s), which run the **same** test concurrently against
+`base_port + client_id` (client0→5202, client1→5203). This relies on cross-core
+notifications, which work on hardware (validated on odroidc4) but **not** under
+QEMU SMP.
+
 ## How the test works
 
-1. **DHCP.** On boot the client brings up the lwIP netif and waits for a DHCP
-   lease (prints `DHCP request finished, IP address ... is: 172.16.2.x`).
-2. **Control connection (TCP).** The client connects to the server's
-   control port (5202 for client0) and runs the iperf3 state machine:
+1. **DHCP, then wait for `start`.** On boot the client brings up the lwIP netif,
+   waits for a DHCP lease (`DHCP request finished, IP address ... is: 172.16.x.x`),
+   then prints `iperf3>` and waits for a `start` command (above).
+2. **Control connection (TCP).** On `start`, the client connects to the server's
+   control port and runs the iperf3 state machine:
    exchange cookie → `PARAM_EXCHANGE` (send the JSON test parameters) →
    `CREATE_STREAMS` → `TEST_START` → `TEST_RUNNING`. You can watch this on the
    serial as `[iperf3] server state byte = N`.
 3. **Data path.**
-   - **TCP**: the client opens `NUM_STREAMS` data connections and sends as fast
-     as the send window allows at `TARGET_BW_MBPS`. Send is ACK-clocked.
-   - **UDP**: the client pumps datagrams at `TARGET_BW_MBPS` and the server
+   - **TCP**: the client opens `streams` data connections and sends as fast
+     as the send window allows, capped at `bw_mbps`. Send is ACK-clocked.
+   - **UDP**: the client pumps datagrams at `bw_mbps` and the server
      reports throughput / loss / jitter.
 4. **End of test.** The measured window excludes a warm-up/omit period, so the
    reported throughput is steady-state. At `omit_end` the benchmark PD resets its
@@ -108,12 +151,15 @@ system-total-per-core and per-PD. User cycles = Total − Kernel.
 |---|---|---|
 | `MICROKIT_BOARD` | e.g. `odroidc4`, `qemu_virt_aarch64` | **required** |
 | `MICROKIT_SDK` | path | **required** |
-| `PROTOCOL` | `tcp` \| `udp` | default `udp` |
+| `PROTOCOL` | `tcp` \| `udp` | default `udp`; one protocol per image |
 | `MICROKIT_CONFIG` | `benchmark` (single_core) \| `smp-benchmark` (two/four core) | needed for cpu_util/PMU data |
 | `SMP_CONFIG` | `core_config/{single,two,four}_core.json` | core layout (default `single_core`) |
-| `SERVER_IP` | a.b.c.d | **mandatory for hardware** (`172.16.0.101`); QEMU default `10.0.2.2` |
-| `TARGET_BW_MBPS` | N | rate target for **both** UDP and TCP; **per stream**, so aggregate ≈ N×`NUM_STREAMS`. Caps only (won't exceed window). Unset = unlimited |
-| `NUM_STREAMS` | N | TCP parallel streams (default 1) |
+
+Server IP, port, duration, **streams** and **bandwidth** are no longer build
+flags — they are runtime arguments to the serial `start` command (see top).
+`SERVER_IP` is still accepted (it's injected into each client's `app_config`) but
+the client ignores it; the address comes from `start`. The old `NUM_STREAMS` /
+`TARGET_BW_MBPS` `-D` flags have been removed.
 
 Built image: **`build/loader.img`**.
 
@@ -131,8 +177,7 @@ Built image: **`build/loader.img`**.
 ### Rebuild rules (flag changes don't always recompile)
 
 - Changing **PROTOCOL** or **SMP_CONFIG**: `make clean` first (stale SDF/objects).
-- Changing only **TARGET_BW_MBPS** / **NUM_STREAMS** (same protocol+config):
-  `touch iperf3_ctrl.c && make ...` recompiles just that file (fast - fine for a sweep).
+- Stream count / bandwidth no longer need a rebuild — they're runtime `start` args.
 - First build for a new board: `make clean`.
 - If lwipopts.h edits seem to have no effect: `make clobber` (a stale suffixed
   `lib_sddf_lwip_iperf_client.a` survives plain `make clean`).
@@ -141,39 +186,89 @@ Built image: **`build/loader.img`**.
 
 ## Running on SSH boards (the machine queue)
 
-### Build, copy, and run one test
+Because the client now waits for a typed `start` command, the headless
+`mq.sh run ... -c 'MQ_EXIT'` flow (which only *reads* the console) is no longer
+enough — you must **drive the serial console**. `mq.sh`'s keep-alive flag `-a`
+puts the console into interactive mode (it forwards your stdin to the board's
+UART) once a completion regex matches. Match on the flushed `Ready` line (the
+`iperf3>` prompt is emitted unbuffered + per-char colour-wrapped, so it is not a
+greppable contiguous string), then send the `start` command.
+
+### Build, copy, run one test
 
 ```sh
 cd examples/iperf3_client
 
-# single-core UDP at 500 Mbps
+# single-core TCP image (no SERVER_IP needed — it's a runtime arg now)
 make MICROKIT_BOARD=odroidc4 MICROKIT_SDK=/Users/lululululluke/sddf/microkit-sdk-2.1.0 \
-     MICROKIT_CONFIG=benchmark PROTOCOL=udp SMP_CONFIG=core_config/single_core.json \
-     TARGET_BW_MBPS=500 SERVER_IP=172.16.0.101
+     MICROKIT_CONFIG=benchmark PROTOCOL=tcp SMP_CONFIG=core_config/single_core.json
 
-scp build/loader.img lukez@tftp.keg.cse.unsw.edu.au:~/test.img
+scp build/loader.img lukez@tftp.keg.cse.unsw.edu.au:~/luke_iperf.img
 
-ssh tftp.keg.cse.unsw.edu.au \
-  "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/test.img -c 'MQ_EXIT' -d 120
+# Boot interactively; when the 'Ready' line appears, type:  start 172.16.0.101 5202 10 1 0
+ssh -tt tftp.keg.cse.unsw.edu.au \
+  "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 200"
 ```
 
-For a four-core TCP run instead: `make clean` first, then
-`MICROKIT_CONFIG=smp-benchmark PROTOCOL=tcp SMP_CONFIG=core_config/four_core.json`
-(and make sure both servers, 5202 and 5203, are up).
+To script it, pipe the command in (it gets forwarded when interact starts, right
+after the `Ready` line), watch the log for `MQ_EXIT`, then `kill` the run to
+release the board lock:
 
-For additional metrics you can log the serial output
+```sh
+( until grep -aq 'run an iperf3' /tmp/hw.log; do sleep 2; done
+  sleep 3; printf 'start 172.16.0.101 5202 10 1 0\r'; sleep 200 ) \
+| ssh -tt tftp.keg.cse.unsw.edu.au \
+    "cd ~/machine_queue && ./mq.sh run -s odroidc4_1 -f ~/luke_iperf.img -c 'run an iperf3' -a -d 200" \
+    >/tmp/hw.log 2>&1
+```
 
+For a four-core TCP run: `make clean` first, then
+`MICROKIT_CONFIG=smp-benchmark PROTOCOL=tcp SMP_CONFIG=core_config/four_core.json`,
+make sure both servers (5202 and 5203) are up, and type one `start` on client0 —
+client1 runs the same params automatically.
 
 For TCP, throughput is `end.sum_received.bits_per_second` (no loss/jitter);
 RTT/packets come from the board's `[rtt]` / `[pkts]` serial lines.
 
+### Verified hardware result (odroidc4, single_core, TCP)
+
+`start 172.16.0.101 5202 10 1 0` against `iperf3 -s` on vb01 (1 GbE):
+
+```
+[pkts] client=0 tx_segs=814631
+[cpu_util] 80.6% over 1 core(s) (busy=9679697497 idle=2327650853 total=12007348350 cycles)
+[rtt] min=101 mean=2221 max=2464 sd=129 us (n=4475)
+```
+server-side: **938 Mbps** received (single TCP stream ≈ line rate) at **80.6% of one core**.
+
+### Verified multi-client (odroidc4, four_core, TCP)
+
+One typed `start 172.16.0.101 5202 10 1 0` on client0 drove **both** clients:
+```
+[multi] broadcast test to 1 peer(s)
+Starting iperf3 (TCP) -> 172.16.0.101:5203   (client1, via cross-core notify)
+Starting iperf3 (TCP) -> 172.16.0.101:5202   (client0)
+```
+The controller→peer broadcast works cross-core on real hardware. **However**
+four_core throughput is heavily degraded — ~11 Mbps per client, `[cpu_util] 1.0%
+over 4 cores` (99% idle), `[rtt] mean=171ms`: both clients stall on the cross-core
+data path (clients on cores 2/3 depend on `net_virt_tx`/eth on core 1). This is the
+known multi-core data-path bottleneck, not a coordination bug. **single_core is the
+config that saturates the link;** four_core is for studying the multi-core path.
+
 ---
 
-## Example
+## Example (QEMU)
 ```sh
 make clean MICROKIT_BOARD=qemu_virt_aarch64 MICROKIT_SDK=/Users/lululululluke/sddf/microkit-sdk-2.1.0
-make qemu MICROKIT_BOARD=qemu_virt_aarch64 MICROKIT_SDK=/Users/lululululluke/sddf/microkit-sdk-2.1.0 PROTOCOL=tcp NUM_STREAMS=1 MICROKIT_CONFIG=smp-benchmark SMP_CONFIG=core_config/four_core.json
+make qemu  MICROKIT_BOARD=qemu_virt_aarch64 MICROKIT_SDK=/Users/lululululluke/sddf/microkit-sdk-2.1.0 PROTOCOL=tcp MICROKIT_CONFIG=benchmark SMP_CONFIG=core_config/single_core.json
 ```
+QEMU wires your terminal to the board's serial (`-nographic`), so when `iperf3>`
+appears you can just type `start 10.0.2.2 5202 10 1 0` (run `iperf3 -s -p 5202` on
+the host first). Notes: QEMU is the throughput ceiling (numbers aren't
+representative — measure on hardware); cross-core notifications don't work under
+QEMU SMP, so four_core multi-client and UDP only work on single/two_core there;
+and some hosts hit a pre-existing virtio-net eth-driver fault at boot under QEMU.
 
 ## TCP send window (single-stream bottleneck)
 

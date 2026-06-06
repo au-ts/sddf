@@ -32,7 +32,7 @@ vpath %.c ${SDDF} ${IPERF3_CLIENT}
 
 IMAGES := eth_driver.elf iperf3_client.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
+	  timer_driver.elf serial_driver.elf serial_virt_tx.elf serial_virt_rx.elf
 
 CFLAGS += \
 	  -Wno-unused-function \
@@ -48,13 +48,9 @@ CFLAGS += \
 
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
-ifneq ($(TARGET_BW_MBPS),)
-CFLAGS += -DTARGET_BW_MBPS=$(TARGET_BW_MBPS)
-endif
-
-ifneq ($(NUM_STREAMS),)
-CFLAGS += -DNUM_STREAMS=$(NUM_STREAMS)
-endif
+# NUM_STREAMS / TARGET_BW_MBPS used to be compile-time; they are now runtime
+# arguments to the serial `start` command (ctrl.num_streams / ctrl.target_bw_mbps),
+# so no -D flags are needed for them anymore.
 
 PROTOCOL ?= udp
 ifeq ($(PROTOCOL),udp)
@@ -65,13 +61,9 @@ CFLAGS += -DIPERF3_TCP
 STREAM_OBJ := iperf3_stream_tcp.o
 endif
 
-ifdef SERVER_IP
-_sip := $(subst ., ,$(SERVER_IP))
-CFLAGS += -DSERVER_IP_A=$(word 1,$(_sip)) \
-          -DSERVER_IP_B=$(word 2,$(_sip)) \
-          -DSERVER_IP_C=$(word 3,$(_sip)) \
-          -DSERVER_IP_D=$(word 4,$(_sip))
-endif
+# Note: SERVER_IP is still forwarded to meta.py (it injects per-client
+# app_config.server_ip/server_port). The old -DSERVER_IP_A..D compile-time
+# fallback was removed — the server address is now a runtime `start` argument.
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
@@ -98,6 +90,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf

@@ -64,6 +64,16 @@ typedef struct iperf_ctrl {
 
     uint32_t duration_ms;
     uint32_t end_time_ms;
+
+    /* Runtime test parameters, set from the serial `start` command before the
+     * control connection is opened (see iperf3_begin_test in iperf3_client.c).
+     * These drive the param-exchange JSON and the per-stream rate limiting,
+     * replacing the old compile-time NUM_STREAMS / TARGET_BW_MBPS macros. */
+    uint32_t duration_s;     /* test duration in seconds */
+    uint32_t omit_s;         /* warm-up (omit) seconds, excluded from results */
+    uint32_t target_bw_mbps; /* per-test rate target, 0 = unlimited */
+    uint16_t payload_len;    /* UDP datagram payload length (bytes) */
+    char param_json[256];    /* built param-exchange JSON */
 } iperf_ctrl_t;
 
 void iperf3_ctrl_init(iperf_ctrl_t *ctrl);

@@ -19,9 +19,6 @@
 
 #include "iperf3_ctrl.h"
 
-#define _S(x) #x
-#define _STR(x) _S(x)
-
 #define PARAM_EXCHANGE   9
 #define CREATE_STREAMS  10
 #define TEST_START       1
@@ -90,6 +87,18 @@ void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     ctrl->test_active = false;
     ctrl->test_done = false;
     ctrl->bytes_sent = 0;
+    ctrl->omitting = false;
+    /* Sane defaults; the serial `start` command overrides these in
+     * iperf3_begin_test() before the control connection is opened. */
+    ctrl->num_streams = 1;
+    ctrl->target_bw_mbps = 0;
+    ctrl->payload_len = 1460;
+#ifdef IPERF3_UDP
+    ctrl->duration_s = 5;
+#else
+    ctrl->duration_s = 10;
+#endif
+    ctrl->omit_s = 5;
     for (int i = 0; i < MAX_STREAMS; i++) {
         ctrl->streams[i].pcb = NULL;
         ctrl->streams[i].bytes = 0;
@@ -140,26 +149,35 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                 sddf_printf("[iperf3] server state byte = %u (0x%02x)\n", st, st);
 
                 if (st == PARAM_EXCHANGE) {
-#ifndef NUM_STREAMS
-#define NUM_STREAMS 1
-#endif
+                    /* Build the param-exchange JSON from the runtime test
+                     * parameters supplied by the serial `start` command. The
+                     * "%u000000" prints the bitrate in bits/sec (Mbps * 1e6). */
+                    char *json = ctrl->param_json;
 #ifdef IPERF3_UDP
-#ifdef TARGET_BW_MBPS
-                    const char *json = "{\"udp\":true,\"time\":5,\"parallel\":1,\"len\":1460,\"bitrate\":" _STR(TARGET_BW_MBPS) "000000}";
-#else
-                    const char *json = "{\"udp\":true,\"time\":5,\"parallel\":1,\"len\":1460}";
-#endif
-                    ctrl->duration_ms = 5000;
+                    if (ctrl->target_bw_mbps) {
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u,\"bitrate\":%u000000}",
+                            ctrl->duration_s, ctrl->num_streams, ctrl->payload_len,
+                            ctrl->target_bw_mbps);
+                    } else {
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u}",
+                            ctrl->duration_s, ctrl->num_streams, ctrl->payload_len);
+                    }
 #else /* IPERF3_TCP */
-
-#ifdef TARGET_BW_MBPS
-                    const char *json = "{\"tcp\":true,\"time\":10,\"omit\":5,\"parallel\":" _STR(NUM_STREAMS) ",\"bitrate\":" _STR(TARGET_BW_MBPS) "000000}";
-#else
-                    const char *json = "{\"tcp\":true,\"time\":10,\"omit\":5,\"parallel\":" _STR(NUM_STREAMS) "}";
+                    if (ctrl->target_bw_mbps) {
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"bitrate\":%u000000}",
+                            ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
+                            ctrl->target_bw_mbps);
+                    } else {
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u}",
+                            ctrl->duration_s, ctrl->omit_s, ctrl->num_streams);
+                    }
 #endif
-                    ctrl->duration_ms = 10000;
-#endif
-                    ctrl->omit_ms = 5000;
+                    ctrl->duration_ms = ctrl->duration_s * 1000;
+                    ctrl->omit_ms = ctrl->omit_s * 1000;
                     uint32_t json_length = strlen(json);
                     uint32_t be = htonl(json_length);
                     memcpy(ctrl->json_len_buf, &be, 4);
@@ -173,7 +191,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                     iperf3_ctrl_maybe_tx(ctrl);
 
                 } else if (st == CREATE_STREAMS) {
-                    ctrl->num_streams = NUM_STREAMS;
+                    /* ctrl->num_streams was set by the serial `start` command. */
 #ifdef IPERF3_UDP
                     for (int s = 0; s < ctrl->num_streams; s++) {
                         iperf3_udp_stream_t *udp_stream = &ctrl->udp_streams[s];
@@ -244,14 +262,17 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         iperf3_udp_stream_t *stream = &ctrl->udp_streams[s];
                         if (stream->pcb == NULL) continue;
                         stream->phase = SEND_PAYLOAD;
-#ifdef TARGET_BW_MBPS
-                        stream->burst_max = ((uint32_t)(TARGET_BW_MBPS) * 1000000UL) / (8UL * 1460UL * 10UL);
-                        if (stream->burst_max == 0) stream->burst_max = 1;
-#else
-                        stream->burst_max = 10000;
-#endif
+                        /* Datagrams per 100ms tick to hit the rate target; the
+                         * pump is driven 10x/sec (LWIP_TICK_MS). 0 = unlimited. */
+                        if (ctrl->target_bw_mbps) {
+                            stream->burst_max = ((uint64_t)ctrl->target_bw_mbps * 1000000UL)
+                                                / (8UL * (uint64_t)ctrl->payload_len * 10UL);
+                            if (stream->burst_max == 0) stream->burst_max = 1;
+                        } else {
+                            stream->burst_max = 10000;
+                        }
                         stream->tx_buf = ctrl->payload;
-                        stream->payload_len = 1460;
+                        stream->payload_len = ctrl->payload_len;
                         stream->ctrl = ctrl;
                     }
 #else /* IPERF3_TCP */
@@ -264,11 +285,10 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         stream->tx_off = 0;
                         stream->ctrl = ctrl;
                         stream->bytes_this_tick = 0;
-#ifdef TARGET_BW_MBPS
-                        stream->tick_byte_limit = ((uint32_t)(TARGET_BW_MBPS) * 1000000UL) / (8UL * 10UL);
-#else
-                        stream->tick_byte_limit = 0;
-#endif
+                        /* Bytes per 100ms tick to hit the rate target. 0 = unlimited. */
+                        stream->tick_byte_limit = ctrl->target_bw_mbps
+                            ? (uint32_t)(((uint64_t)ctrl->target_bw_mbps * 1000000UL) / (8UL * 10UL))
+                            : 0;
                         iperf3_stream_maybe_tx(stream);
                     }
 #endif
@@ -402,7 +422,7 @@ void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
             iperf3_udp_stream_t *stream = &ctrl->udp_streams[s];
             if (stream->pcb != NULL && stream->phase == SEND_PAYLOAD) {
                 stream->tx_buf = ctrl->payload;
-                stream->payload_len = 1460;
+                stream->payload_len = ctrl->payload_len;
                 stream->ctrl = ctrl;
                 udp_pump(stream);
             }

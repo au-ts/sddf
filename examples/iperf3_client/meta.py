@@ -16,7 +16,9 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
+
+
+assert version("sdfgen").split(".")[1] == "33", "Unexpected sdfgen version"  # enforced by board.py
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -138,6 +140,28 @@ class IperfAppConfig:
         )
 
 
+IPERF3_MAX_PEERS = 8
+
+
+class IperfMultiConfig:
+    """Per-client multi-client coordination config, injected into the
+    .iperf3_multi_config section. Matches struct iperf3_multi_config
+    { uint8_t is_controller, num_peers, listen_channel; uint8_t peer_channels[8]; }."""
+
+    def __init__(self, is_controller: int, listen_channel: int, peer_channels: List[int]):
+        self.is_controller = is_controller
+        self.listen_channel = listen_channel
+        self.peer_channels = peer_channels
+
+    def serialise(self) -> bytes:
+        assert len(self.peer_channels) <= IPERF3_MAX_PEERS
+        peers = bytes(self.peer_channels).ljust(IPERF3_MAX_PEERS, b"\0")
+        return struct.pack(
+            "<BBB" + str(IPERF3_MAX_PEERS) + "s",
+            self.is_controller, len(self.peer_channels), self.listen_channel, peers
+        )
+
+
 # Copies <source>.elf -> <new><number>.elf and returns the new filename.
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     source_elf += ".elf"
@@ -200,7 +224,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=99, cpu=get_core("serial_virt_tx")
     )
-    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
+    # serial_virt_rx lets the client receive keyboard input over the serial console
+    # so a test can be started at runtime (`start <ip> ...`) instead of baked in at
+    # compile time. Keyboard input is routed to one serial client at a time; client0
+    # (the first serial client added) is the default active receiver.
+    serial_virt_rx = ProtectionDomain(
+        "serial_virt_rx", "serial_virt_rx.elf", priority=99, cpu=get_core("serial_virt_rx")
+    )
+    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx,
+                                virt_rx=serial_virt_rx)
 
     ethernet_driver = ProtectionDomain(
         "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400,
@@ -243,10 +275,34 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
             "copier_elf": copier_elf, "copier_pd": copier_pd, "lwip": lwip,
         })
 
+    # Multi-client coordination: client0 is the controller (the only serial
+    # receiver). A shared params region is mapped into every client at a fixed
+    # vaddr; the controller writes the parsed `start` params there and notifies
+    # each peer over a dedicated channel so all clients run the same test
+    # concurrently. (Cross-core notifications work on hardware, not QEMU SMP.)
+    SHARED_PARAMS_VADDR = 0x30_000_000
+    multi_cfg_by_i = {}
+    if len(clients) > 1:
+        shared_params_mr = MemoryRegion(sdf, "iperf3_shared_params", 0x1000)
+        sdf.add_mr(shared_params_mr)
+        for c in clients:
+            c["pd"].add_map(Map(shared_params_mr, SHARED_PARAMS_VADDR, perms="rw"))
+        controller = clients[0]["pd"]
+        peer_channels = []
+        for c in clients[1:]:
+            ch = Channel(controller, c["pd"])
+            sdf.add_channel(ch)
+            peer_channels.append(ch.pd_a_id)
+            multi_cfg_by_i[c["i"]] = IperfMultiConfig(0, ch.pd_b_id, [])
+        multi_cfg_by_i[0] = IperfMultiConfig(1, 0, peer_channels)
+    else:
+        # Single client: it is its own controller with no peers.
+        multi_cfg_by_i[clients[0]["i"]] = IperfMultiConfig(1, 0, [])
+
     # All application PDs become children of their core's benchmark PD.
     child_pds = [
-        uart_driver, serial_virt_tx, ethernet_driver, net_virt_tx, net_virt_rx,
-        timer_driver,
+        uart_driver, serial_virt_tx, serial_virt_rx, ethernet_driver, net_virt_tx,
+        net_virt_rx, timer_driver,
     ]
     for c in clients:
         child_pds.append(c["pd"])
@@ -357,6 +413,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
         with open(f"{output_dir}/iperf3_app_config{i}.data", "wb+") as f:
             f.write(app_config.serialise())
         update_elf_section(c["elf"], "iperf3_app_config", "iperf3_app_config", i)
+
+        with open(f"{output_dir}/iperf3_multi_config{i}.data", "wb+") as f:
+            f.write(multi_cfg_by_i[i].serialise())
+        update_elf_section(c["elf"], "iperf3_multi_config", "iperf3_multi_config", i)
 
     # Benchmark client config goes to client0 only.
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
