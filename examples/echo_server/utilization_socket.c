@@ -117,7 +117,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         return ERR_OK;
     }
 
-    pbuf_copy_partial(p, (void *)data_packet_str, p->tot_len, 0);
+    uint16_t copied = pbuf_copy_partial(p, (void *)data_packet_str, MIN(MAX_TCP_DATA_LEN - 1, p->tot_len), 0);
+    data_packet_str[copied] = '\0';
     err_t error;
 
     if (msg_match(data_packet_str, HELLO)) {
@@ -183,6 +184,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     }
 
+    tcp_recved(pcb, p->tot_len);
+    pbuf_free(p);
     return ERR_OK;
 }
 

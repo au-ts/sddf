@@ -13,9 +13,9 @@
 
 #include <sddf/util/util.h>
 
+#define ECHO_MAX_LEN_TO_TX   (2 * TCP_MSS)
 /* At most ECHO_QUEUE_CAPACITY - 1 bytes can be in the queue */
-#define ECHO_QUEUE_CAPACITY (TCP_WND + 1)
-
+#define ECHO_QUEUE_CAPACITY  (TCP_SND_BUF + ECHO_MAX_LEN_TO_TX + 1)
 /*
  * The echo state stores received data to be echoed back in a circular buffer.
  * Data is written to the tail index, and transmitted from the ack_head in FIFO
@@ -120,19 +120,50 @@ static inline size_t tcp_state_len_unacked(struct echo_state *state)
 /*
  * Callback invoked to update TCP state when data has been acked.
  */
+static void tcp_echo_try_tx(struct echo_state *state, struct tcp_pcb *pcb)
+{
+    bool queued_any = false;
+    size_t len_to_tx = tcp_state_len_to_tx(state);
+    while (len_to_tx > 0) {
+        size_t chunk = MIN(len_to_tx, tcp_state_cont_len_to_tx(state));
+        chunk = MIN(chunk, (size_t)tcp_sndbuf(pcb));
+        chunk = MIN(chunk, (size_t)UINT16_MAX);
+
+        if (chunk == 0) {
+            break;
+        }
+        uint8_t flags = 0;
+        if (chunk < len_to_tx) {
+            flags |= TCP_WRITE_FLAG_MORE;
+        }
+
+        err_t err = tcp_write(pcb, state->buf + state->tcp_write_head, (uint16_t)chunk, flags);
+        if (err != ERR_OK) {
+            break;
+        }
+        state->tcp_write_head = (state->tcp_write_head + chunk) % ECHO_QUEUE_CAPACITY;
+        len_to_tx = tcp_state_len_to_tx(state);
+        queued_any = true;
+    }
+    if (queued_any) {
+        err_t out_err = tcp_output(pcb);
+        if (out_err != ERR_OK) {
+            sddf_dprintf("Error in tcp_output.");
+        }
+    }
+}
+
 static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
     struct echo_state *state = arg;
     assert(state != NULL);
-    assert(len <= tcp_state_len_unacked(state));
 
     state->ack_head = (state->ack_head + len) % ECHO_QUEUE_CAPACITY;
 
     /*
-     * tcp_recved is only for increasing the TCP window, and isn't required to
-     * ACK incoming packets (that is done automatically on receive).
+     * ACKs free send space, so this is the right place to keep draining backlog.
      */
-    tcp_recved(pcb, len);
+    tcp_echo_try_tx(state, pcb);
 
     return ERR_OK;
 }
@@ -150,72 +181,65 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
     if (p == NULL) {
         /* Closing. */
-        sddf_printf("tcp_echo[%s:%d]: closing\n",
-                    ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port
-                   );
+        sddf_printf("tcp_echo[%s:%d]: closing\n", ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port);
 
+        tcp_recv(pcb, NULL);
+        tcp_sent(pcb, NULL);
+        tcp_err(pcb, NULL);
+        tcp_arg(pcb, NULL);
         tcp_state_free(state);
         tcp_arg(pcb, NULL);
 
         err = tcp_close(pcb);
         if (err) {
-            sddf_printf("tcp_echo[%s:%d]: close error: %s\n",
-                        ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
-                        lwip_strerr(err)
-                       );
+            sddf_printf("tcp_echo[%s:%d]: close error: %s\n", ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
+                        lwip_strerr(err));
             return err;
         }
         return ERR_OK;
     }
     if (err) {
-        sddf_printf("tcp_echo[%s:%d]: recv error: %s\n",
-                    ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
-                    lwip_strerr(err)
-                   );
+        sddf_printf("tcp_echo[%s:%d]: recv error: %s\n", ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
+                    lwip_strerr(err));
         return err;
     }
 
     assert(p->tot_len > 0);
 
-    const size_t capacity = MIN(MIN(tcp_state_avail(state), tcp_sndbuf(pcb)), p->tot_len);
-    if (p->tot_len > capacity) {
-        sddf_printf("tcp_echo[%s:%d]: can't handle packet of %d bytes: queue_space=%lu sndbuf=%d snd_queuelen=%d\n",
-                    ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port, p->tot_len, tcp_state_avail(state), tcp_sndbuf(pcb),
-                    pcb->snd_queuelen);
-
-        /*
-         * This causes LWIP to wait a bit and try calling this function again
-         * with the packet. To avoid double-sending any data in the packet, we
-         * don't handle the packet at all, even if we would have space for part
-         * of it.
-         */
+    size_t queue_space = tcp_state_avail(state);
+    if (p->tot_len > queue_space) {
+        sddf_dprintf("tcp_echo[%s:%d]: can't handle recv tot_len=%u len=%u queue_space=%lu sndbuf=%u snd_queuelen=%u\n",
+                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port, p->tot_len, p->len, queue_space, tcp_sndbuf(pcb),
+                     pcb->snd_queuelen);
+       /*
+        * This causes LWIP to wait a bit and try calling this function again
+        * with the packet. To avoid double-sending any data in the packet, we
+        * don't handle the packet at all, even if we would have space for part
+        * of it.
+        */
         return ERR_MEM;
     }
 
     /* Copy received data into tcp state. */
     size_t offset = 0;
-    while (offset < capacity) {
+    while (offset < p->tot_len) {
         const u16_t copied_len = pbuf_copy_partial(p, state->buf + state->tail,
-                                                   MIN(tcp_state_cont_avail(state), capacity - offset), offset);
-
+                                                   MIN(tcp_state_cont_avail(state), p->tot_len - offset), offset);
         offset += copied_len;
         state->tail = (state->tail + copied_len) % ECHO_QUEUE_CAPACITY;
     }
 
-    /* Attempt to transmit more data. */
-    size_t len_to_tx = tcp_state_len_to_tx(state);
-    while (len_to_tx) {
-        size_t tx_batch = MIN(UINT16_MAX, tcp_state_cont_len_to_tx(state));
-        err = tcp_write(pcb, state->buf + state->tcp_write_head, tx_batch, 0);
-        if (err) {
-            /* Retry later. */
-            break;
-        }
-        state->tcp_write_head = (state->tcp_write_head + tx_batch) % ECHO_QUEUE_CAPACITY;
-        len_to_tx = tcp_state_len_to_tx(state);
-    }
+    /*
+     * We have consumed the RX data into our own buffer, so advertise window
+     * growth here, not from tcp_echo_sent().
+     */
+    tcp_recved(pcb, p->tot_len);
 
-    tcp_output(pcb);
+    /*
+     * Keep one immediate TX kick for latency, but ongoing progress now also
+     * happens from tcp_echo_sent() and tcp_echo_poll().
+     */
+    tcp_echo_try_tx(state, pcb);
 
     pbuf_free(p);
     return ERR_OK;
@@ -231,7 +255,9 @@ static void tcp_echo_err(void *arg, err_t err)
 
     sddf_printf("tcp_echo: %s\n", lwip_strerr(err));
 
-    tcp_state_free(state);
+    if (state != NULL) {
+        tcp_state_free(state);
+    }
 }
 
 /*
@@ -246,9 +272,7 @@ static err_t tcp_echo_accept(void *arg, struct tcp_pcb *pcb, err_t err)
         return ERR_MEM;
     }
 
-    sddf_printf("tcp_echo[%s:%d]: accept\n",
-                ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port
-               );
+    sddf_printf("tcp_echo[%s:%d]: accept\n", ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port);
 
     state->tail = 0;
     state->ack_head = 0;
