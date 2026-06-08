@@ -1,8 +1,7 @@
 """
 This file provides functions to correctly tokenize the C Copier.
 The `preprocessed` function is sound, but the `tokenized` function may need
-to be updated in order to tokenize the other Networking components. See
-bottom of file for example usage.
+to be updated in order to tokenize the other Networking components.
 """
 
 from enum import Enum
@@ -25,7 +24,10 @@ class PreprocessState(AutoNumber):
     CHAR_CONST = () # character constant
 
 
-def preprocessed(source):
+def preprocessed(source: str):
+    """Return preprocessed source, with comments removed and semicolons in string
+    literals and character constants replaced with full stops"""
+    
     space = " "
     source_chars = list(source)
     
@@ -62,29 +64,31 @@ def preprocessed(source):
         elif state == PreprocessState.STRING_LIT:
             if char == '"' and source[i - 1] != "\\":
                 state = PreprocessState.NORMAL
+            elif char == ";":
+                source_chars[i] = "."
         elif state == PreprocessState.CHAR_CONST:
             if char == "'" and source[i - 1] != "\\":
                 state = PreprocessState.NORMAL
+            elif char == ";":
+                source_chars[i] = "."
         i += 1
     
     return "".join(source_chars)
 
 
-def expr_call(kind):
-    return fr"\((?P<{kind}_expr>(?&expr))\)"
+def cond_of(kind):
+    return fr"\((?P<{kind}_cond>(?&cond))\)"
 
 
 token_pattern = regex.compile(fr"""
-    (?(DEFINE)(?P<expr>[^()]*(?:\((?&expr)\)[^()]*)*))
-    \s+(?:
-	    (?P<if_cond>if\s*{expr_call("if")})|
-	    (?P<else>else[\s])|
-	    (?P<while_cond>while\s*{expr_call("while")})
-    )
-    |\s*(?:
-	    (?P<lbrace>{{)|
-	    (?P<rbrace>}})|
-	    (?P<sc_suffixed>[^;]*);
+    (?(DEFINE)(?P<cond>[^()]*(?:\((?&cond)\)[^()]*)*))
+    \s*(?:
+	    (?P<if_header>if\s*{cond_of("if")})
+	   |(?P<else>else)(?=\s|{{)
+	   |(?P<while_header>while\s*{cond_of("while")})
+	   |(?P<lbrace>{{)
+	   |(?P<rbrace>}})
+	   |(?P<stmt_expr>[^;]*);
     )
 """, regex.VERBOSE)
 
@@ -96,7 +100,7 @@ class TokenKind(AutoNumber):
     WHILE = ()
     LBRACE = () # left brace
     RBRACE = () # right brace
-    SC_SUFFIXED = ()
+    SEMICOLON = ()
 
 
 class Token:
@@ -110,30 +114,35 @@ class Token:
         return f"Token(kind={self.kind.name}, line_no={self.line_no}, literal={self.literal})"
 
 
-def tokenized(source):
+def tokenized(source: str):
+    """Return the token stream corresponding to a function, such that the
+    left brace of the function body is the first character of `source`"""
+    
     tokens = []
     
     for match_object in token_pattern.finditer(source):
-        if match_object.group("if_cond") is not None: 
+        if match_object.group("if_header") is not None: 
             tokens.extend([
-                Token(TokenKind.IF, match_object.start("if_cond"), None),
-                Token(TokenKind.EXPR, match_object.start("if_expr"), match_object.group("if_expr"))
+                Token(TokenKind.IF, match_object.start("if_header"), None),
+                Token(TokenKind.EXPR, match_object.start("if_cond"), match_object.group("if_cond"))
             ])
         elif match_object.group("else") is not None:
             tokens.append(Token(TokenKind.ELSE, match_object.start("else"), None))
-        elif match_object.group("while_cond") is not None:
+        elif match_object.group("while_header") is not None:
             tokens.extend([
-                Token(TokenKind.WHILE, match_object.start("while_cond"), None),
-                Token(TokenKind.EXPR, match_object.start("while_expr"), match_object.group("while_expr"))
+                Token(TokenKind.WHILE, match_object.start("while_header"), None),
+                Token(TokenKind.EXPR, match_object.start("while_cond"), match_object.group("while_cond"))
             ])
         elif match_object.group("lbrace") is not None:
             tokens.append(Token(TokenKind.LBRACE, match_object.start("lbrace"), None))
         elif match_object.group("rbrace") is not None:
             tokens.append(Token(TokenKind.RBRACE, match_object.start("rbrace"), None))
-        elif match_object.group("sc_suffixed") is not None:
-            tokens.append(Token(
-                TokenKind.SC_SUFFIXED, match_object.start("sc_suffixed"), match_object.group("sc_suffixed")
-            ))
+        elif match_object.group("stmt_expr") is not None:
+            start_expr, end_expr = match_object.span("stmt_expr")
+            tokens.extend([
+                Token(TokenKind.EXPR, start_expr, match_object.group("stmt_expr")),
+                Token(TokenKind.SEMICOLON, end_expr + 1, None)
+            ])
         else:
             raise Exception(f"Unexpected group: {repr(match_object.group())}")
 
@@ -149,15 +158,4 @@ def tokenized(source):
         token.line_no = line_no
     
     return tokens
-
-
-"""
-Example usage:
-
-clean_source = preprocessed(source)
-tokens = tokenized(clean_source)
-
-for token in tokens:
-    print(token)
-"""
 
