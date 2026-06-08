@@ -70,6 +70,8 @@ bench_pmu_event_info_t pmu_event_table[] = {
     { "Write to TTBR", SEL4BENCH_EVENT_TTBR_WRITE_RETIRED },
     { "Bus cycles", SEL4BENCH_EVENT_BUS_CYCLES },
     { "Overflow counter", SEL4BENCH_EVENT_CHAIN },
+    { "Stall backend (load)", SEL4BENCH_EVENT_STALL_BACKEND_LD },
+    { "Stall backend (store)", SEL4BENCH_EVENT_STALL_BACKEND_ST },
 };
 
 static char *child_name(uint8_t child_id)
