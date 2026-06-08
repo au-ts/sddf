@@ -540,20 +540,23 @@ def generate(
 # See the echo server README.md for more information, in particular if you wish
 # to track a PMU event which is not currently listed.
 bench_pmu_events = {
-    "L1I_CACHE_MISS": (0x1, []),
-    "L1I_TLB_MISS": (0x2, []),
-    "L1D_CACHE_MISS": (0x3, []),
-    "L1D_CACHE": (0x4, []),
-    "L1D_TLB_MISS": (0x5, []),
-    "LOAD_INSTRUCTIONS": (0x6, []),
-    "STORE_INSTRUCTIONS": (0x7, []),
-    "INSTRUCTIONS": (0x8, []),
-    "BRANCH_MISPREDICT": (0x10, []),
-    "CPU_CYCLES": (0x11, []),
-    "MEM_ACCESS": (0x13, []),
-    "CHAIN": (0x1E, []),
-    "STALL_BACKEND_LD": (0x1F, ["rpi4b_1gb"]),
-    "STALL_BACKEND_ST": (0x20, ["rpi4b_1gb"]),
+    "L1I_CACHE_MISS": (1, []),
+    "L1I_TLB_MISS": (2, []),
+    "L1D_CACHE_MISS": (3, []),
+    "L1D_CACHE": (4, []),
+    "L1D_TLB_MISS": (5, []),
+    "LOAD_INSTRUCTIONS": (6, []),
+    "STORE_INSTRUCTIONS": (7, []),
+    "INSTRUCTIONS": (8, []),
+    "BRANCH_MISPREDICT": (16, []),
+    "CPU_CYCLES": (17, []),
+    "MEM_ACCESS": (19, []),
+    "CHAIN": (30, []),
+    "STALL_FRONTEND_CACHE": (31, ["rpi4b_1gb"]),
+    "STALL_FRONTEND_TLB": (32, ["rpi4b_1gb"]),
+    "STALL_BACKEND_ILOCK": (33, ["rpi4b_1gb"]),
+    "STALL_BACKEND_LD": (34, ["rpi4b_1gb"]),
+    "STALL_BACKEND_ST": (35, ["rpi4b_1gb"]),
 }
 
 if __name__ == "__main__":
