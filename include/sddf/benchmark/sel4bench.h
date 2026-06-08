@@ -22,15 +22,55 @@ it may temporarily disable the cycle counter.
 */
 
 /* seL4 tracked benchmarking events. */
-#define SEL4BENCH_EVENT_CACHE_L1I_MISS              0x01
-#define SEL4BENCH_EVENT_CACHE_L1D_MISS              0x03
-#define SEL4BENCH_EVENT_TLB_L1I_MISS                0x02
-#define SEL4BENCH_EVENT_TLB_L1D_MISS                0x05
-#define SEL4BENCH_EVENT_EXECUTE_INSTRUCTION         0x08
-#define SEL4BENCH_EVENT_BRANCH_MISPREDICT           0x10
-#define SEL4BENCH_EVENT_CCNT                        0x11
-#define SEL4BENCH_EVENT_MEMORY_ACCESS               0x13
+#define SEL4BENCH_EVENT_SW_INCR                     0x00
+#define SEL4BENCH_EVENT_L1I_CACHE_REFILL            0x01
+#define SEL4BENCH_EVENT_L1I_TLB_REFILL              0x02
+#define SEL4BENCH_EVENT_L1D_CACHE_REFILL            0x03
+#define SEL4BENCH_EVENT_L1D_CACHE                   0x04
+#define SEL4BENCH_EVENT_L1D_TLB_REFILL              0x05
+#define SEL4BENCH_EVENT_LD_RETIRED                  0x06
+#define SEL4BENCH_EVENT_ST_RETIRED                  0x07
+#define SEL4BENCH_EVENT_INST_RETIRED                0x08
+#define SEL4BENCH_EVENT_EXC_TAKEN                   0x09
+#define SEL4BENCH_EVENT_EXC_RETURN                  0x0A
+#define SEL4BENCH_EVENT_CID_WRITE_RETIRED           0x0B
+#define SEL4BENCH_EVENT_PC_WRITE_RETIRED            0x0C
+#define SEL4BENCH_EVENT_BR_IMMED_RETIRED            0x0D
+#define SEL4BENCH_EVENT_BR_RETURN_RETIRED           0x0E
+#define SEL4BENCH_EVENT_UNALIGNED_LDST_RETIRED      0x0F
+#define SEL4BENCH_EVENT_BR_MIS_PRED                 0x10
+#define SEL4BENCH_EVENT_CPU_CYCLES                  0x11
+#define SEL4BENCH_EVENT_BR_PRED                     0x12
+#define SEL4BENCH_EVENT_MEM_ACCESS                  0x13
+#define SEL4BENCH_EVENT_L1I_CACHE                   0x14
+#define SEL4BENCH_EVENT_L1D_CACHE_WB                0x15
+#define SEL4BENCH_EVENT_L2D_CACHE                   0x16
+#define SEL4BENCH_EVENT_L2D_CACHE_REFILL            0x17
+#define SEL4BENCH_EVENT_L2D_CACHE_WB                0x18
+#define SEL4BENCH_EVENT_BUS_ACCESS                  0x19
+#define SEL4BENCH_EVENT_MEMORY_ERROR                0x1A
+#define SEL4BENCH_EVENT_INST_SPEC                   0x1B
+#define SEL4BENCH_EVENT_TTBR_WRITE_RETIRED          0x1C
+#define SEL4BENCH_EVENT_BUS_CYCLES                  0x1D
 #define SEL4BENCH_EVENT_CHAIN                       0x1E
+#define SEL4BENCH_EVENT_L1D_CACHE_ALLOCATE          0x1F
+#define SEL4BENCH_EVENT_L2D_CACHE_ALLOCATE          0x20
+#define SEL4BENCH_EVENT_BR_RETIRED                  0x21
+#define SEL4BENCH_EVENT_BR_MIS_PRED_RETIRED         0x22
+#define SEL4BENCH_EVENT_STALL_FRONTEND              0x23
+#define SEL4BENCH_EVENT_STALL_BACKEND               0x24
+#define SEL4BENCH_EVENT_L1D_TLB                     0x25
+#define SEL4BENCH_EVENT_L1I_TLB                     0x26
+#define SEL4BENCH_EVENT_L2I_CACHE                   0x27
+#define SEL4BENCH_EVENT_L2I_CACHE_REFILL            0x28
+#define SEL4BENCH_EVENT_L3D_CACHE_ALLOCATE          0x29
+#define SEL4BENCH_EVENT_L3D_CACHE_REFILL            0x2A
+#define SEL4BENCH_EVENT_L3D_CACHE                   0x2B
+#define SEL4BENCH_EVENT_L3D_CACHE_WB                0x2C
+#define SEL4BENCH_EVENT_L2D_TLB_REFILL              0x2D
+#define SEL4BENCH_EVENT_L2I_TLB_REFILL              0x2E
+#define SEL4BENCH_EVENT_L2D_TLB                     0x2F
+#define SEL4BENCH_EVENT_L2I_TLB                     0x30
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31

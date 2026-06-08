@@ -40,20 +40,3 @@ struct bench {
  * benchmark PD's ELF file.
  */
 #define BENCHMARK_MAX_PMU_EVENTS 6
-
-/**
- * PMU event identifiers - used by the metaprogram to select events. Event i is
- * described by the pmu_event_table[i] entry in benchmark.c.
- */
-typedef enum {
-    CACHE_L1I_MISS = 0,
-    CACHE_L1D_MISS,
-    TLB_L1I_MISS,
-    TLB_L1D_MISS,
-    EXECUTE_INSTRUCTION,
-    BRANCH_MISPREDICT,
-    CPU_CYCLES,
-    MEM_ACCESS,
-    CHAIN,
-    PMU_EVENT_COUNT,
-} bench_pmu_events_t;
