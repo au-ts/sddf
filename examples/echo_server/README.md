@@ -259,7 +259,7 @@ On AArch64 boards, the [benchmark PD](/benchmark/benchmark.c) has access to 6
 The events can be set at build time using the `BENCH_PMU_EVENTS` make flag:
 
 ```sh
-make BENCH_PMU_EVENTS=EXECUTE_INSTRUCTION,MEM_ACCESS,CACHE_L1D_MISS
+make BENCH_PMU_EVENTS=INSTRUCTIONS,MEM_ACCESS,L1D_CACHE_MISS
 ```
 
 Alternatively the events can be set by modifying the `pmu_events` variable in
@@ -267,9 +267,9 @@ Alternatively the events can be set by modifying the `pmu_events` variable in
 
 ```py
 pmu_events = [
-    "EXECUTE_INSTRUCTION",
+    "INSTRUCTIONS",
     "MEM_ACCESS",
-    "CACHE_L1D_MISS",
+    "L1D_CACHE_MISS",
 ]
 ```
 
@@ -282,7 +282,7 @@ on the event they are tracking. We have implemented two solutions to this:
    the PMU event flag as follows:
 
 ```sh
-BENCH_PMU_EVENTS=EXECUTE_INSTRUCTION,CHAIN
+BENCH_PMU_EVENTS=INSTRUCTIONS,CHAIN
 ```
 
  Then the total count of instructions executed will be given by:
@@ -312,11 +312,11 @@ tracking the following events:
 
 ```py
 pmu_events = [
-    "EXECUTE_INSTRUCTION",
+    "INSTRUCTIONS",
     "CHAIN",
     "MEM_ACCESS",
     "CHAIN",
-    "CACHE_L1D_MISS",
+    "L1D_CACHE_MISS",
     "CHAIN",
 ]
 ```
@@ -324,22 +324,15 @@ pmu_events = [
 #### Available PMU events
 
 For a list of the PMU events that are currently available to select, check the
-`bench_pmu_events_t` enum in [bench.h](/include/sddf/benchmark/bench.h), or
-alternatively the `bench_pmu_events` dictionary in the
-[metaprogram](/examples/echo_server/meta.py). It is important that these two
-data structures *always match*, as this is how the build system transfers the
-user selected events to the benchmark PD.
+`bench_pmu_events` dictionary in the [metaprogram](/examples/echo_server/meta.py).
 
 Adding support for an unlisted PMU event is simple:
-1. Create a new `bench_pmu_events_t` enum member for the event in
-   [bench.h](/include/sddf/benchmark/bench.h). The value of this enum is now the
-   event's identifier.
-2. Add an entry to the `bench_pmu_events` dictionary in the
+1. Add an entry to the `bench_pmu_events` dictionary in the
    [metaprogram](/examples/echo_server/meta.py) recording the event's
    identifier.
-3. [Optional] List any boards that don't support tracking of the event in the
+2. [Optional] List any boards that don't support tracking of the event in the
    dictionary entry. This enables build-time failure in the error case.
-4. Add an entry to the `pmu_event_table` in
+3. Add an entry to the `pmu_event_table` in
    [benchmark.c](/benchmark/benchmark.c) at the index of the event's identifier.
    This table is used for results reporting, so requires a brief description of
    the event, as well as the event's seL4bench identifier.
