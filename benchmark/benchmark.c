@@ -70,6 +70,9 @@ bench_pmu_event_info_t pmu_event_table[] = {
     { "Write to TTBR", SEL4BENCH_EVENT_TTBR_WRITE_RETIRED },
     { "Bus cycles", SEL4BENCH_EVENT_BUS_CYCLES },
     { "Overflow counter", SEL4BENCH_EVENT_CHAIN },
+    { "Stall frontend (i-cache)", SEL4BENCH_EVENT_STALL_FRONTEND_CACHE },
+    { "Stall frontend (i-tlb)", SEL4BENCH_EVENT_STALL_FRONTEND_TLB },
+    { "Stall backend (interlock)", SEL4BENCH_EVENT_STALL_BACKEND_ILOCK },
     { "Stall backend (load)", SEL4BENCH_EVENT_STALL_BACKEND_LD },
     { "Stall backend (store)", SEL4BENCH_EVENT_STALL_BACKEND_ST },
 };
