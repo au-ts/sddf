@@ -39,14 +39,36 @@ typedef struct {
  * i, see bench.h
  */
 bench_pmu_event_info_t pmu_event_table[] = {
-    { "L1 i-cache misses", SEL4BENCH_EVENT_CACHE_L1I_MISS },
-    { "L1 d-cache misses", SEL4BENCH_EVENT_CACHE_L1D_MISS },
-    { "L1 i-tlb misses", SEL4BENCH_EVENT_TLB_L1I_MISS },
-    { "L1 d-tlb misses", SEL4BENCH_EVENT_TLB_L1D_MISS },
-    { "Instructions", SEL4BENCH_EVENT_EXECUTE_INSTRUCTION },
-    { "Branch mispredictions", SEL4BENCH_EVENT_BRANCH_MISPREDICT },
-    { "CPU cycles", SEL4BENCH_EVENT_CCNT },
-    { "Data memory access", SEL4BENCH_EVENT_MEMORY_ACCESS },
+    { "Software increment", SEL4BENCH_EVENT_SW_INCR },
+    { "L1 i-cache misses", SEL4BENCH_EVENT_L1I_CACHE_REFILL },
+    { "L1 i-tlb misses", SEL4BENCH_EVENT_L1I_TLB_REFILL },
+    { "L1 d-cache misses", SEL4BENCH_EVENT_L1D_CACHE_REFILL },
+    { "L1 d-cache access", SEL4BENCH_EVENT_L1D_CACHE },
+    { "L1 d-tlb misses", SEL4BENCH_EVENT_L1D_TLB_REFILL },
+    { "Load instructions", SEL4BENCH_EVENT_LD_RETIRED },
+    { "Store instructions", SEL4BENCH_EVENT_ST_RETIRED },
+    { "Instructions", SEL4BENCH_EVENT_INST_RETIRED },
+    { "Exception taken", SEL4BENCH_EVENT_EXC_TAKEN },
+    { "Exception return", SEL4BENCH_EVENT_EXC_RETURN },
+    { "contextidr writes", SEL4BENCH_EVENT_CID_WRITE_RETIRED },
+    { "Software change of the PC", SEL4BENCH_EVENT_PC_WRITE_RETIRED },
+    { "Branch (immediate)", SEL4BENCH_EVENT_BR_IMMED_RETIRED },
+    { "Function return", SEL4BENCH_EVENT_BR_RETURN_RETIRED },
+    { "Unaligned load or store", SEL4BENCH_EVENT_UNALIGNED_LDST_RETIRED },
+    { "Branch mispredictions", SEL4BENCH_EVENT_BR_MIS_PRED },
+    { "CPU cycles", SEL4BENCH_EVENT_CPU_CYCLES },
+    { "Predictable branches", SEL4BENCH_EVENT_BR_PRED },
+    { "Data memory access", SEL4BENCH_EVENT_MEM_ACCESS },
+    { "L1 i-cache access", SEL4BENCH_EVENT_L1I_CACHE },
+    { "L1 d-cache write-back", SEL4BENCH_EVENT_L1D_CACHE_WB },
+    { "L2 d-cache access", SEL4BENCH_EVENT_L2D_CACHE },
+    { "L2 d-cache refill", SEL4BENCH_EVENT_L2D_CACHE_REFILL },
+    { "L2 d-cache write-back", SEL4BENCH_EVENT_L2D_CACHE_WB },
+    { "Bus access", SEL4BENCH_EVENT_BUS_ACCESS },
+    { "Memory error", SEL4BENCH_EVENT_MEMORY_ERROR },
+    { "Instructions speculatively executed", SEL4BENCH_EVENT_INST_SPEC },
+    { "Write to TTBR", SEL4BENCH_EVENT_TTBR_WRITE_RETIRED },
+    { "Bus cycles", SEL4BENCH_EVENT_BUS_CYCLES },
     { "Overflow counter", SEL4BENCH_EVENT_CHAIN },
 };
 
@@ -230,7 +252,7 @@ static void benchmark_stop(void)
     sddf_printf("{CORE %u: \n", benchmark_config.core);
     uint8_t i = 0;
     while (i < benchmark_config.num_pmu_events) {
-        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
+        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == SEL4BENCH_EVENT_CHAIN) {
             sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
                         counter_values[i] + (counter_values[i + 1] << 32));
             i += 2;
@@ -298,7 +320,7 @@ void init(void)
     sddf_printf("BENCH|LOG: ENABLE_PMU_EVENTS defined. Tracking PMU events:\n");
     uint8_t event = 0, i = 0;
     while (i < benchmark_config.num_pmu_events) {
-        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
+        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == SEL4BENCH_EVENT_CHAIN) {
             sddf_printf("%u. %s (64-bit counter)\n", event, pmu_event_table[benchmark_config.pmu_events[i]].event_name);
             i += 2;
         } else {

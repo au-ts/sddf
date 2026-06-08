@@ -540,15 +540,17 @@ def generate(
 # See the echo server README.md for more information, in particular if you wish
 # to track a PMU event which is not currently listed.
 bench_pmu_events = {
-    "CACHE_L1I_MISS": (0, []),
-    "CACHE_L1D_MISS": (1, []),
-    "TLB_L1I_MISS": (2, []),
-    "TLB_L1D_MISS": (3, []),
-    "EXECUTE_INSTRUCTION": (4, []),
-    "BRANCH_MISPREDICT": (5, []),
-    "CPU_CYCLES": (6, []),
-    "MEM_ACCESS": (7, []),
-    "CHAIN": (8, []),
+    "L1I_CACHE_MISS": (0x1, []),
+    "L1I_TLB_MISS": (0x2, []),
+    "L1D_CACHE_MISS": (0x3, []),
+    "L1D_TLB_MISS": (0x5, []),
+    "LOAD_INSTRUCTIONS": (0x6, []),
+    "STORE_INSTRUCTIONS": (0x7, []),
+    "INSTRUCTIONS": (0x8, []),
+    "BRANCH_MISPREDICT": (0x10, []),
+    "CPU_CYCLES": (0x11, []),
+    "MEM_ACCESS": (0x13, []),
+    "CHAIN": (0x1E, []),
 }
 
 if __name__ == "__main__":
