@@ -71,6 +71,8 @@ it may temporarily disable the cycle counter.
 #define SEL4BENCH_EVENT_L2I_TLB_REFILL              0x2E
 #define SEL4BENCH_EVENT_L2D_TLB                     0x2F
 #define SEL4BENCH_EVENT_L2I_TLB                     0x30
+#define SEL4BENCH_EVENT_STALL_BACKEND_LD            0xE7
+#define SEL4BENCH_EVENT_STALL_BACKEND_ST            0xE8
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31
