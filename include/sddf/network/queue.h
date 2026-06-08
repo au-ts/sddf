@@ -150,7 +150,12 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
         return -1;
     }
 
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
     free->buffers[tail % capacity] = buffer;
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
     __atomic_store_n(&free->tail, tail + 1, __ATOMIC_RELAXED);
 
     return 0;
@@ -174,7 +179,12 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
         return -1;
     }
 
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
     active->buffers[tail % capacity] = buffer;
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
     __atomic_store_n(&active->tail, tail + 1, __ATOMIC_RELAXED);
 
     return 0;
@@ -198,7 +208,12 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
         return -1;
     }
 
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
     *buffer = free->buffers[head % capacity];
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
     __atomic_store_n(&free->head, head + 1, __ATOMIC_RELAXED);
 
     return 0;
@@ -222,7 +237,12 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
         return -1;
     }
 
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
     *buffer = active->buffers[head % capacity];
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
     __atomic_store_n(&active->head, head + 1, __ATOMIC_RELAXED);
 
     return 0;
