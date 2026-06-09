@@ -239,7 +239,7 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
         node = query_same_domain_object_by_name(&object_current, name_segment);
         left_num_segments--;
 
-        /* sddf_dprintf("  Parent: %s, Name segment: %s\n", object_current.parent->name, name_segment); */
+        sddf_dprintf("  Parent: %s, Name segment: %s, left_num_segments: %u\n", node->name, name_segment, left_num_segments);
         /* sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current); */
     } else if (name_type == '\\') {
         // Root Path
@@ -260,6 +260,7 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
     }
 
     if (left_num_segments > 0) {
+        object_current.parent = node;
         return read_if_name_string(node, left_num_segments);
     }
 
@@ -267,10 +268,10 @@ aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_se
         return NULL;
     }
 
-    if (node->op_code == NAME_OP || node->op_code == METHOD_OP || node->op_code == DEVICE_OP) {
+    if (node->op_code == NAME_OP || node->op_code == METHOD_OP || node->op_code == DEVICE_OP || node->op_code == OP_REGION_OP || node->op_code == FIELD_OP) {
         return node;
     } else {
-        sddf_dprintf("Object \'%s\' is not \'METHOD\' or \'NAME\', try parsing the following name segment at 0x%lx\n", node->name, (uintptr_t)scanner.current);
+        sddf_dprintf("Object \'%s\' has invalid OpCode: 0x%x, try parsing the following name segment at 0x%lx\n", node->name, node->op_code, (uintptr_t)scanner.current);
         return read_if_name_string(node, 1);
     }
 
@@ -303,6 +304,7 @@ uint32_t get_integer_data(bool if_execute_method)
 {
     uint8_t data_len = advance();
 
+    sddf_dprintf("data_len: %u\n", data_len);
     switch (data_len) {
         case DATA_OBJ_ZERO:
             return 0;
@@ -328,7 +330,9 @@ uint32_t get_integer_data(bool if_execute_method)
         }
         case LEQUAL_OP: {
             uint32_t operand_a = get_integer_data(if_execute_method);
+            sddf_dprintf("operand_a: %u\n", operand_a);
             uint32_t operand_b = get_integer_data(if_execute_method);
+            sddf_dprintf("operand_b: %u\n", operand_b);
             if (operand_a == operand_b) {
                 return 1;
             }
@@ -336,15 +340,18 @@ uint32_t get_integer_data(bool if_execute_method)
         }
         default: {
             scanner.current--;
+            sddf_dprintf("try read name object\n");
             aml_object_t *node = read_if_name_string(&object_root, 1);
             if (node) {
                 if (node->op_code == NAME_OP) {
+                    uint8_t *save_location = scanner.current;
+                    scanner.current = node->start + 1;
+                    skip_name_string();
                     node->value = get_integer_data(false);
+                    scanner.current = save_location;
                     sddf_dprintf("Found object \'%s\' with value: %u\n", node->name, node->value);
                     return node->value;
                 } else if (node->op_code == METHOD_OP) {
-                    // No need to get integer from MethodObject in our case
-                    /* sddf_dprintf("Warning: method is not executed yet\n"); */
                     if (if_execute_method) {
                         return (uint32_t)execute_method(node, RET_TYPE_INTEGER, 0);
                     }
@@ -445,7 +452,8 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
                 break;
             }
             case OP_REGION_OP: {
-                skip_name_string(); // Name String
+                make_object_if_not_exist(parent, OP_REGION_OP);
+                /* skip_name_string(); // Name String */
                 advance();          // 1 byte for Region Space ID
                 get_integer_data(false); // Region offset
                 get_integer_data(false); // Region length
@@ -454,7 +462,44 @@ void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
                 break;
             }
             case FIELD_OP: {
+                sddf_dprintf("FieldOp, at 0x%lx\n", (uintptr_t)scanner.current);
                 next_obj_start = get_pkt_end(); // By reading pktLen
+                /* skip_name_string(); // Name String */
+                aml_object_t *op_region_node = read_if_name_string(parent, 1);
+                if (op_region_node) {
+                    sddf_dprintf("Found OpRegion node: %s\n", op_region_node->name);
+                } else {
+                    sddf_dprintf("OpRegion node is not found\n");
+                }
+                advance(); // FieldFlags
+
+                uint32_t offset = 0;
+                while (scanner.current < next_obj_start) {
+                    uint8_t byte = advance();
+                    if ((byte >= 'A' && byte <= 'Z') || byte == '_') {
+                        scanner.current--;
+                        aml_object_t *field_obj = make_object_if_not_exist(op_region_node, FIELD_OP);
+                        uint8_t *field_element_start = scanner.current;
+                        uint32_t bit_width = get_pkt_end() - field_element_start;
+                        field_obj->value = (offset << 8) | bit_width;
+                        sddf_dprintf("field name: %s, bit_width: %u, offset: 0x%x\n", field_obj->name, bit_width, offset);
+                        offset += bit_width;
+
+                    } else if (byte == 0x00) {
+                        uint8_t *field_element_start = scanner.current;
+                        uint8_t *reserved_pkt_end = get_pkt_end();
+                        uint32_t padding_bits = (uint32_t)(reserved_pkt_end - field_element_start);
+                        offset += padding_bits;
+                        sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits);
+                        sddf_dprintf("offset: 0x%x\n", offset);
+                    } else if (byte == 0x01) {
+                        uint8_t type = advance();
+                        uint8_t attrib = advance();
+                        sddf_dprintf("Access field - type: 0x%x, attrib: 0x%x\n", type, attrib);
+                    } else {
+                        sddf_dprintf("Error: unknown prefix - 0x%x\n", byte);
+                    }
+                }
                 break;
             }
             case CREATE_WORD_FIELD_OP:
@@ -659,14 +704,14 @@ uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, 
     skip_name_string();
     advance(); // Get MethodFlags
 
-    object_current.parent = node;
-
     bool if_condition = false; // Assume that there is only one layer of condition statements
     uint8_t buffer[1024];
 
     uint8_t byte = advance();
     sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)pkt_end);
     while (scanner.current < pkt_end) {
+        object_current.parent = node;
+
         switch (byte) {
             case IF_OP: {
                 sddf_dprintf("Found IF_OP\n");

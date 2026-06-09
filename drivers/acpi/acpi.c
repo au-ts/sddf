@@ -645,7 +645,7 @@ void init(void)
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     object_pool.next = aml_object_pool_start;
-    object_pool.end = aml_object_pool_start + 0x20000;
+    object_pool.end = aml_object_pool_start + 0x30000;
     sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current);
 
     uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t);
