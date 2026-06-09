@@ -594,11 +594,11 @@ if __name__ == "__main__":
     else:
         # If benchmarking PMU events are not provided, we use these default events
         pmu_events = [
-            "EXECUTE_INSTRUCTION",
+            "INSTRUCTIONS",
             "CHAIN",
             "MEM_ACCESS",
             "CHAIN",
-            "CACHE_L1D_MISS",
+            "L1D_CACHE_MISS",
             "CHAIN",
         ]
 
