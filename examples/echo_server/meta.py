@@ -526,7 +526,7 @@ def generate(
 
 # ARM PMU event identifier dictionary:
 #
-# The pmu_event_table structure (defined in benchmar.c) lists the set of PMU
+# The pmu_event_table structure (defined in benchmark.c) lists the set of PMU
 # events the system can be configured to track during a benchmark run. The
 # python dictionary bench_pmu_events encodes this enum. For each enum event x:
 #
