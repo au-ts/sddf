@@ -35,10 +35,9 @@ typedef struct {
 } bench_pmu_event_info_t;
 
 /**
- * PMU event lookup table. Entry i corresponds to bench_pmu_events_t enum value
- * i, see bench.h
+ * PMU event lookup table.
  */
-bench_pmu_event_info_t pmu_event_table[] = {
+static const bench_pmu_event_info_t pmu_event_table[] = {
     { "Software increment", SEL4BENCH_EVENT_SW_INCR },
     { "L1 i-cache misses", SEL4BENCH_EVENT_L1I_CACHE_REFILL },
     { "L1 i-tlb misses", SEL4BENCH_EVENT_L1I_TLB_REFILL },
