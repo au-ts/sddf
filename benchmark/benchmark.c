@@ -115,7 +115,7 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
     uint64_t overflow_status;
     PMU_READ(PMOVSCLR, overflow_status);
     for (int i = 0; i < 6; i++) {
-        if (i % 2 == 0 && (pmu_event_table[benchmark_config.pmu_events[i + 1]].sel4bench_id & 0xFFFF) == SEL4BENCH_EVENT_CHAIN) {
+        if (i % 2 == 0 && (pmu_event_table[benchmark_config.pmu_events[i + 1]].sel4bench_id & 0xFFFF) == SDDFBENCH_EVENT_CHAIN) {
             uint64_t event = (events[i + 1] << 32) + events[i];
             sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name, event);
             i++;
