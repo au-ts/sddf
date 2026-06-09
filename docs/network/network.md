@@ -35,12 +35,15 @@ the diagram:
   the Rx DMA region into [client-specific Rx data regions](#data-regions). In
   contrast to the other network components, each client [has its own copy
   component](#copy-components-and-availability).
+* There is also an *optional* [vswitch](/docs/network/vswitch.md) component that allows
+  for creating virtual internal networks controlled by the access control lists.
 
 Networking clients can both receive (Rx) and transmit (Tx) data unless the
 system configures them to be Rx or Tx only. Rx clients interface only with their
 respective copiers to receive packets (or in the rare case where they are
 *trusted*, the Rx virtualiser). Tx clients interface only with the Tx
-virtualiser to transmit packets.
+virtualiser to transmit packets. If a client is connected to a vswitch, it
+acts as a virtualiser from client's perspective.
 
 Network components communicate using shared memory (queues and data) and
 asynchronous notifications (Microkit channels). The diagram below gives an
@@ -61,8 +64,9 @@ particular client (referred to as client data regions).
 
 There are separate Rx and Tx DMA regions. In the case of Tx, each client is
 allocated its own Tx DMA region which it has exclusive access to. The only other
-component that has permissions to a client's Tx DMA region is the Tx
-virtualiser, which it requires for performing cache cleaning operations.
+components that have permissions to a client's Tx DMA region are the Tx
+virtualiser, which it requires for performing cache cleaning operations and vswitch,
+requiring it for reading the destination MAC address of a sent packet.
 
 In contrast, as our multiplexing is performed by the virtualiser, all clients
 share a single Rx DMA region. Since giving clients direct access to this global
@@ -663,3 +667,5 @@ Components using lwIP will also require the lwIP include directories
 An example echo server system utilising the network subsystem can be found
 [here](/examples/echo_server/). The [README](/examples/echo_server/README.md)
 describes how to build, run, test and benchmark the system.
+There is also an example for a system with vswitch [here](/examples/vswitch/).
+Same as for echo_server the [README]() describes how to build, run, test and benchmark the system.
