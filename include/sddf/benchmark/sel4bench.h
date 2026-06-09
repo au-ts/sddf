@@ -10,8 +10,8 @@
 #include <sddf/util/util.h>
 #include <os/sddf.h>
 
-/* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
-https://github.com/seL4/seL4_libs
+/* This library contains a selection of libseL4bench used for sDDF benchmarking with modifications.
+libsel4bench can be found here: https://github.com/seL4/seL4_libs
 
 The definitions are specific to ARMv8 - different definitions will need to used for different architectures.
 
@@ -21,65 +21,65 @@ This library configures, resets and starts event counters. It also reconfigures 
 it may temporarily disable the cycle counter.
 */
 
-/* seL4 tracked benchmarking events. */
-#define SEL4BENCH_EVENT_SW_INCR                     0x00
-#define SEL4BENCH_EVENT_L1I_CACHE_REFILL            0x01
-#define SEL4BENCH_EVENT_L1I_TLB_REFILL              0x02
-#define SEL4BENCH_EVENT_L1D_CACHE_REFILL            0x03
-#define SEL4BENCH_EVENT_L1D_CACHE                   0x04
-#define SEL4BENCH_EVENT_L1D_TLB_REFILL              0x05
-#define SEL4BENCH_EVENT_LD_RETIRED                  0x06
-#define SEL4BENCH_EVENT_ST_RETIRED                  0x07
-#define SEL4BENCH_EVENT_INST_RETIRED                0x08
-#define SEL4BENCH_EVENT_EXC_TAKEN                   0x09
-#define SEL4BENCH_EVENT_EXC_RETURN                  0x0A
-#define SEL4BENCH_EVENT_CID_WRITE_RETIRED           0x0B
-#define SEL4BENCH_EVENT_PC_WRITE_RETIRED            0x0C
-#define SEL4BENCH_EVENT_BR_IMMED_RETIRED            0x0D
-#define SEL4BENCH_EVENT_BR_RETURN_RETIRED           0x0E
-#define SEL4BENCH_EVENT_UNALIGNED_LDST_RETIRED      0x0F
-#define SEL4BENCH_EVENT_BR_MIS_PRED                 0x10
-#define SEL4BENCH_EVENT_CPU_CYCLES                  0x11
-#define SEL4BENCH_EVENT_BR_PRED                     0x12
-#define SEL4BENCH_EVENT_MEM_ACCESS                  0x13
-#define SEL4BENCH_EVENT_L1I_CACHE                   0x14
-#define SEL4BENCH_EVENT_L1D_CACHE_WB                0x15
-#define SEL4BENCH_EVENT_L2D_CACHE                   0x16
-#define SEL4BENCH_EVENT_L2D_CACHE_REFILL            0x17
-#define SEL4BENCH_EVENT_L2D_CACHE_WB                0x18
-#define SEL4BENCH_EVENT_BUS_ACCESS                  0x19
-#define SEL4BENCH_EVENT_MEMORY_ERROR                0x1A
-#define SEL4BENCH_EVENT_INST_SPEC                   0x1B
-#define SEL4BENCH_EVENT_TTBR_WRITE_RETIRED          0x1C
-#define SEL4BENCH_EVENT_BUS_CYCLES                  0x1D
-#define SEL4BENCH_EVENT_CHAIN                       0x1E
-#define SEL4BENCH_EVENT_L1D_CACHE_ALLOCATE          0x1F
-#define SEL4BENCH_EVENT_L2D_CACHE_ALLOCATE          0x20
-#define SEL4BENCH_EVENT_BR_RETIRED                  0x21
-#define SEL4BENCH_EVENT_BR_MIS_PRED_RETIRED         0x22
-#define SEL4BENCH_EVENT_STALL_FRONTEND              0x23
-#define SEL4BENCH_EVENT_STALL_BACKEND               0x24
-#define SEL4BENCH_EVENT_L1D_TLB                     0x25
-#define SEL4BENCH_EVENT_L1I_TLB                     0x26
-#define SEL4BENCH_EVENT_L2I_CACHE                   0x27
-#define SEL4BENCH_EVENT_L2I_CACHE_REFILL            0x28
-#define SEL4BENCH_EVENT_L3D_CACHE_ALLOCATE          0x29
-#define SEL4BENCH_EVENT_L3D_CACHE_REFILL            0x2A
-#define SEL4BENCH_EVENT_L3D_CACHE                   0x2B
-#define SEL4BENCH_EVENT_L3D_CACHE_WB                0x2C
-#define SEL4BENCH_EVENT_L2D_TLB_REFILL              0x2D
-#define SEL4BENCH_EVENT_L2I_TLB_REFILL              0x2E
-#define SEL4BENCH_EVENT_L2D_TLB                     0x2F
-#define SEL4BENCH_EVENT_L2I_TLB                     0x30
-#define SEL4BENCH_EVENT_STALL_FRONTEND_OTHER        0xE0
-#define SEL4BENCH_EVENT_STALL_FRONTEND_CACHE        0xE1
-#define SEL4BENCH_EVENT_STALL_FRONTEND_TLB          0xE2
-#define SEL4BENCH_EVENT_STALL_FRONTEND_PDERR        0xE3
-#define SEL4BENCH_EVENT_STALL_BACKEND_ILOCK         0xE4
-#define SEL4BENCH_EVENT_STALL_BACKEND_ILOCK_AGU     0xE5
-#define SEL4BENCH_EVENT_STALL_BACKEND_ILOCK_FPU     0xE6
-#define SEL4BENCH_EVENT_STALL_BACKEND_LD            0xE7
-#define SEL4BENCH_EVENT_STALL_BACKEND_ST            0xE8
+/* Available benchmarking events. */
+#define SDDFBENCH_EVENT_SW_INCR                     0x00
+#define SDDFBENCH_EVENT_L1I_CACHE_REFILL            0x01
+#define SDDFBENCH_EVENT_L1I_TLB_REFILL              0x02
+#define SDDFBENCH_EVENT_L1D_CACHE_REFILL            0x03
+#define SDDFBENCH_EVENT_L1D_CACHE                   0x04
+#define SDDFBENCH_EVENT_L1D_TLB_REFILL              0x05
+#define SDDFBENCH_EVENT_LD_RETIRED                  0x06
+#define SDDFBENCH_EVENT_ST_RETIRED                  0x07
+#define SDDFBENCH_EVENT_INST_RETIRED                0x08
+#define SDDFBENCH_EVENT_EXC_TAKEN                   0x09
+#define SDDFBENCH_EVENT_EXC_RETURN                  0x0A
+#define SDDFBENCH_EVENT_CID_WRITE_RETIRED           0x0B
+#define SDDFBENCH_EVENT_PC_WRITE_RETIRED            0x0C
+#define SDDFBENCH_EVENT_BR_IMMED_RETIRED            0x0D
+#define SDDFBENCH_EVENT_BR_RETURN_RETIRED           0x0E
+#define SDDFBENCH_EVENT_UNALIGNED_LDST_RETIRED      0x0F
+#define SDDFBENCH_EVENT_BR_MIS_PRED                 0x10
+#define SDDFBENCH_EVENT_CPU_CYCLES                  0x11
+#define SDDFBENCH_EVENT_BR_PRED                     0x12
+#define SDDFBENCH_EVENT_MEM_ACCESS                  0x13
+#define SDDFBENCH_EVENT_L1I_CACHE                   0x14
+#define SDDFBENCH_EVENT_L1D_CACHE_WB                0x15
+#define SDDFBENCH_EVENT_L2D_CACHE                   0x16
+#define SDDFBENCH_EVENT_L2D_CACHE_REFILL            0x17
+#define SDDFBENCH_EVENT_L2D_CACHE_WB                0x18
+#define SDDFBENCH_EVENT_BUS_ACCESS                  0x19
+#define SDDFBENCH_EVENT_MEMORY_ERROR                0x1A
+#define SDDFBENCH_EVENT_INST_SPEC                   0x1B
+#define SDDFBENCH_EVENT_TTBR_WRITE_RETIRED          0x1C
+#define SDDFBENCH_EVENT_BUS_CYCLES                  0x1D
+#define SDDFBENCH_EVENT_CHAIN                       0x1E
+#define SDDFBENCH_EVENT_L1D_CACHE_ALLOCATE          0x1F
+#define SDDFBENCH_EVENT_L2D_CACHE_ALLOCATE          0x20
+#define SDDFBENCH_EVENT_BR_RETIRED                  0x21
+#define SDDFBENCH_EVENT_BR_MIS_PRED_RETIRED         0x22
+#define SDDFBENCH_EVENT_STALL_FRONTEND              0x23
+#define SDDFBENCH_EVENT_STALL_BACKEND               0x24
+#define SDDFBENCH_EVENT_L1D_TLB                     0x25
+#define SDDFBENCH_EVENT_L1I_TLB                     0x26
+#define SDDFBENCH_EVENT_L2I_CACHE                   0x27
+#define SDDFBENCH_EVENT_L2I_CACHE_REFILL            0x28
+#define SDDFBENCH_EVENT_L3D_CACHE_ALLOCATE          0x29
+#define SDDFBENCH_EVENT_L3D_CACHE_REFILL            0x2A
+#define SDDFBENCH_EVENT_L3D_CACHE                   0x2B
+#define SDDFBENCH_EVENT_L3D_CACHE_WB                0x2C
+#define SDDFBENCH_EVENT_L2D_TLB_REFILL              0x2D
+#define SDDFBENCH_EVENT_L2I_TLB_REFILL              0x2E
+#define SDDFBENCH_EVENT_L2D_TLB                     0x2F
+#define SDDFBENCH_EVENT_L2I_TLB                     0x30
+#define SDDFBENCH_EVENT_STALL_FRONTEND_OTHER        0xE0
+#define SDDFBENCH_EVENT_STALL_FRONTEND_CACHE        0xE1
+#define SDDFBENCH_EVENT_STALL_FRONTEND_TLB          0xE2
+#define SDDFBENCH_EVENT_STALL_FRONTEND_PDERR        0xE3
+#define SDDFBENCH_EVENT_STALL_BACKEND_ILOCK         0xE4
+#define SDDFBENCH_EVENT_STALL_BACKEND_ILOCK_AGU     0xE5
+#define SDDFBENCH_EVENT_STALL_BACKEND_ILOCK_FPU     0xE6
+#define SDDFBENCH_EVENT_STALL_BACKEND_LD            0xE7
+#define SDDFBENCH_EVENT_STALL_BACKEND_ST            0xE8
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31
