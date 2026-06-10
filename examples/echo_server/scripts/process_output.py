@@ -234,7 +234,7 @@ with open(file, "r") as f:
             if (
                 "psci" not in pmu_key
                 and "Model" not in pmu_key
-                and "Load" not in pmu_key
+                and "Load address" not in pmu_key
             ):
 
                 # Create PMU entry per test
