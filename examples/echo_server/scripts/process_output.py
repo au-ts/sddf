@@ -217,9 +217,9 @@ with open(file, "r") as f:
                 continue
 
             # Capture PMU details
-            match = re.match(r"([\d\w -]+): ([0-9]+).*", line)
+            match = re.match(r"([\d\w -()]+): ([0-9]+).*", line)
             match_overflow = re.match(
-                r"([\d\w -]+): Overflow occurred during benchmark, event count is invalid!",
+                r"([\d\w -()]+): Overflow occurred during benchmark, event count is invalid!",
                 line,
             )
             if match:
