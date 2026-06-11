@@ -180,7 +180,7 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
         if (existing_object) {
             return existing_object;
         }
-        sddf_dprintf("Create a type 0x%02X object\n", op_code);
+        /* sddf_dprintf("Create a type 0x%02X object\n", op_code); */
         return insert_child_object(parent, name_segment, op_code);
     }
 
@@ -193,7 +193,7 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
             return existing_object;
         }
 
-        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current);
+        /* sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current); */
         return insert_child_object(parent, name_segment, op_code);
     }
 

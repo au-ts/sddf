@@ -226,6 +226,14 @@ def generate(
     sdf.add_mr(mr_aml_object_poool)
     acpi_driver.add_map(Map(mr_aml_object_poool, 0x30000000, "rw"))
 
+    mr_acpi_tables_copy = MemoryRegion(sdf, "acpi_tables_copy", 0x50000)
+    sdf.add_mr(mr_acpi_tables_copy)
+    acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
+
+    update_elf_section(
+        "acpi_driver.elf", "test_dsdt_table", "test_dsdt_table"
+    )
+
     mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x8000)
     sdf.add_mr(mr_pci_resources)
     acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
