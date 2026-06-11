@@ -105,7 +105,10 @@ endif
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+test_dsdt_table.data:
+	cp $(ECHO_SERVER)/dsdt_table.data $@
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB) test_dsdt_table.data
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \

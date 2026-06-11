@@ -312,6 +312,23 @@ typedef struct object_lookup_list {
     aml_object_t *next;
 } object_lookup_list_t;
 
+typedef enum {
+    ACPI_TABLE_TYPE_DSDT = 0,
+} acpi_table_type_t;
+
+typedef struct {
+    acpi_table_type_t type;
+    uintptr_t base_addr;
+    uint32_t length;
+} acpi_table_t;
+
+typedef struct {
+    acpi_table_t tables[20];
+    uintptr_t free_addr;
+    uintptr_t end_addr;
+    uint32_t num_tables;
+} acpi_copy_t;
+
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
 void read_eisa_id(aml_object_t *node, char *eisa_id_str);

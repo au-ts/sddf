@@ -67,6 +67,10 @@ uint32_t cap_list_end;
 cnode_caps_t *cnode_caps_pci_resources;
 uint32_t kernel_objects_ut_idx;
 
+acpi_copy_t acpi_tables_copy;
+
+__attribute__((__section__(".test_dsdt_table"))) uint8_t test_dsdt_table[300000];
+
 // TODO: check if this makes sense to go to libsel4
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vka/arch_include/x86/vka/arch/object.h#L62
 uint8_t get_object_size(seL4_Word object_type, seL4_Word size_bits)
@@ -618,10 +622,14 @@ void init(void)
         }
     }
 
+    acpi_tables_copy.free_addr = 0x40000000;
+    acpi_tables_copy.end_addr = 0x40000000 + 0x50000;
+
     uintptr_t dsdt_cur_paddr = acpi_dsdt_addr;
     uint32_t dsdt_offset = acpi_dsdt_addr & 0xfff;
     acpi_header_t *header = (acpi_header_t *)(acpi_vaddr + dsdt_offset);
     uint32_t dsdt_len = 1;
+
     for (; dsdt_cur_paddr < acpi_dsdt_addr + dsdt_len; dsdt_cur_paddr += (1UL << seL4_PageBits)) {
         error = retype_and_map_frame(dsdt_cur_paddr, acpi_vaddr + dsdt_cur_paddr - acpi_dsdt_addr, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_CanRead);
         if (error != seL4_NoError) {
@@ -640,19 +648,36 @@ void init(void)
         }
     }
 
+    uint8_t *copy_cur_vaddr = (uint8_t *)acpi_tables_copy.free_addr;
+    acpi_tables_copy.tables[0].type = ACPI_TABLE_TYPE_DSDT;
+    acpi_tables_copy.tables[0].base_addr = (uintptr_t)copy_cur_vaddr;
+    acpi_tables_copy.tables[0].length = header->length;
+    acpi_tables_copy.num_tables = 1;
+
+    uint8_t *dsdt_end = (uint8_t *)header + header->length;
+    sddf_dprintf("copy from start 0x%lx to 0x%lx\n", (uintptr_t)header, (uintptr_t)dsdt_end);
+    uint32_t k = 0;
+    for (uint8_t *dsdt_vaddr = (uint8_t *)header; dsdt_vaddr < dsdt_end; dsdt_vaddr++) {
+        *copy_cur_vaddr = *dsdt_vaddr;
+        copy_cur_vaddr++;
+    }
+
     sddf_dprintf("===============Scanning DSDT===============\n");
 
-    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header;
+    /* acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)header; */
+    /* acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)acpi_tables_copy.tables[0].base_addr; */
+    acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)&test_dsdt_table;
+    uint8_t *dsdt_copy_end = &test_dsdt_table + header->length;
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     object_pool.next = aml_object_pool_start;
     object_pool.end = aml_object_pool_start + 0x30000;
     sddf_dprintf("scanner.start: 0x%lx\n", (uintptr_t)scanner.current);
 
-    uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t);
+    /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */
     object_root.start = scanner.current;
     object_root.op_code = NULL_OP;
     object_root.name[0] = '\\';
-    scan_objects(&object_root, dsdt_end);
+    scan_objects(&object_root, dsdt_copy_end);
     /* print_object_tree(&object_root, 0); */
 
     sddf_dprintf("===========Pass IRQControl capability======\n");
