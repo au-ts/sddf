@@ -1,30 +1,51 @@
-/*
- * Copyright 2026, UNSW
- *
- * SPDX-License-Identifier: BSD-2-Clause
- */
-
 #include "acpi.h"
+// =========================== Refactor =========================
+aml_namespace_node_t namespace_root;
 
+typedef enum {
+    INIT = 0,
+    PKT_LEN,
+    OBJECT_NAME_STRING, // Name String used for creating objects
+    NAME_STRING,        // Name String referring to other objects
+    TERM_LIST,
+    TERM_INTEGER,
+    METHOD_FLAGS,
+    SYNC_FLAGS,
+    REGION_SPACE,
+    REGION_OFFSET,
+    REGION_LENGTH,
+    FIELD_FLAGS,
+    FIELD_LIST,
+    BYTE_INDEX,
+    BUFFER,
+    DATA_OBJECT,
+    COMPLETE,
+} parse_stage_t;
 
-aml_object_t object_current;
+#define MAX_OPCODE 256 // 1-byte AML opcode
+#define MAX_OP_STAGES 8
 
-uintptr_t alloc_mem(uint32_t mem_size)
-{
-    if ((uintptr_t)object_pool.next + mem_size >= (uintptr_t)object_pool.end) {
-        // Error: Out of memory for AML objects
-        return 0;
-    }
+parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
+    [SCOPE_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
+    [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, METHOD_FLAGS, TERM_LIST, COMPLETE },
+    [NAME_OP] = { INIT, NAME_STRING, DATA_OBJECT, COMPLETE},
+};
 
-    uintptr_t reserved_mem = object_pool.next;
-    object_pool.next = object_pool.next + mem_size;
-    return reserved_mem;
-}
+parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
 
-aml_object_t *alloc_object()
-{
-    return (aml_object_t *)alloc_mem(sizeof(aml_object_t));
-}
+};
+
+typedef struct parse_state {
+    struct parse_state *parent;
+    uint8_t *pkt_end;
+    aml_object_t *node;
+    uint16_t op_code;
+    uint8_t stage_idx;
+    uint8_t num_args;
+    uint32_t arguments[10];
+} parse_state_t;
+
+parse_state_t *current_state;
 
 uint8_t advance() {
     scanner.current++;
@@ -32,71 +53,80 @@ uint8_t advance() {
 }
 
 // scanner.current should be at start of pktLength when invoked
+// PktLength consists of LeadByte followed by variable-length bytes, see more in Section 20.2.4
 uint8_t *get_pkt_end()
 {
-    uint8_t first_byte = advance();
-    uint8_t byte_data_cnt = first_byte >> 6;
+    uint8_t lead_byte = advance();
+    uint8_t extra_bytes_len = lead_byte >> 6;
 
     // pktLength encoded in bits 5-0 if one byte long
-    if (byte_data_cnt == 0) {
-        return scanner.current + (first_byte & 0x3F) - 1;
+    if (extra_bytes_len == 0) {
+        return scanner.current + (lead_byte & 0x3F) - 1;
     }
 
-    uint32_t pkt_len = (first_byte & 0xF) + (advance() << 4);
-    if (byte_data_cnt > 1) pkt_len += (advance() << 12);
-    if (byte_data_cnt > 2) pkt_len += (advance() << 20);
+    uint32_t pkt_len = (lead_byte & 0xF) + (advance() << 4);
+    if (extra_bytes_len > 1) pkt_len += (advance() << 12);
+    if (extra_bytes_len > 2) pkt_len += (advance() << 20);
 
-    return scanner.current + pkt_len - byte_data_cnt - 1;
+    return scanner.current + pkt_len - extra_bytes_len - 1;
 }
 
-uint8_t *get_data_end()
+parse_stage_t get_op_stage()
 {
-    uint8_t first_byte = advance();
-    switch (first_byte) {
-        case DATA_OBJ_ZERO:
-        case DATA_OBJ_ONE:
-            return scanner.current;
-        case DATA_OBJ_BYTE:
-            return scanner.current + 1;
-        case DATA_OBJ_WORD:
-            return scanner.current + 2;
-        case DATA_OBJ_DWORD:
-            return scanner.current + 4;
-        case DATA_OBJ_QWORD:
-            return scanner.current + 8;
-        case DATA_OBJ_STRING: {
-            uint32_t i = 0;
-            while (advance());
-            return scanner.current + i;
-        case DATA_OBJ_BUFFER:
-            return get_pkt_end();
-        case DATA_OBJ_PACKAGE:
-            return get_pkt_end();
+    return op_stage_table[current_state->op_code][current_state->stage_idx];
+}
+
+
+void state_stack_push(uint8_t op_code)
+{
+    parse_state_t *reserved_state = current_state;
+
+    // TODO: allocate a state object from heap
+    /* current_state = allocate_state_object(); */
+    current_state->parent = reserved_state;
+    current_state->op_code = op_code;
+    current_state->stage_idx = 0;
+}
+
+void state_stack_pop()
+{
+    switch(current_state->op_code) {
+        case SCOPE_OP:
+        case METHOD_OP:
+        case NAME_OP: {
+            break;
         }
     }
-    return 0;
-}
 
-// Return object pointer if already exists
-aml_object_t *object_exists(aml_object_t *parent, const char *name_segment)
-{
-    if (parent->child == NULL) return false;
+    parse_state_t *completed_state = current_state;
+    current_state = current_state->parent;
+    // TODO: remove from stack
+    (void)completed_state;
 
-    aml_object_t *child = parent->child;
-    while (child) {
-        if (!strcmp(child->name, name_segment)) return child;
-        child = child->next;
+    if (scanner.current >= current_state->pkt_end) {
+        state_stack_pop();
     }
+}
 
-    return NULL;
+void state_stack_update()
+{
+    current_state->stage_idx += 1;
+
+    if (get_op_stage() == COMPLETE) {
+        state_stack_pop();
+
+        if (current_state->pkt_end != 0) {
+            scanner.current = current_state->pkt_end;
+        }
+    }
 }
 
 // Return object pointer if already exists
-aml_object_t *local_object_exists(aml_object_t *parent, uint8_t op_code)
+aml_namespace_node_t *find_local_variable_in_namespace(aml_namespace_node_t *namespace, uint8_t op_code)
 {
-    if (parent->child == NULL) return false;
+    if (namespace->child == NULL) return false;
 
-    aml_object_t *child = parent->child;
+    aml_namespace_node_t *child = namespace->child;
     while (child) {
         if (child->op_code == op_code) return child;
         child = child->next;
@@ -105,67 +135,54 @@ aml_object_t *local_object_exists(aml_object_t *parent, uint8_t op_code)
     return NULL;
 }
 
-aml_object_t *insert_child_object(aml_object_t *parent, const char *name_segment, enum aml_encoding_value op_code)
+// Return object pointer if already exists
+aml_namespace_node_t *find_node_in_same_namespace(aml_namespace_node_t *namespace, const char *name_segment)
 {
-    aml_object_t *new_object = alloc_object();
-    if (new_object == NULL) {
-        sddf_dprintf("Failed to create a new object: Out of Memory\n");
+    if (namespace->child == NULL) return false;
+
+    aml_object_t *child = namespace->child;
+    while (child) {
+        if (!strcmp(child->name, name_segment)) return child;
+        child = child->next;
+    }
+
+    return NULL;
+}
+
+aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespace, const char *name_segment, enum aml_encoding_value op_code)
+{
+    aml_namespace_node_t *child_node = alloc_namespace_node();
+    if (child_node == NULL) {
+        sddf_dprintf("Failed to create a new namespace node: Out of Memory\n");
         return NULL;
     }
 
-    new_object->start = scanner.start;
-    new_object->parent = parent;
-    new_object->op_code = op_code;
-    memcpy(&new_object->name, name_segment, 4);
-    new_object->name[4] = '\0';
+    child_node->start = scanner.start;
+    child_node->parent = namespace;
+    child_node->op_code = op_code;
+    if (name_segment != NULL) {
+        memcpy(&child_node->name, name_segment, 4);
+        child_node->name[4] = '\0';
+        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current);
+    } else {
+        sddf_dprintf("Create a type 0x%02X object\n", op_code);
+    }
 
     // Insert the new node into the front of list
-    if (parent->child) {
-        new_object->next = parent->child;
+    if (namespace->child) {
+        child_node->next = namespace->child;
     }
 
-    parent->child = new_object;
-    return new_object;
+    namespace->child = child_node;
+    return child_node;
 }
 
-void skip_name_string()
-{
-    uint8_t name_type = advance();
-
-    if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
-        // Name Segment
-        scanner.current += 3;
-    } else if (name_type == '\\') {
-        // Root Path
-        skip_name_string();
-    } else if (name_type == 0x2E) {
-        // Dual Name Segment
-        scanner.current += 8;
-    } else if (name_type == 0x2F) {
-        // Multiple Name Segment
-        uint8_t seg_cnt = advance();
-        scanner.current += (4 * seg_cnt);
-    }
-}
-
-void read_name_segment(char *name_segment)
-{
-    name_segment[0] = (char)advance();
-    name_segment[1] = (char)advance();
-    name_segment[2] = (char)advance();
-    name_segment[3] = (char)advance();
-    name_segment[4] = '\0';
-}
-
-// Make a child object and connect it to parent, returns NULL if failed
-// TODO: save ObjectOp if have, or NullOp first
-aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_value op_code)
+aml_namespace_node_t *make_namespace_node(aml_namespace_node_t *namespace, uint16_t op_code)
 {
     uint8_t name_type = advance();
 
     if (name_type == '\\') {
-        // TODO: replace parent with the root
-        parent = &object_root;
+        parent = &namespace_root;
         name_type = advance();
     }
 
@@ -173,28 +190,26 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
         return parent;
     }
 
+    // Local variable [Local0Op, Local7Op]
     if (op_code >= LOCAL0_OP && op_code <= LOCAL7_OP) {
         scanner.current--;
-        char name_segment[5]; // Not used for local objects
-        aml_object_t *existing_object = local_object_exists(parent, op_code);
-        if (existing_object) {
-            return existing_object;
+        aml_namespace_node_t *local_variable = find_local_variablein_namespace(parent, op_code);
+        if (local_variable) {
+            return local_variable;
         }
-        /* sddf_dprintf("Create a type 0x%02X object\n", op_code); */
-        return insert_child_object(parent, name_segment, op_code);
+        return namespace_insert_child_node(parent, NULL, op_code);
     }
 
     if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
         scanner.current--;
         char name_segment[5];
         read_name_segment(name_segment);
-        aml_object_t *existing_object = object_exists(parent, name_segment);
-        if (existing_object) {
-            return existing_object;
+        aml_namespace_node_t *existing_node = find_node_in_namespace(parent, name_segment);
+        if (existing_node) {
+            return existing_node;
         }
 
-        /* sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current); */
-        return insert_child_object(parent, name_segment, op_code);
+        return namespace_insert_child_node(parent, name_segment, op_code);
     }
 
     uint8_t name_segment_cnt = 0;
@@ -203,905 +218,64 @@ aml_object_t *make_object_if_not_exist(aml_object_t *parent, enum aml_encoding_v
     } else if (name_type == 0x2F) {
         name_segment_cnt = advance();
     } else {
-        // Invalid encoding
+        sddf_dprintf("Error: invalid encoding \'0x%02x\' for expected NameString\n", name_type);
         return NULL;
     }
 
     while (--name_segment_cnt) {
-        parent = make_object_if_not_exist(parent, NULL_OP);
+        parent = make_namespace_if_not_exist(parent, NULL_OP);
     }
 
-    return make_object_if_not_exist(parent, op_code);
+    return make_namespace_if_not_exist(parent, op_code);
 }
 
-bool skip_if_name_string(uint8_t c)
+void parse_namespace_tree(aml_object_t *namespace, uint8_t *table_end)
 {
-    if ((c >= 'A' && c <= 'Z') || (c == 0x2E) || (c == 0x2F) || (c == '_') || (c == '\\')) {
-        scanner.current--;
-        skip_name_string();
-        sddf_dprintf("Warning: ref data object at 0x%lx is skipped\n", (uintptr_t)scanner.current);
-        return true;
-    }
+    uint16_t op_code = 0;
 
-    return false;
-}
-
-aml_object_t *read_if_name_string(aml_object_t *parent_node, uint8_t left_num_segments)
-{
-    char name_segment[5];
-    uint8_t name_type = advance();
-    aml_object_t *node = NULL;
-
-    if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
-        // Name Segment
-        scanner.current--;
-        read_name_segment(name_segment);
-        /* node = query_child_object_by_name(parent_node, name_segment); */
-        node = query_same_domain_object_by_name(&object_current, name_segment);
-        left_num_segments--;
-
-        /* sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current); */
-    } else if (name_type == '\\') {
-        // Root Path
-        node = &object_root;
-    } else if (name_type == 0x2E) {
-        // Dual Name Segment
-        left_num_segments = 2;
-        node = parent_node;
-    } else if (name_type == 0x2F) {
-        // Multiple Name Segment
-        uint8_t seg_cnt = advance();
-        left_num_segments = seg_cnt;
-        node = parent_node;
-    } else {
-        sddf_dprintf("Not a NameString at 0x%lx\n", (uintptr_t)scanner.current);
-        scanner.current--;
-        return NULL;
-    }
-
-    if (node == NULL) {
-        return NULL;
-    }
-
-    if (left_num_segments > 0) {
-        sddf_dprintf("  Parent: %s, Name segment: %s, left_num_segments: %u\n", node->name, name_segment, left_num_segments);
-        object_current.parent = node;
-        return read_if_name_string(node, left_num_segments);
-    }
-
-    if (node->op_code == NAME_OP || node->op_code == METHOD_OP || node->op_code == DEVICE_OP || node->op_code == OP_REGION_OP || node->op_code == FIELD_OP) {
-        return node;
-    } else {
-        sddf_dprintf("Object \'%s\' has invalid OpCode: 0x%x, try parsing the following name segment at 0x%lx\n", node->name, node->op_code, (uintptr_t)scanner.current);
-        return read_if_name_string(node, 1);
-    }
-
-    return NULL;
-}
-
-uint32_t get_integer_data(bool if_execute_method);
-
-uint32_t aml_alg_eval(uint8_t op, bool if_execute_method)
-{
-    uint32_t operand1 = get_integer_data(if_execute_method);
-    uint32_t operand2 = get_integer_data(if_execute_method);
-    advance();
-
-    sddf_dprintf("operand1: %u, op: 0x%x, operand2: %u\n", operand1, op, operand2);
-    switch (op) {
-        case ADD_OP:
-            return operand1 + operand2;
-        case SUBTRACT_OP:
-            return operand1 - operand2;
-        default: {
-            sddf_dprintf("Error: Algorithmic operator %u is not supported yet\n", op);
-        }
-    }
-    return 0;
-}
-
-// scanner.current needs to be at start of data
-uint32_t get_integer_data(bool if_execute_method)
-{
-    uint8_t data_len = advance();
-
-    sddf_dprintf("data_len: %u, if_execute_method: %u\n", data_len, if_execute_method);
-    switch (data_len) {
-        case DATA_OBJ_ZERO:
-            return 0;
-        case DATA_OBJ_ONE:
-            return 1;
-        case DATA_OBJ_BYTE:
-            return advance();
-        case DATA_OBJ_WORD: {
-            uint16_t data = advance();
-            data |= (advance() << 8);
-            return data;
-        }
-        case DATA_OBJ_DWORD: {
-            uint32_t data = advance();
-            data |= (advance() << 8);
-            data |= (advance() << 16);
-            data |= (advance() << 24);
-            return data;
-        }
-        case ADD_OP:
-        case SUBTRACT_OP: {
-            return aml_alg_eval(data_len, if_execute_method);
-        }
-        case LEQUAL_OP: {
-            uint32_t operand_a = get_integer_data(if_execute_method);
-            sddf_dprintf("operand_a: %u\n", operand_a);
-            uint32_t operand_b = get_integer_data(if_execute_method);
-            sddf_dprintf("operand_b: %u\n", operand_b);
-            if (operand_a == operand_b) {
-                return 1;
-            }
-            return 0;
-        }
-        case SHIFT_LEFT_OP:
-        case SHIFT_RIGHT_OP: {
-            sddf_dprintf("Shift\n");
-            uint32_t operand = get_integer_data(true);
-            sddf_dprintf("operand: %u\n", operand);
-            uint32_t shift_count = get_integer_data(true);
-            sddf_dprintf("shift_count: %u\n", shift_count);
-            uint8_t supername_byte = advance();
-            if (supername_byte != 0x00) {
-                sddf_dprintf("Error: target should be 0x00 in inline SHIFT operations\n");
-            }
-
-            if (supername_byte == SHIFT_RIGHT_OP) {
-                return operand >> shift_count;
-            } else if (supername_byte == SHIFT_LEFT_OP) {
-                return operand << shift_count;
-            }
-
-            break;
-        }
-        default: {
-            if (data_len >= LOCAL0_OP && data_len <= LOCAL7_OP) {
-                aml_object_t *existing_object = local_object_exists(object_current.parent, data_len);
-                if (existing_object == NULL) {
-                    sddf_dprintf("Error: LOCAL%u does not exist\n", data_len - LOCAL0_OP);
-                    return 0;
-                }
-
-                return existing_object->value;
-            }
-
-            scanner.current--;
-            sddf_dprintf("try read name object\n");
-            aml_object_t *node = read_if_name_string(&object_root, 1);
-            if (node) {
-                if (node->op_code == NAME_OP) {
-                    uint8_t *save_location = scanner.current;
-                    scanner.current = node->start + 1;
-                    skip_name_string();
-                    node->value = get_integer_data(false);
-                    scanner.current = save_location;
-                    sddf_dprintf("Found object \'%s\' with value: %u\n", node->name, node->value);
-                    return node->value;
-                } else if (node->op_code == METHOD_OP) {
-                    if (if_execute_method) {
-                        sddf_dprintf("execute method in get_integer_data()\n");
-                        uint8_t *saved_location = scanner.current;
-                        uint32_t method_ret = (uint32_t)execute_method(node, RET_TYPE_INTEGER, 0);
-                        scanner.current = saved_location;
-                        return method_ret;
-                    }
-                    sddf_dprintf("Warning: method is not executed yet\n");
-                    return 0;
-                } else if (node->op_code == DEVICE_OP) {
-                    // Assume that we want to extract IRQ number
-                    aml_object_t *irq_crs = query_child_object_by_name(node, acpi_str_crs);
-                    if (irq_crs == NULL) {
-                        sddf_dprintf("_CRS of IRQ Name Object \'%s\' is not found\n", node->name);
-                    }
-                    uint8_t *saved_current = scanner.current;
-                    acpi_crs_list_t *crs_list = extract_pcie_crs(irq_crs);
-                    scanner.current = saved_current;
-                    if (crs_list && crs_list->resource_type != EXTENDED_IRQ_DESCRIPTOR) {
-                        sddf_dprintf("No IRQ is extracted\n");
-                        return 0;
-                    }
-
-                    acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
-                    return ext_irq->irq_num;
-                }
-            } else {
-                sddf_dprintf("Error: not implemented data type: 0x%x\n", data_len);
-            }
-        }
-    }
-    return 0;
-}
-
-void scan_objects(aml_object_t *parent, uint8_t *next_parent_start)
-{
-    scanner.start = scanner.current;
-    uint8_t *next_obj_start = next_parent_start;
-    uint16_t ext_op_prefix = 0;
-
-    while (scanner.start < next_parent_start) {
-        object_current.parent = parent;
-        uint16_t op_code = advance() | ext_op_prefix;
-        if (op_code == EXT_OP_PREFIX) {
-            ext_op_prefix = EXT_OP_PREFIX << 8;
+    while (scanner.current < table_end) {
+        op_code = op_code | advance();
+        if (op_code == 0x5B) {
+            op_code = 0x5B00;
             continue;
         }
-        ext_op_prefix = 0;
 
-        switch (op_code) {
-            case ALIAS_OP: {
-                skip_name_string();
-                skip_name_string();
-
-                next_obj_start = scanner.current;
-                break;
-            }
-            case SCOPE_OP: {
-                next_obj_start = get_pkt_end(); // By reading pktLen
-                aml_object_t *node = make_object_if_not_exist(parent, SCOPE_OP);
-
-                scan_objects(node, next_obj_start);
-                break;
-            }
-            case METHOD_OP: {
-                next_obj_start = get_pkt_end(); // By reading pktLen
-                make_object_if_not_exist(parent, METHOD_OP);
-
-                break;
-            }
-            case NAME_OP: {
-                make_object_if_not_exist(parent, NAME_OP);
-
-                next_obj_start = get_data_end();
-                break;
-            }
-            case DEVICE_OP: {
-                next_obj_start = get_pkt_end(); // By reading pktLen
-                aml_object_t *node = make_object_if_not_exist(parent, DEVICE_OP);
-
-                scan_objects(node, next_obj_start);
-                break;
-            }
-            case MUTEX_OP: {
-                skip_name_string(); // Name String
-                advance();          // 1 byte for SyncFlags
-
-                next_obj_start = scanner.current;
-                break;
-            }
-            case EVENT_OP: {
-                skip_name_string(); // Name String
-                next_obj_start = scanner.current;
-                break;
-            }
-            case INDEX_FIELD_OP: {
-                next_obj_start = get_pkt_end(); // By reading pktLen
-                break;
-            }
-            case IF_OP: {
-                next_obj_start = get_pkt_end();
-                break;
-            }
-            case OP_REGION_OP: {
-                make_object_if_not_exist(parent, OP_REGION_OP);
-                /* skip_name_string(); // Name String */
-                advance();          // 1 byte for Region Space ID
-                sddf_dprintf("OP_REGION_OP\n");
-                get_integer_data(false); // Region offset
-                sddf_dprintf("======\n");
-                get_integer_data(false); // Region length
-                sddf_dprintf("end OP_REGION_OP\n");
-
-                next_obj_start = scanner.current;
-                break;
-            }
-            case FIELD_OP: {
-                sddf_dprintf("FieldOp, at 0x%lx\n", (uintptr_t)scanner.current);
-                next_obj_start = get_pkt_end(); // By reading pktLen
-                /* skip_name_string(); // Name String */
-                aml_object_t *op_region_node = read_if_name_string(parent, 1);
-                if (op_region_node) {
-                    sddf_dprintf("Found OpRegion node: %s\n", op_region_node->name);
-                } else {
-                    sddf_dprintf("OpRegion node is not found\n");
-                }
-                advance(); // FieldFlags
-
-                uint32_t offset = 0;
-                while (scanner.current < next_obj_start) {
-                    uint8_t byte = advance();
-                    if ((byte >= 'A' && byte <= 'Z') || byte == '_') {
-                        scanner.current--;
-                        aml_object_t *field_obj = make_object_if_not_exist(op_region_node, FIELD_OP);
-                        uint8_t *field_element_start = scanner.current;
-                        uint32_t bit_width = get_pkt_end() - field_element_start;
-                        field_obj->value = (offset << 8) | bit_width;
-                        sddf_dprintf("field name: %s, bit_width: %u, offset: 0x%x\n", field_obj->name, bit_width, offset);
-                        offset += bit_width;
-
-                    } else if (byte == 0x00) {
-                        uint8_t *field_element_start = scanner.current;
-                        uint8_t *reserved_pkt_end = get_pkt_end();
-                        uint32_t padding_bits = (uint32_t)(reserved_pkt_end - field_element_start);
-                        offset += padding_bits;
-                        sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits);
-                        sddf_dprintf("offset: 0x%x\n", offset);
-                    } else if (byte == 0x01) {
-                        uint8_t type = advance();
-                        uint8_t attrib = advance();
-                        sddf_dprintf("Access field - type: 0x%x, attrib: 0x%x\n", type, attrib);
-                    } else {
-                        sddf_dprintf("Error: unknown prefix - 0x%x\n", byte);
-                    }
-                }
-                break;
-            }
-            case CREATE_WORD_FIELD_OP:
-            case CREATE_DWORD_FIELD_OP: {
-                get_integer_data(false);
-                advance(); // 1 byte for ByteIndex
-                skip_name_string();
-
-                next_obj_start = scanner.current;
-                break;
-            }
-            default: {
-                sddf_dprintf("Op code 0x%04X is not implemented (at 0x%lx), so jump to the end\n", op_code, (uintptr_t)scanner.current);
-                return;
-            }
-        }
-
-        scanner.start = next_obj_start;
-        scanner.current = scanner.start;
-    }
-}
-
-// Parse the compressed EISA ID to readable characters
-// see 19.3.4 ASL Macros, EISAID
-void read_eisa_id(aml_object_t *node, char *eisa_id_str)
-{
-    scanner.current = node->start + 1; // First byte for NAME_OP
-    skip_name_string();
-
-    uint8_t eisa_type = advance();
-
-    if (eisa_type == DATA_OBJ_DWORD) {
-        // Combine the first two bytes in little-endian
-        uint16_t char_word = advance() << 8;
-        char_word |= advance();
-
-        // Extract the 3 characters
-        // Bit mapping: 0-4 (Char 3), 5-9 (Char 2), 10-14 (Char 1)
-        eisa_id_str[0] = (char)(((char_word >> 10) & 0x1F) + 0x40);
-        eisa_id_str[1] = (char)(((char_word >> 5)  & 0x1F) + 0x40);
-        eisa_id_str[2] = (char)((char_word & 0x1F) + 0x40);
-
-        // Extract four Hex ID from the last two bytes
-        uint8_t hex_hi = advance();
-        eisa_id_str[3] = (char)(HEX_TO_CHAR(hex_hi >> 4));
-        eisa_id_str[4] = (char)(HEX_TO_CHAR(hex_hi & 0xF));
-        uint8_t hex_lo = advance();
-        eisa_id_str[5] = (char)(HEX_TO_CHAR(hex_lo >> 4));
-        eisa_id_str[6] = (char)(HEX_TO_CHAR(hex_lo & 0xF));
-        eisa_id_str[7] = '\0';
-    } else if (eisa_type == DATA_OBJ_STRING){
-        char c;
-        uint8_t i = 0;
-        while ((c = advance())) {
-            eisa_id_str[i] = c;
-            i++;
-        }
-        eisa_id_str[i] = '\0';
-    }
-}
-
-void print_crs_list(acpi_crs_list_t *crs_list)
-{
-    while (crs_list) {
-        switch (crs_list->resource_type) {
-            case EXTENDED_IRQ_DESCRIPTOR: {
-                acpi_ext_irq_t *ext_irq = (acpi_ext_irq_t *)crs_list->data_addr;
-                sddf_dprintf("  =========\n");
-                sddf_dprintf("  IRQ number: %u\n", ext_irq->irq_num);
-                break;
-            }
-            case WORD_AS_DESCRIPTOR: {
-                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr;
-                sddf_dprintf("  =========\n");
-                switch (word_as->resource_type) {
-                    case 0: { sddf_dprintf("  type: Word Memory\n"); break; }
-                    case 1: { sddf_dprintf("  type: Word I/O\n"); break; }
-                    case 2: { sddf_dprintf("  type: Word Bus Number Range\n"); break; }
-                }
-                sddf_dprintf("  granularity: 0x%x\n", word_as->granularity);
-                sddf_dprintf("  min_addr: 0x%x\n", word_as->min_address);
-                sddf_dprintf("  max_addr: 0x%x\n", word_as->max_address);
-                sddf_dprintf("  translation: 0x%x\n", word_as->translation);
-                sddf_dprintf("  addr_len: 0x%x\n", word_as->address_length);
-                break;
-            }
-            case IO_PORT_DESCRIPTOR: {
-                acpi_io_port_t *io_port = (acpi_io_port_t *)scanner.current;
-                sddf_dprintf("  =========\n");
-                sddf_dprintf("  type: I/O Port\n");
-                sddf_dprintf("  min_addr: 0x%x\n", io_port->min_address);
-                sddf_dprintf("  max_addr: 0x%x\n", io_port->max_address);
-                sddf_dprintf("  alignment: 0x%x\n", io_port->alignment);
-                sddf_dprintf("  addr_len: 0x%x\n", io_port->address_length);
-                break;
-            }
-            case DWORD_AS_DESCRIPTOR: {
-                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr;
-                sddf_dprintf("  =========\n");
-                switch (dword_as->resource_type) {
-                    case 0: { sddf_dprintf("  type: DWord Memory\n"); break; }
-                    case 1: { sddf_dprintf("  type: DWord I/O\n"); break; }
-                    case 2: { sddf_dprintf("  type: DWord Bus Number Range\n"); break; }
-                }
-
-                sddf_dprintf("  granularity: 0x%x\n", dword_as->granularity);
-                sddf_dprintf("  min_addr: 0x%x\n", dword_as->min_address);
-                sddf_dprintf("  max_addr: 0x%x\n", dword_as->max_address);
-                sddf_dprintf("  translation: 0x%x\n", dword_as->translation);
-                sddf_dprintf("  addr_len: 0x%x\n", dword_as->address_length);
-                break;
-            }
-            case QWORD_AS_DESCRIPTOR: {
-                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr;
-                sddf_dprintf("  =========\n");
-                switch (qword_as->resource_type) {
-                    case 0: { sddf_dprintf("  type: QWord Memory\n"); break; }
-                    case 1: { sddf_dprintf("  type: QWord I/O\n"); break; }
-                    case 2: { sddf_dprintf("  type: QWord Bus Number Range\n"); break; }
-                }
-
-                sddf_dprintf("  granularity: 0x%lx\n", qword_as->granularity);
-                sddf_dprintf("  min_addr: 0x%lx\n", qword_as->min_address);
-                sddf_dprintf("  max_addr: 0x%lx\n", qword_as->max_address);
-                sddf_dprintf("  translation: 0x%lx\n", qword_as->translation);
-                sddf_dprintf("  addr_len: 0x%lx\n", qword_as->address_length);
-                break;
-            }
-            default: {
-                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type);
-            }
-        }
-
-        crs_list = crs_list->next;
-    }
-}
-
-// return true if find RETURN_OP or finish all the term list
-bool execute_term_list()
-{
-    uint8_t byte = advance();
-
-    while (true) {
-        switch (byte) {
-            case RETURN_OP: {
-                sddf_dprintf("RETURN_OP\n");
-                return true;
-            }
-            default: {
-                sddf_dprintf("Op %u is not implemneted, exit from term list parsing\n", byte);
-                return false;
-            }
-        }
-        byte = advance();
-    }
-
-    return false;
-}
-
-void buffer_copy(uint8_t *dst_buf, uint32_t dst_buf_size, aml_object_t *src_node)
-{
-    scanner.current = src_node->start;
-    uint8_t op = advance();
-    if (op != NAME_OP) {
-        sddf_dprintf("Error: source buffer node is not a Name Object\n");
-        return;
-    }
-
-    skip_name_string();
-    uint8_t data_type = advance();
-    sddf_dprintf("data type: 0x%x\n", data_type);
-    if (data_type != DATA_OBJ_BUFFER) {
-        sddf_dprintf("Error: source buffer node does not contain Buffer-type data\n");
-        return;
-    }
-
-    get_pkt_end();
-    uint32_t buffer_size = get_integer_data(true);
-
-    if (buffer_size > dst_buf_size) {
-        sddf_dprintf("Error: no sufficient memory in destination buffer - %u > %u\n", buffer_size, dst_buf_size);
-        return;
-    }
-
-    for (int i = 0; i < buffer_size; i++) {
-        dst_buf[i] = advance();
-    }
-}
-
-uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0)
-{
-    if (node->op_code != METHOD_OP) {
-        sddf_dprintf("Error: non-METHOD OP passed\n");
-        return false;
-    }
-
-    scanner.current = node->start;
-    sddf_dprintf("EXECUTE method\n");
-
-    advance();
-    uint8_t *pkt_end = get_pkt_end();
-    skip_name_string();
-    advance(); // Get MethodFlags
-
-    bool if_condition = false; // Assume that there is only one layer of condition statements
-    uint8_t buffer[1024];
-
-    uint8_t byte = advance();
-    sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)pkt_end);
-    while (scanner.current < pkt_end) {
-        object_current.parent = node;
-
-        switch (byte) {
-            case IF_OP: {
-                sddf_dprintf("Found IF_OP\n");
-                uint8_t *pkt_end = get_pkt_end();
-                uint32_t predicate = get_integer_data(true);
-                if_condition = true;
-
-                if (predicate == 0) {
-                    scanner.current = pkt_end;
-                    if_condition = false;
-                }
-                break;
-            }
-            case ELSE_OP: {
-                sddf_dprintf("Found ELSE_OP\n");
-                uint8_t *pkt_end = get_pkt_end();
-
-                if (if_condition) {
-                    scanner.current = pkt_end;
-                }
-                break;
-            }
-            case STORE_OP: {
-                sddf_dprintf("StoreOp\n");
-                // Assume there is only one argument
-                uint32_t term_arg = advance();
-                if (term_arg == ARG0_OP) {
-                    term_arg = argv_0;
-                    sddf_dprintf("term_arg = argv_0: %u\n", argv_0);
-                } else {
-                    scanner.current--;
-                    term_arg = get_integer_data(true);
-                    sddf_dprintf("term_arg = %u\n", term_arg);
-                }
-
-                uint8_t byte = advance();
-                aml_object_t *supername_node = NULL;
-                sddf_dprintf("byte: 0x%x\n", byte);
-                if (byte >= LOCAL0_OP && byte <= LOCAL7_OP) {
-                    sddf_dprintf("StoreOp: local0 = 0x%x\n", term_arg);
-                    supername_node = make_object_if_not_exist(node, byte);
-                } else {
-                    scanner.current--;
-                    supername_node = read_if_name_string(&object_root, 1);
-                }
-
-                if (supername_node) {
-                    sddf_dprintf("Found SuperName object: %s\n", supername_node->name);
-                    supername_node->value = term_arg;
-                } else {
-                    sddf_dprintf("Warning: SuperName is not found, skip this StoreOp\n");
-                }
-                break;
-            }
-            case SHIFT_LEFT_OP:
-            case SHIFT_RIGHT_OP: {
-                sddf_dprintf("Shift\n");
-                uint32_t operand = get_integer_data(true);
-                sddf_dprintf("operand: %u\n", operand);
-                uint32_t shift_count = get_integer_data(true);
-                sddf_dprintf("shift_count: %u\n", shift_count);
-                uint8_t supername_byte = advance();
-                aml_object_t *supername_node = NULL;
-                sddf_dprintf("byte: 0x%x\n", byte);
-                if (supername_byte >= LOCAL0_OP && supername_byte <= LOCAL7_OP) {
-                    sddf_dprintf("ShiftRightOp: local0 = 0x%x >> 0x%x\n", operand, shift_count);
-                    supername_node = make_object_if_not_exist(node, supername_byte);
-                } else {
-                    scanner.current--;
-                    supername_node = read_if_name_string(&object_root, 1);
-                }
-
-                if (supername_node) {
-                    sddf_dprintf("Found SuperName object: %s\n", supername_node->name);
-                    if (byte == SHIFT_RIGHT_OP) {
-                        supername_node->value = operand >> shift_count;
-                    } else if (byte == SHIFT_LEFT_OP) {
-                        supername_node->value = operand << shift_count;
-                    }
-                } else {
-                    sddf_dprintf("Warning: SuperName is not found, skip this StoreOp\n");
-                }
-
-                break;
-            }
-            case RETURN_OP: {
-                if (ret_type == RET_TYPE_INTEGER) {
-                    uint32_t ret_val = get_integer_data(true);
-                    sddf_dprintf("Found return value %u\n", ret_val);
-                    return (uintptr_t)ret_val;
-                } else if (ret_type == RET_TYPE_OBJECT) {
-                    aml_object_t *node = read_if_name_string(&object_root, 1);
-                    if (node) {
-                        sddf_dprintf("Found return object at 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current);
-                        return (uintptr_t)node;
-                    } else {
-                        sddf_dprintf("Error: no object returned\n");
-                        return 0;
-                    }
-                }
-
-                return 0;
-            }
-            case CREATE_WORD_FIELD_OP:
-            case CREATE_DWORD_FIELD_OP: {
-                aml_object_t *source_buffer = read_if_name_string(node, 1);
-                sddf_dprintf("source buffer: %s\n", source_buffer->name);
-                uint32_t byte_index = get_integer_data(true);
-                sddf_dprintf("byte index: 0x%x\n", byte_index);
-                aml_object_t *var_obj = make_object_if_not_exist(node, byte);
-                var_obj->value = byte_index;
-
-                uint8_t *save_location = scanner.current;
-                // TODO: not necessary to copy it everytime
-                buffer_copy(buffer, 1024, source_buffer);
-                scanner.current = save_location;
-
-                break;
-            }
-            default: {
-                sddf_dprintf("Op 0x%x is not implemented\n", byte);
-                return 0;
-            }
-        }
-        byte = advance();
-    }
-
-    return 0;
-}
-
-// Section 6.4
-acpi_crs_list_t *extract_pcie_crs(aml_object_t *node)
-{
-    scanner.current = node->start; // First byte for NAME_OP
-    uint8_t op = advance();
-    if (op == NAME_OP) {
-        skip_name_string();
-
-        get_data_end();
-        uint8_t *buffer_start = scanner.current;
-        uint32_t buffer_size = get_integer_data(true);
-        uint8_t *buffer_end = buffer_start + buffer_size;
-        acpi_crs_list_t *crs_list = NULL;
-
-        while (scanner.current < buffer_end) {
-            uint32_t descriptor_type = scanner.current[0];
-            uint32_t descriptor_len = (scanner.current[0] & 0x80) ? ((scanner.current[2] << 8) + scanner.current[1] + 3) : ((scanner.current[0] & 0x7) + 1);
-
-            acpi_crs_list_t *new_entry = (acpi_crs_list_t *)alloc_mem(sizeof(acpi_crs_list_t));
-            new_entry->resource_type = descriptor_type;
-            new_entry->data_addr = (uintptr_t)scanner.current;
-            new_entry->next = crs_list;
-            crs_list = new_entry;
-
-            scanner.current += descriptor_len;
-        }
-
-        return crs_list;
-    } else if (op == METHOD_OP) {
-        execute_method(node, RET_TYPE_NONE, 0);
-        /* get_pkt_end(); */
-        /* skip_name_string(); */
-        /* advance(); // MethodFlags */
-
-        /* uint8_t byte = advance(); */
-        /* sddf_dprintf("Byte: 0x%x, current: 0x%lx\n", byte, (uintptr_t)scanner.current); */
-    }
-
-    return NULL;
-}
-
-void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource)
-{
-    scanner.current = node->start;
-    if (advance() != NAME_OP) {
-        return;
-    }
-
-    skip_name_string();
-
-    // DefPackage := PackageOp PkgLength NumElements PackageElementList
-    if (advance() != PACKAGE_OP) {
-        // Not a PackageObject
-        return;
-    }
-
-    uint8_t *pkt_end = get_pkt_end();
-    uint8_t num_elements = advance();
-    sddf_dprintf("num_elements: %u\n", num_elements);
-
-    while (scanner.current < pkt_end) {
-        // Check if element is also Package Object
-        if (advance() != PACKAGE_OP) return;
-
-        get_pkt_end();
-        uint32_t element_num_elements = advance();
-
-        // Check if num of elements is 4
-        if (element_num_elements != 4) return;
-
-        pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
-        // Parse address, i.e. PCI slot
-        pci_prt->address = get_integer_data(true);
-        // Parse PIN
-        pci_prt->pin = get_integer_data(true);
-        // Parse Source, i.e. GSI number
-        uint32_t source = get_integer_data(true);
-        // Parse Source Index, i.e. index in I/O APIC
-        uint32_t source_index = get_integer_data(true);
-
-        if (source == 0) {
-            pci_prt->gsi = source_index;
-        } else if (source_index == 0) {
-            pci_prt->gsi = source;
+        uint8_t op_stage = get_op_stage();
+        if (op_stage == PKT_LEN) {
+            current_state->pkt_end = get_pkt_end();
+        } else if (op_stage == METHOD_FLAGS || op_stage == SYNC_FLAGS) {
+            advance(); // Read one byte
+        } else if (op_stage == DATA_OBJECT) {
+            /* scanner.current = get_data_end(op_code); */
+        } else if (op_stage == OBJECT_NAME_STRING) {
+            aml_object_t *new_node = make_object_if_not_exist(NULL, op_code);
+            current_state->node = new_node;
+        } else if (op_stage == NAME_STRING) {
+          skip_name_string();
+        } else if (op_stage == TERM_INTEGER) {
+          /* aml_object_t *node = look_up_node_by_name(); */
         } else {
-            sddf_dprintf("Error: there might be multiple interrupts in _CRS, need to fix this case\n");
-        }
-
-        pci_bridge_resource->num_prt_entries++;
-        sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
-    }
-}
-
-
-bool get_term_list_return(aml_object_t *node, uint8_t *pkt_end, char *package_name)
-{
-    return false;
-}
-
-// DefMethod := MethodOp PkgLength NameString MethodFlags TermList
-bool extract_pcie_prt(aml_object_t *node, char *package_name)
-{
-    scanner.current = node->start + 1; // Skip MethodOp
-    uint8_t *pkt_end = get_pkt_end(); // PktLength
-    skip_name_string(); // Skip NameString
-
-    advance(); // Get MethodFlags
-    if (scanner.current < pkt_end) {
-        // TermList := Nothing | <termobj termlist>
-        // TermObj := Object | StatementOpcode | ExpressionOpcode
-        // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
-        // DefElse := Nothing | <elseop pkglength termlist>
-        // DefLEqual := LequalOp Operand Operand
-        // Operand := TermArg => Integer
-        // DefReturn := ReturnOp ArgObject
-        // ArgObject := TermArg => DataRefObject
-        //
-        // Example:
-        //   0xA0  IfOp
-        //   0x0C  PktLength = 0x0C
-        //   0x93  LEqualOp
-        //   0x50  'P' (Operand 1)
-        //   0x49  'I'
-        //   0x43  'C'
-        //   0x46  'F'
-        //   0x00  Zero (Operand 2)
-        //   0xA4  ReturnOp
-        //   0x50  'P'
-        //   0x52  'R'
-        //   0x54  'T'
-        //   0x50  'P'
-        //   0xA1  ElseOp
-        //   0x06  PkeLength = 0x06
-        //   0xA4  ReturnOp
-        //   0x50  'P'
-        //   0x52  'I'
-        //   0x54  'C'
-        //   0x41  'A'
-
-        while (scanner.current < pkt_end) {
-            uint8_t op_code = advance();
             switch (op_code) {
-            case IF_OP: {
-                // DefIfElse := IfOp PkgLength Predicate TermList DefElse
-                // @terryb: we assume IF is for legacy PIC mode, so just skip it
-                //   but this is not the case on makatea
-                scanner.current = get_pkt_end();
-                break;
-            }
-            case ELSE_OP: {
-                get_pkt_end();
-                break;
-            }
-            case RETURN_OP: {
-                read_name_segment(package_name);
-                return true;
-            }
-            default: {
-                sddf_dprintf("OpCode %u is not implemented\n", op_code);
-            }
+                case SCOPE_OP:
+                case METHOD_OP:
+                case NAME_OP:
+                case MUTEX_OP:
+                case EVENT_OP:
+                case INDEX_FIELD_OP:
+                case IF_OP:
+                case OP_REGION_OP:
+                case DEVICE_OP: {
+                    state_stack_push(op_code);
+                    break;
+                }
+                default: {
+
+                }
             }
         }
 
+        state_stack_update();
+        op_code = 0;
     }
-    return false;
-}
 
-// Look for objects with matched name, returns number of matched results
-void query_all_objects_by_name(aml_object_t *node, const char *name_segment)
-{
-    if (!strcmp(node->name, name_segment)) {
-        lookup_results[lookup_cnt] = node;
-        lookup_cnt++;
-    }
-    aml_object_t *child = node->child;
-    while (child) {
-        query_all_objects_by_name(child, name_segment);
-        child = child->next;
-    }
-}
-
-aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment)
-{
-    aml_object_t *child = node->child;
-    while (child) {
-        if (!strcmp(child->name, name_segment)) {
-            return child;
-        }
-        if (child->op_code == OP_REGION_OP) {
-            aml_object_t *target = query_child_object_by_name(child, name_segment);
-            if (target) {
-                return target;
-            }
-        }
-        child = child->next;
-    }
-    return NULL;
-}
-
-aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment)
-{
-    aml_object_t *parent = node->parent;
-    while (parent) {
-        aml_object_t *target = query_child_object_by_name(parent, name_segment);
-        if (target) {
-            return target;
-        }
-        parent = parent->parent;
-    }
-    return NULL;
-}
-
-void print_object_tree(aml_object_t *node, uint8_t depth)
-{
-    for (uint8_t i = 0; i < depth; i++) sddf_dprintf("    ");
-    sddf_dprintf("OpCode: 0x%02X, Name: %s, Location: 0x%lx\n", node->op_code, node->name, (uintptr_t)node->start);
-
-    if (node->child) {
-        aml_object_t *child = node->child;
-        while (child) {
-            print_object_tree(child, depth + 1);
-            child = child->next;
-        }
-    }
 }

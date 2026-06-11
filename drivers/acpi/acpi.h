@@ -302,6 +302,16 @@ typedef struct aml_object {
     uint32_t value;             // Only used for NameObject
 } aml_object_t;
 
+typedef struct aml_namespace_node {
+    uint8_t *start;
+    struct aml_namespace_node *parent;  // parent
+    struct aml_namespace_node *child;   // first child object
+    struct aml_namespace_node *next;    // siblings
+    char name[5];               // Name Segment
+    enum aml_encoding_value op_code;
+    uint32_t value;             // Only used for NameObject
+} aml_namespace_node_t;
+
 typedef struct aml_object_pool {
     uintptr_t next;
     uintptr_t end;
