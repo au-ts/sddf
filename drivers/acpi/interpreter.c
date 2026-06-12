@@ -28,6 +28,7 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [CREATE_WORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
     [CREATE_BYTE_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
     [CREATE_DWORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
+    [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -183,6 +184,7 @@ void state_stack_push(uint16_t op_code, bool execute)
     current_state->op_code = op_code;
     current_state->stage_idx = 0;
     current_state->execute = execute;
+    current_state->node = current_state->parent->node; // used for looking up namespace nodes
 }
 
 void state_stack_pop()
@@ -210,7 +212,9 @@ void state_stack_update()
     if (current_state->op_code == NULL_OP) return;
     parse_stage_t op_stage = get_op_stage();
     if (current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
-        if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
+        if (current_state->execute == false) {
+            current_state->stage_idx = 4;
+        } else if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
             current_state->stage_idx += 2;
         }
     } else if (current_state->op_code == METHOD_OP && op_stage == OBJECT_NAME_STRING) {
@@ -444,19 +448,19 @@ void parse_field_list()
             uint8_t *field_element_start = scanner.current;
             uint32_t bit_width = get_pkt_end() - field_element_start;
             field_node->value = (offset << 8) | bit_width;
-            sddf_dprintf("field name: %s, bit_width: %u, offset: 0x%x\n", field_node->name, bit_width, offset);
+            /* sddf_dprintf("field name: %s, bit_width: %u, offset: 0x%x\n", field_node->name, bit_width, offset); */
             offset += bit_width;
         } else if (byte == 0x00) {
             uint8_t *field_element_start = scanner.current;
             uint8_t *reserved_pkt_end = get_pkt_end();
             uint32_t padding_bits = (uint32_t)(reserved_pkt_end - field_element_start);
             offset += padding_bits;
-            sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits);
-            sddf_dprintf("offset: 0x%x\n", offset);
+            /* sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits); */
+            /* sddf_dprintf("offset: 0x%x\n", offset); */
         } else if (byte == 0x01) {
             uint8_t type = advance();
             uint8_t attrib = advance();
-            sddf_dprintf("Access field - type: 0x%x, attrib: 0x%x\n", type, attrib);
+            /* sddf_dprintf("Access field - type: 0x%x, attrib: 0x%x\n", type, attrib); */
         } else {
             sddf_dprintf("Error: unknown prefix - 0x%x\n", byte);
         }
@@ -521,6 +525,7 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                      state_stack_add_argument(data);
                      break;
                 }
+                case ADD_OP:
                 case ALIAS_OP:
                 case SCOPE_OP:
                 case METHOD_OP:
