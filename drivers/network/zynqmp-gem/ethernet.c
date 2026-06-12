@@ -65,12 +65,10 @@ static void update_ring_slot_rx(hw_ring_t *ring, unsigned int idx, uintptr_t phy
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr_hi = (uint32_t)(phys >> 32);
     d->stat = 0;  /* HW fills on receive */
-
-    /* Ensure all writes to the descriptor complete, before we set the flags
-     * that makes hardware aware of this slot. Recall d->addr includes ownership bit.
+    /* Ensure all writes to the descriptor are ordered before we set the flags
+     * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
-
+    wwmb();
     d->addr = (uint32_t)(phys);
 }
 
@@ -79,12 +77,10 @@ static void update_ring_slot_tx(hw_ring_t *ring, unsigned int idx, uintptr_t phy
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = (uint32_t)(phys);
     d->addr_hi = (uint32_t)(phys >> 32);
-
-    /* Ensure all writes to the descriptor complete, before we set the flags
+    /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
-
+    wwmb();
     d->stat = stat | (len & TXD_LEN_MASK);
 }
 
@@ -141,7 +137,11 @@ static void rx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'status' field of the descriptor.
+         */
+        rrmb();
 
         /* See Table 34-5: RX Buffer Descriptor Entry (64-bit mode) */
         uint16_t len = d->stat & RXD_LEN_MASK;
@@ -180,8 +180,6 @@ static void tx_provide(void)
 
             update_ring_slot_tx(&tx, idx, phys, buffer.len, stat);
             tx.tail++;
-
-            eth->nwctrl |= ZYNQ_GEM_NWCTRL_STARTTX_MASK;
         }
 
         net_request_signal_active(&tx_queue);
@@ -192,6 +190,13 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
+
+    /* The following barrier orders the write to the DMA register to be after the write to
+     * the 'status' fields of the descriptors updated in function update_ring_slot().
+     */
+    wwmb();
+
+    eth->nwctrl |= ZYNQ_GEM_NWCTRL_STARTTX_MASK;
 }
 
 static void tx_return(void)
@@ -207,7 +212,11 @@ static void tx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads to the descriptor to be after
+         * the read to the 'status' field of the descriptor.
+         */
+        rrmb();
 
         uintptr_t phys_addr = ((uintptr_t)d->addr_hi << 32) | d->addr;
         net_buff_desc_t buffer = { phys_addr, 0 };
