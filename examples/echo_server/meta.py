@@ -222,9 +222,13 @@ def generate(
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
 
-    mr_aml_object_poool = MemoryRegion(sdf, "aml_object_pool", 0x30000)
-    sdf.add_mr(mr_aml_object_poool)
-    acpi_driver.add_map(Map(mr_aml_object_poool, 0x30000000, "rw"))
+    mr_aml_object_pool = MemoryRegion(sdf, "aml_object_pool", 0x30000)
+    sdf.add_mr(mr_aml_object_pool)
+    acpi_driver.add_map(Map(mr_aml_object_pool, 0x30000000, "rw"))
+
+    mr_aml_state_stack = MemoryRegion(sdf, "aml_state_stack", 0x10000)
+    sdf.add_mr(mr_aml_state_stack)
+    acpi_driver.add_map(Map(mr_aml_state_stack, 0x50000000, "rw"))
 
     mr_acpi_tables_copy = MemoryRegion(sdf, "acpi_tables_copy", 0x50000)
     sdf.add_mr(mr_acpi_tables_copy)
