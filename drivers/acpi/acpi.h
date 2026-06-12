@@ -306,7 +306,8 @@ typedef struct aml_object {
 } aml_object_t;
 
 typedef struct aml_namespace_node {
-    uint8_t *start;
+    uint8_t *pkt_start;
+    uint8_t *pkt_end;
     struct aml_namespace_node *parent;  // parent
     struct aml_namespace_node *child;   // first child object
     struct aml_namespace_node *next;    // siblings
@@ -381,5 +382,6 @@ typedef struct {
 extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
 
-void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end);
+void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
+void eval_namespace_node(aml_namespace_node_t *node);

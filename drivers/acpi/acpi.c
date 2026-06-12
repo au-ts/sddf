@@ -525,10 +525,10 @@ void init(void)
     sddf_dprintf("dsdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_dsdt_table, (uintptr_t)scanner.current);
 
     /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */
-    namespace_root.start = scanner.current;
+    namespace_root.pkt_start = scanner.current;
     namespace_root.op_code = NULL_OP;
     namespace_root.name[0] = '\\';
-    parse_namespace_tree(&namespace_root, dsdt_copy_end);
+    scan_namespace_tree(&namespace_root, dsdt_copy_end);
 
     aml_namespace_node_t *lookup_results[10];
     uint8_t num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_pic, lookup_results, 0);
@@ -536,7 +536,9 @@ void init(void)
         sddf_dprintf("[Error] namespace node \'%s\' is not found\n", acpi_str_pic);
         return;
     }
-    sddf_dprintf("Found _PIC method!\n");
+    sddf_dprintf("Found _PIC method! num: %u\n", num_results);
+
+    eval_namespace_node(lookup_results[0]);
 
     /* seL4_Error error; */
     /* pci_resources = (pci_resources_t *)pci_resources_vaddr; */

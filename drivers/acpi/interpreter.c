@@ -9,7 +9,6 @@ typedef enum {
     TERM_LIST,
     TERM_INTEGER,
     TERM_BUFFER,
-    ONE_BYTE_FLAGS,
     FIELD_LIST,
     BYTE_INDEX,
     BUFFER,
@@ -25,7 +24,7 @@ typedef enum {
 
 parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [SCOPE_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
-    [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, ONE_BYTE_FLAGS, TERM_LIST, COMPLETE },
+    [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, BYTE_DATA, TERM_LIST, COMPLETE },
     [NAME_OP] = { INIT, OBJECT_NAME_STRING, DATA_OBJECT, COMPLETE},
     [IF_OP] = { INIT, PKT_LEN, TERM_INTEGER, TERM_LIST, COMPLETE },
     [ELSE_OP] = { INIT, PKT_LEN, TERM_LIST, COMPLETE },
@@ -40,17 +39,18 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
-    [FIELD_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, ONE_BYTE_FLAGS, FIELD_LIST, COMPLETE},
+    [FIELD_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, BYTE_DATA, FIELD_LIST, COMPLETE},
     [INDEX_FIELD_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE},
-    [OP_REGION_OP & 0xFF] = { INIT, OBJECT_NAME_STRING, ONE_BYTE_FLAGS, TERM_INTEGER, TERM_INTEGER, COMPLETE},
+    [OP_REGION_OP & 0xFF] = { INIT, OBJECT_NAME_STRING, BYTE_DATA, TERM_INTEGER, TERM_INTEGER, COMPLETE},
     [DEVICE_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
-    [MUTEX_OP & 0xFF] = { INIT, NAME_STRING, ONE_BYTE_FLAGS, COMPLETE },
-    [POWER_RESOURCE_OP & 0xFF] = { INIT, PKT_LEN, NAME_STRING, ONE_BYTE_FLAGS, WORD_DATA, TERM_LIST, COMPLETE },
+    [MUTEX_OP & 0xFF] = { INIT, NAME_STRING, BYTE_DATA, COMPLETE },
+    [POWER_RESOURCE_OP & 0xFF] = { INIT, PKT_LEN, NAME_STRING, BYTE_DATA, WORD_DATA, TERM_LIST, COMPLETE },
     [PROCESSOR_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
 };
 
 typedef struct parse_state {
     struct parse_state *parent;
+    uint8_t *node_start;
     uint8_t *pkt_end;
     aml_namespace_node_t *node;
     uint16_t op_code;
@@ -137,6 +137,8 @@ uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *nam
         num_results = find_decendant_nodes_by_name(child, name_segment, lookup_results, num_results);
         child = child->next;
     }
+
+    return num_results;
 }
 
 aml_namespace_node_t *find_namespace_node_by_name(aml_namespace_node_t *node, const char *name_segment)
@@ -160,7 +162,7 @@ aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespac
         return NULL;
     }
 
-    child_node->start = scanner.start;
+    child_node->pkt_start = current_state->node_start;
     child_node->parent = namespace;
     child_node->op_code = op_code;
     if (name_segment != NULL) {
@@ -208,6 +210,10 @@ void state_stack_push(uint16_t op_code, bool execute)
     current_state->stage_idx = 0;
     current_state->execute = execute;
     current_state->node = current_state->parent->node; // used for looking up namespace nodes
+    current_state->node_start = scanner.current - 1;
+    if ((op_code & 0x5B) == 0x5B) {
+        current_state->node_start = scanner.current - 2;
+    }
 }
 
 void state_stack_add_argument(uintptr_t argument)
@@ -422,6 +428,11 @@ aml_namespace_node_t *make_namespace_node(aml_namespace_node_t *namespace, uint1
         name_type = advance();
     }
 
+    if (name_type == '^') {
+        namespace = namespace->parent;
+        name_type = advance();
+    }
+
     if (name_type == 0x00) {
         return namespace;
     }
@@ -486,35 +497,35 @@ void parse_field_list()
             /* sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits); */
             /* sddf_dprintf("offset: 0x%x\n", offset); */
         } else if (byte == 0x01) {
-            uint8_t type = advance();
-            uint8_t attrib = advance();
+            advance(); // Type
+            advance(); // Attrib
             /* sddf_dprintf("Access field - type: 0x%x, attrib: 0x%x\n", type, attrib); */
         } else {
             sddf_dprintf("Error: unknown prefix - 0x%x\n", byte);
         }
     }
-
 }
 
-void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
+void parse_namespace_node(bool evaluation)
 {
+    sddf_dprintf("Evaluation? %s\n", evaluation ? "true" : "false");
+
     uint16_t op_code = 0;
+    uint8_t *namespace_end = current_state->pkt_end;
 
-    state_stack_push(NULL_OP, false);
-    current_state->pkt_end = table_end;
-    current_state->node = namespace;
-
-    while (scanner.current < table_end) {
+    while (scanner.current < namespace_end) {
         uint8_t op_stage = get_op_stage();
         if (op_stage == PKT_LEN) {
             current_state->pkt_end = get_pkt_end();
-        } else if (op_stage == ONE_BYTE_FLAGS) {
-            state_stack_add_argument(advance()); // Read one byte flags
         } else if (op_stage == DATA_OBJECT) {
             scanner.current = get_data_end();
         } else if (op_stage == OBJECT_NAME_STRING) {
             aml_namespace_node_t *new_node = make_namespace_node(current_state->parent->node, current_state->op_code);
             current_state->node = new_node;
+            new_node->pkt_start = current_state->node_start;
+            if (current_state->pkt_end != 0) {
+                new_node->pkt_end = current_state->pkt_end;
+            }
         } else if (op_stage == NAME_STRING) {
             skip_name_string();
         } else if (op_stage == FIELD_LIST) {
@@ -588,11 +599,30 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
         op_code = 0;
     }
 
+}
+
+void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end)
+{
+    state_stack_push(NULL_OP, false);
+    current_state->node_start = scanner.current;
+    current_state->pkt_end = namespace_end;
+    current_state->node = namespace;
+
+    parse_namespace_node(false);
     // TODO: destroy root state
 }
 
 
-void eval_namespace_node(aml_namespace_node_t *namespace_root, aml_namespace_node_t *node)
+void eval_namespace_node(aml_namespace_node_t *node)
 {
+    scanner.current = node->pkt_start;
+    sddf_dprintf("scanner.current: 0x%lx\n", (uintptr_t)scanner.current);
 
+    uint16_t op_code = 0;
+
+    state_stack_push(node->op_code, true);
+    current_state->node = node;
+    current_state->stage_idx = 0;
+
+    parse_namespace_node(true);
 }
