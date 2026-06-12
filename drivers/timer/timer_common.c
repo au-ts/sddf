@@ -33,17 +33,16 @@ static inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64
 }
 
 /**
- *  Shift some number of periods in `input_freq` to some number of periods in `target_freq`,
+ *  Transform some number of periods in `input_freq` to some number of periods in `target_freq`,
  *  taking extra care to avoid integer division precision loss when dividing the period.
  *
- *  This code is safe for all frequencies that fit in a `uint32_t` but should still be OK
- *  for slightly higher values, albeit with a diminished time to run before overflow.
+ *  This function will return a transformed number of ticks for any input values that possibly
+ *  correspond to 64-bit output for any clock frequency we expect from timers.
+ *  See `timer_common.z3` for a proof of correctness.
+ *  TODO: return an error if overflow.
  */
-static inline uint64_t period_shift(uint64_t period, uint64_t target_freq, uint64_t input_freq)
+static inline uint64_t period_transform(uint64_t period, uint64_t target_freq, uint64_t input_freq)
 {
-    //  We expect periods to constantly grow and threaten to overflow frequencies stay more
-    //  or less the same.
-    //
     // We use a split-remainder technique to divide and multiply the `period` without
     // any overflow until `period` is very large.
     // See https://gist.github.com/midnightveil/23fc4dc16cad52114a94fb1978550a98
@@ -77,7 +76,7 @@ static inline uint64_t period_shift(uint64_t period, uint64_t target_freq, uint6
  */
 uint64_t ticks_to_ns(uint64_t ticks, sddf_timer_freq_hz_t freq)
 {
-    return period_shift(ticks, ONE_GHZ, freq);
+    return period_transform(ticks, ONE_GHZ, freq);
 }
 
 /**
@@ -85,7 +84,7 @@ uint64_t ticks_to_ns(uint64_t ticks, sddf_timer_freq_hz_t freq)
  */
 uint64_t ns_to_ticks(uint64_t ns, sddf_timer_freq_hz_t freq)
 {
-    return period_shift(ns, freq, ONE_GHZ);
+    return period_transform(ns, freq, ONE_GHZ);
 }
 
 // Convenience functions for timers using prescalers
