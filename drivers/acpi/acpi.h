@@ -113,6 +113,7 @@ enum aml_encoding_value {
     SUBTRACT_OP = 0x74,
     SHIFT_LEFT_OP = 0x79,
     SHIFT_RIGHT_OP = 0x7A,
+    CREATE_BYTE_FIELD_OP = 0x8C,
     CREATE_WORD_FIELD_OP = 0x8B,
     CREATE_DWORD_FIELD_OP = 0x8A,
     LEQUAL_OP = 0x93,
@@ -366,3 +367,16 @@ extern const char acpi_str_hid[];
 extern const char acpi_str_crs[];
 extern const char acpi_str_prt[];
 extern const char eisaid_str_pcie[];
+
+
+// ====== Refactor =====
+typedef struct {
+    void *start;
+    void *next;
+    void *end;
+} mempool_t;
+
+extern mempool_t aml_namespace_mempool;
+extern aml_namespace_node_t namespace_root;
+
+void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end);
