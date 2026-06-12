@@ -8,10 +8,14 @@ typedef enum {
     NAME_STRING,        // Name String referring to other objects
     TERM_LIST,
     TERM_INTEGER,
+    TERM_BUFFER,
     ONE_BYTE_FLAGS,
     FIELD_LIST,
     BYTE_INDEX,
     BUFFER,
+    BYTE_DATA,
+    WORD_DATA,
+    DWORD_DATA,
     DATA_OBJECT,
     COMPLETE,
 } parse_stage_t;
@@ -24,11 +28,15 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, ONE_BYTE_FLAGS, TERM_LIST, COMPLETE },
     [NAME_OP] = { INIT, OBJECT_NAME_STRING, DATA_OBJECT, COMPLETE},
     [IF_OP] = { INIT, PKT_LEN, TERM_INTEGER, TERM_LIST, COMPLETE },
+    [ELSE_OP] = { INIT, PKT_LEN, TERM_LIST, COMPLETE },
     [ALIAS_OP] = { INIT, NAME_STRING, NAME_STRING, COMPLETE },
     [CREATE_WORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
     [CREATE_BYTE_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
     [CREATE_DWORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, NAME_STRING, COMPLETE },
     [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
+    [BYTE_PREFIX] = { INIT, BYTE_DATA, COMPLETE },
+    [WORD_PREFIX] = { INIT, WORD_DATA, COMPLETE },
+    [DWORD_PREFIX] = { INIT, DWORD_DATA, COMPLETE },
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -37,6 +45,8 @@ parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [OP_REGION_OP & 0xFF] = { INIT, OBJECT_NAME_STRING, ONE_BYTE_FLAGS, TERM_INTEGER, TERM_INTEGER, COMPLETE},
     [DEVICE_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
     [MUTEX_OP & 0xFF] = { INIT, NAME_STRING, ONE_BYTE_FLAGS, COMPLETE },
+    [POWER_RESOURCE_OP & 0xFF] = { INIT, PKT_LEN, NAME_STRING, ONE_BYTE_FLAGS, WORD_DATA, TERM_LIST, COMPLETE },
+    [PROCESSOR_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
 };
 
 typedef struct parse_state {
@@ -187,20 +197,35 @@ void state_stack_push(uint16_t op_code, bool execute)
     current_state->node = current_state->parent->node; // used for looking up namespace nodes
 }
 
+void state_stack_add_argument(uintptr_t argument)
+{
+    sddf_dprintf("add argument: 0x%lx\n", argument);
+    current_state->arguments[current_state->num_args] = argument;
+    current_state->num_args++;
+
+    if (get_op_stage() == TERM_INTEGER) {
+        /* state_stack_update(); */
+    }
+}
+
 void state_stack_pop()
 {
-    switch(current_state->op_code) {
-        case SCOPE_OP:
-        case METHOD_OP:
-        case NAME_OP: {
-            break;
-        }
+    if (current_state->op_code == NULL_OP) return;
+
+    uintptr_t ret_val = 0;
+    if (current_state->num_args > 0) {
+        ret_val = current_state->arguments[0];
     }
 
     sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
     parse_state_t *completed_state = current_state;
     current_state = current_state->parent;
     mempool_rc(&state_stack_mempool, (void *)completed_state, sizeof(parse_state_t));
+
+    parse_stage_t op_stage = get_op_stage();
+    if (op_stage == TERM_INTEGER || op_stage == TERM_BUFFER) {
+        state_stack_add_argument(ret_val);
+    }
 
     if (scanner.current >= current_state->pkt_end) {
         state_stack_pop();
@@ -211,10 +236,13 @@ void state_stack_update()
 {
     if (current_state->op_code == NULL_OP) return;
     parse_stage_t op_stage = get_op_stage();
-    if (current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
+    if ((current_state->op_code == IF_OP || current_state->op_code == ELSE_OP) && op_stage == PKT_LEN) {
+        // TODO: This should be removed once real-time value reading is implemented
         if (current_state->execute == false) {
             current_state->stage_idx = 4;
-        } else if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
+        }
+    } else if (current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
+        if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
             current_state->stage_idx += 2;
         }
     } else if (current_state->op_code == METHOD_OP && op_stage == OBJECT_NAME_STRING) {
@@ -229,23 +257,12 @@ void state_stack_update()
     // Check if the Op has been completely parsed
     op_stage = get_op_stage();
     if (op_stage == COMPLETE) {
-        sddf_dprintf("Complete Op \'0x%04x\' parsing\n", current_state->op_code);
 
         if (current_state->pkt_end != 0) {
             scanner.current = current_state->pkt_end;
         }
+        sddf_dprintf("Complete Op \'0x%04x\' parsing\n", current_state->op_code);
         state_stack_pop();
-    }
-}
-
-void state_stack_add_argument(uintptr_t argument)
-{
-    sddf_dprintf("add argument: 0x%lx\n", argument);
-    current_state->arguments[current_state->num_args] = argument;
-    current_state->num_args++;
-
-    if (get_op_stage() == TERM_INTEGER) {
-        /* state_stack_update(); */
     }
 }
 
@@ -491,6 +508,18 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
             skip_name_string();
         } else if (op_stage == FIELD_LIST) {
             parse_field_list();
+        } else if (op_stage == BYTE_DATA) {
+            state_stack_add_argument(advance());
+        } else if (op_stage == WORD_DATA) {
+            uint16_t data = advance();
+            data |= (advance() << 8);
+            state_stack_add_argument(data);
+        } else if (op_stage == DWORD_DATA) {
+            uint32_t data = advance();
+            data |= (advance() << 8);
+            data |= (advance() << 16);
+            data |= (advance() << 24);
+            state_stack_add_argument(data);
         } else {
             op_code = op_code | advance();
             if (op_code == 0x5B) {
@@ -498,6 +527,7 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                 continue;
             }
 
+            sddf_dprintf("op_code: 0x%04x\n", op_code);
             switch (op_code) {
                 case ZERO_OP: {
                     state_stack_add_argument(0);
@@ -507,24 +537,9 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                     state_stack_add_argument(1);
                     break;
                 }
-                case BYTE_PREFIX: {
-                    state_stack_add_argument(advance());
-                    break;
-                }
-                case WORD_PREFIX: {
-                    uint16_t data = advance();
-                    data |= (advance() << 8);
-                     state_stack_add_argument(data);
-                    break;
-                }
-                case DWORD_PREFIX: {
-                     uint32_t data = advance();
-                     data |= (advance() << 8);
-                     data |= (advance() << 16);
-                     data |= (advance() << 24);
-                     state_stack_add_argument(data);
-                     break;
-                }
+                case BYTE_PREFIX:
+                case WORD_PREFIX:
+                case DWORD_PREFIX:
                 case ADD_OP:
                 case ALIAS_OP:
                 case SCOPE_OP:
@@ -535,10 +550,13 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                 case FIELD_OP:
                 case INDEX_FIELD_OP:
                 case IF_OP:
+                case ELSE_OP:
                 case OP_REGION_OP:
                 case CREATE_BYTE_FIELD_OP:
                 case CREATE_WORD_FIELD_OP:
                 case CREATE_DWORD_FIELD_OP:
+                case POWER_RESOURCE_OP:
+                case PROCESSOR_OP:
                 case DEVICE_OP: {
                     state_stack_push(op_code, false);
                     break;
@@ -551,7 +569,7 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                         sddf_dprintf("Found node \'%s\'\n", node->name);
                         state_stack_add_argument((uintptr_t)node);
                     } else {
-                    sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
+                        sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                     }
                 }
             }

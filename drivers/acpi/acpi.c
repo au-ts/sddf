@@ -517,11 +517,11 @@ void init(void)
     sddf_dprintf("===============Scanning DSDT===============\n");
 
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)&test_dsdt_table;
-    uint8_t *dsdt_copy_end = &test_dsdt_table + 299745;
+    uint8_t *dsdt_copy_end = (uint8_t *)&test_dsdt_table + 299745;
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     aml_namespace_mempool.start = (void *)aml_object_pool_start;
     aml_namespace_mempool.next = (void *)aml_object_pool_start;
-    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x30000;
+    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x40000;
     sddf_dprintf("dsdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_dsdt_table, (uintptr_t)scanner.current);
 
     /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */
