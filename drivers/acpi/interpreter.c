@@ -99,11 +99,11 @@ void mempool_rc(mempool_t *mempool, void *addr, uint32_t mem_size)
 // =============== Namespace Node ==============
 
 // Return object pointer if already exists
-aml_namespace_node_t *find_local_variable_in_namespace(aml_namespace_node_t *namespace, uint8_t op_code)
+aml_namespace_node_t *find_local_variable_in_namespace(aml_namespace_node_t *node, uint8_t op_code)
 {
-    if (namespace->child == NULL) return false;
+    if (node->child == NULL) return false;
 
-    aml_namespace_node_t *child = namespace->child;
+    aml_namespace_node_t *child = node->child;
     while (child) {
         if (child->op_code == op_code) return child;
         child = child->next;
@@ -113,17 +113,30 @@ aml_namespace_node_t *find_local_variable_in_namespace(aml_namespace_node_t *nam
 }
 
 // Return object pointer if already exists
-aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *namespace, const char *name_segment)
+aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment)
 {
-    if (namespace->child == NULL) return false;
+    if (node->child == NULL) return false;
 
-    aml_namespace_node_t *child = namespace->child;
+    aml_namespace_node_t *child = node->child;
     while (child) {
         if (!strcmp(child->name, name_segment)) return child;
         child = child->next;
     }
 
     return NULL;
+}
+
+uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results)
+{
+    if (!strcmp(node->name, name_segment)) {
+        lookup_results[num_results] = node;
+        num_results++;
+    }
+    aml_namespace_node_t *child = node->child;
+    while (child) {
+        num_results = find_decendant_nodes_by_name(child, name_segment, lookup_results, num_results);
+        child = child->next;
+    }
 }
 
 aml_namespace_node_t *find_namespace_node_by_name(aml_namespace_node_t *node, const char *name_segment)
@@ -186,7 +199,7 @@ parse_stage_t get_op_stage()
 
 void state_stack_push(uint16_t op_code, bool execute)
 {
-    sddf_dprintf("stack push op_code: 0x%04x\n", op_code);
+    /* sddf_dprintf("stack push op_code: 0x%04x\n", op_code); */
     parse_state_t *reserved_state = current_state;
 
     current_state = (parse_state_t *)mempool_alloc(&state_stack_mempool, sizeof(parse_state_t));
@@ -199,7 +212,7 @@ void state_stack_push(uint16_t op_code, bool execute)
 
 void state_stack_add_argument(uintptr_t argument)
 {
-    sddf_dprintf("add argument: 0x%lx\n", argument);
+    /* sddf_dprintf("add argument: 0x%lx\n", argument); */
     current_state->arguments[current_state->num_args] = argument;
     current_state->num_args++;
 
@@ -217,7 +230,7 @@ void state_stack_pop()
         ret_val = current_state->arguments[0];
     }
 
-    sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+    /* sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
     parse_state_t *completed_state = current_state;
     current_state = current_state->parent;
     mempool_rc(&state_stack_mempool, (void *)completed_state, sizeof(parse_state_t));
@@ -252,7 +265,7 @@ void state_stack_update()
         current_state->stage_idx += 1;
     }
 
-    sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage());
+    /* sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage()); */
 
     // Check if the Op has been completely parsed
     op_stage = get_op_stage();
@@ -261,7 +274,7 @@ void state_stack_update()
         if (current_state->pkt_end != 0) {
             scanner.current = current_state->pkt_end;
         }
-        sddf_dprintf("Complete Op \'0x%04x\' parsing\n", current_state->op_code);
+        /* sddf_dprintf("Complete Op \'0x%04x\' parsing\n", current_state->op_code); */
         state_stack_pop();
     }
 }
@@ -288,7 +301,6 @@ uint8_t *get_pkt_end()
     uint32_t pkt_len = (lead_byte & 0xF) + (advance() << 4);
     if (extra_bytes_len > 1) pkt_len += (advance() << 12);
     if (extra_bytes_len > 2) pkt_len += (advance() << 20);
-    sddf_dprintf("lead_byte: 0x%02x, pkt_len: %u\n", lead_byte, pkt_len);
 
     return scanner.current + pkt_len - extra_bytes_len - 1;
 }
@@ -333,7 +345,6 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
         // Name Segment
         scanner.current--;
         read_name_segment(name_segment);
-        sddf_dprintf("read name segment: %s\n", name_segment);
         node = find_namespace_node_by_name(current_state->node, name_segment);
         left_num_segments--;
         /* sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current); */
@@ -527,7 +538,6 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                 continue;
             }
 
-            sddf_dprintf("op_code: 0x%04x\n", op_code);
             switch (op_code) {
                 case ZERO_OP: {
                     state_stack_add_argument(0);
@@ -566,7 +576,6 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
                     // Try looking up the object by name string by name string by name string by name string
                     aml_namespace_node_t *node = find_node_by_name_string(current_state->parent->node, 1);
                     if (node) {
-                        sddf_dprintf("Found node \'%s\'\n", node->name);
                         state_stack_add_argument((uintptr_t)node);
                     } else {
                         sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
@@ -578,5 +587,12 @@ void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end)
         state_stack_update();
         op_code = 0;
     }
+
+    // TODO: destroy root state
+}
+
+
+void eval_namespace_node(aml_namespace_node_t *namespace_root, aml_namespace_node_t *node)
+{
 
 }

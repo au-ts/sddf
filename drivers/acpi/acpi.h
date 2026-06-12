@@ -382,3 +382,4 @@ extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
 
 void parse_namespace_tree(aml_namespace_node_t *namespace, uint8_t *table_end);
+uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
