@@ -18,7 +18,7 @@
 #define LOG_CLIENT_ERR(...) do{}while(0)
 #endif
 
-#define REMOTE_CONTROL (1)
+#define REMOTE_CONTROL (0)
 
 #define STACK_SIZE (4096)
 #define BUFFER_SIZE (1024)
@@ -201,7 +201,6 @@ void client_main(void) {
         }
 
         uint64_t time_new = get_time_now();
-        LOG_CLIENT("time max %d\n", time_new - time_prev);
     }
 }
 
