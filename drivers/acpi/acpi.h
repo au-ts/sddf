@@ -97,6 +97,8 @@ enum aml_encoding_value {
     OP_REGION_OP = 0x5B80,
     FIELD_OP = 0x5B81,
     DEVICE_OP = 0x5B82,
+    PROCESSOR_OP = 0x5B83,
+    POWER_RESOURCE_OP = 0x5B84,
     INDEX_FIELD_OP = 0x5B86,
     // Something more
     LOCAL0_OP = 0x60,
