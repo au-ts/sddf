@@ -530,6 +530,14 @@ void init(void)
     namespace_root.name[0] = '\\';
     parse_namespace_tree(&namespace_root, dsdt_copy_end);
 
+    aml_namespace_node_t *lookup_results[10];
+    uint8_t num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_pic, lookup_results, 0);
+    if (num_results == 0) {
+        sddf_dprintf("[Error] namespace node \'%s\' is not found\n", acpi_str_pic);
+        return;
+    }
+    sddf_dprintf("Found _PIC method!\n");
+
     /* seL4_Error error; */
     /* pci_resources = (pci_resources_t *)pci_resources_vaddr; */
 
