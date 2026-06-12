@@ -227,17 +227,13 @@ static void tx_return(void)
 static void handle_irq(void)
 {
     uint32_t isr = eth->isr & IRQ_MASK;
-    uint32_t rxsr = eth->rxsr;
-    uint32_t txsr = eth->txsr;
+    uint32_t rxsr = eth->rxsr & ZYNQ_GEM_RXSR_ERR_MASK;
+    uint32_t txsr = eth->txsr & ZYNQ_GEM_TXSR_ERR_MASK;
     eth->isr = isr;
 
     /* Clear any RX/TX status (write to clear) */
-    if (rxsr) {
-        eth->rxsr = rxsr;
-    }
-    if (txsr) {
-        eth->txsr = txsr;
-    }
+    eth->rxsr = rxsr;
+    eth->txsr = txsr;
 
     while (isr & IRQ_MASK) {
         if (isr & ZYNQ_INT_TXC) {
@@ -248,13 +244,13 @@ static void handle_irq(void)
             rx_return();
             rx_provide();
         }
-        if (rxsr & ZYNQ_GEM_RXSR_ERR_MASK) {
+        if (rxsr) {
             sddf_dprintf("ETH|ERROR: Receive error, status: %u\n", rxsr);
             /* bit 0: Hw tried to read a Sw-owned buffer */
             /* bit 2: packets arriving faster than GEM_DMA processes */
             /* see: https://docs.amd.com/r/en-US/ug1087-zynq-ultrascale-registers/receive_status-GEM-Register */
         }
-        if (txsr & ZYNQ_GEM_TXSR_ERR_MASK) {
+        if (txsr) {
             sddf_dprintf("ETH|ERROR: Transmit error, status: %u\n", txsr);
             /* see: https://docs.amd.com/r/en-US/ug1087-zynq-ultrascale-registers/transmit_status-GEM-Register */
         }
