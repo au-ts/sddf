@@ -538,7 +538,9 @@ void init(void)
     }
     sddf_dprintf("Found _PIC method! num: %u\n", num_results);
 
-    eval_namespace_node(lookup_results[0]);
+    prepare_context_for_evaluation(lookup_results[0]);
+    push_method_argument(1); // Enable APIC mode: pass 1 to method "_PIC"
+    eval_namespace_node();
 
     /* seL4_Error error; */
     /* pci_resources = (pci_resources_t *)pci_resources_vaddr; */

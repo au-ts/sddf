@@ -110,6 +110,12 @@ enum aml_encoding_value {
     LOCAL6_OP = 0x66,
     LOCAL7_OP = 0x67,
     ARG0_OP = 0x68,
+    ARG1_OP = 0x69,
+    ARG2_OP = 0x6A,
+    ARG3_OP = 0x6B,
+    ARG4_OP = 0x6C,
+    ARG5_OP = 0x6D,
+    ARG6_OP = 0x6E,
     STORE_OP = 0x70,
     ADD_OP = 0x72,
     SUBTRACT_OP = 0x74,
@@ -384,4 +390,6 @@ extern aml_namespace_node_t namespace_root;
 
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
-void eval_namespace_node(aml_namespace_node_t *node);
+void prepare_context_for_evaluation(aml_namespace_node_t *node);
+void push_method_argument(uintptr_t argv);
+void eval_namespace_node();
