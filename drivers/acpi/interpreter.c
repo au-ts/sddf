@@ -346,6 +346,45 @@ void skip_name_string()
     }
 }
 
+// Parse the compressed EISA ID to readable characters
+// see 19.3.4 ASL Macros, EISAID
+void read_eisa_id(aml_object_t *node, char *eisa_id_str)
+{
+    scanner.current = node->start + 1; // First byte for NAME_OP
+    skip_name_string();
+
+    uint8_t eisa_type = advance();
+
+    if (eisa_type == DATA_OBJ_DWORD) {
+        // Combine the first two bytes in little-endian
+        uint16_t char_word = advance() << 8;
+        char_word |= advance();
+
+        // Extract the 3 characters
+        // Bit mapping: 0-4 (Char 3), 5-9 (Char 2), 10-14 (Char 1)
+        eisa_id_str[0] = (char)(((char_word >> 10) & 0x1F) + 0x40);
+        eisa_id_str[1] = (char)(((char_word >> 5)  & 0x1F) + 0x40);
+        eisa_id_str[2] = (char)((char_word & 0x1F) + 0x40);
+
+        // Extract four Hex ID from the last two bytes
+        uint8_t hex_hi = advance();
+        eisa_id_str[3] = (char)(HEX_TO_CHAR(hex_hi >> 4));
+        eisa_id_str[4] = (char)(HEX_TO_CHAR(hex_hi & 0xF));
+        uint8_t hex_lo = advance();
+        eisa_id_str[5] = (char)(HEX_TO_CHAR(hex_lo >> 4));
+        eisa_id_str[6] = (char)(HEX_TO_CHAR(hex_lo & 0xF));
+        eisa_id_str[7] = '\0';
+    } else if (eisa_type == DATA_OBJ_STRING){
+        char c;
+        uint8_t i = 0;
+        while ((c = advance())) {
+            eisa_id_str[i] = c;
+            i++;
+        }
+        eisa_id_str[i] = '\0';
+    }
+}
+
 void read_name_segment(char *name_segment)
 {
     name_segment[0] = (char)advance();
