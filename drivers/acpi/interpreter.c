@@ -612,23 +612,17 @@ void parse_namespace_node(bool evaluation)
         } else if (op_stage == DATA_OBJECT) {
             scanner.current = get_data_end();
         } else if (op_stage == OBJECT_NAME_STRING) {
-            if (evaluation) {
-                sddf_dprintf("Skip the Object Name String\n");
-                skip_name_string();
-                sddf_dprintf("scanner.current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)namespace_end);
-            } else {
-                // create nodes in only scan mode
-                aml_namespace_node_t *new_node = make_namespace_node(current_state->parent->node, current_state->op_code);
-                current_state->node = new_node;
-                new_node->pkt_start = current_state->node_start;
-                if (current_state->pkt_end != 0) {
-                    new_node->pkt_end = current_state->pkt_end;
-                }
+            aml_namespace_node_t *new_node = make_namespace_node(current_state->parent->node, current_state->op_code);
+            current_state->node = new_node;
+            new_node->pkt_start = current_state->node_start;
+            if (current_state->pkt_end != 0) {
+                new_node->pkt_end = current_state->pkt_end;
             }
         } else if (op_stage == NAME_STRING) {
             if (evaluation) {
                 sddf_dprintf("Need to read the value of node at 0x%lx, %s\n", (uintptr_t)scanner.current, current_state->node->name);
-                aml_namespace_node_t *node = make_namespace_node(current_state->parent->node, current_state->op_code);
+                /* aml_namespace_node_t *node = make_namespace_node(current_state->parent->node, current_state->op_code); */
+                aml_namespace_node_t *node = find_node_by_name_string(current_state->parent->node, 1);
                 sddf_dprintf("node: %s, value: %u\n", node->name, node->value);
                 state_stack_add_argument((uintptr_t)node);
             } else {
