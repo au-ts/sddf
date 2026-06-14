@@ -546,7 +546,8 @@ void init(void)
     }
     sddf_dprintf("Found _PIC method! num: %u\n", num_results);
 
-    prepare_context_for_evaluation(lookup_results[0]);
+    uint8_t ret_buffer[100];
+    prepare_context_for_evaluation(lookup_results[0], (uintptr_t)ret_buffer);
     push_method_argument(1); // Enable APIC mode: pass 1 to method "_PIC"
     eval_namespace_node();
 
@@ -560,12 +561,14 @@ void init(void)
         char eisa_id[10];
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
-            sddf_dprintf("Found PCIe Bus\n");
+            sddf_dprintf("=====Found PCIe Bus\n");
             aml_namespace_node_t *crs_node = find_child_node_by_name(node->parent, acpi_str_crs);
             if (crs_node == NULL) {
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
+            prepare_context_for_evaluation(crs_node, (uintptr_t)ret_buffer);
+            eval_namespace_node();
             /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
             /* print_crs_list(crs_list); */
             /* return; */
