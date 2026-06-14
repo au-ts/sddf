@@ -70,6 +70,7 @@ uint32_t kernel_objects_ut_idx;
 acpi_copy_t acpi_tables_copy;
 
 __attribute__((__section__(".test_dsdt_table"))) uint8_t test_dsdt_table[300000];
+__attribute__((__section__(".test_ssdt_table"))) uint8_t test_ssdt_table[300000];
 
 // TODO: check if this makes sense to go to libsel4
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vka/arch_include/x86/vka/arch/object.h#L62
@@ -521,7 +522,7 @@ void init(void)
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     aml_namespace_mempool.start = (void *)aml_object_pool_start;
     aml_namespace_mempool.next = (void *)aml_object_pool_start;
-    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x40000;
+    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x50000;
     sddf_dprintf("dsdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_dsdt_table, (uintptr_t)scanner.current);
 
     /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */
@@ -529,6 +530,13 @@ void init(void)
     namespace_root.op_code = NULL_OP;
     namespace_root.name[0] = '\\';
     scan_namespace_tree(&namespace_root, dsdt_copy_end);
+
+    sddf_dprintf("===============Scanning SSDT===============\n");
+    acpi_dsdt_t *acpi_ssdt_table = (acpi_dsdt_t *)&test_ssdt_table;
+    uint8_t *ssdt_copy_end = (uint8_t *)&test_ssdt_table + 12492;
+    scanner.current = (uint8_t *)&acpi_ssdt_table->content[0];
+    sddf_dprintf("ssdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_ssdt_table, (uintptr_t)scanner.current);
+    scan_namespace_tree(&namespace_root, ssdt_copy_end);
 
     aml_namespace_node_t *lookup_results[128];
     uint8_t num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_pic, lookup_results, 0);
@@ -548,12 +556,22 @@ void init(void)
         return;
     }
     for (uint32_t i = 0; i < num_results; i++) {
-        aml_object_t *node = lookup_results[i];
+        aml_namespace_node_t *node = lookup_results[i];
         char eisa_id[10];
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
             sddf_dprintf("Found PCIe Bus\n");
+            aml_namespace_node_t *crs_node = find_child_node_by_name(node->parent, acpi_str_crs);
+            if (crs_node == NULL) {
+                sddf_dprintf("_CRS node is not found\n");
+                return;
+            }
+            /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
+            /* print_crs_list(crs_list); */
+            /* return; */
+            /* pass_crs_and_caps(crs_list, pci_resources->num_bridges); */
         }
+
     }
 
     /* seL4_Error error; */

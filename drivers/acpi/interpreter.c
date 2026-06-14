@@ -348,9 +348,9 @@ void skip_name_string()
 
 // Parse the compressed EISA ID to readable characters
 // see 19.3.4 ASL Macros, EISAID
-void read_eisa_id(aml_object_t *node, char *eisa_id_str)
+void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str)
 {
-    scanner.current = node->start + 1; // First byte for NAME_OP
+    scanner.current = node->pkt_start + 1; // First byte for NAME_OP
     skip_name_string();
 
     uint8_t eisa_type = advance();
