@@ -390,7 +390,7 @@ extern aml_namespace_node_t namespace_root;
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
-void prepare_context_for_evaluation(aml_namespace_node_t *node);
+void prepare_context_for_evaluation(aml_namespace_node_t *node, uintptr_t ret_buf);
 void push_method_argument(uintptr_t argv);
 void eval_namespace_node();
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
