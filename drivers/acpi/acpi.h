@@ -351,7 +351,6 @@ typedef struct {
 
 void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
 void print_object_tree(aml_object_t *node, uint8_t depth);
-void read_eisa_id(aml_object_t *node, char *eisa_id_str);
 acpi_crs_list_t *extract_pcie_crs(aml_object_t *node);
 void print_crs_list(acpi_crs_list_t *crs_list);
 bool extract_pcie_prt(aml_object_t *node, char *package_name);
@@ -389,7 +388,9 @@ extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
 
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
+aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
 void prepare_context_for_evaluation(aml_namespace_node_t *node);
 void push_method_argument(uintptr_t argv);
 void eval_namespace_node();
+void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
