@@ -71,6 +71,7 @@ acpi_copy_t acpi_tables_copy;
 
 __attribute__((__section__(".test_dsdt_table"))) uint8_t test_dsdt_table[300000];
 __attribute__((__section__(".test_ssdt_table"))) uint8_t test_ssdt_table[300000];
+__attribute__((__section__(".test_mcfg_table"))) uint8_t test_mcfg_table[100];
 
 // TODO: check if this makes sense to go to libsel4
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vka/arch_include/x86/vka/arch/object.h#L62
@@ -515,6 +516,69 @@ aml_namespace_node_t namespace_root;
 void init(void)
 {
 
+    capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds;
+    cap_list_start = capDLBootInfo->untypeds.start;
+    // TODO: is end empty?
+    for (uint32_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
+        cap_list[i].base_addr = capDLBootInfo->untypedList[i].paddr;
+        cap_list[i].end_addr = cap_list[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits);
+        cap_list[i].is_device = capDLBootInfo->untypedList[i].isDevice;
+        cap_list[i].object_type = seL4_UntypedObject;
+        cap_list_end = i + 1;
+    }
+
+    // TODO: find a proper untyped for PT objects, not the first one is used by capDL initialiser
+    uint32_t non_dev_mem_id = 0;
+    for (uint32_t i = cap_list_start; i < cap_list_end; i++) {
+        if (!cap_list[i].is_device) {
+            if (non_dev_mem_id == 5) {
+                kernel_objects_ut_idx = i;
+                break;
+            }
+            non_dev_mem_id++;
+        }
+    }
+    sddf_dprintf("Found an untyped for kernel objects: ut idx: 0x%x, paddr: 0x%lx\n", kernel_objects_ut_idx, cap_list[kernel_objects_ut_idx].base_addr);
+
+
+    // Print summary
+    sddf_dprintf("======MAP ======\n");
+    pci_resources = (pci_resources_t *)pci_resources_vaddr;
+    acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)&test_mcfg_table;
+    uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
+    sddf_dprintf("num_pci: %u\n", num_pci_seg_grps);
+    for (int j = 0; j < num_pci_seg_grps; j++) {
+        memcpy(&pci_resources->pci_seg_groups[pci_resources->num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
+        pci_resources->num_pci_groups++;
+    }
+
+    seL4_Error error;
+    uintptr_t ecam_base_vaddr = 0x20000000;
+    for (int i = 0; i < pci_resources->num_pci_groups; i++) {
+        sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
+                     pci_resources->pci_seg_groups[i].group_id,
+                     pci_resources->pci_seg_groups[i].base_addr,
+                     pci_resources->pci_seg_groups[i].bus_start,
+                     pci_resources->pci_seg_groups[i].bus_end);
+        uint32_t ecam_size = (1 + pci_resources->pci_seg_groups[i].bus_end - pci_resources->pci_seg_groups[i].bus_start) * (1 << 20);
+        uintptr_t end_paddr = pci_resources->pci_seg_groups[i].base_addr + ecam_size;
+        uintptr_t cur_paddr = pci_resources->pci_seg_groups[i].base_addr;
+        uintptr_t cur_vaddr = ecam_base_vaddr;
+        while (cur_paddr < end_paddr) {
+            error = retype_and_map_frame(cur_paddr, cur_vaddr, seL4_CapInitThreadVSpace, seL4_X86_LargePageObject, seL4_ReadWrite);
+            if (error != seL4_NoError) {
+                sddf_dprintf("Error: failed to retype or map a frame.\n");
+                return;
+            }
+            cur_paddr += (1 << seL4_LargePageBits);
+            cur_vaddr += (1 << seL4_LargePageBits);
+        }
+
+        pci_resources->pci_seg_groups[i].base_addr = ecam_base_vaddr;
+        ecam_base_vaddr = cur_vaddr;
+    }
+    sddf_dprintf("Finished ECAM mapping!\n");
+
     sddf_dprintf("===============Scanning DSDT===============\n");
 
     acpi_dsdt_t *acpi_dsdt_table = (acpi_dsdt_t *)&test_dsdt_table;
@@ -538,6 +602,7 @@ void init(void)
     sddf_dprintf("ssdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_ssdt_table, (uintptr_t)scanner.current);
     scan_namespace_tree(&namespace_root, ssdt_copy_end);
 
+
     aml_namespace_node_t *lookup_results[128];
     uint8_t num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_pic, lookup_results, 0);
     if (num_results == 0) {
@@ -550,6 +615,9 @@ void init(void)
     prepare_context_for_evaluation(lookup_results[0], (uintptr_t)ret_buffer);
     push_method_argument(1); // Enable APIC mode: pass 1 to method "_PIC"
     eval_namespace_node();
+
+
+    sddf_dprintf("===============Extract _CRS===============\n");
 
     num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_hid, lookup_results, 0);
     if (num_results == 0) {
@@ -587,30 +655,6 @@ void init(void)
     /* if (bi_rsdp->content.revision > 1) { */
     /*     rsdt_addr = bi_rsdp->content.xsdt_address; */
     /* } */
-
-    /* capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds; */
-    /* cap_list_start = capDLBootInfo->untypeds.start; */
-    /* // TODO: is end empty? */
-    /* for (uint32_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) { */
-    /*     cap_list[i].base_addr = capDLBootInfo->untypedList[i].paddr; */
-    /*     cap_list[i].end_addr = cap_list[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits); */
-    /*     cap_list[i].is_device = capDLBootInfo->untypedList[i].isDevice; */
-    /*     cap_list[i].object_type = seL4_UntypedObject; */
-    /*     cap_list_end = i + 1; */
-    /* } */
-
-    /* // TODO: find a proper untyped for PT objects, not the first one is used by capDL initialiser */
-    /* uint32_t non_dev_mem_id = 0; */
-    /* for (uint32_t i = cap_list_start; i < cap_list_end; i++) { */
-    /*     if (!cap_list[i].is_device) { */
-    /*         if (non_dev_mem_id == 5) { */
-    /*             kernel_objects_ut_idx = i; */
-    /*             break; */
-    /*         } */
-    /*         non_dev_mem_id++; */
-    /*     } */
-    /* } */
-    /* sddf_dprintf("Found an untyped for kernel objects: ut idx: 0x%x, paddr: 0x%lx\n", kernel_objects_ut_idx, cap_list[kernel_objects_ut_idx].base_addr); */
 
     /* // Map all the frames covering the RSDT table */
     /* uintptr_t rsdt_cur_paddr = rsdt_addr; */
