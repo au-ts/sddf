@@ -16,6 +16,7 @@ SUPPORTED_BOARDS := \
 		    imx8mp_evk \
 			imx8mq_evk \
 		    imx8mp_iotgate \
+			kria_k26 \
 			maaxboard \
 			odroidc2 \
 			odroidc4 \
@@ -24,7 +25,8 @@ SUPPORTED_BOARDS := \
 			rock3b \
 			star64 \
 			x86_64_generic \
-			rpi4b_1gb
+			rpi4b_1gb \
+			zcu102
 
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
