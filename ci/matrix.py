@@ -108,6 +108,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "rpi4b_1gb",
             "star64",
             "x86_64_generic",
+            "zcu102",
         ],
         "tests_exclude": [
             # not in machine queue
@@ -190,6 +191,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "rpi4b_1gb",
             "star64",
             "x86_64_generic",
+            "zcu102",
         ],
         "tests_exclude": [
             # not in machine queue
