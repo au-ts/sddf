@@ -240,6 +240,9 @@ def generate(
     update_elf_section(
         "acpi_driver.elf", "test_ssdt_table", "test_ssdt_table"
     )
+    update_elf_section(
+        "acpi_driver.elf", "test_mcfg_table", "test_mcfg_table"
+    )
 
     mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x8000)
     sdf.add_mr(mr_pci_resources)

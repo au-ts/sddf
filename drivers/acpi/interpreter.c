@@ -633,17 +633,17 @@ void read_field_value(aml_namespace_node_t *field_node)
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
     aml_namespace_node_t *adr_node = find_namespace_node_by_name(field_node, acpi_str_adr);
     sddf_dprintf("adr_node: %s\n", adr_node->name);
-    // TODO different return types
-    uint32_t ret_buf;
-    prepare_context_for_evaluation(adr_node, (uintptr_t)&ret_buf);
+    // TODO: this might be 64-bit
+    uint32_t address;
+    prepare_context_for_evaluation(adr_node, (uintptr_t)&address);
     eval_namespace_node();
-    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", adr_node->name, (uintptr_t)&ret_buf, ret_buf);
+    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", adr_node->name, (uintptr_t)&address, address);
 
-    ret_buf = 0;
+    uint32_t bus;
     aml_namespace_node_t *bbn_node = find_namespace_node_by_name(field_node, acpi_str_bbn);
-    prepare_context_for_evaluation(bbn_node, (uintptr_t)&ret_buf);
+    prepare_context_for_evaluation(bbn_node, (uintptr_t)&bus);
     eval_namespace_node();
-    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", bbn_node->name, (uintptr_t)&ret_buf, ret_buf);
+    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", bbn_node->name, (uintptr_t)&bus, bus);
 
     sddf_dprintf("OpRegionOp: %s, op_code: 0x%x\n", field_node->parent->name, field_node->parent->op_code);
     scanner.current = field_node->parent->pkt_start;
@@ -653,6 +653,15 @@ void read_field_value(aml_namespace_node_t *field_node)
     uint8_t region_length = advance();
     sddf_dprintf("space: 0x%x, offset: 0x%x, length: 0x%x\n", region_space, region_offset, region_length);
 
+    uint32_t offset_bits = field_node->value >> 8;
+    uint32_t field_width = field_node->value & 0xFF;
+    sddf_dprintf("Field offset: 0x%x, width: %u\n", offset_bits / 8, field_width);
+
+    uintptr_t ecam_base_vaddr = 0x20000000;
+    uint32_t *field_register = (uint32_t *)ecam_base_vaddr + (bus << 20) + address + offset_bits / 8;
+    sddf_dprintf("Read field register: 0x%x\n", *field_register);
+    uint32_t field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
+    sddf_dprintf("field value: 0x%x\n", field_value);
 }
 
 void parse_namespace_node(bool evaluation)

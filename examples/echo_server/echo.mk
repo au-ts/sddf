@@ -111,7 +111,10 @@ test_dsdt_table.data:
 test_ssdt_table.data:
 	cp $(ECHO_SERVER)/ssdt_table.data $@
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB) test_dsdt_table.data test_ssdt_table.data
+test_mcfg_table.data:
+	cp $(ECHO_SERVER)/mcfg_table.data $@
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB) test_dsdt_table.data test_ssdt_table.data test_mcfg_table.data
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
