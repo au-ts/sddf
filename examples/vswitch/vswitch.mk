@@ -23,7 +23,8 @@ SUPPORTED_BOARDS := \
 			rock3b \
 			star64 \
 			x86_64_generic \
-			rpi4b_1gb
+			rpi4b_1gb \
+			zcu102
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := vswitch.system
