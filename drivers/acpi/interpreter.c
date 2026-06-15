@@ -1,6 +1,9 @@
 #include "acpi.h"
 // =========================== Refactor =========================
 
+const char acpi_str_adr[] = {'_', 'A', 'D', 'R', 0};  // Address
+const char acpi_str_bbn[] = {'_', 'B', 'B', 'N', 0};  // BIOS Bus Number
+
 typedef enum {
     INIT = 0,
     PKT_LEN,
@@ -24,8 +27,7 @@ typedef enum {
 #define MAX_OP_STAGES 8
 
 parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
-    [ZERO_OP] = { INIT, COMPLETE },
-    [ONE_OP] = { INIT, COMPLETE },
+    [RETURN_OP] = { INIT, DATA_OBJECT, COMPLETE },
     [SCOPE_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
     [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, BYTE_DATA, TERM_LIST, COMPLETE },
     [NAME_OP] = { INIT, OBJECT_NAME_STRING, DATA_OBJECT, COMPLETE},
@@ -125,11 +127,17 @@ aml_namespace_node_t *find_local_variable_in_namespace(aml_namespace_node_t *nod
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment)
 {
     if (node == NULL) return NULL;
-    if (node->child == NULL) return false;
+    if (node->child == NULL) return NULL;
 
     aml_namespace_node_t *child = node->child;
     while (child) {
         if (!strcmp(child->name, name_segment)) return child;
+        if (child->op_code == OP_REGION_OP) {
+            aml_namespace_node_t *field_node = find_child_node_by_name(child, name_segment);
+            if (field_node) {
+                return field_node;
+            }
+        }
         child = child->next;
     }
 
@@ -221,7 +229,7 @@ void state_stack_push(uint16_t op_code, bool evaluation)
     current_state->evaluation = evaluation;
     current_state->node = current_state->parent->node; // used for looking up namespace nodes
     current_state->node_start = scanner.current - 1;
-    if ((op_code & 0x5B) == 0x5B) {
+    if ((op_code & 0x5B00) == 0x5B00) {
         current_state->node_start = scanner.current - 2;
     }
 }
@@ -286,7 +294,18 @@ void state_stack_pop()
                 break;
             }
             case NAME_OP: {
-                sddf_dprintf("")
+                assert(current_state->num_args == 2);
+                sddf_dprintf("assign NameOp: %s, addr: 0x%lx, ret_buf = %u\n", current_state->node->name, (uintptr_t)current_state->arguments[0], (uint32_t)current_state->arguments[1]);
+                // TODO: no only uint32_t
+                uint32_t *ret_buf = (uint32_t *)current_state->arguments[0];
+                *ret_buf = (uint32_t)current_state->arguments[1];
+                ret_val = *ret_buf;
+                break;
+            }
+            case RETURN_OP: {
+                sddf_dprintf("assign MethodOp: %s, addr: 0x%lx, ret_buf = %u\n", current_state->parent->node->name, (uintptr_t)current_state->parent->arguments[0], (uint32_t)current_state->arguments[0]);
+                uint32_t *ret_buf = (uint32_t *)current_state->parent->arguments[0];
+                *ret_buf = (uint32_t)current_state->arguments[1];
                 break;
             }
         }
@@ -294,13 +313,6 @@ void state_stack_pop()
 
     if (current_state->node->pkt_end == 0) {
         current_state->node->pkt_end = scanner.current;
-    }
-
-    if (current_state->op_code == NAME_OP && current_state->num_args == 2) {
-        uint32_t *ret_buf = (uint32_t *)current_state->arguments[0];
-        sddf_dprintf("assign name: %s, addr: 0x%lx, ret_buf = %u\n", current_state->node->name, (uintptr_t)current_state->arguments[0], (uint32_t)current_state->arguments[1]);
-        *ret_buf = (uint32_t)current_state->arguments[1];
-        ret_val = *ret_buf;
     }
 
     sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
@@ -389,7 +401,7 @@ void skip_name_string()
     if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
         // Name Segment
         scanner.current += 3;
-    } else if (name_type == '\\') {
+    } else if (name_type == '\\' || name_type == '^') {
         // Root Path
         skip_name_string();
     } else if (name_type == 0x2E) {
@@ -592,7 +604,7 @@ void parse_field_list()
         uint8_t byte = advance();
         if ((byte >= 'A' && byte <= 'Z') || byte == '_') {
             scanner.current--;
-            aml_namespace_node_t *field_node = make_namespace_node(current_state->parent->node, FIELD_OP);
+            aml_namespace_node_t *field_node = make_namespace_node(current_state->node, FIELD_OP);
             uint8_t *field_element_start = scanner.current;
             uint32_t bit_width = get_pkt_end() - field_element_start;
             field_node->value = (offset << 8) | bit_width;
@@ -615,6 +627,34 @@ void parse_field_list()
     }
 }
 
+
+void read_field_value(aml_namespace_node_t *field_node)
+{
+    sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
+    aml_namespace_node_t *adr_node = find_namespace_node_by_name(field_node, acpi_str_adr);
+    sddf_dprintf("adr_node: %s\n", adr_node->name);
+    // TODO different return types
+    uint32_t ret_buf;
+    prepare_context_for_evaluation(adr_node, (uintptr_t)&ret_buf);
+    eval_namespace_node();
+    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", adr_node->name, (uintptr_t)&ret_buf, ret_buf);
+
+    ret_buf = 0;
+    aml_namespace_node_t *bbn_node = find_namespace_node_by_name(field_node, acpi_str_bbn);
+    prepare_context_for_evaluation(bbn_node, (uintptr_t)&ret_buf);
+    eval_namespace_node();
+    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", bbn_node->name, (uintptr_t)&ret_buf, ret_buf);
+
+    sddf_dprintf("OpRegionOp: %s, op_code: 0x%x\n", field_node->parent->name, field_node->parent->op_code);
+    scanner.current = field_node->parent->pkt_start;
+    skip_name_string();
+    uint8_t region_space = advance();
+    uint8_t region_offset = advance();
+    uint8_t region_length = advance();
+    sddf_dprintf("space: 0x%x, offset: 0x%x, length: 0x%x\n", region_space, region_offset, region_length);
+
+}
+
 void parse_namespace_node(bool evaluation)
 {
     sddf_dprintf("Evaluation? %s\n", evaluation ? "true" : "false");
@@ -632,9 +672,12 @@ void parse_namespace_node(bool evaluation)
         } else if (op_stage == OBJECT_NAME_STRING) {
             aml_namespace_node_t *new_node = make_namespace_node(current_state->parent->node, current_state->op_code);
             current_state->node = new_node;
-            new_node->pkt_start = current_state->node_start;
-            if (current_state->pkt_end != 0) {
-                new_node->pkt_end = current_state->pkt_end;
+
+            if (new_node->op_code != OP_REGION_OP) {
+                new_node->pkt_start = current_state->node_start;
+                if (current_state->pkt_end != 0) {
+                    new_node->pkt_end = current_state->pkt_end;
+                }
             }
         } else if (op_stage == NAME_STRING) {
             if (evaluation) {
@@ -734,15 +777,12 @@ void parse_namespace_node(bool evaluation)
                 case CREATE_DWORD_FIELD_OP:
                 case POWER_RESOURCE_OP:
                 case PROCESSOR_OP:
-                case DEVICE_OP: {
+                case DEVICE_OP:
+                case RETURN_OP: {
                     if (evaluation) {
                         sddf_dprintf("stack push 0x%04x\n", op_code);
                     }
                     state_stack_push(op_code, evaluation);
-                    break;
-                }
-                case RETURN_OP: {
-                    sddf_dprintf("RETURN_OP to implement\n");
                     break;
                 }
                 default: {
@@ -760,7 +800,7 @@ void parse_namespace_node(bool evaluation)
                             eval_namespace_node();
                             state_stack_add_argument(ret_buf);
                             scanner.current = saved_location;
-                        } if (evaluation && node->op_code == NAME_OP) {
+                        } else if (evaluation && node->op_code == NAME_OP) {
                             sddf_dprintf("Try evaluating NameOp: %s\n", node->name);
                             uint8_t *saved_location = scanner.current;
                             uint32_t ret_buf;
@@ -768,6 +808,10 @@ void parse_namespace_node(bool evaluation)
                             eval_namespace_node();
                             sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", node->name, (uintptr_t)&ret_buf, ret_buf);
                             state_stack_add_argument(ret_buf);
+                            scanner.current = saved_location;
+                        } else if (evaluation && node->op_code == FIELD_OP) {
+                            uint8_t *saved_location = scanner.current;
+                            read_field_value(node);
                             scanner.current = saved_location;
                         } else {
                             state_stack_add_argument((uintptr_t)node);
