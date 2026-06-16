@@ -113,7 +113,7 @@ class TestConfig(TestCase):
 
     def is_qemu(self):
         # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
+        return self.board.startswith("qemu") or self.board.startswith("x86_64_generic")
 
     def pretty_name(self) -> str:
         return f"{self.example} on {self.board} ({self.config}, built with {self.build_system})"
