@@ -81,6 +81,7 @@ typedef struct bootinfo_rsdp {
 enum aml_encoding_value {
     ZERO_OP = 0x00,
     ONE_OP = 0x01,
+    NULL_OP = 0x02,
     ALIAS_OP = 0x06,
     NAME_OP = 0x08,
     BYTE_PREFIX = 0x0A,
@@ -128,7 +129,6 @@ enum aml_encoding_value {
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
     RETURN_OP = 0xA4,
-    NULL_OP = 0xFFFF,
 };
 
 enum aml_data_object_type {
@@ -319,7 +319,7 @@ typedef struct aml_namespace_node {
     struct aml_namespace_node *next;    // siblings
     char name[5];               // Name Segment
     enum aml_encoding_value op_code;
-    uint32_t value;             // Only used for NameObject
+    uint64_t value;             // Only used for NameObject
 } aml_namespace_node_t;
 
 typedef struct aml_object_pool {
@@ -390,7 +390,5 @@ extern aml_namespace_node_t namespace_root;
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
-void prepare_context_for_evaluation(aml_namespace_node_t *node, uintptr_t ret_buf);
-void push_method_argument(uintptr_t argv);
-void eval_namespace_node();
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
+void eval_namespace_node(aml_namespace_node_t *node, uintptr_t ret_buf, uint8_t ret_type, uint8_t num_args, uint64_t argv[]);
