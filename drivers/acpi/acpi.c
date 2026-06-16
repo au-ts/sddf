@@ -612,10 +612,9 @@ void init(void)
     sddf_dprintf("Found _PIC method! num: %u\n", num_results);
 
     uint8_t ret_buffer[100];
-    prepare_context_for_evaluation(lookup_results[0], (uintptr_t)ret_buffer);
-    push_method_argument(1); // Enable APIC mode: pass 1 to method "_PIC"
-    eval_namespace_node();
-
+    uint64_t pic_method_arg = 1; // Enable APIC mode: pass 1 to method "_PIC"
+    // TODO: fix ret_type
+    eval_namespace_node(lookup_results[0], (uintptr_t)ret_buffer, 0, 1, &pic_method_arg);
 
     sddf_dprintf("===============Extract _CRS===============\n");
 
@@ -635,8 +634,8 @@ void init(void)
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
-            prepare_context_for_evaluation(crs_node, (uintptr_t)ret_buffer);
-            eval_namespace_node();
+            // TODO: fix ret_type
+            eval_namespace_node(crs_node, (uintptr_t)ret_buffer, 0, 0, NULL);
             /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
             /* print_crs_list(crs_list); */
             /* return; */
