@@ -231,13 +231,11 @@ void state_stack_create(uint16_t op_code, bool evaluation)
 
 void state_stack_push(uint16_t op_code, bool evaluation)
 {
-    sddf_dprintf("stack push op_code: 0x%04x\n", op_code);
     parse_state_t *reserved_state = current_state;
 
     state_stack_create(op_code, evaluation);
     current_state->parent = reserved_state;
     current_state->node = current_state->parent->node; // used for looking up namespace nodes
-    sddf_dprintf("Done stack push op_code: 0x%04x\n", op_code);
 }
 
 void state_stack_add_argument(uintptr_t argument)
@@ -479,13 +477,26 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
     uint8_t name_type = advance();
     aml_namespace_node_t *node = NULL;
 
-    // Local variable [Local0Op, Local7Op] or ARGs [ARG0, ARG6]
-    if ((name_type >= LOCAL0_OP && name_type <= LOCAL7_OP) || (name_type >= ARG0_OP && name_type <= ARG6_OP)) {
+    sddf_dprintf("name_type: 0x%x\n", name_type);
+    if (name_type >= LOCAL0_OP && name_type <= LOCAL7_OP) {
         scanner.current--;
         aml_namespace_node_t *local_variable = find_local_variable_in_namespace(parent_node, name_type);
         if (local_variable) {
             return local_variable;
         }
+
+        return namespace_insert_child_node(parent_node, NULL, name_type);
+    }
+
+    if (name_type >= ARG0_OP && name_type <= ARG6_OP) {
+        scanner.current--;
+        aml_namespace_node_t *local_variable = find_local_variable_in_namespace(parent_node, name_type);
+        if (local_variable) {
+            return local_variable;
+        }
+
+        sddf_dprintf("[Error] node ARG%u is not found\n", name_type - ARG0_OP);
+        return NULL;
     }
 
     if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
