@@ -586,7 +586,7 @@ void init(void)
     scanner.current = (uint8_t *)&acpi_dsdt_table->content[0];
     aml_namespace_mempool.start = (void *)aml_object_pool_start;
     aml_namespace_mempool.next = (void *)aml_object_pool_start;
-    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x50000;
+    aml_namespace_mempool.end = (void *)aml_object_pool_start + 0x100000;
     sddf_dprintf("dsdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&test_dsdt_table, (uintptr_t)scanner.current);
 
     /* uint8_t *dsdt_end = scanner.current + header->length - sizeof(acpi_header_t); */

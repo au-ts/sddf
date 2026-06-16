@@ -9,7 +9,6 @@ typedef enum {
     PKT_LEN,
     OBJECT_NAME_STRING, // Name String used for creating objects
     NAME_STRING,        // Name String referring to other objects
-    SUPERNAME,
     TERM_ARG,
     TERM_LIST,
     TERM_INTEGER,
@@ -43,8 +42,8 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [LEQUAL_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
     [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
     [SUBTRACT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
-    [SHIFT_LEFT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, SUPERNAME, COMPLETE },
-    [SHIFT_RIGHT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, SUPERNAME, COMPLETE },
+    [SHIFT_LEFT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
+    [SHIFT_RIGHT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [BYTE_PREFIX] = { INIT, BYTE_DATA, COMPLETE },
     [WORD_PREFIX] = { INIT, WORD_DATA, COMPLETE },
     [DWORD_PREFIX] = { INIT, DWORD_DATA, COMPLETE },
@@ -283,25 +282,22 @@ void state_stack_pop()
             }
             case SHIFT_LEFT_OP: {
                 assert(current_state->num_args == 3);
-                ret_val = current_state->arguments[0] << current_state->arguments[1];
-                aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[2];
-                target_node->value = current_state->arguments[0];
-                sddf_dprintf("save value %lu to node\n", target_node->value);
+                sddf_dprintf("argument0: 0x%lx, argument1: 0x%lx\n", current_state->arguments[0], current_state->arguments[1]);
+                ret_val = (current_state->arguments[0]) << (current_state->arguments[1]);
+                aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
+                supername_node->value = ret_val;
+                supername_node->evaluated = true;
+                sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
                 break;
             }
             case SHIFT_RIGHT_OP: {
-                sddf_dprintf("Stack pop Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
-                sddf_dprintf("num_args: %u\n", current_state->num_args);
                 assert(current_state->num_args == 3);
                 sddf_dprintf("argument0: 0x%lx, argument1: 0x%lx\n", current_state->arguments[0], current_state->arguments[1]);
-                uintptr_t operand1 = current_state->arguments[0];
-                uintptr_t operand2 = current_state->arguments[1];
-                ret_val = operand1 >> operand2;
-                sddf_dprintf("arg2: 0x%lx\n", (uintptr_t)current_state->arguments[2]);
-                /* ret_val = current_state->arguments[0] >> current_state->arguments[1]; */
-                aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[2];
-                target_node->value = ret_val;
-                sddf_dprintf("save value %lu to node\n", target_node->value);
+                ret_val = (current_state->arguments[0]) >> (current_state->arguments[1]);
+                aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
+                supername_node->value = ret_val;
+                supername_node->evaluated = true;
+                sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
                 break;
             }
             case NAME_OP: {
@@ -311,6 +307,8 @@ void state_stack_pop()
                 uint32_t *ret_buf = (uint32_t *)current_state->arguments[0];
                 *ret_buf = (uint32_t)current_state->arguments[2];
                 ret_val = *ret_buf;
+                current_state->node->value = current_state->arguments[2];
+                current_state->node->evaluated = true;
                 break;
             }
             case RETURN_OP: {
@@ -355,7 +353,7 @@ void state_stack_update()
         if (current_state->evaluation == false) {
             current_state->stage_idx = 4;
         }
-    } else if (current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
+    } else if (!current_state->evaluation && current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
         if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
             current_state->stage_idx += 2;
         }
@@ -683,6 +681,8 @@ void read_field_value(aml_namespace_node_t *field_node)
     sddf_dprintf("Read field register: 0x%x\n", *field_register);
     uint32_t field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
     sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
+
+    state_stack_add_argument(field_value);
 }
 
 void parse_namespace_node(bool evaluation)
@@ -872,6 +872,13 @@ void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end
 
 void eval_namespace_node(aml_namespace_node_t *node, uintptr_t ret_buf, uint8_t ret_type, uint8_t num_args, uint64_t argv[])
 {
+    if (node->op_code == NAME_OP && node->evaluated) {
+        uint32_t *ret = (uint32_t *)ret_buf;
+        *ret = node->value;
+        sddf_dprintf("Read node's value: 0x%x\n", node->value);
+        return;
+    }
+
     parse_state_t *recovery_state = current_state;
     uint8_t *recovery_location = scanner.current;
 

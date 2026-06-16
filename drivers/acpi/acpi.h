@@ -319,7 +319,8 @@ typedef struct aml_namespace_node {
     struct aml_namespace_node *next;    // siblings
     char name[5];               // Name Segment
     enum aml_encoding_value op_code;
-    uint64_t value;             // Only used for NameObject
+    uint64_t value;             // Store evaluation results
+    bool evaluated;             // If this has been evaluated
 } aml_namespace_node_t;
 
 typedef struct aml_object_pool {

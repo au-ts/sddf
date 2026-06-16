@@ -222,7 +222,7 @@ def generate(
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
 
-    mr_aml_object_pool = MemoryRegion(sdf, "aml_object_pool", 0x50000)
+    mr_aml_object_pool = MemoryRegion(sdf, "aml_object_pool", 0x100000)
     sdf.add_mr(mr_aml_object_pool)
     acpi_driver.add_map(Map(mr_aml_object_pool, 0x30000000, "rw"))
 
