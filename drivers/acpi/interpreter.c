@@ -168,7 +168,13 @@ aml_namespace_node_t *find_namespace_node_by_name(aml_namespace_node_t *node, co
 {
     aml_namespace_node_t *parent = node->parent;
     while (parent) {
+        if (current_state && current_state->evaluation) {
+            sddf_dprintf("  look for %s under parent %s\n", name_segment, parent->name);
+        }
         aml_namespace_node_t *target = find_child_node_by_name(parent, name_segment);
+        if (current_state && current_state->evaluation) {
+            sddf_dprintf("  Done look for %s under parent %s\n", name_segment, parent->name);
+        }
         if (target) {
             return target;
         }
@@ -389,7 +395,7 @@ void state_stack_update()
         current_state->stage_idx += 1;
     }
 
-    sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args);
+    /* sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args); */
 
     // Check if the Op has been completely parsed
     op_stage = get_op_stage();
@@ -398,7 +404,6 @@ void state_stack_update()
         if (current_state->pkt_end != 0) {
             scanner.current = current_state->pkt_end;
         }
-        sddf_dprintf("Complete Op \'0x%04x\' parsing\n", current_state->op_code);
         state_stack_pop();
     }
 }
@@ -696,38 +701,43 @@ void parse_field_list()
 void read_field_value(aml_namespace_node_t *field_node)
 {
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
-    aml_namespace_node_t *adr_node = find_namespace_node_by_name(field_node, acpi_str_adr);
-    sddf_dprintf("adr_node: %s\n", adr_node->name);
-    // TODO: this might be 64-bit
-    uint32_t address;
-    eval_namespace_node(adr_node, (uintptr_t)&address, WORD_DATA, 0, NULL);
-    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", adr_node->name, (uintptr_t)&address, address);
-
-    uint32_t bus;
-    aml_namespace_node_t *bbn_node = find_namespace_node_by_name(field_node, acpi_str_bbn);
-    sddf_dprintf("bbn_node: %s\n", bbn_node->name);
-    eval_namespace_node(bbn_node, (uintptr_t)&bus, WORD_DATA, 0, NULL);
-    sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", bbn_node->name, (uintptr_t)&bus, bus);
 
     sddf_dprintf("OpRegionOp: %s, op_code: 0x%x\n", field_node->parent->name, field_node->parent->op_code);
-    scanner.current = field_node->parent->pkt_start;
+    scanner.current = field_node->parent->pkt_start + 2;
     skip_name_string();
     uint8_t region_space = advance();
     uint8_t region_offset = advance();
     uint8_t region_length = advance();
     sddf_dprintf("space: 0x%x, offset: 0x%x, length: 0x%x\n", region_space, region_offset, region_length);
 
-    uint32_t offset_bits = field_node->value >> 8;
-    uint32_t field_width = field_node->value & 0xFF;
-    sddf_dprintf("Field offset: 0x%x, width: %u\n", offset_bits / 8, field_width);
+    if (region_space == 0x02) { // PCI_Config
+        aml_namespace_node_t *adr_node = find_namespace_node_by_name(field_node, acpi_str_adr);
+        sddf_dprintf("adr_node: %s\n", adr_node->name);
+        // TODO: this might be 64-bit
+        uint32_t address;
+        eval_namespace_node(adr_node, (uintptr_t)&address, WORD_DATA, 0, NULL);
+        sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", adr_node->name, (uintptr_t)&address, address);
 
-    uintptr_t ecam_base_vaddr = 0x20000000;
-    uint32_t *field_register = (uint32_t *)ecam_base_vaddr + (bus << 20) + address + offset_bits / 8;
-    sddf_dprintf("Read field register: 0x%x\n", *field_register);
-    uint32_t field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
-    sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
+        uint32_t bus;
+        aml_namespace_node_t *bbn_node = find_namespace_node_by_name(field_node, acpi_str_bbn);
+        sddf_dprintf("bbn_node: %s\n", bbn_node->name);
+        eval_namespace_node(bbn_node, (uintptr_t)&bus, WORD_DATA, 0, NULL);
+        sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", bbn_node->name, (uintptr_t)&bus, bus);
 
-    state_stack_add_argument(field_value);
+        uint32_t offset_bits = field_node->value >> 8;
+        uint32_t field_width = field_node->value & 0xFF;
+        sddf_dprintf("Field offset: 0x%x, width: %u\n", offset_bits / 8, field_width);
+
+        uintptr_t ecam_base_vaddr = 0x20000000;
+        uint32_t *field_register = (uint32_t *)ecam_base_vaddr + (bus << 20) + address + offset_bits / 8;
+        sddf_dprintf("Read field register: 0x%x\n", *field_register);
+        uint32_t field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
+        sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
+
+        state_stack_add_argument(field_value);
+    } else {
+        sddf_dprintf("Region space 0x%02x parsing is not implemented\n", region_space);
+    }
 }
 
 void parse_namespace_node(bool evaluation)
@@ -782,10 +792,6 @@ void parse_namespace_node(bool evaluation)
             if (op_code == 0x5B) {
                 op_code = 0x5B00;
                 continue;
-            }
-
-            if (evaluation) {
-                sddf_dprintf("op_code: 0x%0x\n", op_code);
             }
 
             switch (op_code) {
