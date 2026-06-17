@@ -32,16 +32,17 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [SCOPE_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
     [METHOD_OP] = { INIT, PKT_LEN, OBJECT_NAME_STRING, BYTE_DATA, TERM_LIST, COMPLETE },
     [NAME_OP] = { INIT, OBJECT_NAME_STRING, DATA_OBJECT, COMPLETE},
-    [STORE_OP] = { INIT, TERM_ARG, NAME_STRING, COMPLETE },
+    [STORE_OP] = { INIT, DATA_OBJECT, NAME_STRING, COMPLETE },
     [IF_OP] = { INIT, PKT_LEN, TERM_INTEGER, TERM_LIST, COMPLETE },
     [ELSE_OP] = { INIT, PKT_LEN, TERM_LIST, COMPLETE },
     [ALIAS_OP] = { INIT, NAME_STRING, NAME_STRING, COMPLETE },
     [CREATE_WORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_BIT_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [CREATE_BYTE_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [CREATE_DWORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [LEQUAL_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
-    [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
-    [SUBTRACT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
+    [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
+    [SUBTRACT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [SHIFT_LEFT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [SHIFT_RIGHT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [BYTE_PREFIX] = { INIT, BYTE_DATA, COMPLETE },
@@ -132,6 +133,9 @@ aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const 
 
     aml_namespace_node_t *child = node->child;
     while (child) {
+        /* if (current_state && current_state->evaluation) { */
+            /* sddf_dprintf("    parent: %s, node: %s, target: %s\n", node->name, child->name, name_segment); */
+        /* } */
         if (!strcmp(child->name, name_segment)) return child;
         if (child->op_code == OP_REGION_OP) {
             aml_namespace_node_t *field_node = find_child_node_by_name(child, name_segment);
@@ -187,7 +191,7 @@ aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespac
     if (name_segment != NULL) {
         memcpy(&child_node->name, name_segment, 4);
         child_node->name[4] = '\0';
-        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx\n", op_code, name_segment, (uintptr_t)scanner.current);
+        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name);
     } else {
         sddf_dprintf("Create a type 0x%02X object\n", op_code);
     }
@@ -258,8 +262,13 @@ void state_stack_pop()
             case STORE_OP: {
                 assert(current_state->num_args == 2);
                 aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[1];
-                target_node->value = current_state->arguments[0];
-                sddf_dprintf("save value %lu to node\n", target_node->value);
+                if (target_node) {
+                    target_node->value = current_state->arguments[0];
+                    target_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node\n", target_node->value);
+                } else {
+                    sddf_dprintf("target node is invalid\n");
+                }
                 break;
             }
             case LEQUAL_OP: {
@@ -269,13 +278,27 @@ void state_stack_pop()
                 break;
             }
             case ADD_OP: {
-                assert(current_state->num_args == 2);
+                assert(current_state->num_args == 3);
                 ret_val = current_state->arguments[0] + current_state->arguments[1];
+                sddf_dprintf("subtract: 0x%lx - 0x%lx = 0x%lx\n", current_state->arguments[0], current_state->arguments[1], ret_val);
+                aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
+                if (supername_node) {
+                    supername_node->value = ret_val;
+                    supername_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                }
                 break;
             }
             case SUBTRACT_OP: {
-                assert(current_state->num_args == 2);
+                assert(current_state->num_args == 3);
                 ret_val = current_state->arguments[0] - current_state->arguments[1];
+                sddf_dprintf("subtract: 0x%lx - 0x%lx = 0x%lx\n", current_state->arguments[0], current_state->arguments[1], ret_val);
+                aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
+                if (supername_node) {
+                    supername_node->value = ret_val;
+                    supername_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                }
                 break;
             }
             case SHIFT_LEFT_OP: {
@@ -283,19 +306,23 @@ void state_stack_pop()
                 sddf_dprintf("argument0: 0x%lx, argument1: 0x%lx\n", current_state->arguments[0], current_state->arguments[1]);
                 ret_val = (current_state->arguments[0]) << (current_state->arguments[1]);
                 aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
-                supername_node->value = ret_val;
-                supername_node->evaluated = true;
-                sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                if (supername_node) {
+                    supername_node->value = ret_val;
+                    supername_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                }
                 break;
             }
             case SHIFT_RIGHT_OP: {
                 assert(current_state->num_args == 3);
-                sddf_dprintf("argument0: 0x%lx, argument1: 0x%lx\n", current_state->arguments[0], current_state->arguments[1]);
                 ret_val = (current_state->arguments[0]) >> (current_state->arguments[1]);
+                sddf_dprintf("argument0: 0x%lx, argument1: 0x%lx, ret_val: 0x%lx\n", current_state->arguments[0], current_state->arguments[1], ret_val);
                 aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2];
-                supername_node->value = ret_val;
-                supername_node->evaluated = true;
-                sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                if (supername_node) {
+                    supername_node->value = ret_val;
+                    supername_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node %s\n", supername_node->value, supername_node->name);
+                }
                 break;
             }
             case NAME_OP: {
@@ -312,7 +339,7 @@ void state_stack_pop()
             case RETURN_OP: {
                 sddf_dprintf("assign MethodOp: %s, addr: 0x%lx, ret_buf = %u\n", current_state->parent->node->name, (uintptr_t)current_state->parent->arguments[0], (uint32_t)current_state->arguments[0]);
                 uint32_t *ret_buf = (uint32_t *)current_state->parent->arguments[0];
-                *ret_buf = (uint32_t)current_state->arguments[1];
+                *ret_buf = (uint32_t)current_state->arguments[0];
                 current_state->parent->stage_idx += 1; // MethodOp completes
                 break;
             }
@@ -333,7 +360,7 @@ void state_stack_pop()
     parse_stage_t op_stage = get_op_stage();
     if (op_stage == TERM_INTEGER || op_stage == TERM_BUFFER || op_stage == DATA_OBJECT) {
         state_stack_add_argument(ret_val);
-        sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+        sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx, ret_val: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, ret_val);
         state_stack_update();
     }
 
@@ -420,6 +447,8 @@ void skip_name_string()
         // Multiple Name Segment
         uint8_t seg_cnt = advance();
         scanner.current += (4 * seg_cnt);
+    } else {
+        scanner.current--;
     }
 }
 
@@ -477,7 +506,12 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
     uint8_t name_type = advance();
     aml_namespace_node_t *node = NULL;
 
-    sddf_dprintf("name_type: 0x%x\n", name_type);
+    sddf_dprintf("name_type: 0x%x, current: 0x%lx\n", name_type, (uintptr_t)scanner.current);
+    if (name_type == 0x00) {
+        sddf_dprintf("Null Name\n");
+        return NULL;
+    }
+
     if (name_type >= LOCAL0_OP && name_type <= LOCAL7_OP) {
         scanner.current--;
         aml_namespace_node_t *local_variable = find_local_variable_in_namespace(parent_node, name_type);
@@ -505,7 +539,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
         read_name_segment(name_segment);
         node = find_namespace_node_by_name(current_state->node, name_segment);
         left_num_segments--;
-        /* sddf_dprintf("  node: 0x%lx, current: 0x%lx\n", (uintptr_t)node, (uintptr_t)scanner.current); */
+        sddf_dprintf("  node: 0x%lx, current: 0x%lx, segment: %s, parent: %s\n", (uintptr_t)node, (uintptr_t)scanner.current, name_segment, parent_node->name);
     } else if (name_type == '\\') {
         // Root Path
         node = &namespace_root;
@@ -724,7 +758,6 @@ void parse_namespace_node(bool evaluation)
             if (evaluation) {
                 sddf_dprintf("Need to read the value of node at 0x%lx, %s\n", (uintptr_t)scanner.current, current_state->node->name);
                 aml_namespace_node_t *node = find_node_by_name_string(current_state->parent->node, 1);
-                sddf_dprintf("node: %s, value: %lu\n", node->name, node->value);
                 state_stack_add_argument((uintptr_t)node);
             } else {
                 sddf_dprintf("Skip the Name String\n");
@@ -790,7 +823,11 @@ void parse_namespace_node(bool evaluation)
                 case LOCAL7_OP: {
                     aml_namespace_node_t *local_node = make_namespace_node(current_state->node, op_code);
                     sddf_dprintf("Local variable\n");
-                    state_stack_add_argument((uintptr_t)local_node);
+                    if (local_node && local_node->evaluated) {
+                        state_stack_add_argument((uintptr_t)local_node->value);
+                    } else {
+                        sddf_dprintf("Local%u is not found or evaluated\n", op_code - LOCAL0_OP);
+                    }
                     break;
                 }
                 case BYTE_PREFIX:
@@ -813,6 +850,7 @@ void parse_namespace_node(bool evaluation)
                 case STORE_OP:
                 case LEQUAL_OP:
                 case OP_REGION_OP:
+                case CREATE_BIT_FIELD_OP:
                 case CREATE_BYTE_FIELD_OP:
                 case CREATE_WORD_FIELD_OP:
                 case CREATE_DWORD_FIELD_OP:
@@ -828,36 +866,41 @@ void parse_namespace_node(bool evaluation)
                 }
                 default: {
                     scanner.current--;
-                    // Try looking up the object by name string by name string by name string by name string
-                    aml_namespace_node_t *node = find_node_by_name_string(current_state->parent->node, 1);
-                    if (node) {
-                        sddf_dprintf("Found node %s\n", node->name);
-                        if (evaluation && node->op_code == METHOD_OP) {
-                            uint8_t *saved_location = scanner.current;
-                            // TODO: need to fix return buffer
-                            uint32_t ret_buf;
-                            sddf_dprintf("Eval inside Eval\n");
-                            eval_namespace_node(node, (uintptr_t)&ret_buf, WORD_DATA, 0, NULL);
-                            sddf_dprintf("come back from method %s eval, ret_buf: %u\n", node->name, ret_buf);
-                            state_stack_add_argument(ret_buf);
-                            scanner.current = saved_location;
-                        } else if (evaluation && node->op_code == NAME_OP) {
-                            sddf_dprintf("Try evaluating NameOp: %s\n", node->name);
-                            uint8_t *saved_location = scanner.current;
-                            uint32_t ret_buf;
-                            eval_namespace_node(node, (uintptr_t)&ret_buf, WORD_DATA, 0, NULL);
-                            sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", node->name, (uintptr_t)&ret_buf, ret_buf);
-                            state_stack_add_argument(ret_buf);
-                            scanner.current = saved_location;
-                        } else if (evaluation && node->op_code == FIELD_OP) {
-                            uint8_t *saved_location = scanner.current;
-                            read_field_value(node);
-                            scanner.current = saved_location;
+                    if (evaluation) {
+                        // Try looking up the object by name string by name string by name string by name string
+                        sddf_dprintf("parent: %s\n", current_state->parent->node->name);
+                        aml_namespace_node_t *node = find_node_by_name_string(current_state->parent->node, 1);
+                        if (node) {
+                            sddf_dprintf("Found node %s\n", node->name);
+                            if (evaluation && node->op_code == METHOD_OP) {
+                                uint8_t *saved_location = scanner.current;
+                                // TODO: need to fix return buffer
+                                uint32_t ret_buf;
+                                sddf_dprintf("Eval inside Eval\n");
+                                eval_namespace_node(node, (uintptr_t)&ret_buf, WORD_DATA, 0, NULL);
+                                sddf_dprintf("come back from method %s eval, ret_buf: %u\n", node->name, ret_buf);
+                                state_stack_add_argument(ret_buf);
+                                scanner.current = saved_location;
+                            } else if (evaluation && node->op_code == NAME_OP) {
+                                sddf_dprintf("Try evaluating NameOp: %s\n", node->name);
+                                uint8_t *saved_location = scanner.current;
+                                uint32_t ret_buf;
+                                eval_namespace_node(node, (uintptr_t)&ret_buf, WORD_DATA, 0, NULL);
+                                sddf_dprintf("name: %s, addr: 0x%lx, ret_buf: %u\n", node->name, (uintptr_t)&ret_buf, ret_buf);
+                                state_stack_add_argument(ret_buf);
+                                scanner.current = saved_location;
+                            } else if (evaluation && node->op_code == FIELD_OP) {
+                                uint8_t *saved_location = scanner.current;
+                                read_field_value(node);
+                                scanner.current = saved_location;
+                            } else {
+                                state_stack_add_argument((uintptr_t)node);
+                            }
                         } else {
-                            state_stack_add_argument((uintptr_t)node);
+                            sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
                     } else {
-                        sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
+                        skip_name_string();
                     }
                 }
             }

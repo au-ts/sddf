@@ -122,6 +122,7 @@ enum aml_encoding_value {
     SUBTRACT_OP = 0x74,
     SHIFT_LEFT_OP = 0x79,
     SHIFT_RIGHT_OP = 0x7A,
+    CREATE_BIT_FIELD_OP = 0x8D,
     CREATE_BYTE_FIELD_OP = 0x8C,
     CREATE_WORD_FIELD_OP = 0x8B,
     CREATE_DWORD_FIELD_OP = 0x8A,
