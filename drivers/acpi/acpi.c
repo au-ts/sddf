@@ -651,8 +651,16 @@ void init(void)
             eval_namespace_node(crs_node, (uintptr_t)ret_buffer, 0, 0, NULL);
             /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
             /* print_crs_list(crs_list); */
-            /* return; */
             /* pass_crs_and_caps(crs_list, pci_resources->num_bridges); */
+            sddf_dprintf("======Finish _CRS parsing\n");
+
+            /* aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, acpi_str_prt); */
+            /* if (crs_node == NULL) { */
+            /*     sddf_dprintf("_PRT node is not found\n"); */
+            /*     return; */
+            /* } */
+            /* eval_namespace_node(prt_node, (uintptr_t)ret_buffer, 0, 0, NULL); */
+            /* sddf_dprintf("======Finish _PRT parsing\n"); */
         }
 
     }
