@@ -126,6 +126,7 @@ enum aml_encoding_value {
     CREATE_BYTE_FIELD_OP = 0x8C,
     CREATE_WORD_FIELD_OP = 0x8B,
     CREATE_DWORD_FIELD_OP = 0x8A,
+    CREATE_QWORD_FIELD_OP = 0x8F,
     LEQUAL_OP = 0x93,
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
