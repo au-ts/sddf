@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Return how many pages a PDF has. For fun times, construct a commit hook from
 # this that updates a 'underlimit' tag to point at the latest changeset under
