@@ -170,13 +170,7 @@ aml_namespace_node_t *find_namespace_node_by_name(aml_namespace_node_t *node, co
 {
     aml_namespace_node_t *parent = node;
     while (parent) {
-        if (current_state && current_state->evaluation) {
-            sddf_dprintf("  look for %s under parent %s\n", name_segment, parent->name);
-        }
         aml_namespace_node_t *target = find_child_node_by_name(parent, name_segment);
-        if (current_state && current_state->evaluation) {
-            sddf_dprintf("  Done look for %s under parent %s\n", name_segment, parent->name);
-        }
         if (target) {
             return target;
         }
@@ -405,18 +399,16 @@ void state_stack_pop()
         parse_stage_t op_stage = get_op_stage();
         if (op_stage == TERM_INTEGER || op_stage == TERM_BUFFER || op_stage == DATA_OBJECT) {
             state_stack_add_argument(ret_val);
-            sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx, ret_val: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, ret_val);
+            /* sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx, ret_val: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, ret_val); */
             state_stack_update();
-            sddf_dprintf("finish update\n");
         }
     }
 
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+            /* sddf_dprintf("current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
             state_stack_pop();
-            sddf_dprintf("finish pop\n");
         }
     }
 }
@@ -439,6 +431,7 @@ void state_stack_update()
     } else if (current_state->evaluation && current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
         if (current_state->num_args == 1 && current_state->arguments[0] == 0) {
             current_state->if_condition = false;
+            current_state->stage_idx += 2;
         } else {
             current_state->if_condition = true;
         }
@@ -600,7 +593,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
         read_name_segment(name_segment);
         node = find_namespace_node_by_name(current_state->node, name_segment);
         left_num_segments--;
-        sddf_dprintf("  node: 0x%lx, current: 0x%lx, segment: %s, parent: %s\n", (uintptr_t)node, (uintptr_t)scanner.current, name_segment, parent_node->name);
+        /* sddf_dprintf("  node: 0x%lx, current: 0x%lx, segment: %s, parent: %s\n", (uintptr_t)node, (uintptr_t)scanner.current, name_segment, parent_node->name); */
     } else if (name_type == '\\') {
         // Root Path
         node = &namespace_root;
@@ -773,10 +766,12 @@ void read_field_value(aml_namespace_node_t *field_node)
 
     sddf_dprintf("field_register: 0x%lx\n", (uintptr_t)field_register);
 
-    // TODO: fix this by properly mapping target system memory
-    /* sddf_dprintf("Read field register: 0x%x\n", *field_register); */
-    /* uint8_t field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1); */
     uint8_t field_value = 0;
+    if (field_register >= 0x20000000 && field_register < 0x30000000) {
+    // TODO: fix this by properly mapping target system memory
+        field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
+
+    }
     sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
     state_stack_add_argument(field_value);
 }
@@ -807,7 +802,6 @@ void parse_namespace_node(bool evaluation)
                 }
             }
         } else if (op_stage == NAME_STRING) {
-            sddf_dprintf("Evaluation: %u\n", evaluation);
             if (evaluation) {
                 sddf_dprintf("Need to read the value of node at 0x%lx, %s\n", (uintptr_t)scanner.current, current_state->node->name);
                 aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
@@ -816,7 +810,6 @@ void parse_namespace_node(bool evaluation)
                 sddf_dprintf("Skip the Name String\n");
                 skip_name_string();
             }
-            sddf_dprintf("========\n");
         } else if (op_stage == FIELD_LIST) {
             parse_field_list();
         } else if (op_stage == BYTE_DATA) {
