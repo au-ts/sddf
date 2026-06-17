@@ -387,6 +387,12 @@ typedef struct {
     void *end;
 } mempool_t;
 
+typedef struct {
+    uintptr_t value;
+    enum aml_data_object_type type;
+    uint32_t length;
+} eval_ret_t;
+
 extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
 
