@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 CC := clang
+CXX := clang++
 LD := ld.lld
 RANLIB := llvm-ranlib
 AR := llvm-ar

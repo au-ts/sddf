@@ -23,6 +23,7 @@ CFLAGS_ARCH += \
 endif
 
 CC := ${TRIPLE}-gcc
+CXX := ${TRIPLE}-g++
 AS := ${TRIPLE}-as
 LD := ${TRIPLE}-ld
 RANLIB := ${TRIPLE}-ranlib
