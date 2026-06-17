@@ -618,6 +618,7 @@ void init(void)
 
     sddf_dprintf("===============Extract _CRS===============\n");
 
+    sddf_dprintf("object_root: 0x%lx\n", (uintptr_t)acpi_dsdt_table);
     num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_hid, lookup_results, 0);
     if (num_results == 0) {
         sddf_dprintf("[Error] namespace node \'%s\' is not found\n", acpi_str_pic);
