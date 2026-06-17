@@ -62,16 +62,17 @@ uintptr_t acpi_dsdt_addr = 0x0;
 uint32_t acpi_rsdt_entries[MAX_NUM_RSDT_ENTRIES];
 
 cap_desc_t cap_list[512];
-uint32_t cap_list_start;
-uint32_t cap_list_end;
+seL4_Word cap_list_start;
+seL4_Word cap_list_end;
 cnode_caps_t *cnode_caps_pci_resources;
 uint32_t kernel_objects_ut_idx;
 
 acpi_copy_t acpi_tables_copy;
 
-__attribute__((__section__(".test_dsdt_table"))) uint8_t test_dsdt_table[300000];
-__attribute__((__section__(".test_ssdt_table"))) uint8_t test_ssdt_table[300000];
-__attribute__((__section__(".test_mcfg_table"))) uint8_t test_mcfg_table[100];
+__attribute__((__aligned__(0x1000))) __attribute__((__section__(".test_dsdt_table"))) uint8_t test_dsdt_table[300000];
+__attribute__((__aligned__(0x1000))) __attribute__((__section__(".test_ssdt_table"))) uint8_t test_ssdt_table[300000];
+// TODO: proper size
+__attribute__((__aligned__(0x1000))) __attribute__((__section__(".test_mcfg_table"))) uint8_t test_mcfg_table[1000];
 
 // TODO: check if this makes sense to go to libsel4
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vka/arch_include/x86/vka/arch/object.h#L62
@@ -515,11 +516,10 @@ aml_namespace_node_t namespace_root;
 
 void init(void)
 {
-
     capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds;
     cap_list_start = capDLBootInfo->untypeds.start;
     // TODO: is end empty?
-    for (uint32_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
+    for (uint64_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
         cap_list[i].base_addr = capDLBootInfo->untypedList[i].paddr;
         cap_list[i].end_addr = cap_list[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits);
         cap_list[i].is_device = capDLBootInfo->untypedList[i].isDevice;
@@ -544,13 +544,25 @@ void init(void)
     // Print summary
     sddf_dprintf("======MAP ======\n");
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
+    sddf_dprintf("ello\n");
     acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)&test_mcfg_table;
+    sddf_dprintf("test_mcfg_table: 0x%lx\n", (uintptr_t)&test_mcfg_table);
+    sddf_dprintf("Alignof(uint32_t): %u\n", _Alignof(uint32_t));
+    sddf_dprintf("sizeof header: 0x%x\n", sizeof(acpi_header_t));
+    sddf_dprintf("sizeof: 0x%x, alignof: %u\n", sizeof(acpi_mcfg_t), _Alignof(acpi_header_t));
+    sddf_dprintf("header: 0x%lx\n", (uintptr_t)&mcfg_table->header);
+    sddf_dprintf("length: 0x%lx\n", (uintptr_t)&mcfg_table->header.length);
+    sddf_dprintf("ello\n");
+    sddf_dprintf("")
     uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
+    sddf_dprintf("ello2\n");
     sddf_dprintf("num_pci: %u\n", num_pci_seg_grps);
+    sddf_dprintf("ello3\n");
     for (int j = 0; j < num_pci_seg_grps; j++) {
         memcpy(&pci_resources->pci_seg_groups[pci_resources->num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
         pci_resources->num_pci_groups++;
     }
+    sddf_dprintf("ello\n");
 
     seL4_Error error;
     uintptr_t ecam_base_vaddr = 0x20000000;
