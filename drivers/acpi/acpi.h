@@ -133,7 +133,7 @@ enum aml_encoding_value {
     RETURN_OP = 0xA4,
 };
 
-typedef enum aml_data_object_type {
+typedef enum aml_data_type {
     DATA_OBJ_ZERO = 0x00,
     DATA_OBJ_ONE = 0x01,
     DATA_OBJ_BYTE = 0x0A,
@@ -143,7 +143,9 @@ typedef enum aml_data_object_type {
     DATA_OBJ_QWORD = 0x0E,
     DATA_OBJ_BUFFER = 0x11,
     DATA_OBJ_PACKAGE = 0x12,
-} aml_data_object_type_t;
+    DATA_OBJ_NODE = 0xFE,    // custom type: node
+    DATA_OBJ_RET = 0xFF,     // custom type: ret_data
+} aml_data_type_t;
 
 enum aml_data_resource_type {
     EXTENDED_IRQ_DESCRIPTOR = 0x89,
@@ -313,18 +315,6 @@ typedef struct aml_object {
     uint32_t value;             // Only used for NameObject
 } aml_object_t;
 
-typedef struct aml_namespace_node {
-    uint8_t *pkt_start;
-    uint8_t *pkt_end;
-    struct aml_namespace_node *parent;  // parent
-    struct aml_namespace_node *child;   // first child object
-    struct aml_namespace_node *next;    // siblings
-    char name[5];               // Name Segment
-    enum aml_encoding_value op_code;
-    uint64_t value;             // Store evaluation results
-    bool evaluated;             // If this has been evaluated
-} aml_namespace_node_t;
-
 typedef struct aml_object_pool {
     uintptr_t next;
     uintptr_t end;
@@ -388,10 +378,35 @@ typedef struct {
 } mempool_t;
 
 typedef struct {
-    uintptr_t value;
-    aml_data_object_type_t type;
+    uint64_t value;
+    aml_data_type_t type;
     uint32_t length;
-} eval_ret_t;
+} aml_data_t;
+
+typedef struct aml_namespace_node {
+    uint8_t *pkt_start;
+    uint8_t *pkt_end;
+    struct aml_namespace_node *parent;  // parent
+    struct aml_namespace_node *child;   // first child object
+    struct aml_namespace_node *next;    // siblings
+    char name[5];                       // Name Segment
+    enum aml_encoding_value op_code;
+    aml_data_t data;                    // Store evaluation results
+    bool evaluated;                     // If this has been evaluated
+} aml_namespace_node_t;
+
+typedef struct parse_state {
+    struct parse_state *parent;
+    uint8_t *node_start;
+    uint8_t *pkt_end;
+    aml_namespace_node_t *node;
+    uint16_t op_code;
+    uint8_t stage_idx;
+    uint8_t num_args;
+    aml_data_t arguments[10];
+    bool evaluation;
+    bool if_condition;
+} parse_state_t;
 
 extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
@@ -400,4 +415,4 @@ void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
-eval_ret_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, uint64_t argv[]);
+aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml_data_t argv[]);
