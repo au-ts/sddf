@@ -133,7 +133,7 @@ enum aml_encoding_value {
     RETURN_OP = 0xA4,
 };
 
-enum aml_data_object_type {
+typedef enum aml_data_object_type {
     DATA_OBJ_ZERO = 0x00,
     DATA_OBJ_ONE = 0x01,
     DATA_OBJ_BYTE = 0x0A,
@@ -143,7 +143,7 @@ enum aml_data_object_type {
     DATA_OBJ_QWORD = 0x0E,
     DATA_OBJ_BUFFER = 0x11,
     DATA_OBJ_PACKAGE = 0x12,
-};
+} aml_data_object_type_t;
 
 enum aml_data_resource_type {
     EXTENDED_IRQ_DESCRIPTOR = 0x89,
@@ -389,7 +389,7 @@ typedef struct {
 
 typedef struct {
     uintptr_t value;
-    enum aml_data_object_type type;
+    aml_data_object_type_t type;
     uint32_t length;
 } eval_ret_t;
 
@@ -400,4 +400,4 @@ void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
-void eval_namespace_node(aml_namespace_node_t *node, uintptr_t ret_buf, uint8_t ret_type, uint8_t num_args, uint64_t argv[]);
+eval_ret_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, uint64_t argv[]);

@@ -626,7 +626,7 @@ void init(void)
     uint8_t ret_buffer[100];
     uint64_t pic_method_arg = 1; // Enable APIC mode: pass 1 to method "_PIC"
     // TODO: fix ret_type
-    eval_namespace_node(lookup_results[0], (uintptr_t)ret_buffer, 0, 1, &pic_method_arg);
+    eval_namespace_node(lookup_results[0], 1, &pic_method_arg);
 
     sddf_dprintf("===============Extract _CRS===============\n");
 
@@ -648,7 +648,7 @@ void init(void)
                 return;
             }
             // TODO: fix ret_type
-            eval_namespace_node(crs_node, (uintptr_t)ret_buffer, 0, 0, NULL);
+            eval_namespace_node(crs_node, 0, NULL);
             /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
             /* print_crs_list(crs_list); */
             /* pass_crs_and_caps(crs_list, pci_resources->num_bridges); */
@@ -659,7 +659,7 @@ void init(void)
             /*     sddf_dprintf("_PRT node is not found\n"); */
             /*     return; */
             /* } */
-            /* eval_namespace_node(prt_node, (uintptr_t)ret_buffer, 0, 0, NULL); */
+            /* eval_namespace_node(prt_node, 0, 0, NULL); */
             /* sddf_dprintf("======Finish _PRT parsing\n"); */
         }
 
