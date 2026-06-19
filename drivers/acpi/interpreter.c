@@ -329,7 +329,7 @@ void state_stack_pop()
             case BUFFER_PREFIX: {
                 assert(current_state->num_args == 1);
                 ret_data.value = (uint64_t)current_state->pkt_end - current_state->arguments[0].value;
-                sddf_dprintf("return buffer prefix: 0x%x\n", ret_data.value);
+                sddf_dprintf("return buffer prefix: 0x%lx\n", ret_data.value);
                 ret_data.type = DATA_OBJ_BUFFER;
                 ret_data.length = current_state->arguments[0].value;
                 break;
@@ -456,7 +456,10 @@ void state_stack_update()
             current_state->stage_idx += 2;
         }
     } else if (current_state->op_code == BUFFER_PREFIX && op_stage == TERM_INTEGER) {
-        sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n", (uintptr_t)current_state->node->pkt_start, current_state->pkt_end, current_state->arguments[0].value);
+        sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n",
+                     (uintptr_t)current_state->node->pkt_start,
+                     (uintptr_t)current_state->pkt_end,
+                     current_state->arguments[0].value);
         current_state->stage_idx += 2;
     } else if (op_stage != TERM_LIST) {
         current_state->stage_idx += 1;
