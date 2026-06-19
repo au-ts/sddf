@@ -16,12 +16,19 @@
  */
 
 typedef struct ialloc {
-    uint32_t *idxlist; /* linked list pointing to the next free index */
-    uint32_t head; /* next free index */
-    uint32_t tail; /* last free index */
-    uint32_t num_free; /* number of free indices */
-    uint32_t offset; /* offset to add to the index */
-    uint32_t size; /* total number of indices */
+    /* linked list pointing to the next free index. An index x is free if
+     idxlist[x] != -1. The last free index in the list is set to the capacity of
+     the index allocator. */
+    uint32_t *idxlist;
+    /* first free index */
+    uint32_t head;
+    /* last free index */
+    uint32_t tail;
+    /* number of allocated indices */
+    uint32_t size;
+    /* total number of indices. This must be < UINT32MAX to distinguish between
+    indices being allocated */
+    uint32_t capacity;
 } ialloc_t;
 
 /**
@@ -33,7 +40,7 @@ typedef struct ialloc {
  */
 static inline bool ialloc_full(ialloc_t *ia)
 {
-    return ia->num_free == 0;
+    return ia->size == ia->capacity;
 }
 
 /**
@@ -45,7 +52,7 @@ static inline bool ialloc_full(ialloc_t *ia)
  */
 static inline uint32_t ialloc_num_free(ialloc_t *ia)
 {
-    return ia->num_free;
+    return ia->capacity - ia->size;
 }
 
 /**
@@ -54,14 +61,14 @@ static inline uint32_t ialloc_num_free(ialloc_t *ia)
  * @param ia pointer to the ialloc struct.
  * @param id index to check.
  *
- * @return true if index is in use, false otherwise.
+ * @return true if index is in use and valid, false otherwise.
  */
 static inline bool ialloc_in_use(ialloc_t *ia, uint32_t id)
 {
-    if (id >= ia->size + ia->offset || id < ia->offset) {
+    if (id >= ia->capacity || ia->idxlist[id] != -1) {
         return false;
     }
-    return ia->idxlist[id - ia->offset] == -1;
+    return true;
 }
 
 /**
@@ -77,10 +84,17 @@ static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
     if (ialloc_full(ia)) {
         return -1;
     }
-    *id = ia->head + ia->offset;
-    ia->head = ia->idxlist[ia->head];
-    ia->idxlist[*id - ia->offset] = -1;
-    ia->num_free--;
+
+    *id = ia->head;
+    if (ia->head == ia->tail) {
+        /* List is now empty */
+        ia->head = -1;
+        ia->tail = -1;
+    } else {
+        ia->head = ia->idxlist[*id];
+    }
+    ia->idxlist[*id] = -1;
+    ia->size++;
     return 0;
 }
 
@@ -94,19 +108,19 @@ static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
  */
 static inline int ialloc_free(ialloc_t *ia, uint32_t id)
 {
-    if (id >= ia->size + ia->offset || id < ia->offset || !ialloc_in_use(ia, id)) {
+    if (!ialloc_in_use(ia, id)) {
         return -1;
     }
+
     if (ialloc_full(ia)) {
-        // When index list is full, head and tail will point
-        // to stale indices, so we have to restore it here.
-        ia->head = id - ia->offset;
-        ia->tail = id - ia->offset;
+        ia->head = id;
+        ia->tail = id;
     } else {
-        ia->idxlist[ia->tail] = id - ia->offset;
-        ia->tail = id - ia->offset;
+        ia->idxlist[ia->tail] = id;
+        ia->tail = id;
     }
-    ia->num_free++;
+    ia->idxlist[id] = ia->capacity;
+    ia->size--;
     return 0;
 }
 
@@ -115,33 +129,17 @@ static inline int ialloc_free(ialloc_t *ia, uint32_t id)
  *
  * @param ia pointer to the ialloc struct.
  * @param idxlist pointer to the linked list array storing the next free index.
- * @param size number of indices that can be allocated.
+ * @param capacity number of indices that can be allocated.
  */
-static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t size)
+static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t capacity)
 {
-    assert(size < -1);
+    assert(capacity < -1);
     ia->idxlist = idxlist;
     ia->head = 0;
-    ia->tail = size - 1;
-    ia->num_free = size;
-    ia->size = size;
-    ia->offset = 0;
-    for (uint32_t i = 0; i < size - 1; i++) {
+    ia->tail = capacity - 1;
+    ia->size = 0;
+    ia->capacity = capacity;
+    for (uint32_t i = 0; i < capacity; i++) {
         ia->idxlist[i] = i + 1;
     }
-    ia->idxlist[size - 1] = -1;
-}
-
-/**
- * Initialise the index allocator. Allocates indices from offset to offset + size - 1 inclusive.
- *
- * @param ia pointer to the ialloc struct.
- * @param idxlist pointer to the linked list array storing the next free index.
- * @param size number of indices that can be allocated.
- * @param offset offset to add to the index.
- */
-static inline void ialloc_init_with_offset(ialloc_t *ia, uint32_t *idxlist, uint32_t size, uint32_t offset)
-{
-    ialloc_init(ia, idxlist, size);
-    ia->offset = offset;
 }
