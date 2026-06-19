@@ -472,6 +472,11 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 pass_resource_with_range(1, dev_res->min_addr, dev_res->max_addr);
                 break;
             }
+            case END_TAG: {
+                sddf_dprintf("end_tag\n");
+                // TODO: checksum
+                break;
+            }
             default: {
                 sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", buf_cur[0]);
             }
@@ -641,6 +646,8 @@ void init(void)
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
+            aml_data_t crs_data_before_eval = {0x21375b, 17, 540};
+            pass_crs_and_caps(crs_data_before_eval, pci_resources->num_bridges);
             // TODO: fix ret_type
             aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
             pass_crs_and_caps(crs_data, pci_resources->num_bridges);

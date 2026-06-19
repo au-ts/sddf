@@ -151,6 +151,7 @@ typedef enum aml_data_type {
 enum aml_data_resource_type {
     EXTENDED_IRQ_DESCRIPTOR = 0x89,
     IO_PORT_DESCRIPTOR = 0x47,
+    END_TAG = 0x79,
     DWORD_AS_DESCRIPTOR = 0x87,
     WORD_AS_DESCRIPTOR = 0x88,
     QWORD_AS_DESCRIPTOR = 0x8A,
