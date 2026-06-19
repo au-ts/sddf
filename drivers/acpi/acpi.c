@@ -394,94 +394,99 @@ seL4_Error map_frame(seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL
     return err;
 }
 
-void pass_crs_and_caps(acpi_crs_list_t *crs_list, uint32_t bridge_idx)
+void pass_resource_with_range(uint8_t resource_type, uint64_t min_address, uint64_t max_address)
 {
+    switch (resource_type) {
+        case 0: {
+            /* pass_ut_with_range(dev_res->min_addr, dev_res->max_addr); */
+            break;
+            sddf_dprintf("Memory ");
+        }
+        case 1: {
+            sddf_dprintf("IO ");
+            break;
+        }
+        case 2: {
+            sddf_dprintf("Bus ");
+            break;
+        }
+    }
+    sddf_dprintf(": [0x%lx-0x%lx]\n", min_address, max_address);
+}
+
+// Section 6.4
+void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
+{
+    uint8_t *buf_cur= (uint8_t *)crs_data.value;
+    uint8_t *crs_data_end = (uint8_t *)crs_data.value + crs_data.length;
+
     // TODO: deal with WORD_IO and WORD_BUS
     sddf_dprintf("=====pass CRS untypeds=====\n");
-    while (crs_list) {
+    while (buf_cur < crs_data_end) {
         uint8_t new_res_idx = pci_resources->bridges[bridge_idx].num_dev_resources;
         device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[bridge_idx].dev_resources[new_res_idx];
-        switch (crs_list->resource_type) {
+
+        switch (buf_cur[0]) {
             case WORD_AS_DESCRIPTOR: {
-                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)crs_list->data_addr;
+                acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)buf_cur;
                 dev_res->min_addr = word_as->min_address;
                 dev_res->max_addr = word_as->min_address + word_as->address_length;
+                dev_res->type = word_as->resource_type;
 
-                switch (word_as->resource_type) {
-                    case 0: {
-                        dev_res->type = WORD_MEMORY;
-                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
-                        break;
-                    }
-                    case 1: {
-                        dev_res->type = WORD_IO;
-                        break;
-                    }
-                    case 2: {
-                        dev_res->type = WORD_BUS;
-                        break;
-                    }
-                }
+                sddf_dprintf("Word ");
+                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
             case DWORD_AS_DESCRIPTOR: {
-                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)crs_list->data_addr;
+                acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)buf_cur;
                 dev_res->min_addr = dword_as->min_address;
                 dev_res->max_addr = dword_as->min_address + dword_as->address_length;
+                dev_res->type = dword_as->resource_type;
 
-                switch (dword_as->resource_type) {
-                    case 0: {
-                        dev_res->type = DWORD_MEMORY;
-                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
-                        break;
-                    }
-                    case 1: {
-                        dev_res->type = DWORD_IO;
-                        break;
-                    }
-                    case 2: {
-                        dev_res->type = DWORD_BUS;
-                        break;
-                    }
-                }
+                sddf_dprintf("DWord ");
+                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
             case QWORD_AS_DESCRIPTOR: {
-                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)crs_list->data_addr;
+                acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)buf_cur;
                 dev_res->min_addr = qword_as->min_address;
                 dev_res->max_addr = qword_as->min_address + qword_as->address_length;
+                dev_res->type = qword_as->resource_type;
 
-                switch (qword_as->resource_type) {
-                    case 0: {
-                        dev_res->type = QWORD_MEMORY;
-                        pass_ut_with_range(dev_res->min_addr, dev_res->max_addr);
-                        break;
-                    }
-                    case 1: {
-                        dev_res->type = QWORD_IO;
-                        break;
-                    }
-                    case 2: {
-                        dev_res->type = QWORD_BUS;
-                        break;
-                    }
-                }
+                sddf_dprintf("QWord ");
+                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
             }
+            case IO_PORT_DESCRIPTOR: {
+                acpi_io_port_t *io_port = (acpi_io_port_t *)buf_cur;
+                dev_res->min_addr = io_port->min_address;
+                dev_res->max_addr = io_port->min_address + io_port->address_length;
+
+                sddf_dprintf("I/O Port ");
+                pass_resource_with_range(1, dev_res->min_addr, dev_res->max_addr);
+                break;
+            }
             default: {
-                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", crs_list->resource_type);
+                sddf_dprintf("Resource type 0x%02x parsing is not implemented\n", buf_cur[0]);
             }
         }
 
-        crs_list = crs_list->next;
+        if (buf_cur[0] & 0x80) {
+            // Large Resource Data Length
+            buf_cur += 3 + buf_cur[1] + (buf_cur[2] << 8);
+        } else {
+            // Small Resource Data Length: Byte0[2:0]
+            buf_cur += (buf_cur[0] & 0x7) + 1;
+        }
     }
 }
+
 
 seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
 {
@@ -544,20 +549,10 @@ void init(void)
     // Print summary
     sddf_dprintf("======MAP ======\n");
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
-    sddf_dprintf("ello\n");
     acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)&test_mcfg_table;
     sddf_dprintf("test_mcfg_table: 0x%lx\n", (uintptr_t)&test_mcfg_table);
-    sddf_dprintf("Alignof(uint32_t): %u\n", _Alignof(uint32_t));
-    sddf_dprintf("sizeof header: 0x%x\n", sizeof(acpi_header_t));
-    sddf_dprintf("sizeof: 0x%x, alignof: %u\n", sizeof(acpi_mcfg_t), _Alignof(acpi_header_t));
-    sddf_dprintf("header: 0x%lx\n", (uintptr_t)&mcfg_table->header);
-    sddf_dprintf("length: 0x%lx\n", (uintptr_t)&mcfg_table->header.length);
-    sddf_dprintf("ello\n");
-    sddf_dprintf("")
     uint32_t num_pci_seg_grps = (mcfg_table->header.length - sizeof(acpi_header_t)) / sizeof(pci_seg_group_t);
-    sddf_dprintf("ello2\n");
     sddf_dprintf("num_pci: %u\n", num_pci_seg_grps);
-    sddf_dprintf("ello3\n");
     for (int j = 0; j < num_pci_seg_grps; j++) {
         memcpy(&pci_resources->pci_seg_groups[pci_resources->num_pci_groups], &mcfg_table->pci_seg_group[j], sizeof(pci_seg_group_t));
         pci_resources->num_pci_groups++;
@@ -623,8 +618,7 @@ void init(void)
     }
     sddf_dprintf("Found _PIC method! num: %u\n", num_results);
 
-    uint8_t ret_buffer[100];
-    uint64_t pic_method_arg = 1; // Enable APIC mode: pass 1 to method "_PIC"
+    aml_data_t pic_method_arg = {1, DATA_OBJ_QWORD, 0}; // Enable APIC mode: pass 1 to method "_PIC"
     // TODO: fix ret_type
     eval_namespace_node(lookup_results[0], 1, &pic_method_arg);
 
@@ -648,7 +642,8 @@ void init(void)
                 return;
             }
             // TODO: fix ret_type
-            eval_namespace_node(crs_node, 0, NULL);
+            aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
+            pass_crs_and_caps(crs_data, pci_resources->num_bridges);
             /* acpi_crs_list_t *crs_list = extract_pcie_crs(crs_node); */
             /* print_crs_list(crs_list); */
             /* pass_crs_and_caps(crs_list, pci_resources->num_bridges); */
