@@ -12,7 +12,6 @@ typedef enum {
     TERM_ARG,
     TERM_LIST,
     TERM_INTEGER,
-    TERM_BUFFER,
     FIELD_LIST,
     BYTE_INDEX,
     BUFFER,
@@ -38,11 +37,11 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [IF_OP] = { INIT, PKT_LEN, TERM_INTEGER, TERM_LIST, COMPLETE },
     [ELSE_OP] = { INIT, PKT_LEN, TERM_LIST, COMPLETE },
     [ALIAS_OP] = { INIT, NAME_STRING, NAME_STRING, COMPLETE },
-    [CREATE_WORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
-    [CREATE_BIT_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
-    [CREATE_BYTE_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
-    [CREATE_DWORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
-    [CREATE_QWORD_FIELD_OP] = { INIT, NAME_STRING, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_BIT_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_BYTE_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_WORD_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_DWORD_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
+    [CREATE_QWORD_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [LEQUAL_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
     [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [SUBTRACT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
@@ -260,9 +259,62 @@ void state_stack_pop()
                 assert(current_state->arguments[1].type == DATA_OBJ_NODE);
                 aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[1].value;
                 if (target_node) {
-                    target_node->data = current_state->arguments[0];
-                    target_node->evaluated = true;
-                    sddf_dprintf("save value %lu to node\n", target_node->data.value);
+                    // TODO: distinguish bitIndex and ByteIndex
+                    switch (target_node->op_code) {
+                        case CREATE_BIT_FIELD_OP: {
+                            sddf_dprintf("update BIT_FIELD %s to 0x%lx at 0x%lx\n",
+                                         target_node->name,
+                                         current_state->arguments[0].value,
+                                         target_node->data.value);
+                            uint8_t *buf_to_update = (uint8_t *)target_node->data.value;
+                            // bitOffset in byte is stored in data.length
+                            uint8_t bit_value = (bool)current_state->arguments[0].value ? 1 : 0;
+                            // TODO: improve this
+                            *buf_to_update = (*buf_to_update & ~(1 << target_node->data.length)) | (bit_value << target_node->data.length);
+                            break;
+                        }
+                        case CREATE_BYTE_FIELD_OP: {
+                            sddf_dprintf("update BYTE_FIELD %s to 0x%lx at 0x%lx\n",
+                                         target_node->name,
+                                         current_state->arguments[0].value,
+                                         target_node->data.value);
+                            uint8_t *buf_to_update = (uint8_t *)target_node->data.value;
+                            *buf_to_update = (uint8_t)current_state->arguments[0].value;
+                            break;
+                        }
+                        case CREATE_WORD_FIELD_OP: {
+                            sddf_dprintf("update WORD_FIELD %s to 0x%lx at 0x%lx\n",
+                                         target_node->name,
+                                         current_state->arguments[0].value,
+                                         target_node->data.value);
+                            uint16_t *buf_to_update = (uint16_t *)target_node->data.value;
+                            *buf_to_update = (uint16_t)current_state->arguments[0].value;
+                            break;
+                        }
+                        case CREATE_DWORD_FIELD_OP: {
+                            sddf_dprintf("update DWORD_FIELD %s to 0x%lx at 0x%lx\n",
+                                         target_node->name,
+                                         current_state->arguments[0].value,
+                                         target_node->data.value);
+                            uint32_t *buf_to_update = (uint32_t *)target_node->data.value;
+                            *buf_to_update = (uint32_t)current_state->arguments[0].value;
+                            break;
+                        }
+                        case CREATE_QWORD_FIELD_OP: {
+                            sddf_dprintf("update QWORD_FIELD %s to 0x%lx at 0x%lx\n",
+                                         target_node->name,
+                                         current_state->arguments[0].value,
+                                         target_node->data.value);
+                            uint64_t *buf_to_update = (uint64_t *)target_node->data.value;
+                            *buf_to_update = (uint64_t)current_state->arguments[0].value;
+                            break;
+                        }
+                        default: {
+                            target_node->data = current_state->arguments[0];
+                            target_node->evaluated = true;
+                            sddf_dprintf("save value %lu to node\n", target_node->data.value);
+                        }
+                    }
                 } else {
                     sddf_dprintf("target node is invalid\n");
                 }
@@ -329,9 +381,9 @@ void state_stack_pop()
             case BUFFER_PREFIX: {
                 assert(current_state->num_args == 1);
                 ret_data.value = (uint64_t)current_state->pkt_end - current_state->arguments[0].value;
-                sddf_dprintf("return buffer prefix: 0x%lx\n", ret_data.value);
                 ret_data.type = DATA_OBJ_BUFFER;
                 ret_data.length = current_state->arguments[0].value;
+                sddf_dprintf("return buffer prefix: 0x%lx, len: 0x%lx\n", ret_data.value, ret_data.length);
                 break;
             }
             case NAME_OP: {
@@ -396,6 +448,28 @@ void state_stack_pop()
                 sddf_dprintf("complete OpRegionOp: %s, ret_buf = %lu\n", current_state->node->name, eval_ret->value);
                 break;
             }
+            case CREATE_BIT_FIELD_OP:
+            case CREATE_BYTE_FIELD_OP:
+            case CREATE_WORD_FIELD_OP:
+            case CREATE_DWORD_FIELD_OP:
+            case CREATE_QWORD_FIELD_OP: {
+                assert(current_state->num_args == 2);
+                assert(current_state->arguments[0].type == DATA_OBJ_BUFFER);
+                aml_data_t field_buffer = current_state->arguments[0];
+                uint64_t index = current_state->arguments[1].value;
+                if (current_state->op_code == CREATE_BIT_FIELD_OP) {
+                    // 2nd argument is bitIndex in CreateBitFieldOp
+                    field_buffer.value = field_buffer.value + index / 8;
+                    // use buffer_field.length as bit offset
+                    field_buffer.length = index % 8;
+                } else {
+                    // 2nd argument is byteIndex
+                    field_buffer.value = field_buffer.value + index;
+                }
+                current_state->node->data = field_buffer;
+                sddf_dprintf("CreateFieldOp: {0x%lx, %u, %u}\n", field_buffer.value, field_buffer.type, field_buffer.length);
+                break;
+            }
         }
     }
 
@@ -412,7 +486,7 @@ void state_stack_pop()
 
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
-        if (op_stage == TERM_INTEGER || op_stage == TERM_BUFFER || op_stage == DATA_OBJECT) {
+        if (op_stage == TERM_INTEGER || op_stage == BUFFER_DATA || op_stage == DATA_OBJECT) {
             state_stack_add_argument(ret_data);
             /* sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx, ret_val: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, ret_val); */
             state_stack_update();
@@ -643,7 +717,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
 
     if (node->op_code == NAME_OP || node->op_code == METHOD_OP || node->op_code == DEVICE_OP
         || node->op_code == OP_REGION_OP || node->op_code == FIELD_OP || node->op_code == CREATE_DWORD_FIELD_OP
-        || node->op_code == CREATE_QWORD_FIELD_OP) {
+        || node->op_code == CREATE_QWORD_FIELD_OP || node->op_code == CREATE_WORD_FIELD_OP) {
         return node;
     } else {
         sddf_dprintf("Object \'%s\' has invalid OpCode: 0x%x, try parsing the following name segment at 0x%lx\n", node->name, node->op_code, (uintptr_t)scanner.current);
@@ -773,7 +847,6 @@ void read_field_value(aml_namespace_node_t *field_node)
 {
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
 
-    uint64_t ret_buf;
     // TODO: should be DWORD_DATA
     aml_data_t eval_ret = eval_namespace_node(field_node->parent, 0, NULL);
     sddf_dprintf("name: %s, ret_value: 0x%lx, op_code: 0x%x\n", field_node->parent->name, eval_ret.value, field_node->parent->op_code);
@@ -1002,8 +1075,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
     aml_data_t eval_ret;
 
     if (node->op_code == NAME_OP && node->evaluated) {
-        eval_ret.value = node->data.value;
-        eval_ret.type = DATA_OBJ_QWORD;
+        eval_ret = node->data;
         sddf_dprintf("Read node's value: 0x%lx\n", node->data.value);
         return eval_ret;
     }
