@@ -112,7 +112,8 @@ if [[ "$PARTITION_SCHEMA" == "MBR" ]]; then
         for i in $(seq 1 $NUM_PARTITIONS)
         do
             echo edit $i
-            echo 01 # Set partition type to FAT12
+            #echo 01 # Set partition type to FAT12
+            echo 04 # Set partition type to FAT16
             echo n # No to editing in CHS mode
             echo $PREV # First sector
             echo $FS_COUNT # Number of sectors in partition
@@ -166,7 +167,7 @@ fi
 
 # Create the FAT filesystem
 rm -f $BUILD_DIR/fat.img
-mkfs.fat -C $BUILD_DIR/fat.img $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 12 -S $LSIZE
+mkfs.fat -C $BUILD_DIR/fat.img $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 16 -S $LSIZE
 
 # Copy the FAT filesystem to the virtual disk
 for i in $(seq 0 $(( NUM_PARTITIONS - 1 )))
