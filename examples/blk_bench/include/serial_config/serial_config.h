@@ -6,7 +6,7 @@
 #pragma once
 
 #include <microkit.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/serial/queue.h>
 #include <stdint.h>
 
@@ -53,9 +53,9 @@ static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_
                                              serial_queue_t *rx_queue,
                                              char *rx_data, serial_queue_handle_t *tx_queue_handle, serial_queue_t *tx_queue, char *tx_data)
 {
-    if (!sddf_strcmp(pd_name, SERIAL_CLI0_NAME)) {
+    if (!strcmp(pd_name, SERIAL_CLI0_NAME)) {
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI0, tx_data);
-    } else if (!sddf_strcmp(pd_name, SERIAL_CLI1_NAME)) {
+    } else if (!strcmp(pd_name, SERIAL_CLI1_NAME)) {
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI1, tx_data);
     }
 }
@@ -63,7 +63,7 @@ static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_
 static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle_t *cli_queue_handle,
                                               serial_queue_t *cli_queue, char *cli_data)
 {
-    if (!sddf_strcmp(pd_name, SERIAL_VIRT_TX_NAME)) {
+    if (!strcmp(pd_name, SERIAL_VIRT_TX_NAME)) {
         serial_queue_init(cli_queue_handle, cli_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI0, cli_data);
         serial_queue_init(&cli_queue_handle[1], (serial_queue_t *)((uintptr_t)cli_queue + SERIAL_QUEUE_SIZE),
                           SERIAL_TX_DATA_REGION_CAPACITY_CLI1, cli_data + SERIAL_TX_DATA_REGION_CAPACITY_CLI0);

@@ -172,7 +172,7 @@ def generate(sdf_file: str, output_dir: str, sdf: SystemDescription, dtb: Device
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition, queue_capacity=1024, data_size=10*1024*1024)
     if board.name == "odroidc4":
-        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xff800000)
+        gpio_mr = MemoryRegion(sdf,"gpio", 0x1000, paddr=0xff800000)
         blk_driver.add_map(Map(gpio_mr, 0xff800000, perms="rw", cached=False))
         sdf.add_mr(gpio_mr)
 
@@ -223,7 +223,7 @@ def generate(sdf_file: str, output_dir: str, sdf: SystemDescription, dtb: Device
     bench_idle_ch = Channel(bench_idle, bench)
     sdf.add_channel(bench_idle_ch)
 
-    cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
+    cycle_counters_mr = MemoryRegion(sdf, "cycle_counters", 0x1000)
     sdf.add_mr(cycle_counters_mr)
 
     bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))
