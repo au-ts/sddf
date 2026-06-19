@@ -6,7 +6,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/blk/config.h>

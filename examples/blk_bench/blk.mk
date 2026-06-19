@@ -18,6 +18,18 @@ endif
 DTC := dtc
 PYTHON ?= python3
 
+SUPPORTED_BOARDS := qemu_virt_aarch64 \
+		    maaxboard
+#qemu_virt_riscv64 \
+#x86_64_generic
+
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := clang
+endif
+
+include ${SDDF}/tools/make/board/common.mk
+SDDF_CUSTOM_LIBC := 1
+
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BLK_BENCHMARK := ${SDDF}/examples/blk_bench
 BENCHMARK := $(SDDF)/benchmark_blk
@@ -29,30 +41,25 @@ BENCHMARK_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/benchmark_config
 
 CONFIGS_INCLUDE := ${BLK_BENCHMARK}
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 SYSTEM_FILE  := blk.system
+
+
+
 
 IMAGES := client.elf blk_virt.elf benchmark_blk.elf idle.elf \
 		  serial_driver.elf serial_virt_tx.elf timer_driver.elf \
 		  blk_driver.elf
 
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
-		  -nostdlib \
-		  -ffreestanding \
-		  -g3 \
-		  -O3 \
-		  -Wall -Wno-unused-function  -Werror -Wno-unused-command-line-argument \
+CFLAGS += -I$(SDDF)/include \
+		  -I$(SDDF)/include/microkit \
 		  -DMICROKIT_CONFIG_${MICROKIT_CONFIG} \
 		  -DMICROKIT_BOARD_${MICROKIT_BOARD} \
-		  -I$(BOARD_DIR)/include \
-		  -I$(SDDF)/include \
-		  -I$(CONFIGS_INCLUDE) \
 		  -I$(SERIAL_CONFIG_INCLUDE) \
 		  -I$(BENCHMARK_CONFIG_INCLUDE)
-LDFLAGS := -L$(BOARD_DIR)/lib
+#-I$(SDDF)/include \
+
 LIBS := --start-group -lmicrokit -Tmicrokit.ld
 ifeq ($(strip $(MICROKIT_CONFIG)), debug)
 	LIBS += libsddf_util_debug.a --end-group
@@ -60,20 +67,12 @@ else
 	LIBS +=  libsddf_util.a  --end-group
 endif
 
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
-DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(BLK_BENCHMARK)/meta.py
-
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
-
-${CHECK_FLAGS_BOARD_MD5}:
-	-rm -f .board_cflags-*
-	touch $@
 
 %.elf: %.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
+BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
 
 BLK_COMPONENTS := $(SDDF)/blk/components
 
@@ -117,7 +116,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
 	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-ifdef BLK_DRIV_USE_TIMER
+ifdef BLK_NEED_TIMER 
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
 endif
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
@@ -132,8 +131,9 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:
-	$(SDDF)/tools/mkvirtdisk mydisk 1 4096 1073741824
-	#$(SDDF)/tools/mkvirtdisk mydisk 1 512 16777216
+	$(SDDF)/tools/mkvirtdisk mydisk 1 4096 3221225472 MBR 
+	#$(SDDF)/tools/mkvirtdisk mydisk 1 4096 1073741824 GPT
+	#$(SDDF)/tools/mkvirtdisk mydisk 1 512 16777216 GPT
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) -machine virt,virtualization=on \

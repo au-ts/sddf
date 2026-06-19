@@ -14,7 +14,7 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/string.h>
+#include <string.h>
 /* headers only for benchmarking constants */
 #include <sddf/blk/queue.h>
 /* Needs to be included in the build dir, configures benchmarking params and constants */
@@ -164,16 +164,16 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
                 child_name(id), id, kernel, entries, number_schedules, total);
     // Update the across-benchmark tracked stats. TODO: atm this must match names in `meta.py`
     char *pd_name = child_name(id);
-    if (sddf_strcmp("client", pd_name) == 0) {
+    if (strcmp("client", pd_name) == 0) {
         bench_results[benchmark_size_idx + run_offset].cycles_client = total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_client = total;
-    } else if (sddf_strcmp("blk_virt", pd_name) == 0) {
+    } else if (strcmp("blk_virt", pd_name) == 0) {
         bench_results[benchmark_size_idx + run_offset].cycles_virtualiser = total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_virtualiser = total;
-    } else if (sddf_strcmp("blk_driver", pd_name) == 0) {
+    } else if (strcmp("blk_driver", pd_name) == 0) {
         bench_results[benchmark_size_idx + run_offset].cycles_driver = total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_driver = total;
-    } else if (sddf_strcmp("bench_idle", pd_name) == 0) {
+    } else if (strcmp("bench_idle", pd_name) == 0) {
         bench_results[benchmark_size_idx + run_offset].cycles_idle = total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_idle = total;
     } else {
