@@ -19,6 +19,8 @@ typedef enum {
     BYTE_DATA,
     WORD_DATA,
     DWORD_DATA,
+    BUFFER_DATA,
+    PACKAGE_DATA,
     DATA_OBJECT,
     COMPLETE,
 } parse_stage_t;
@@ -49,6 +51,8 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [BYTE_PREFIX] = { INIT, BYTE_DATA, COMPLETE },
     [WORD_PREFIX] = { INIT, WORD_DATA, COMPLETE },
     [DWORD_PREFIX] = { INIT, DWORD_DATA, COMPLETE },
+    [BUFFER_PREFIX] = { INIT, PKT_LEN, TERM_INTEGER, BUFFER_DATA, COMPLETE },
+    [PACKAGE_PREFIX] = { INIT, PACKAGE_DATA, COMPLETE },
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -322,6 +326,14 @@ void state_stack_pop()
                 }
                 break;
             }
+            case BUFFER_PREFIX: {
+                assert(current_state->num_args == 1);
+                ret_data.value = (uint64_t)current_state->pkt_end - current_state->arguments[0].value;
+                sddf_dprintf("return buffer prefix: 0x%x\n", ret_data.value);
+                ret_data.type = DATA_OBJ_BUFFER;
+                ret_data.length = current_state->arguments[0].value;
+                break;
+            }
             case NAME_OP: {
                 assert(current_state->num_args == 2);
                 assert(current_state->arguments[0].type == DATA_OBJ_RET);
@@ -433,15 +445,19 @@ void state_stack_update()
         scanner.current = current_state->pkt_end;
     } else if (current_state->evaluation && current_state->op_code == IF_OP && op_stage == TERM_INTEGER) {
         if (current_state->num_args == 1 && current_state->arguments[0].value == 0) {
-            current_state->if_condition = false;
+            current_state->parent->if_condition = false;
             current_state->stage_idx += 2;
         } else {
-            current_state->if_condition = true;
+            current_state->parent->if_condition = true;
         }
     } else if (current_state->evaluation && current_state->op_code == ELSE_OP && op_stage == PKT_LEN) {
-        if (current_state->if_condition) {
+        if (current_state->parent->if_condition) {
+            sddf_dprintf("Skip Elseif to 0x%lx\n", (uintptr_t)current_state->pkt_end);
             current_state->stage_idx += 2;
         }
+    } else if (current_state->op_code == BUFFER_PREFIX && op_stage == TERM_INTEGER) {
+        sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n", (uintptr_t)current_state->node->pkt_start, current_state->pkt_end, current_state->arguments[0].value);
+        current_state->stage_idx += 2;
     } else if (op_stage != TERM_LIST) {
         current_state->stage_idx += 1;
     }
@@ -884,6 +900,9 @@ void parse_namespace_node(bool evaluation)
                 case BYTE_PREFIX:
                 case WORD_PREFIX:
                 case DWORD_PREFIX:
+                case QWORD_PREFIX:
+                case BUFFER_PREFIX:
+                case PACKAGE_PREFIX:
                 case ADD_OP:
                 case SUBTRACT_OP:
                 case SHIFT_LEFT_OP:
