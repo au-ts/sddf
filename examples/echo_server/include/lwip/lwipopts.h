@@ -53,7 +53,7 @@
 /**
  * Should be set to the alignment of the CPU.
  */
-#define MEM_ALIGNMENT                   8
+#define MEM_ALIGNMENT                   4
 
 /**
  * The size of the heap memory. If the application will send
