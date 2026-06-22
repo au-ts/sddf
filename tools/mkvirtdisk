@@ -6,7 +6,7 @@
 
 # This bash script creates a virtual disk image with an msdos/GPT partition table.
 # It aligns the partitions to both the sDDF transfer size and the device's logical size.
-# It creates a filesystem on each partition (FAT12 by default, or ext4).
+# It creates a filesystem on each partition (FAT12 by default, or FAT16 or ext4).
 
 set -e
 
@@ -19,9 +19,10 @@ function cleanup {
 trap cleanup EXIT
 
 # Usage instructions
-if [ $# -lt 5 ] || [ $# -gt 6 ]; then
-    echo "Usage: $0 <virtual_disk_name> <num_partitions> <logical_size> <memsize> <partition_schema> [filesystem]"
+if [ $# -lt 5 ] || [ $# -gt 7 ]; then
+    echo "Usage: $0 <virtual_disk_name> <num_partitions> <logical_size> <memsize> <partition_schema> [filesystem] [fat_size]"
     echo "filesystem: fat (default), ext4"
+    echo "fat_size: 12 (default), 16"
     exit 1
 fi
 
@@ -36,10 +37,16 @@ LSIZE=$3
 MEMSIZE=$4
 PARTITION_SCHEMA=$5
 FS_TYPE=${6:-fat}
+FAT_SIZE=${7:-12}
 
 if [[ "$FS_TYPE" == "fat" ]]; then
     if ! command -v mkfs.fat &> /dev/null; then
         echo "mkfs.fat could not be found"
+        exit 1
+    fi
+    ALLOWED_FATS=(12 16)
+    if [[ $FAT_SIZE != 12 && $FAT_SIZE  != 16 ]]; then
+        echo "Only FAT12 and FAT16 are supported. Requested: $FAT_SIZE"
         exit 1
     fi
 elif [[ "$FS_TYPE" == "ext4" ]]; then
@@ -125,8 +132,14 @@ if [[ "$PARTITION_SCHEMA" == "MBR" ]]; then
         for i in $(seq 1 $NUM_PARTITIONS)
         do
             echo edit $i
-            #echo 01 # Set partition type to FAT12
-            echo 04 # Set partition type to FAT16
+            if [ $FAT_SIZE == 12 ]; then
+                echo 01 # Set partition type to FAT12
+            elif [ $FAT_SIZE == 16 ]; then
+                echo 04 # Set partition type to FAT16
+            else
+                echo "Oops, should be caught above"
+                exit 1
+            fi 
             echo n # No to editing in CHS mode
             echo $PREV # First sector
             echo $FS_COUNT # Number of sectors in partition
@@ -183,7 +196,7 @@ rm -f "$FS_IMAGE"
 
 if [[ "$FS_TYPE" == "fat" ]]; then
     # Create the FAT filesystem
-    mkfs.fat -C "$FS_IMAGE" $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F 16 -S $LSIZE
+    mkfs.fat -C "$FS_IMAGE" $(( (FS_COUNT * FDISK_LSIZE) / 1024 )) -F $FAT_SIZE -S $LSIZE
 else
     # Create the EXT4 filesystem
     # The fs_size argument is in units of the filesystem block size (SDDF_TRANSFER_SIZE).
