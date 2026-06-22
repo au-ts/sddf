@@ -417,7 +417,7 @@ void pass_resource_with_range(uint8_t resource_type, uint64_t min_address, uint6
 // Section 6.4
 void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
 {
-    uint8_t *buf_cur= (uint8_t *)crs_data.value;
+    uint8_t *buf_cur = (uint8_t *)crs_data.value;
     uint8_t *crs_data_end = (uint8_t *)crs_data.value + crs_data.length;
 
     // TODO: deal with WORD_IO and WORD_BUS
@@ -492,6 +492,53 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
     }
 }
 
+/* void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx) */
+/* { */
+/*     // DefPackage := PackageOp PkgLength NumElements PackageElementList */
+/*     if (prt_data.type != DATA_OBJ_PACKAGE) { */
+/*         sddf_dprintf("[Error] not a package data given\n"); */
+/*         return; */
+/*     } */
+
+/*     uint8_t *buf_cur = (uint8_t *)crs_data.value; */
+/*     uint8_t *crs_data_end = (uint8_t *)crs_data.value + crs_data.length; */
+
+/*     uint8_t *pkt_end = get_pkt_end(); */
+/*     uint8_t num_elements = advance(); */
+/*     sddf_dprintf("num_elements: %u\n", num_elements); */
+
+/*     while (scanner.current < pkt_end) { */
+/*         // Check if element is also Package Object */
+/*         if (advance() != PACKAGE_OP) return; */
+
+/*         get_pkt_end(); */
+/*         uint32_t element_num_elements = advance(); */
+
+/*         // Check if num of elements is 4 */
+/*         if (element_num_elements != 4) return; */
+
+/*         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries]; */
+/*         // Parse address, i.e. PCI slot */
+/*         pci_prt->address = get_integer_data(true); */
+/*         // Parse PIN */
+/*         pci_prt->pin = get_integer_data(true); */
+/*         // Parse Source, i.e. GSI number */
+/*         uint32_t source = get_integer_data(true); */
+/*         // Parse Source Index, i.e. index in I/O APIC */
+/*         uint32_t source_index = get_integer_data(true); */
+
+/*         if (source == 0) { */
+/*             pci_prt->gsi = source_index; */
+/*         } else if (source_index == 0) { */
+/*             pci_prt->gsi = source; */
+/*         } else { */
+/*             sddf_dprintf("Error: there might be multiple interrupts in _CRS, need to fix this case\n"); */
+/*         } */
+
+/*         pci_bridge_resource->num_prt_entries++; */
+/*         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi); */
+/*     } */
+/* } */
 
 seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
 {
@@ -646,7 +693,7 @@ void init(void)
                 sddf_dprintf("_CRS node is not found\n");
                 return;
             }
-            aml_data_t crs_data_before_eval = {0x21375b, 17, 540};
+            aml_data_t crs_data_before_eval = {0x21675b, 17, 540};
             pass_crs_and_caps(crs_data_before_eval, pci_resources->num_bridges);
             // TODO: fix ret_type
             aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
@@ -656,12 +703,15 @@ void init(void)
             /* pass_crs_and_caps(crs_list, pci_resources->num_bridges); */
             sddf_dprintf("======Finish _CRS parsing\n");
 
-            /* aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, acpi_str_prt); */
-            /* if (crs_node == NULL) { */
-            /*     sddf_dprintf("_PRT node is not found\n"); */
-            /*     return; */
-            /* } */
-            /* eval_namespace_node(prt_node, 0, 0, NULL); */
+            aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, acpi_str_prt);
+            if (crs_node == NULL) {
+                sddf_dprintf("_PRT node is not found\n");
+                return;
+            }
+            aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
+            sddf_dprintf("value: 0x%lx, type: %u, length: %u\n", prt_data.value, prt_data.type, prt_data.length);
+            /* parse_prt_package(prt_data, pci_resources->num_bridges); */
+            pci_resources->num_bridges++;
             /* sddf_dprintf("======Finish _PRT parsing\n"); */
         }
 

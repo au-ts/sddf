@@ -8,13 +8,10 @@ typedef enum {
     INIT = 0,
     PKT_LEN,
     OBJECT_NAME_STRING, // Name String used for creating objects
-    NAME_STRING,        // Name String referring to other objects
-    TERM_ARG,
+    NAME_STRING,        // Name String referring to a namespace node
     TERM_LIST,
-    TERM_INTEGER,
     FIELD_LIST,
-    BYTE_INDEX,
-    BUFFER,
+    TERM_INTEGER,
     BYTE_DATA,
     WORD_DATA,
     DWORD_DATA,
@@ -51,7 +48,7 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [WORD_PREFIX] = { INIT, WORD_DATA, COMPLETE },
     [DWORD_PREFIX] = { INIT, DWORD_DATA, COMPLETE },
     [BUFFER_PREFIX] = { INIT, PKT_LEN, TERM_INTEGER, BUFFER_DATA, COMPLETE },
-    [PACKAGE_PREFIX] = { INIT, PACKAGE_DATA, COMPLETE },
+    [PACKAGE_PREFIX] = { INIT, PKT_LEN, COMPLETE },
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -125,9 +122,6 @@ aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const 
 
     aml_namespace_node_t *child = node->child;
     while (child) {
-        /* if (current_state && current_state->evaluation) { */
-            /* sddf_dprintf("    parent: %s, node: %s, target: %s\n", node->name, child->name, name_segment); */
-        /* } */
         if (!strcmp(child->name, name_segment)) return child;
         if (child->op_code == OP_REGION_OP) {
             aml_namespace_node_t *field_node = find_child_node_by_name(child, name_segment);
@@ -243,81 +237,86 @@ void state_stack_add_argument(aml_data_t argument)
     current_state->num_args++;
 }
 
+void write_to_buffer(uint64_t buf_addr, uint64_t value, uint8_t bytes)
+{
+    sddf_dprintf("update FIELD(%u bytes) to 0x%lx at 0x%lx\n",
+                 bytes,
+                 value,
+                 buf_addr);
+
+    uint8_t *buffer = (uint8_t *)buf_addr;
+    while (bytes--) {
+        *buffer = value & 0xFF;
+        value = value >> 8;
+        buffer++;
+    }
+}
+
+void store_op_evaluation()
+{
+    assert(current_state->num_args == 2);
+    assert(current_state->arguments[1].type == DATA_OBJ_NODE);
+    aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[1].value;
+    if (target_node) {
+        // TODO: distinguish bitIndex and ByteIndex
+        switch (target_node->op_code) {
+            case CREATE_BIT_FIELD_OP: {
+                sddf_dprintf("update BIT_FIELD %s to 0x%lx at 0x%lx\n",
+                             target_node->name,
+                             current_state->arguments[0].value,
+                             target_node->data.value);
+                uint8_t *buf_to_update = (uint8_t *)target_node->data.value;
+                // bitOffset in byte is stored in data.length
+                uint8_t bit_value = 0;
+                if (current_state->arguments[0].value) {
+                    bit_value = 0xFF;
+                } else {
+                    bit_value = ~(1 << (target_node->data.length % 8));
+                }
+                // TODO: improve this
+                *buf_to_update = (*buf_to_update) & bit_value;
+                break;
+            }
+            case CREATE_BYTE_FIELD_OP: {
+                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 1);
+                break;
+            }
+            case CREATE_WORD_FIELD_OP: {
+                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 2);
+                break;
+            }
+            case CREATE_DWORD_FIELD_OP: {
+                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 2);
+                break;
+            }
+            case CREATE_QWORD_FIELD_OP: {
+                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 8);
+                break;
+            }
+            default: {
+                target_node->data = current_state->arguments[0];
+                target_node->evaluated = true;
+                sddf_dprintf("save value %lu to node\n", target_node->data.value);
+            }
+        }
+    } else {
+        sddf_dprintf("target node is invalid\n");
+    }
+}
+
 void state_stack_update();
 void state_stack_pop()
 {
     aml_data_t ret_data;
     ret_data.type = DATA_OBJ_QWORD;
-    if (current_state->num_args > 0) {
+    if (current_state && current_state->num_args > 0) {
         ret_data = current_state->arguments[0];
     }
 
-    if (current_state->evaluation) {
+    if (current_state && current_state->evaluation) {
         switch (current_state->op_code) {
             case STORE_OP: {
-                assert(current_state->num_args == 2);
-                assert(current_state->arguments[1].type == DATA_OBJ_NODE);
-                aml_namespace_node_t *target_node = (aml_namespace_node_t *)current_state->arguments[1].value;
-                if (target_node) {
-                    // TODO: distinguish bitIndex and ByteIndex
-                    switch (target_node->op_code) {
-                        case CREATE_BIT_FIELD_OP: {
-                            sddf_dprintf("update BIT_FIELD %s to 0x%lx at 0x%lx\n",
-                                         target_node->name,
-                                         current_state->arguments[0].value,
-                                         target_node->data.value);
-                            uint8_t *buf_to_update = (uint8_t *)target_node->data.value;
-                            // bitOffset in byte is stored in data.length
-                            uint8_t bit_value = (bool)current_state->arguments[0].value ? 1 : 0;
-                            // TODO: improve this
-                            *buf_to_update = (*buf_to_update & ~(1 << target_node->data.length)) | (bit_value << target_node->data.length);
-                            break;
-                        }
-                        case CREATE_BYTE_FIELD_OP: {
-                            sddf_dprintf("update BYTE_FIELD %s to 0x%lx at 0x%lx\n",
-                                         target_node->name,
-                                         current_state->arguments[0].value,
-                                         target_node->data.value);
-                            uint8_t *buf_to_update = (uint8_t *)target_node->data.value;
-                            *buf_to_update = (uint8_t)current_state->arguments[0].value;
-                            break;
-                        }
-                        case CREATE_WORD_FIELD_OP: {
-                            sddf_dprintf("update WORD_FIELD %s to 0x%lx at 0x%lx\n",
-                                         target_node->name,
-                                         current_state->arguments[0].value,
-                                         target_node->data.value);
-                            uint16_t *buf_to_update = (uint16_t *)target_node->data.value;
-                            *buf_to_update = (uint16_t)current_state->arguments[0].value;
-                            break;
-                        }
-                        case CREATE_DWORD_FIELD_OP: {
-                            sddf_dprintf("update DWORD_FIELD %s to 0x%lx at 0x%lx\n",
-                                         target_node->name,
-                                         current_state->arguments[0].value,
-                                         target_node->data.value);
-                            uint32_t *buf_to_update = (uint32_t *)target_node->data.value;
-                            *buf_to_update = (uint32_t)current_state->arguments[0].value;
-                            break;
-                        }
-                        case CREATE_QWORD_FIELD_OP: {
-                            sddf_dprintf("update QWORD_FIELD %s to 0x%lx at 0x%lx\n",
-                                         target_node->name,
-                                         current_state->arguments[0].value,
-                                         target_node->data.value);
-                            uint64_t *buf_to_update = (uint64_t *)target_node->data.value;
-                            *buf_to_update = (uint64_t)current_state->arguments[0].value;
-                            break;
-                        }
-                        default: {
-                            target_node->data = current_state->arguments[0];
-                            target_node->evaluated = true;
-                            sddf_dprintf("save value %lu to node\n", target_node->data.value);
-                        }
-                    }
-                } else {
-                    sddf_dprintf("target node is invalid\n");
-                }
+                store_op_evaluation();
                 break;
             }
             case LEQUAL_OP: {
@@ -383,7 +382,14 @@ void state_stack_pop()
                 ret_data.value = (uint64_t)current_state->pkt_end - current_state->arguments[0].value;
                 ret_data.type = DATA_OBJ_BUFFER;
                 ret_data.length = current_state->arguments[0].value;
-                sddf_dprintf("return buffer prefix: 0x%lx, len: 0x%lx\n", ret_data.value, ret_data.length);
+                sddf_dprintf("return buffer prefix: 0x%lx, len: 0x%x\n", ret_data.value, ret_data.length);
+                break;
+            }
+            case PACKAGE_PREFIX: {
+                assert(current_state->num_args == 0);
+                ret_data.value = (uint64_t)current_state->node;
+                ret_data.type = DATA_OBJ_PACKAGE;
+                sddf_dprintf("return package prefix: 0x%lx\n", ret_data.value);
                 break;
             }
             case NAME_OP: {
@@ -401,9 +407,17 @@ void state_stack_pop()
             case RETURN_OP: {
                 assert(current_state->num_args == 1);
                 sddf_dprintf("complete MethodOp: %s, ret_buf = 0x%lx\n", current_state->parent->node->name, (uint64_t)current_state->arguments[0].value);
-                aml_data_t *eval_ret = (aml_data_t *)current_state->parent->arguments[0].value;
-                *eval_ret = current_state->arguments[0];
-                current_state->parent->stage_idx += 1; // MethodOp completes
+                parse_state_t *method_state = current_state->parent;
+                while (method_state && method_state->op_code != METHOD_OP) {
+                    method_state = method_state->parent;
+                }
+                if (method_state) {
+                    aml_data_t *eval_ret = (aml_data_t *)method_state->arguments[0].value;
+                    sddf_dprintf("completes, ret: 0x%lx\n", (uintptr_t)eval_ret);
+                    *eval_ret = current_state->arguments[0];
+                    current_state->parent->stage_idx += 1; // MethodOp completes
+                    sddf_dprintf("complets\n");
+                }
                 break;
             }
             case OP_REGION_OP: {
@@ -1021,7 +1035,6 @@ void parse_namespace_node(bool evaluation)
                             sddf_dprintf("Found node %s\n", node->name);
                             if (evaluation && node->op_code == METHOD_OP) {
                                 uint8_t *saved_location = scanner.current;
-                                // TODO: need to fix return buffer
                                 sddf_dprintf("Eval inside Eval\n");
                                 aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
                                 sddf_dprintf("come back from method %s eval, ret_buf: %lu\n", node->name, eval_ret.value);
@@ -1060,7 +1073,6 @@ void parse_namespace_node(bool evaluation)
 
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end)
 {
-
     state_stack_create(NULL_OP, false);
     current_state->node_start = scanner.current;
     current_state->pkt_end = namespace_end;
