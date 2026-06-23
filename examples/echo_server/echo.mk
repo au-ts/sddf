@@ -70,7 +70,7 @@ CFLAGS += \
 
 
 # Suppress warning from lwIP
-CFLAGS += -Wno-tautological-constant-out-of-range-compare
+CFLAGS += -Wno-tautological-constant-out-of-range-compare -fsanitize=undefined -fsanitize-trap=undefined
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
