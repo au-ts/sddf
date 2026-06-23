@@ -492,54 +492,40 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
     }
 }
 
-/* void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx) */
-/* { */
-/*     // DefPackage := PackageOp PkgLength NumElements PackageElementList */
-/*     if (prt_data.type != DATA_OBJ_PACKAGE) { */
-/*         sddf_dprintf("[Error] not a package data given\n"); */
-/*         return; */
-/*     } */
+void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
+{
+    // DefPackage := PackageOp PkgLength NumElements PackageElementList
+    if (prt_data.type != DATA_OBJ_PACKAGE) {
+        sddf_dprintf("[Error] not a package data given\n");
+        return;
+    }
 
-/*     uint8_t *buf_cur = (uint8_t *)prt_data.value; */
-/*     scanner.current =  */
-/*     uint8_t *crs_data_end = (uint8_t *)prt_data.value + prt_data.length; */
+    scanner.current = (uint8_t *)prt_data.value;
+    uint8_t *package_end = (uint8_t *)prt_data.value + prt_data.length;
+    pci_bridge_t *pci_bridge_resource = &pci_resources->bridges[pci_resources->num_bridges];
 
-/*     uint8_t *pkt_end = get_pkt_end(); */
-/*     uint8_t num_elements = advance(); */
-/*     sddf_dprintf("num_elements: %u\n", num_elements); */
+    uint8_t num_elements = advance();
+    sddf_dprintf("num_elements: %u\n", num_elements);
 
-/*     while (scanner.current < pkt_end) { */
-/*         // Check if element is also Package Object */
-/*         if (advance() != PACKAGE_OP) return; */
+    while (scanner.current < package_end) {
+        // Check if element is also Package Object
+        if (advance() != PACKAGE_PREFIX) return;
 
-/*         get_pkt_end(); */
-/*         uint32_t element_num_elements = advance(); */
+        uint8_t *element_pkt_end = get_pkt_end();
+        uint32_t element_num_elements = advance();
 
-/*         // Check if num of elements is 4 */
-/*         if (element_num_elements != 4) return; */
+        // Check if num of elements is 4
+        if (element_num_elements != 4) return;
 
-/*         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries]; */
-/*         // Parse address, i.e. PCI slot */
-/*         pci_prt->address = get_integer_data(true); */
-/*         // Parse PIN */
-/*         pci_prt->pin = get_integer_data(true); */
-/*         // Parse Source, i.e. GSI number */
-/*         uint32_t source = get_integer_data(true); */
-/*         // Parse Source Index, i.e. index in I/O APIC */
-/*         uint32_t source_index = get_integer_data(true); */
+        sddf_dprintf("current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)element_pkt_end);
+        pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
+        eval_data_object(pci_prt, element_pkt_end);
 
-/*         if (source == 0) { */
-/*             pci_prt->gsi = source_index; */
-/*         } else if (source_index == 0) { */
-/*             pci_prt->gsi = source; */
-/*         } else { */
-/*             sddf_dprintf("Error: there might be multiple interrupts in _CRS, need to fix this case\n"); */
-/*         } */
-
-/*         pci_bridge_resource->num_prt_entries++; */
-/*         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi); */
-/*     } */
-/* } */
+        pci_bridge_resource->num_prt_entries++;
+        sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
+        /* return; */
+    }
+}
 
 seL4_Error retype_and_map_frame(uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
 {
@@ -711,7 +697,7 @@ void init(void)
             }
             aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
             sddf_dprintf("value: 0x%lx, type: %u, length: %u\n", prt_data.value, prt_data.type, prt_data.length);
-            /* parse_prt_package(prt_data, pci_resources->num_bridges); */
+            parse_prt_package(prt_data, pci_resources->num_bridges);
             pci_resources->num_bridges++;
             /* sddf_dprintf("======Finish _PRT parsing\n"); */
         }
