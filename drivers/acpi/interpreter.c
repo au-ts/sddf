@@ -857,7 +857,7 @@ void parse_field_list()
 }
 
 
-void read_field_value(aml_namespace_node_t *field_node)
+aml_data_t read_field_value(aml_namespace_node_t *field_node)
 {
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
 
@@ -881,7 +881,8 @@ void read_field_value(aml_namespace_node_t *field_node)
     }
     sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
     aml_data_t field_data = {field_value, DATA_OBJ_QWORD, 0};
-    state_stack_add_argument(field_data);
+    /* state_stack_add_argument(field_data); */
+    return field_data;
 }
 
 void parse_namespace_node(bool evaluation)
@@ -1033,28 +1034,9 @@ void parse_namespace_node(bool evaluation)
                         aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
                         if (node) {
                             sddf_dprintf("Found node %s\n", node->name);
-                            if (evaluation && node->op_code == METHOD_OP) {
-                                uint8_t *saved_location = scanner.current;
-                                sddf_dprintf("Eval inside Eval\n");
-                                aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
-                                sddf_dprintf("come back from method %s eval, ret_buf: %lu\n", node->name, eval_ret.value);
-                                state_stack_add_argument(eval_ret);
-                                scanner.current = saved_location;
-                            } else if (evaluation && node->op_code == NAME_OP) {
-                                sddf_dprintf("Try evaluating NameOp: %s\n", node->name);
-                                uint8_t *saved_location = scanner.current;
-                                aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
-                                sddf_dprintf("name: %s, ret_buf: 0x%lx\n", node->name, eval_ret.value);
-                                state_stack_add_argument(eval_ret);
-                                scanner.current = saved_location;
-                            } else if (evaluation && node->op_code == FIELD_OP) {
-                                uint8_t *saved_location = scanner.current;
-                                read_field_value(node);
-                                scanner.current = saved_location;
-                            } else {
-                                aml_data_t argument = {(uintptr_t)node, DATA_OBJ_NODE, 0};
-                                state_stack_add_argument(argument);
-                            }
+
+                            aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
+                            state_stack_add_argument(eval_ret);
                         } else {
                             sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
@@ -1068,7 +1050,6 @@ void parse_namespace_node(bool evaluation)
         state_stack_update();
         op_code = 0;
     }
-
 }
 
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end)
@@ -1094,6 +1075,13 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
 
     parse_state_t *recovery_state = current_state;
     uint8_t *recovery_location = scanner.current;
+
+    if (node->op_code == FIELD_OP) {
+        eval_ret = read_field_value(node);
+        current_state = recovery_state;
+        scanner.current = recovery_location;
+        return eval_ret;
+    }
 
     sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end);
 
@@ -1130,7 +1118,8 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         skip_name_string(); // NAME STRING
         current_state->stage_idx = 2;
     } else {
-        sddf_dprintf("Evaluation of op 0x%04x is not implmented\n", node->op_code);
+        sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code);
+        eval_ret = (aml_data_t){(uintptr_t)node, DATA_OBJ_NODE, 0};
     }
 
     parse_namespace_node(true);
