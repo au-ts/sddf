@@ -3,203 +3,118 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <stdint.h>
 #include <sddf/util/bitarray.h>
 #include <sddf/util/util.h>
 
-#define WORD_MAX  (~(word_t)0)
+/* Create a bit mask of nbits contiguous bits starting from the least
+significant bit*/
+#define BITMASK(nbits) ((nbits) ? ~(uint64_t)0 >> (64 - nbits): (uint64_t)0)
 
-#define bitmask(nbits,type) ((nbits) ? ~(type)0 >> (sizeof(type)*8-(nbits)): (type)0)
-#define bitmask32(nbits) bitmask(nbits,uint32_t)
-#define bitmask64(nbits) bitmask(nbits,uint64_t)
+/* Find the index of the word containing the bit_pos bit */
+#define WORD_IDX(bit_pos) ((bit_pos) >> 6)
 
-#define bitset64_wrd(bit_pos) ((bit_pos) >> 6)
-#define bitset64_idx(bit_pos) ((bit_pos) & 63)
+/* Find the index of the bit_pos bit within it's word */
+#define BIT_IDX(bit_pos) ((bit_pos) & 63)
 
-/**
- * Set a region of bits in a bit array to a specified value.
- *
- * @param arr The bit array.
- * @param start The starting position of the region.
- * @param len The length of the region.
- */
-#define SET_REGION(arr,start,len) _set_region((arr),(start),(len),FILL_REGION)
-
-/**
- * Clear a region of bits in a bit array, setting them to 0.
- *
- * @param arr The bit array.
- * @param start The starting position of the region.
- * @param len The length of the region.
- */
-#define CLEAR_REGION(arr,start,len) _set_region((arr),(start),(len),ZERO_REGION)
-
-/**
- * Toggle a region of bits in a bit array, flipping their values.
- *
- * @param arr The bit array.
- * @param start The starting position of the region.
- * @param len The length of the region.
- */
-#define TOGGLE_REGION(arr,start,len) _set_region((arr),(start),(len),SWAP_REGION)
-
-void bitarray_init(bitarray_t *bitarr, word_t *words, word_index_t num_of_words)
+void bitarray_init(bitarray_t *bitarr, uint64_t *words, uint64_t num_bits)
 {
+    bitarr->num_bits = num_bits;
     bitarr->words = words;
-    bitarr->num_of_words = num_of_words;
-    bitarr->num_of_bits = num_of_words * 64;
 }
 
-char bitarray_get_bit(bitarray_t *bitarr, bit_index_t index)
+char bitarray_get_bit(bitarray_t *bitarr, uint64_t index)
 {
-    word_index_t word = bitset64_wrd(index);
-    word_offset_t offset = bitset64_idx(index);
-    return (bitarr->words[word] >> offset) & 1;
+    assert(index < bitarr->num_bits);
+    return (bitarr->words[WORD_IDX(index)] >> BIT_IDX(index)) & 1;
 }
 
-// FillAction is fill with 0 or 1 or toggle
-typedef enum {ZERO_REGION, FILL_REGION, SWAP_REGION} FillAction;
+typedef enum {ZERO_REGION, FILL_REGION, SWAP_REGION} bitarray_action_t;
 
-static inline void _set_region(bitarray_t *bitarr, bit_index_t start,
-                               bit_index_t length, FillAction action)
+static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bitarray_action_t action)
 {
+    assert(start < bitarr->num_bits && start + length <= bitarr->num_bits);
+
     if (length == 0) {
         return;
     }
 
-    word_index_t first_word = bitset64_wrd(start);
-    word_index_t last_word = bitset64_wrd(start + length - 1);
-    word_offset_t foffset = bitset64_idx(start);
-    word_offset_t loffset = bitset64_idx(start + length - 1);
+    uint64_t word_idx = WORD_IDX(start);
+    uint64_t last_word_idx = WORD_IDX(start + length - 1);
+    uint64_t bit_idx = BIT_IDX(start);
+    uint64_t last_bit_idx = 63;
 
-    if (first_word == last_word) {
-        word_t mask = bitmask64(length) << foffset;
+    while (word_idx <= last_word_idx) {
+        if (word_idx == last_word_idx) {
+            last_bit_idx = BIT_IDX(start + length - 1);
+        }
+        uint64_t mask = BITMASK(last_bit_idx - bit_idx + 1) << bit_idx;
 
         switch (action) {
         case ZERO_REGION:
-            bitarr->words[first_word] &= ~mask;
+            bitarr->words[word_idx] &= ~mask;
             break;
         case FILL_REGION:
-            bitarr->words[first_word] |=  mask;
+            bitarr->words[word_idx] |= mask;
             break;
         case SWAP_REGION:
-            bitarr->words[first_word] ^=  mask;
-            break;
-        }
-    } else {
-        // Set first word
-        switch (action) {
-        case ZERO_REGION:
-            bitarr->words[first_word] &=  bitmask64(foffset);
-            break;
-        case FILL_REGION:
-            bitarr->words[first_word] |= ~bitmask64(foffset);
-            break;
-        case SWAP_REGION:
-            bitarr->words[first_word] ^= ~bitmask64(foffset);
+            bitarr->words[word_idx] ^= mask;
             break;
         }
 
-        word_index_t i;
-
-        // Set whole words
-        switch (action) {
-        case ZERO_REGION:
-            for (i = first_word + 1; i < last_word; i++) {
-                bitarr->words[i] = (word_t)0;
-            }
-            break;
-        case FILL_REGION:
-            for (i = first_word + 1; i < last_word; i++) {
-                bitarr->words[i] = WORD_MAX;
-            }
-            break;
-        case SWAP_REGION:
-            for (i = first_word + 1; i < last_word; i++) {
-                bitarr->words[i] ^= WORD_MAX;
-            }
-            break;
-        }
-
-        // Set last word
-        switch (action) {
-        case ZERO_REGION:
-            bitarr->words[last_word] &= ~bitmask64(loffset + 1);
-            break;
-        case FILL_REGION:
-            bitarr->words[last_word] |=  bitmask64(loffset + 1);
-            break;
-        case SWAP_REGION:
-            bitarr->words[last_word] ^=  bitmask64(loffset + 1);
-            break;
-        }
+        word_idx++;
+        bit_idx = 0;
     }
 }
 
-void bitarray_set_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
+void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, uint8_t value)
 {
-    assert(start + len <= bitarr->num_of_bits);
-    SET_REGION(bitarr, start, len);
+    assert(value == 0 || value == 1);
+
+    switch (value) {
+    case 0:
+        set_region(bitarr, start, len, ZERO_REGION);
+        break;
+    case 1:
+        set_region(bitarr, start, len, FILL_REGION);
+        break;
+    }
 }
 
-void bitarray_clear_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
+void bitarray_toggle_region(bitarray_t *bitarr, uint64_t start, uint64_t len)
 {
-    assert(start + len <= bitarr->num_of_bits);
-    CLEAR_REGION(bitarr, start, len);
+    set_region(bitarr, start, len, SWAP_REGION);
 }
 
-void bitarray_toggle_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
+uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, uint8_t value)
 {
-    assert(start + len <= bitarr->num_of_bits);
-    TOGGLE_REGION(bitarr, start, len);
-}
+    assert(start < bitarr->num_bits);
 
-bool bitarray_cmp_region(bitarray_t *bitarr1, bit_index_t start1,
-                         bitarray_t *bitarr2, bit_index_t start2, bit_index_t len)
-{
-    assert(start1 + len <= bitarr1->num_of_bits);
-    assert(start2 + len <= bitarr2->num_of_bits);
+    uint64_t count = 0;
+    uint64_t word_idx = WORD_IDX(start);
+    uint64_t last_word_idx = WORD_IDX(bitarr->num_bits - 1);
+    uint64_t bit_idx = BIT_IDX(start);
+    uint64_t last_bit_idx = 63;
 
-    if (len == 0) {
-        return true;
+    while (word_idx <= last_word_idx) {
+
+        uint64_t word = bitarr->words[word_idx];
+
+        if (word_idx == last_word_idx) {
+            last_bit_idx = BIT_IDX(bitarr->num_bits - 1);
+        }
+
+        while (bit_idx <= last_bit_idx) {
+            if ((word & (1 >> bit_idx)) != value) {
+                return count;
+            }
+            count++;
+            bit_idx++;
+        }
+
+        word_idx++;
+        bit_idx = 0;
     }
 
-    while (len > 0) {
-        // calculate the word index and bit offset for both arrays
-        word_index_t word_idx1 = bitset64_wrd(start1);
-        word_offset_t bit_offset1 = bitset64_idx(start1);
-        word_index_t word_idx2 = bitset64_wrd(start2);
-        word_offset_t bit_offset2 = bitset64_idx(start2);
-
-        // calculate the number of bits to compare in this iteration
-        bit_index_t bits_in_current_word1 = 64 - bit_offset1;
-        bit_index_t bits_in_current_word2 = 64 - bit_offset2;
-        bit_index_t bits_to_compare = len;
-        if (bits_to_compare > bits_in_current_word1) {
-            bits_to_compare = bits_in_current_word1;
-        }
-        if (bits_to_compare > bits_in_current_word2) {
-            bits_to_compare = bits_in_current_word2;
-        }
-
-        // create masks for the bits to compare
-        word_t mask1 = bitmask64(bits_to_compare) << bit_offset1;
-        word_t mask2 = bitmask64(bits_to_compare) << bit_offset2;
-
-        // extract the relevant bits from each array
-        word_t bits1 = (bitarr1->words[word_idx1] & mask1) >> bit_offset1;
-        word_t bits2 = (bitarr2->words[word_idx2] & mask2) >> bit_offset2;
-
-        // compare the bits
-        if (bits1 != bits2) {
-            return false;
-        }
-
-        // update for the next iteration
-        len -= bits_to_compare;
-        start1 += bits_to_compare;
-        start2 += bits_to_compare;
-    }
-
-    return true;
+    return count;
 }
-
