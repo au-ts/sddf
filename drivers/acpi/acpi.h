@@ -132,6 +132,8 @@ enum aml_encoding_value {
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
     RETURN_OP = 0xA4,
+    // Custom Ops
+    PRT_PACKAGE = 0xFE01,
 };
 
 typedef enum aml_data_type {
@@ -418,3 +420,6 @@ aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const 
 uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *name_segment, aml_namespace_node_t **lookup_results, uint8_t num_results);
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
 aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml_data_t argv[]);
+uint8_t advance();
+uint8_t *get_pkt_end();
+void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end);

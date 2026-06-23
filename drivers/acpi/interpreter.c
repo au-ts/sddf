@@ -61,6 +61,10 @@ parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [PROCESSOR_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
 };
 
+parse_stage_t op_stage_custom[MAX_OPCODE][MAX_OP_STAGES] = {
+    [PRT_PACKAGE & 0xFF] = { INIT, PKT_LEN, BYTE_DATA, TERM_INTEGER, TERM_INTEGER, DATA_OBJECT, TERM_INTEGER, COMPLETE },
+};
+
 parse_state_t *current_state;
 
 mempool_t state_stack_mempool = {
@@ -202,6 +206,9 @@ parse_stage_t get_op_stage()
     if ((current_state->op_code & 0x5B00) == 0x5B00) {
         uint8_t second_op_code = current_state->op_code & 0xFF;
         return op_stage_5b_table[second_op_code][current_state->stage_idx];
+    } else if ((current_state->op_code & 0xFE00) == 0xFE00) {
+        uint8_t second_op_code = current_state->op_code & 0xFF;
+        return op_stage_custom[second_op_code][current_state->stage_idx];
     }
 
     return op_stage_table[current_state->op_code][current_state->stage_idx];
@@ -396,13 +403,15 @@ void state_stack_pop()
             case NAME_OP: {
                 assert(current_state->num_args == 2);
                 assert(current_state->arguments[0].type == DATA_OBJ_RET);
-                sddf_dprintf("complete NameOp: %s, addr: 0x%lx, ret_buf = %u\n", current_state->node->name, (uintptr_t)current_state->arguments[0].value, (uint32_t)current_state->arguments[2].value);
+                sddf_dprintf("complete NameOp: addr: 0x%lx, ret_buf = %u\n", (uintptr_t)current_state->arguments[0].value, (uint32_t)current_state->arguments[2].value);
                 // TODO: check ret_type
                 aml_data_t *eval_ret = (aml_data_t *)current_state->arguments[0].value;
                 *eval_ret = current_state->arguments[1];
                 ret_data = current_state->arguments[1];
-                current_state->node->data = current_state->arguments[1];
-                current_state->node->evaluated = true;
+                if (current_state->node) {
+                    current_state->node->data = current_state->arguments[1];
+                    current_state->node->evaluated = true;
+                }
                 break;
             }
             case RETURN_OP: {
@@ -419,6 +428,23 @@ void state_stack_pop()
                     method_state->stage_idx += 1; // MethodOp completes
                     sddf_dprintf("complets\n");
                 }
+                break;
+            }
+            case PRT_PACKAGE: {
+                assert(current_state->num_args == 5);
+                assert(current_state->arguments[0].type == DATA_OBJ_RET);
+                pci_prt_t *prt = (pci_prt_t *)current_state->arguments[0].value;
+                prt->address = (uint32_t)current_state->arguments[1].value;
+                prt->pin = (uint32_t)current_state->arguments[2].value;
+                // TODO: handle multiple IRQ cases
+                if (current_state->arguments[3].type == DATA_OBJ_NODE) {
+                    sddf_dprintf("need to parse source\n");
+                } else if (current_state->arguments[3].value == 0) {
+                    prt->gsi = current_state->arguments[4].value;
+                } else {
+                    prt->gsi = current_state->arguments[3].value;
+                }
+                sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", prt->address, prt->pin, prt->gsi);
                 break;
             }
             case OP_REGION_OP: {
@@ -489,7 +515,7 @@ void state_stack_pop()
     }
 
     // Update
-    if ((current_state->parent == NULL || current_state->parent->node != current_state->node) && current_state->node->pkt_end == 0) {
+    if ((current_state->parent == NULL || current_state->parent->node != current_state->node) && current_state->node && current_state->node->pkt_end == 0) {
         current_state->node->pkt_end = scanner.current;
         sddf_dprintf("save pkt_end 0x%lx to node %s\n", (uintptr_t)scanner.current, current_state->node->name);
     }
@@ -558,7 +584,7 @@ void state_stack_update()
         current_state->stage_idx += 1;
     }
 
-    /* sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args); */
+    sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args);
 
     // Check if the Op has been completely parsed
     op_stage = get_op_stage();
@@ -1135,19 +1161,18 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
     return eval_ret;
 }
 
-aml_data_t eval_data_object()
+void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end)
 {
-    aml_data_t eval_ret;
-    aml_data_t ret_buf = {(uintptr_t)&eval_ret, DATA_OBJ_RET, 0};
-    state_stack_add_argument(ret_buf); // First argument as address of return buffer
+    aml_data_t ret_buf = {(uintptr_t)prt, DATA_OBJ_RET, 0};
+
     // Make a fake NAME_OP, just to extract data object
-    state_stack_create(NAME_OP, true);
+    state_stack_create(PRT_PACKAGE, true);
     current_state->node = NULL;
     current_state->node_start = 0;
-    current_state->pkt_end = 0;
-    current_state->stage_idx = 2;
+    current_state->pkt_end = pkt_end;
+    current_state->stage_idx = 3;
+
+    state_stack_add_argument(ret_buf); // First argument as address of return buffer
 
     parse_namespace_node(true);
-
-    return eval_ret;
 }
