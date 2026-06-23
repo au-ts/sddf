@@ -500,8 +500,9 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
 /*         return; */
 /*     } */
 
-/*     uint8_t *buf_cur = (uint8_t *)crs_data.value; */
-/*     uint8_t *crs_data_end = (uint8_t *)crs_data.value + crs_data.length; */
+/*     uint8_t *buf_cur = (uint8_t *)prt_data.value; */
+/*     scanner.current =  */
+/*     uint8_t *crs_data_end = (uint8_t *)prt_data.value + prt_data.length; */
 
 /*     uint8_t *pkt_end = get_pkt_end(); */
 /*     uint8_t num_elements = advance(); */

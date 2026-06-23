@@ -386,8 +386,9 @@ void state_stack_pop()
                 break;
             }
             case PACKAGE_PREFIX: {
-                assert(current_state->num_args == 0);
-                ret_data.value = (uint64_t)current_state->node;
+                assert(current_state->num_args == 1);
+                ret_data.value = current_state->arguments[0].value;
+                ret_data.length = (uint64_t)current_state->pkt_end - current_state->arguments[0].value;
                 ret_data.type = DATA_OBJ_PACKAGE;
                 sddf_dprintf("return package prefix: 0x%lx\n", ret_data.value);
                 break;
@@ -415,7 +416,7 @@ void state_stack_pop()
                     aml_data_t *eval_ret = (aml_data_t *)method_state->arguments[0].value;
                     sddf_dprintf("completes, ret: 0x%lx\n", (uintptr_t)eval_ret);
                     *eval_ret = current_state->arguments[0];
-                    current_state->parent->stage_idx += 1; // MethodOp completes
+                    method_state->stage_idx += 1; // MethodOp completes
                     sddf_dprintf("complets\n");
                 }
                 break;
@@ -549,6 +550,10 @@ void state_stack_update()
                      (uintptr_t)current_state->pkt_end,
                      current_state->arguments[0].value);
         current_state->stage_idx += 2;
+    } else if (current_state->op_code == PACKAGE_PREFIX && op_stage == PKT_LEN) {
+        aml_data_t package_start = {(uint64_t)scanner.current, DATA_OBJ_QWORD, 0};
+        state_stack_add_argument(package_start);
+        current_state->stage_idx += 1;
     } else if (op_stage != TERM_LIST) {
         current_state->stage_idx += 1;
     }
@@ -1060,7 +1065,6 @@ void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end
     current_state->node = namespace;
 
     parse_namespace_node(false);
-    // TODO: destroy root state
 }
 
 aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml_data_t argv[])
@@ -1127,6 +1131,23 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
     sddf_dprintf("Finish Eval node %s, Op: 0x%x\n", node->name, node->op_code);
     current_state = recovery_state;
     scanner.current = recovery_location;
+
+    return eval_ret;
+}
+
+aml_data_t eval_data_object()
+{
+    aml_data_t eval_ret;
+    aml_data_t ret_buf = {(uintptr_t)&eval_ret, DATA_OBJ_RET, 0};
+    state_stack_add_argument(ret_buf); // First argument as address of return buffer
+    // Make a fake NAME_OP, just to extract data object
+    state_stack_create(NAME_OP, true);
+    current_state->node = NULL;
+    current_state->node_start = 0;
+    current_state->pkt_end = 0;
+    current_state->stage_idx = 2;
+
+    parse_namespace_node(true);
 
     return eval_ret;
 }
