@@ -9,7 +9,7 @@
 
 /* Create a bit mask of nbits contiguous bits starting from the least
 significant bit*/
-#define BITMASK(nbits) ((nbits) ? ~(uint64_t)0 >> (64 - nbits): (uint64_t)0)
+#define BITMASK(nbits) ((nbits) ? ~(uint64_t)0 >> (64 - (nbits)): (uint64_t)0)
 
 /* Find the index of the word containing the bit_pos bit */
 #define WORD_IDX(bit_pos) ((bit_pos) >> 6)
@@ -105,7 +105,7 @@ uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, uint8_t value)
         }
 
         while (bit_idx <= last_bit_idx) {
-            if ((word & (1 >> bit_idx)) != value) {
+            if (((word >> bit_idx) & 1) != value) {
                 return count;
             }
             count++;
