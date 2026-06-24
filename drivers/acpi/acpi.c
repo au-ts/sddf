@@ -523,7 +523,6 @@ void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
 
         pci_bridge_resource->num_prt_entries++;
         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
-        /* return; */
     }
 }
 
