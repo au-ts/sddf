@@ -16,7 +16,7 @@ significant bit*/
 #define WORD_IDX(bit_pos) ((bit_pos) >> 6)
 
 /* Find the index of the bit_pos bit within it's word */
-#define BIT_IDX(bit_pos) ((bit_pos) & 63)
+#define BIT_IDX(bit_pos) ((bit_pos) % 64)
 
 void bitarray_init(bitarray_t *bitarr, uint64_t *words, uint64_t num_bits)
 {
