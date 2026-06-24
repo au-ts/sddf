@@ -47,6 +47,13 @@ void tx_provide(void)
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
 
+                if (buffer.len == 0 || buffer.len > NET_BUFFER_SIZE) {
+                    sddf_dprintf("VIRT_TX|LOG: Client provided buffer with len == 0 or > buffer size, buffer.len == %u\n", buffer.len);
+                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
+                    assert(!err);
+                    continue;
+                }
+
                 if (buffer.oid >= config.clients[client].num_regions) {
                     sddf_dprintf(
                         "VIRT_TX|LOG: Client provided buffer with id %d which is not from within the mapped memory\n",
