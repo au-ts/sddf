@@ -340,10 +340,13 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 
     uintptr_t frame = buffer.io_or_offset + sddf_state.tx_buffer_data_region;
     uint16_t copied = 0;
+    lwip_state.err_output("LWIP|LOG: p->tot_len = %u\n", p->tot_len);
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
+        lwip_state.err_output("LWIP|LOG: curr->len = %u, copied = %u\n", curr->len, copied);
         memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
+    lwip_state.err_output("LWIP|LOG: total copied = %u\n", copied);
 
     buffer.len = copied;
     err = net_enqueue_active(&sddf_state.tx_queue, buffer);
