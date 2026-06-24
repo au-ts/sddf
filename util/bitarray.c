@@ -29,7 +29,7 @@ char bitarray_get_bit(bitarray_t *bitarr, uint64_t index)
     return (bitarr->words[WORD_IDX(index)] >> BIT_IDX(index)) & 1;
 }
 
-typedef enum {ZERO_REGION, FILL_REGION, SWAP_REGION} bitarray_action_t;
+typedef enum { ZERO_REGION, FILL_REGION, SWAP_REGION } bitarray_action_t;
 
 static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bitarray_action_t action)
 {
