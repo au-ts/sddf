@@ -10,7 +10,7 @@
 
 /* Create a bit mask of nbits contiguous bits starting from the least
 significant bit*/
-#define BITMASK(nbits) ((nbits) ? ~(uint64_t)0 >> (64 - (nbits)): (uint64_t)0)
+#define BITMASK(nbits) ((nbits) ? ~0ull >> (64 - (nbits)): 0ull)
 
 /* Find the index of the word containing the bit_pos bit */
 #define WORD_IDX(bit_pos) ((bit_pos) >> 6)
