@@ -52,9 +52,9 @@ char bitarray_get_bit(bitarray_t *bitarr, uint64_t index);
  * @param bitarr pointer to the bitarray struct.
  * @param start starting index of the region.
  * @param len length of the region.
- * @param value value to set the bits.
+ * @param value true sets the bits to 1, false sets the bits to 0.
  */
-void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, uint8_t value);
+void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, bool value);
 
 /**
  * Toggle all the bits in a specific region of the bit array.
@@ -70,8 +70,8 @@ void bitarray_toggle_region(bitarray_t *bitarr, uint64_t start, uint64_t len);
  *
  * @param bitarr pointer to the bitarray struct.
  * @param start bit to start counting from.
- * @param value value of bits to count.
+ * @param is_set true counts the bits set to 1, false counts the bits set to 0.
  *
  * @return number of contiguous bits starting from start having the value provided.
  */
-uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, uint8_t value);
+uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, bool is_set);

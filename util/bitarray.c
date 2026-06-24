@@ -4,6 +4,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <sddf/util/bitarray.h>
 #include <sddf/util/util.h>
 
@@ -67,17 +68,12 @@ static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bita
     }
 }
 
-void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, uint8_t value)
+void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, bool value)
 {
-    assert(value == 0 || value == 1);
-
-    switch (value) {
-    case 0:
-        set_region(bitarr, start, len, ZERO_REGION);
-        break;
-    case 1:
+    if (value) {
         set_region(bitarr, start, len, FILL_REGION);
-        break;
+    } else {
+        set_region(bitarr, start, len, ZERO_REGION);
     }
 }
 
@@ -86,7 +82,7 @@ void bitarray_toggle_region(bitarray_t *bitarr, uint64_t start, uint64_t len)
     set_region(bitarr, start, len, SWAP_REGION);
 }
 
-uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, uint8_t value)
+uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, bool is_set)
 {
     assert(start < bitarr->num_bits);
 
@@ -105,7 +101,7 @@ uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, uint8_t value)
         }
 
         while (bit_idx <= last_bit_idx) {
-            if (((word >> bit_idx) & 1) != value) {
+            if (((word >> bit_idx) & 1) != is_set) {
                 return count;
             }
             count++;
