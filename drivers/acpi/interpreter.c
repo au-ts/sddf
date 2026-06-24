@@ -1165,7 +1165,7 @@ void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end)
 {
     aml_data_t ret_buf = {(uintptr_t)prt, DATA_OBJ_RET, 0};
 
-    // Make a fake NAME_OP, just to extract data object
+    // Make a PRT_PACJAGE, and extract PRT data
     state_stack_create(PRT_PACKAGE, true);
     current_state->node = NULL;
     current_state->node_start = 0;
