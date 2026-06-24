@@ -34,7 +34,7 @@ typedef struct bitarray {
  * @param words pointer to the word array.
  * @param num_of_bits number of bits in the word array.
  */
-void bitarray_init(bitarray_t *bitarr, uint64_t *words, uint64_t num_of_bits);
+void bitarray_init(bitarray_t *bitarr, uint64_t *words, uint64_t num_bits);
 
 /**
  * Get the value of a specific bit in the bit array.
