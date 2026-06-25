@@ -14,7 +14,7 @@
 static char SDDF_TIMER_MAGIC[SDDF_TIMER_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x6 };
 
 typedef struct timer_client_config {
-    char magic[SDDF_TIMER_MAGIC_LEN];
+    char magic[SDDF_TIMER_MAGIC_LEN + 1];
     uint8_t driver_id;
 } timer_client_config_t;
 
