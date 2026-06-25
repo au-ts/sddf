@@ -27,7 +27,7 @@ typedef struct i2c_connection_resource {
 
 // zig: Driver
 typedef struct i2c_driver_config {
-    char magic[SDDF_I2C_MAGIC_LEN];
+    char magic[SDDF_I2C_MAGIC_LEN + 1];
     i2c_connection_resource_t virt;
 } i2c_driver_config_t;
 
@@ -41,7 +41,7 @@ typedef struct i2c_virt_client_config {
 
 // zig: Virt
 typedef struct i2c_virt_config {
-    char magic[SDDF_I2C_MAGIC_LEN];
+    char magic[SDDF_I2C_MAGIC_LEN + 1];
     uint64_t num_clients;
     i2c_connection_resource_t driver;
     i2c_virt_client_config_t clients[SDDF_I2C_MAX_CLIENTS];
@@ -49,7 +49,7 @@ typedef struct i2c_virt_config {
 
 // zig: Client
 typedef struct i2c_client_config {
-    char magic[SDDF_I2C_MAGIC_LEN];
+    char magic[SDDF_I2C_MAGIC_LEN + 1];
     i2c_connection_resource_t virt;
     region_resource_t data;
 } i2c_client_config_t;
