@@ -3,44 +3,34 @@
 import os
 import sys
 import argparse
-from sdfgen import SystemDescription, Sddf, DeviceTree
 import importlib
-
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
-)
+from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob
+from acacia.arch import x86_64
 
 # Use importlib to dynamically load. Using `from` import below other code is bad style.
-board_module = importlib.import_module("board")
-BOARDS = board_module.BOARDS
+# board_module = importlib.import_module("board")
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")
+)
+from acacia_sddf import BOARDS, sDDFTimer
 
-ProtectionDomain = SystemDescription.ProtectionDomain
-
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    timer_node = None
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=253)
+def generate(sdf_file: str, output_dir: str):
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        board_module.add_x86_hpet(sdf, timer_driver)
-    else:
-        timer_node = dtb.node(board.timer)
-        assert timer_node is not None
 
-    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client)
+    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer.add_client(client)
+    sdf.add_subsystem(timer)
+    sdf.add_pd(client)
 
-    pds = [timer_driver, client]
-    for pd in pds:
-        sdf.add_pd(pd)
+    # Add HPET if x86
+    if board.arch == x86_64:
+        timer.add_x86_hpet(sdf)
 
-    assert timer_system.connect()
-    assert timer_system.serialise_config(output_dir)
-
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
-
+    sdf.make_config_structs()
+    out_file = f"{output_dir}/{sdf_file}"
+    print(f"Saving to {out_file}")
+    sdf.write_xml_file(out_file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -54,12 +44,10 @@ if __name__ == "__main__":
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
-    sddf = Sddf(args.sddf)
+    if board.arch != x86_64:
+        dtb = DeviceTreeBlob(args.dtb)
+    else:
+        dtb = None
+    sdf = System(board.arch, board.paddr_top, dtb)
 
-    dtb = None
-    if board.arch != SystemDescription.Arch.X86_64:
-        with open(args.dtb, "rb") as f:
-            dtb = DeviceTree(f.read())
-
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output)
