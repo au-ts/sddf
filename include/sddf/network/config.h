@@ -25,7 +25,7 @@ typedef struct net_connection_resource {
 } net_connection_resource_t;
 
 typedef struct net_driver_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
     net_connection_resource_t virt_rx;
     net_connection_resource_t virt_tx;
 } net_driver_config_t;
@@ -42,7 +42,7 @@ typedef struct net_virt_tx_client_config {
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
     net_connection_resource_t driver;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
@@ -55,7 +55,7 @@ typedef struct net_virt_rx_client_config {
 } net_virt_rx_client_config_t;
 
 typedef struct net_virt_rx_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
     net_connection_resource_t driver;
     device_region_resource_t data;
     /**
@@ -74,7 +74,7 @@ typedef struct net_virt_rx_config {
 } net_virt_rx_config_t;
 
 typedef struct net_copy_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
     net_connection_resource_t rx;
     region_resource_t rx_data[SDDF_NET_MAX_CLIENTS];
 
@@ -83,7 +83,7 @@ typedef struct net_copy_config {
 } net_copy_config_t;
 
 typedef struct net_client_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
     net_connection_resource_t rx;
     region_resource_t rx_data;
 
@@ -105,7 +105,7 @@ typedef struct net_vswitch_port_config {
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
-    char magic[SDDF_NET_MAGIC_LEN];
+    char magic[SDDF_NET_MAGIC_LEN + 1];
 
     /**
      * Ports encode the vswitch's connection with both the virtualisers and its
