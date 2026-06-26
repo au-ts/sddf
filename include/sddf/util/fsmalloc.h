@@ -57,4 +57,4 @@ void fsmalloc_free(fsmalloc_t *fsmalloc, uintptr_t addr, uint64_t count);
  * @param num_words number of words in the array of bitarray struct. This needs to be >= num_cells/64. Can be calculated using BITS_2_WORDS64(num_cells).
  */
 void fsmalloc_init(fsmalloc_t *fsmalloc, uintptr_t base_addr, uint64_t cell_size, uint64_t num_cells,
-                   bitarray_t *bitarr, uint64_t *words, uint64_t num_words);
+                   bitarray_t *bitarr, uint64_t *words, size_t num_words);
