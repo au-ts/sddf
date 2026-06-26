@@ -15,16 +15,16 @@ significant bit*/
 /* Find the index of the word containing the bit_pos bit */
 #define WORD_IDX(bit_pos) ((bit_pos) >> 6)
 
-/* Find the index of the bit_pos bit within it's word */
+/* Find the index of the bit_pos bit within its word */
 #define BIT_IDX(bit_pos) ((bit_pos) % 64)
 
-void bitarray_init(bitarray_t *bitarr, uint64_t *words, uint64_t num_bits)
+void bitarray_init(bitarray_t *bitarr, uint64_t *words, size_t num_bits)
 {
     bitarr->num_bits = num_bits;
     bitarr->words = words;
 }
 
-char bitarray_get_bit(bitarray_t *bitarr, uint64_t index)
+char bitarray_get_bit(bitarray_t *bitarr, size_t index)
 {
     assert(index < bitarr->num_bits);
     return (bitarr->words[WORD_IDX(index)] >> BIT_IDX(index)) & 1;
@@ -32,7 +32,7 @@ char bitarray_get_bit(bitarray_t *bitarr, uint64_t index)
 
 typedef enum { ZERO_REGION, FILL_REGION, SWAP_REGION } bitarray_action_t;
 
-static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bitarray_action_t action)
+static void set_region(bitarray_t *bitarr, size_t start, size_t length, bitarray_action_t action)
 {
     assert(start < bitarr->num_bits && start + length <= bitarr->num_bits);
 
@@ -40,10 +40,10 @@ static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bita
         return;
     }
 
-    uint64_t word_idx = WORD_IDX(start);
-    uint64_t last_word_idx = WORD_IDX(start + length - 1);
-    uint64_t bit_idx = BIT_IDX(start);
-    uint64_t last_bit_idx = 63;
+    size_t word_idx = WORD_IDX(start);
+    size_t last_word_idx = WORD_IDX(start + length - 1);
+    size_t bit_idx = BIT_IDX(start);
+    size_t last_bit_idx = 63;
 
     while (word_idx <= last_word_idx) {
         if (word_idx == last_word_idx) {
@@ -68,7 +68,7 @@ static void set_region(bitarray_t *bitarr, uint64_t start, uint64_t length, bita
     }
 }
 
-void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, bool value)
+void bitarray_set_region(bitarray_t *bitarr, size_t start, size_t len, bool value)
 {
     if (value) {
         set_region(bitarr, start, len, FILL_REGION);
@@ -77,20 +77,20 @@ void bitarray_set_region(bitarray_t *bitarr, uint64_t start, uint64_t len, bool 
     }
 }
 
-void bitarray_toggle_region(bitarray_t *bitarr, uint64_t start, uint64_t len)
+void bitarray_toggle_region(bitarray_t *bitarr, size_t start, size_t len)
 {
     set_region(bitarr, start, len, SWAP_REGION);
 }
 
-uint64_t bitarray_count_bits(bitarray_t *bitarr, uint64_t start, bool is_set)
+size_t bitarray_count_bits(bitarray_t *bitarr, size_t start, bool is_set)
 {
     assert(start < bitarr->num_bits);
 
-    uint64_t count = 0;
-    uint64_t word_idx = WORD_IDX(start);
-    uint64_t last_word_idx = WORD_IDX(bitarr->num_bits - 1);
-    uint64_t bit_idx = BIT_IDX(start);
-    uint64_t last_bit_idx = 63;
+    size_t count = 0;
+    size_t word_idx = WORD_IDX(start);
+    size_t last_word_idx = WORD_IDX(bitarr->num_bits - 1);
+    size_t bit_idx = BIT_IDX(start);
+    size_t last_bit_idx = 63;
 
     while (word_idx <= last_word_idx) {
 
