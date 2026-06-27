@@ -134,7 +134,6 @@ static void tx_provide(void)
         /* Finally, need to notify the queue if we have transferred data */
         /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
         virtio_transport_queue_notify(&dev, VIRTIO_SERIAL_TX_QUEUE);
-        // uart_regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
         if (serial_require_consumer_signal(&tx_queue_handle)) {
             serial_cancel_consumer_signal(&tx_queue_handle);
             sddf_notify(config.tx.id);
@@ -207,7 +206,6 @@ static void rx_provide(void)
     if (transferred) {
         /* We have added more avail buffers, so notify the device */
         virtio_transport_queue_notify(&dev, VIRTIO_SERIAL_RX_QUEUE);
-        // uart_regs->QueueNotify = VIRTIO_SERIAL_RX_QUEUE;
     }
 }
 
@@ -276,7 +274,7 @@ void console_setup()
     // Set the ACKNOWLEDGE bit to say we have noticed the device
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
 
-        // Set the DRIVER bit to say we know how to drive the device
+    // Set the DRIVER bit to say we know how to drive the device
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
 
 #ifdef DEBUG_DRIVER
@@ -343,7 +341,6 @@ static void handle_irq()
     if (irq_status & VIRTIO_IRQ_VQUEUE) {
         // ACK the interrupt first before handling responses
         virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
-        // uart_regs->InterruptACK = VIRTIO_IRQ_VQUEUE;
 
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
@@ -367,7 +364,6 @@ void init()
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 4);
 
-    // uart_regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
     virtio_rx_char = device_resources.regions[2].region.vaddr;
