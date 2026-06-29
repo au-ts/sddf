@@ -17,6 +17,7 @@ static uint32_t local_tail;
 /* Ensure to call serial_putchar_init during initialisation. Multiplexes output based on \n or when buffer is full. */
 void _sddf_putchar(char character)
 {
+    local_tail = tx_queue_handle->queue->tail;
     if (serial_queue_full(tx_queue_handle, local_tail) || serial_queue_full(tx_queue_handle, local_tail + 1)) {
         return;
     }
@@ -36,6 +37,7 @@ void _sddf_putchar(char character)
 
 void sddf_putchar_unbuffered(char character)
 {
+    local_tail = tx_queue_handle->queue->tail;
     if (serial_queue_full(tx_queue_handle, local_tail)) {
         return;
     }
