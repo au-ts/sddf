@@ -87,7 +87,14 @@
             ];
           };
 
-          # For building the design documnet
+          spin-models = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              spin
+              gcc
+            ];
+          };
+
+          # For building the design document
           docs = pkgs.mkShell rec {
             nativeBuildInputs = with pkgs; [
               texliveFull
