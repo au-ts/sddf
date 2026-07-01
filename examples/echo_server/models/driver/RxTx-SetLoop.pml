@@ -5,7 +5,7 @@
 // OUTCOME: Deadlock freedom:
 // - RX path verifies in 0.24 seconds
 // - TX path verifies in 0.15 seconds
-// - Impossible to verify both paths simultaneously in exhaustive mode
+// - Full model verifies in 263 seconds if compiled with `gcc -DBITSTATE`
 
 #define QUEUE_CAPACITY 2
 
@@ -213,6 +213,8 @@ active proctype ETH() priority 1 {
             ETH_TX_free.notification ! 1;
         :: else;
         fi
+
+        goto work_eth_tx;
 
     :: IRQ_RX ? 1 ->
         bit notify_rx = 0;
