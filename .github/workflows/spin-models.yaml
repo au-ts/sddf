@@ -1,0 +1,52 @@
+# Copyright 2026, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+# Run Spin/PROMELA models in CI
+
+name: spin-models
+
+on:
+  pull_request:
+    paths:
+      - '**/*.pml'
+  push:
+    branches: [ "main" ]
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        include:
+          - path: 'copy/RxOnly-SetLoop.pml'
+            depth: 10000000
+            gcc_flags: ''
+          - path: 'virt_tx/TxOnly-SetLoop.pml'
+            depth: 10000000
+            gcc_flags: ''
+          - path: 'client/RxTx-SetLoop.pml'
+            depth: 100000000
+            gcc_flags: ''
+          - path: 'virt_rx/RxOnly-SetLoop.pml'
+            depth: 100000000
+            gcc_flags: ''
+          - path: 'driver/RxTx-SetLoop.pml'
+            depth: 100000000
+            gcc_flags: '-DBITSTATE'
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop .#spin-models -c bash -c 'echo Hello World'
+      - name: Run spin model verifier
+        run: |
+          nix develop .#spin-models --ignore-environment -c bash -c '\
+            spin -a examples/echo_server/models/${{ matrix.path }} && \
+            gcc -o model ${{ matrix.gcc_flags }} pan.c && \
+            ./model -m${{ matrix.depth}}
+          '
