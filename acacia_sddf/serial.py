@@ -114,7 +114,7 @@ class sDDFSerial(sDDFDriverClass):
             )
 
         driver_tx_queue_mr = MemoryRegion(
-            self.sdf, "serial_driver_tx_queue", self.queue_size
+            "serial_driver_tx_queue", self.queue_size, self.sdf
         )
         driver_tx_data_mr = MemoryRegion(
             self.sdf,
@@ -140,6 +140,7 @@ class sDDFSerial(sDDFDriverClass):
             self.sdf,
             Channel.End(self.driver, can_notify=True, can_pp=False),
             Channel.End(self.virt_tx, can_notify=True, can_pp=False),
+            self.sdf,
         )
 
         driver_tx_conn = self.serial_connection_resource_factory(
@@ -156,10 +157,10 @@ class sDDFSerial(sDDFDriverClass):
         driver_rx_conn = None
         if self.virt_rx:
             driver_rx_queue_mr = MemoryRegion(
-                self.sdf, "serial_driver_rx_queue", self.queue_size
+                "serial_driver_rx_queue", self.queue_size, self.sdf
             )
             driver_rx_data_mr = MemoryRegion(
-                self.sdf, "serial_driver_rx_data", self.data_size
+                "serial_driver_rx_data", self.data_size, self.sdf
             )
 
             driver_rx_queue_map = self.driver.create_automap(
@@ -179,6 +180,7 @@ class sDDFSerial(sDDFDriverClass):
                 self.sdf,
                 Channel.End(self.driver, can_notify=True, can_pp=False),
                 Channel.End(self.virt_rx, can_notify=True, can_pp=False),
+                self.sdf,
             )
 
             driver_rx_conn = self.serial_connection_resource_factory(
@@ -223,10 +225,10 @@ class sDDFSerial(sDDFDriverClass):
 
             # TX connection: virt_tx -> client
             tx_queue_mr = MemoryRegion(
-                self.sdf, f"serial_tx_queue_{c.name}", self.queue_size
+                f"serial_tx_queue_{c.name}", self.queue_size, self.sdf
             )
             tx_data_mr = MemoryRegion(
-                self.sdf, f"serial_tx_data_{c.name}", self.data_size
+                f"serial_tx_data_{c.name}", self.data_size, self.sdf
             )
 
             virt_tx_tx_queue_map = self.virt_tx.create_automap(
@@ -246,6 +248,7 @@ class sDDFSerial(sDDFDriverClass):
                 self.sdf,
                 Channel.End(self.virt_tx, can_notify=True, can_pp=False),
                 Channel.End(c, can_notify=True, can_pp=False),
+                self.sdf,
             )
 
             virt_tx_conn = self.serial_connection_resource_factory(
@@ -263,10 +266,10 @@ class sDDFSerial(sDDFDriverClass):
             client_rx_conn = None
             if self.virt_rx:
                 rx_queue_mr = MemoryRegion(
-                    self.sdf, f"serial_rx_queue_{c.name}", self.queue_size
+                    f"serial_rx_queue_{c.name}", self.queue_size, self.sdf
                 )
                 rx_data_mr = MemoryRegion(
-                    self.sdf, f"serial_rx_data_{c.name}", self.data_size
+                    f"serial_rx_data_{c.name}", self.data_size, self.sdf
                 )
 
                 virt_rx_rx_queue_map = self.virt_rx.create_automap(
@@ -286,6 +289,7 @@ class sDDFSerial(sDDFDriverClass):
                     self.sdf,
                     Channel.End(self.virt_rx, can_notify=True, can_pp=False),
                     Channel.End(c, can_notify=True, can_pp=False),
+                    self.sdf,
                 )
 
                 virt_rx_conn = self.serial_connection_resource_factory(
