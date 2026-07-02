@@ -4,78 +4,52 @@ import os, sys
 import argparse
 from typing import List
 from dataclasses import dataclass
-from sdfgen import SystemDescription, Sddf, DeviceTree
+from acacia import System, MemoryRegion, Map, Channel, DeviceTreeBlob, ProtectionDomain
 
 sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../")
 )
-from board import BOARDS
 
-ProtectionDomain = SystemDescription.ProtectionDomain
-MemoryRegion = SystemDescription.MemoryRegion
-Map = SystemDescription.Map
+from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
-    )
-
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
-    i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
-    i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     client_scan = ProtectionDomain("client_scan", "client_scan.elf", priority=1)
+
+    i2c = sDDFI2C(board.i2c.compatible, board.i2c.node_path, sdf, driver_prio=200, virt_prio=199)
+    i2c.add_client(client_scan)
+    sdf.add_subsystem(i2c)
+
+    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer.add_client(client_scan)
+    sdf.add_subsystem(timer)
+
+    serial = sDDFSerial(
+            board.serial.compatible,
+            board.serial.node_path,
+            sdf,
+            driver_prio=201,
+            virt_tx_prio=200,
+            allow_rx=False,
+            enable_color=False,
+            baud_rate=board.baud_rate if board.baud_rate else 115200
+    )
+    serial.add_client(client_scan)
+    sdf.add_subsystem(serial)
 
     if board.name == "odroidc4":
         # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
         # direct access.
-        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
-        gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000)
-        sdf.add_mr(clk_mr)
-        sdf.add_mr(gpio_mr)
-        i2c_driver.add_map(Map(clk_mr, 0x30_000_000, "rw", cached=False))
-        i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, "rw", cached=False))
+        clk_mr = MemoryRegion("clk", 0x1000, paddr=0xFF63C000, cached=False)
+        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xFF634000, cached=False)
+        sdf.add_memory_region(clk_mr)
+        sdf.add_memory_region(gpio_mr)
+        i2c.driver.add_map(Map(clk_mr, 0x30_000_000, "rw"))
+        i2c.driver.add_map(Map(gpio_mr, 0x30_100_000, "rw"))
 
-    i2c_node = dtb.node(board.i2c)
-    assert i2c_node is not None
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-
-    i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    i2c_system.add_client(client_scan)
-
-    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client_scan)
-
-    serial_system = Sddf.Serial(
-        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
-    )
-    serial_system.add_client(client_scan)
-
-    pds = [
-        serial_driver,
-        serial_virt_tx,
-        timer_driver,
-        i2c_driver,
-        i2c_virt,
-        client_scan,
-    ]
-    for pd in pds:
-        sdf.add_pd(pd)
-
-    assert i2c_system.connect()
-    assert i2c_system.serialise_config(output_dir)
-    assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
-    assert timer_system.connect()
-    assert timer_system.serialise_config(output_dir)
-
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
+    out_file = f"{output_dir}/{sdf_file}"
+    sdf.make_config_structs()
+    print(f"Saving to {out_file}")
+    sdf.write_xml_file(out_file)
 
 
 if __name__ == "__main__":
@@ -90,10 +64,7 @@ if __name__ == "__main__":
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
-    sddf = Sddf(args.sddf)
-
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = DeviceTreeBlob(args.dtb)
+    sdf = System(board.arch, board.paddr_top, dtb)
 
     generate(args.sdf, args.output, dtb)
