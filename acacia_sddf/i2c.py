@@ -374,3 +374,13 @@ add_driver_config(
         irqs=[DTSIRQ(4), DTSIRQ(0), DTSIRQ(1), DTSIRQ(7), DTSIRQ(9)],
     ),
 )
+
+# imx (8mq only for now? untested on others)
+add_driver_config(
+    "imx",
+    sDDFDriverConfig(
+        compatible=["fsl,imx8mq-i2c", "fsl,imx21-i2c"],
+        regions=[DTSRegion("regs", "rw", 4096, 0)],
+        irqs=[DTSIRQ(0)],
+    ),
+)

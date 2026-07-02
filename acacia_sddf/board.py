@@ -95,7 +95,7 @@ BOARDS: List[Board] = [
         ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
         blk=DriverDouble("", "soc@0/bus@30800000/mmc@30b40000"),
         i2c=DriverDouble("","soc@0/bus@30800000/i2c@30a50000"),
-        partition=2
+        partition=2,
     ),
     Board(
         name="odroidc2",

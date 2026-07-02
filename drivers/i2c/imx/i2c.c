@@ -11,7 +11,6 @@
 #include <string.h>
 #include "driver.h"
 
-
 __attribute__((__section__(".i2c_driver_config"))) i2c_driver_config_t config;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -26,9 +25,8 @@ i2c_queue_handle_t queue_handle;
 
 bool dummy_read = false;
 
-i2c_state_func_t *i2c_state_table[NUM_STATES] = {
-    state_idle, state_req, state_sel_cmd, state_cmd, state_cmd_ret, state_resp
-};
+i2c_state_func_t *i2c_state_table[NUM_STATES] = { state_idle, state_req,     state_sel_cmd,
+                                                  state_cmd,  state_cmd_ret, state_resp };
 
 /**
  * Initialise the i2c master interface for 400KHz fast mode.
@@ -98,14 +96,14 @@ void init(void)
 /**
  * Send a start condition. This method should short circuit other writes to the CR register.
  */
-static inline void imx_i2c_start(bool repeat) {
+static inline void imx_i2c_start(bool repeat)
+{
     // Update dummy read flag upon switch to MTX
     dummy_read = false;
     if (!repeat) {
         regs->i2cr |= REG_CR_MSTA;
         // wait until bus is clear
-        for (uint32_t i = 0; (i < 10000) && (regs->i2sr & REG_SR_IBB); i++) {
-        }
+        for (uint32_t i = 0; (i < 10000) && (regs->i2sr & REG_SR_IBB); i++) {}
 
         // if our short busy wait failed, die
         if (regs->i2sr & REG_SR_IBB) {
@@ -130,7 +128,8 @@ static inline void imx_i2c_start(bool repeat) {
  * This is required as the hardware will only generate an interrupt on
  * the successful completion of a transfer.
  */
-static inline bool imx_i2c_ackd(void) {
+static inline bool imx_i2c_ackd(void)
+{
     // TODO: figure out if a busy wait is required
     return ((regs->i2sr & REG_SR_RXAK) == 0);
 }
@@ -142,8 +141,8 @@ static inline bool imx_i2c_ackd(void) {
  */
 void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {
-    LOG_I2C_DRIVER("S_CMD: rw_idx=%u, len=%u, await_start=%u, await_stop=%u\n",
-                   data->rw_idx, data->active_cmd.data_len, data->await_start, data->await_stop);
+    LOG_I2C_DRIVER("S_CMD: rw_idx=%u, len=%u, await_start=%u, await_stop=%u\n", data->rw_idx, data->active_cmd.data_len,
+                   data->await_start, data->await_stop);
 
     // Sanity: if IAL (arbitration lost) is ever asserted, die. This should never happen for now,
     // as our protocol currently doesn't support arbitration.
@@ -250,7 +249,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
                 // The byte we read here is garbage/invalid for the first read.
                 // Store dummy byte in this buffer to avoid optimising out...
                 // TODO: check for fencepost error here.
-                data->active_cmd.payload.data[0] = (uint8_t) regs->i2dr;
+                data->active_cmd.payload.data[0] = (uint8_t)regs->i2dr;
                 LOG_I2C_DRIVER("MTX->RX dummy read completed...\n");
                 dummy_read = true;
             }
@@ -283,9 +282,9 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
 
             // Real read: simply store result directly. We are effectively saving
             // the result of the previous read data kick.
-            data->active_cmd.payload.data[data->bytes_read] = (uint8_t) regs->i2dr;
-            LOG_I2C_DRIVER("Reading byte 0x%02x at idx %u\n",
-                           data->active_cmd.payload.data[data->bytes_read], data->rw_idx);
+            data->active_cmd.payload.data[data->bytes_read] = (uint8_t)regs->i2dr;
+            LOG_I2C_DRIVER("Reading byte 0x%02x at idx %u\n", data->active_cmd.payload.data[data->bytes_read],
+                           data->rw_idx);
             data->bytes_read++;
             data->rw_idx++;
 
@@ -295,7 +294,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
             write_byte = data->active_cmd.payload.data[data->rw_idx];
 
             // Generate stop just after sending last byte.
-            if (data->rw_idx >= data->active_cmd.data_len-1) {
+            if (data->rw_idx >= data->active_cmd.data_len - 1) {
                 if (data->await_stop) {
                     LOG_I2C_DRIVER("Generating STOP (read)\n");
                     // Clear MSTA and MTX to generate STOP condition
@@ -401,4 +400,3 @@ void notified(microkit_channel ch)
         LOG_I2C_DRIVER_ERR("unexpected notification on channel %d\n", ch);
     }
 }
-
