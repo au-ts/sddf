@@ -39,4 +39,3 @@ struct imx_i2c_regs {
 #define REG_SR_SRW      (1 << 2)    // Slave Read/Write (1=Slave transmit)
 #define REG_SR_IIF      (1 << 1)    // I2C Interrupt (set when byte transfer complete)
 #define REG_SR_RXAK     (1 << 0)    // Received Acknowledge (1=No ACK received, 0=ACK received)
-
