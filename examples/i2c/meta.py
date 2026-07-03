@@ -11,8 +11,10 @@ from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", sdf, priority=1)
-    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", sdf, priority=1)
+    client_pn532 = ProtectionDomain(sdf, "client_pn532", "client_pn532.elf", priority=1)
+    client_ds3231 = ProtectionDomain(
+        sdf, "client_ds3231", "client_ds3231.elf", priority=1
+    )
 
     i2c = sDDFI2C(
         sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
