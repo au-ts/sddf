@@ -5,10 +5,12 @@ from typing import List, Optional, Tuple
 from acacia import System, ProtectionDomain, aarch64, riscv64, x86_64, Arch
 from importlib.metadata import version
 
+
 @dataclass(frozen=True)
 class DriverDouble:
     compatible: str
     node_path: str
+
 
 @dataclass
 class Board:
@@ -45,7 +47,9 @@ BOARDS: List[Board] = [
         name="imx8mm_evk",
         arch=aarch64,
         paddr_top=0x70000000,
-        serial=DriverDouble("fsl,imx8mm-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"),
+        serial=DriverDouble(
+            "fsl,imx8mm-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+        ),
         timer=DriverDouble("fsl,imx8mm-gpt", "soc@0/bus@30000000/timer@302d0000"),
         ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
     ),
@@ -53,7 +57,9 @@ BOARDS: List[Board] = [
         name="imx8mp_evk",
         arch=aarch64,
         paddr_top=0x70000000,
-        serial=DriverDouble("fsl,imx8mp-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"),
+        serial=DriverDouble(
+            "fsl,imx8mp-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+        ),
         timer=DriverDouble("fsl,imx8mp-gpt", "soc@0/bus@30000000/timer@302d0000"),
         ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30bf0000"),
     ),
@@ -97,7 +103,7 @@ BOARDS: List[Board] = [
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@c8100000/serial@4c0"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@c1100000/watchdog@98d0"),
         ethernet=DriverDouble("", "soc/ethernet@c9410000"),
-        baud_rate=115200
+        baud_rate=115200,
     ),
     Board(
         name="odroidc4",
@@ -107,7 +113,7 @@ BOARDS: List[Board] = [
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@ff800000/serial@3000"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@ffd00000/watchdog@f0d0"),
         ethernet=DriverDouble("amlogic,meson-gx-uart", "soc/ethernet@ff3f0000"),
-        baud_rate=115200
+        baud_rate=115200,
     ),
     Board(
         name="qemu_virt_aarch64",

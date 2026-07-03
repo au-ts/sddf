@@ -2,8 +2,21 @@
 # SPDX-License-Identifier: BSD-2-Clause
 import sys, os
 from typing import List, Optional, Tuple
-from acacia import Subsystem, ProtectionDomain, Channel, Map, MemoryRegion, DTBNode, DeviceTreeBlob, SchedulingProperties, ConfigStruct, IRQ, System
+from acacia import (
+    Subsystem,
+    ProtectionDomain,
+    Channel,
+    Map,
+    MemoryRegion,
+    DTBNode,
+    DeviceTreeBlob,
+    SchedulingProperties,
+    ConfigStruct,
+    IRQ,
+    System,
+)
 from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
+
 
 class sDDFDriverClass(Subsystem):
     """
@@ -13,29 +26,38 @@ class sDDFDriverClass(Subsystem):
         b) Parsing the device tree to set up device resources
         c) Providing some common utility functions for generating config structs, etc.
     """
-    def __init__(self,
-                 class_name: str,
-                 dev_compatible: str,
-                 dev_dt_path: str,
-                 system: System,
-                 magic: str):
-        super().__init__(self, class_name)
+
+    def __init__(
+        self,
+        class_name: str,
+        dev_compatible: str,
+        dev_dt_path: str,
+        system: System,
+        magic: str,
+    ):
+        super().__init__(class_name, system)
 
         self.sdf = system
         self.dtb = system.dtb
         self.driver_magic = magic
         if system.dtb is None:
-            print(f"Initialising {class_name} driver with no DTB. Assuming this is x86 and no DTB is needed")
+            print(
+                f"Initialising {class_name} driver with no DTB. Assuming this is x86 and no DTB is needed"
+            )
             return
 
         # Find real DTB node
-        print(f"Finding {class_name} compatible for {dev_compatible} -- {dev_dt_path} from {self.dtb.file_path}")
+        print(
+            f"Finding {class_name} compatible for {dev_compatible} -- {dev_dt_path} from {self.dtb.file_path}"
+        )
         target_node = self.dtb.get_node_by_path(dev_dt_path)
 
         # make sure compatible matches!
         if dev_compatible not in (a_c := self.dtb.get_compatible(target_node)):
-            raise IOError(f"Target node {dev_dt_path} has compatible {a_c}... "
-                          f"doesn't match expected {dev_compatible}!")
+            raise IOError(
+                f"Target node {dev_dt_path} has compatible {a_c}... "
+                f"doesn't match expected {dev_compatible}!"
+            )
 
         # check if DTB node is "okay" if it has a status
         ok = self.dtb.get_node_prop(target_node, "status")
@@ -45,13 +67,19 @@ class sDDFDriverClass(Subsystem):
         self.dtb_node = target_node
 
         # Find sDDF driver matching this node
-        matching_configs = sDDFDriverManifest().get_configs_matching_compatible(type(self), dev_compatible)
+        matching_configs = sDDFDriverManifest().get_configs_matching_compatible(
+            type(self), dev_compatible
+        )
 
         if len(matching_configs) == 0:
-            raise RuntimeError(f"No driver config matches {dev_compatible} -> {dev_dt_path}!")
+            raise RuntimeError(
+                f"No driver config matches {dev_compatible} -> {dev_dt_path}!"
+            )
         elif len(matching_configs) != 1:
-            raise RuntimeError(f"Multiple sDDF drivers satisfy {dev_compatible}! "\
-                               f"There whould be only one.\n{matching_configs}")
+            raise RuntimeError(
+                f"Multiple sDDF drivers satisfy {dev_compatible}! "
+                f"There whould be only one.\n{matching_configs}"
+            )
         self.driver_config = matching_configs[0]
 
     def create_dtb_resources(self, driver_pd: ProtectionDomain) -> ConfigStruct:
@@ -78,14 +106,13 @@ class sDDFDriverClass(Subsystem):
             # We generate an empty deviceresources despite it being useless, as our build system expects it.
             # TODO: fix that?
             self.__device_resources = DeviceResourcesFactory(
-                self.driver_magic,
-                [],
-                [],
-                target_file=driver_pd.prog_image
+                self.driver_magic, [], [], target_file=driver_pd.prog_image
             )
             return self.__device_resources
 
-        region_maps = []   # track fields to store in DeviceResources. tuples of vaddr, offset
+        region_maps = (
+            []
+        )  # track fields to store in DeviceResources. tuples of vaddr, offset
         for region in self.driver_config.regions:
             mr = None
             # We name regions as [region_name]_[node_path] to avoid collisions with
@@ -102,11 +129,13 @@ class sDDFDriverClass(Subsystem):
                 # Check we can turn this into a region
                 if region.size is not None:
                     if r_sz < region.size:
-                        raise RuntimeError() # todo
+                        raise RuntimeError()  # todo
 
-                    if (region.size & (self.sdf.arch.default_page_size()-1)) != 0:
-                        raise RuntimeError(f"Region {region} with size={region.size} is not aligned to"\
-                                           f"system page size!")
+                    if (region.size & (self.sdf.arch.default_page_size() - 1)) != 0:
+                        raise RuntimeError(
+                            f"Region {region} with size={region.size} is not aligned to"
+                            f"system page size!"
+                        )
                 mr_sz = region.size if region.size is not None else r_sz
                 d_paddr = self.dtb.get_reg_paddr(self.sdf.arch, self.dtb_node, r_addr)
                 d_reg_offset = r_addr % self.sdf.arch.default_page_size()
@@ -118,10 +147,12 @@ class sDDFDriverClass(Subsystem):
                 if len(existing_mr) == 1:
                     mr = existing_mr[0]
                 elif len(existing_mr) > 1:
-                    raise RuntimeError(f"Multiple MRs with paddr={d_paddr}! -> {existing_mr}")
+                    raise RuntimeError(
+                        f"Multiple MRs with paddr={d_paddr}! -> {existing_mr}"
+                    )
                 else:
                     # This is new (or overlapping with a different start)
-                    mr = MemoryRegion(region_name, mr_sz, paddr=d_paddr, cached=False)
+                    mr = MemoryRegion(region_name, mr_sz, self.sdf, paddr=d_paddr, cached=False)
             else:
                 # This is a MR that doesn't correspond to physical memory
                 # mr = MemoryRegion(region_name, region.size)
@@ -134,12 +165,13 @@ class sDDFDriverClass(Subsystem):
             # Assumes permission string is correctly formatted. Non r/w/x chars are ignored
             d_map = driver_pd.create_automap(mr, region.perms if region.perms else "rw")
             region_maps.append((d_map, d_reg_offset))
-            self.sdf.add_memory_region(mr)
 
         # Next: set up IRQs
         irqs_from_prop = self.dtb.get_parsed_irqs(self.dtb_node, self.sdf.arch)
-        if len(irqs_from_prop) == 0 and (t:= len(self.driver_config.irqs)) != 0:
-            raise RuntimeError(f"Driver config expects {t} irqs but none found in node!")
+        if len(irqs_from_prop) == 0 and (t := len(self.driver_config.irqs)) != 0:
+            raise RuntimeError(
+                f"Driver config expects {t} irqs but none found in node!"
+            )
 
         irq_ids = []
         for irq in self.driver_config.irqs:
@@ -148,35 +180,33 @@ class sDDFDriverClass(Subsystem):
 
         # Finally: make config struct
         self.__device_resources = DeviceResourcesFactory(
-            self.driver_magic,
-            region_maps,
-            irq_ids,
-            target_file=driver_pd.prog_image
+            self.driver_magic, region_maps, irq_ids, target_file=driver_pd.prog_image
         )
         return self.__device_resources
 
 
-def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset = 0):
-    fields = {
-        "vaddr": map.vaddr + offset,
-        "size": map.mr.size
-    }
+def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
+    fields = {"vaddr": map.vaddr + offset, "size": map.mr.size}
     return ConfigStruct("region_resource_t", section_name=section_name, fields=fields)
 
+
 def DeviceRegionResourceFactory(region: ConfigStruct, io_addr: int):
-    fields = {
-        "region": region,
-        "io_addr": io_addr
-    }
+    fields = {"region": region, "io_addr": io_addr}
     return ConfigStruct("device_region_resource_t", fields=fields)
 
+
 def DeviceIRQResourceFactory(id: int):
-    fields = {
-        "id": id
-    }
+    fields = {"id": id}
     return ConfigStruct("device_irq_resource_t", fields=fields)
 
-def DeviceResourcesFactory(magic_str: str, maps_offsets: List[Tuple[Map,int]], irq_ids: List[int], target_file: str, section_name = "device_resources"):
+
+def DeviceResourcesFactory(
+    magic_str: str,
+    maps_offsets: List[Tuple[Map, int]],
+    irq_ids: List[int],
+    target_file: str,
+    section_name="device_resources",
+):
     region_structs = [
         DeviceRegionResourceFactory(RegionResourceFactory(m, offset=o), m.mr.paddr)
         for m, o in maps_offsets
@@ -187,6 +217,11 @@ def DeviceResourcesFactory(magic_str: str, maps_offsets: List[Tuple[Map,int]], i
         "num_regions": len(region_structs),
         "num_irqs": len(irq_structs),
         "regions": region_structs,
-        "irqs": irq_structs
+        "irqs": irq_structs,
     }
-    return ConfigStruct("device_resources_t", section_name=section_name, fields=fields, target_file=target_file)
+    return ConfigStruct(
+        "device_resources_t",
+        section_name=section_name,
+        fields=fields,
+        target_file=target_file,
+    )

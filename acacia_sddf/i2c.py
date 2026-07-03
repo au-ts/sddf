@@ -1,7 +1,18 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from acacia import System, Subsystem, ProtectionDomain, Channel, Map, MemoryRegion, DTBNode, DeviceTreeBlob, SchedulingProperties, ConfigStruct
+from acacia import (
+    System,
+    Subsystem,
+    ProtectionDomain,
+    Channel,
+    Map,
+    MemoryRegion,
+    DTBNode,
+    DeviceTreeBlob,
+    SchedulingProperties,
+    ConfigStruct,
+)
 import sys, os
 from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
 from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
@@ -12,19 +23,23 @@ I2C_DATA_SZ = 0x1000
 I2C_NUM_BUFS = 128  # TODO: add support for dynamically sized queues
 I2C_PROTOCOL_MAGIC = "sDDF" + chr(0x4)
 
+
 class sDDFI2C(sDDFDriverClass):
-    def __init__(self,
-                 dev_compatible: str,
-                 dev_dt_path: str,
-                 sdf: System,
-                 driver_prio: int,
-                 virt_prio: int,
-                 cpu:Optional[int]=None,
-                 virt_elf: str="i2c_virt.elf",
-                 driver_elf: str="i2c_driver.elf"
-                 ):
-        super().__init__("i2c", dev_compatible, dev_dt_path, sdf, magic="sDDF"+chr(0x1))
-        # assert driver_prio > virt_prio > 0
+    def __init__(
+        self,
+        dev_compatible: str,
+        dev_dt_path: str,
+        sdf: System,
+        driver_prio: int,
+        virt_prio: int,
+        cpu: Optional[int] = None,
+        virt_elf: str = "i2c_virt.elf",
+        driver_elf: str = "i2c_driver.elf",
+    ):
+        super().__init__(
+            "i2c", dev_compatible, dev_dt_path, sdf, magic="sDDF" + chr(0x1)
+        )
+        self.sdf = sdf
         self.cpu = cpu
 
         # Internal bookkeeping
@@ -36,7 +51,13 @@ class sDDFI2C(sDDFDriverClass):
         # compiled objects itself. This will not be required once we start using
         # the sDDF with an SDK model, but that is for the future.
         self.virt_elf = virt_elf
-        self.driver = ProtectionDomain("i2c_driver", driver_elf, scheduling=SchedulingProperties(driver_prio), cpu=self.cpu)
+        self.driver = ProtectionDomain(
+            "i2c_driver",
+            driver_elf,
+            self.sdf,
+            scheduling=SchedulingProperties(driver_prio),
+            cpu=self.cpu,
+        )
 
         # We must make the driver BEFORE we get here
         self.driver_dev_resources = self.create_dtb_resources(self.driver)
@@ -46,6 +67,7 @@ class sDDFI2C(sDDFDriverClass):
         self.driver_config = None
         self.virt_driver_config = None
         self.client_configs = []
+        self.channels = []
 
         # We create queues etc. AFTER setting up the device resources to ensure that IRQ channels
         # have a lower value than any other channels. This is necessary because Microkit will
@@ -54,35 +76,54 @@ class sDDFI2C(sDDFDriverClass):
         self.construct_infrastructure(virt_prio)
 
     def construct_infrastructure(self, virt_prio):
-        self.virt = ProtectionDomain("i2c_virt", self.virt_elf, scheduling=SchedulingProperties(virt_prio), cpu=self.cpu)
-        self.pds.extend([self.driver, self.virt])
+        self.virt = ProtectionDomain(
+            "i2c_virt",
+            self.virt_elf,
+            self.sdf,
+            scheduling=SchedulingProperties(virt_prio),
+            cpu=self.cpu,
+        )
 
         # Make queues
-        driver_req_q_mr = MemoryRegion("i2c_driver_request", 0x1000)
-        driver_resp_q_mr = MemoryRegion("i2c_driver_response", 0x1000)
-        driver_req_map = self.driver.create_automap(driver_req_q_mr, Map.Permissions(r=True, w=True))
-        driver_resp_map = self.driver.create_automap(driver_resp_q_mr, Map.Permissions(r=True, w=True))
-        virt_req_map = self.virt.create_automap(driver_req_q_mr, Map.Permissions(r=True, w=True))
-        virt_resp_map = self.virt.create_automap(driver_resp_q_mr, Map.Permissions(r=True, w=True))
-
-        # Need to keep a reference to MRs to serialise them!
-        self.mrs.extend([driver_req_q_mr, driver_resp_q_mr])
+        driver_req_q_mr = MemoryRegion("i2c_driver_request", 0x1000, self.sdf)
+        driver_resp_q_mr = MemoryRegion("i2c_driver_response", 0x1000, self.sdf)
+        driver_req_map = self.driver.create_automap(
+            driver_req_q_mr, Map.Permissions(r=True, w=True)
+        )
+        driver_resp_map = self.driver.create_automap(
+            driver_resp_q_mr, Map.Permissions(r=True, w=True)
+        )
+        virt_req_map = self.virt.create_automap(
+            driver_req_q_mr, Map.Permissions(r=True, w=True)
+        )
+        virt_resp_map = self.virt.create_automap(
+            driver_resp_q_mr, Map.Permissions(r=True, w=True)
+        )
 
         # Create channels
         driver_virt_ch = Channel(
-                Channel.End(self.driver, can_notify=True, can_pp=False),
-                Channel.End(self.virt, can_notify=True, can_pp=False)
+            Channel.End(self.driver, can_notify=True, can_pp=False),
+            Channel.End(self.virt, can_notify=True, can_pp=False),
+            self.sdf
         )
         self.channels.append(driver_virt_ch)
 
         # Create config structs
         self.virt_driver_config = self.i2c_connection_resource_factory(
-            virt_req_map, virt_resp_map, I2C_NUM_BUFS, driver_virt_ch.id_for_pd(self.virt)
+            virt_req_map,
+            virt_resp_map,
+            I2C_NUM_BUFS,
+            driver_virt_ch.id_for_pd(self.virt),
         )
         driver_virt_connection = self.i2c_connection_resource_factory(
-            driver_req_map, driver_resp_map, I2C_NUM_BUFS, driver_virt_ch.id_for_pd(self.driver)
+            driver_req_map,
+            driver_resp_map,
+            I2C_NUM_BUFS,
+            driver_virt_ch.id_for_pd(self.driver),
         )
-        self.driver_config = self.i2c_driver_config_factory(self.driver, I2C_PROTOCOL_MAGIC, driver_virt_connection)
+        self.driver_config = self.i2c_driver_config_factory(
+            self.driver, I2C_PROTOCOL_MAGIC, driver_virt_connection
+        )
 
     def connect_clients(self):
         assert self.virt is not None
@@ -96,20 +137,22 @@ class sDDFI2C(sDDFDriverClass):
         virt_client_configs = []
         for c in self.clients:
             if c.priority >= self.virt.priority:
-                raise SubsystemBuildError(f"Client {c} has a priority higher "
-                                          f"than virt's ({self.driver.priority})!")
+                raise SubsystemBuildError(
+                    f"Client {c} has a priority higher "
+                    f"than virt's ({self.driver.priority})!"
+                )
             # Make channel
             ch = Channel(
-                    Channel.End(c, can_notify=True, can_pp=True),
-                    Channel.End(self.virt, can_notify=True, can_pp=False)
+                Channel.End(c, can_notify=True, can_pp=True),
+                Channel.End(self.virt, can_notify=True, can_pp=False),
+                self.sdf
             )
             self.channels.append(ch)
 
             # Add request and response queue
-            c_req_q_mr = MemoryRegion(f"i2c_client_request_{c.name}", 0x1000)
-            c_resp_q_mr = MemoryRegion(f"i2c_client_response_{c.name}", 0x1000)
-            c_data_mr = MemoryRegion(f"i2c_client_data_{c.name}", I2C_DATA_SZ)
-            self.mrs.extend([c_req_q_mr, c_resp_q_mr, c_data_mr])
+            c_req_q_mr = MemoryRegion(f"i2c_client_request_{c.name}", 0x1000, self.sdf)
+            c_resp_q_mr = MemoryRegion(f"i2c_client_response_{c.name}", 0x1000, self.sdf)
+            c_data_mr = MemoryRegion(f"i2c_client_data_{c.name}", I2C_DATA_SZ, self.sdf)
 
             # Create maps for clients
             c_req_map = c.create_automap(c_req_q_mr, Map.Permissions(r=True, w=True))
@@ -117,13 +160,23 @@ class sDDFI2C(sDDFDriverClass):
             c_data_map = c.create_automap(c_data_mr, Map.Permissions(r=True, w=True))
 
             # Maps for virt / driver
-            req_map = self.virt.create_automap(c_req_q_mr, Map.Permissions(r=True, w=True))
-            resp_map = self.virt.create_automap(c_resp_q_mr, Map.Permissions(r=True, w=True))
-            data_map = self.driver.create_automap(c_data_mr, Map.Permissions(r=True, w=True))
+            req_map = self.virt.create_automap(
+                c_req_q_mr, Map.Permissions(r=True, w=True)
+            )
+            resp_map = self.virt.create_automap(
+                c_resp_q_mr, Map.Permissions(r=True, w=True)
+            )
+            data_map = self.driver.create_automap(
+                c_data_mr, Map.Permissions(r=True, w=True)
+            )
 
             # Prep config structs
-            virt_connection = self.i2c_connection_resource_factory(req_map, resp_map, I2C_NUM_BUFS, ch.id_for_pd(self.virt))
-            client_connection = self.i2c_connection_resource_factory(c_req_map, c_resp_map, I2C_NUM_BUFS, ch.id_for_pd(c))
+            virt_connection = self.i2c_connection_resource_factory(
+                req_map, resp_map, I2C_NUM_BUFS, ch.id_for_pd(self.virt)
+            )
+            client_connection = self.i2c_connection_resource_factory(
+                c_req_map, c_resp_map, I2C_NUM_BUFS, ch.id_for_pd(c)
+            )
             client_data = RegionResourceFactory(c_data_map)
 
             self.client_configs.append(
@@ -136,9 +189,12 @@ class sDDFI2C(sDDFDriverClass):
             )
         # Clients added. Finally, create virt config
         self.virt_config = self.i2c_virt_config_factory(
-                self.virt, I2C_PROTOCOL_MAGIC, len(self.clients), self.virt_driver_config, virt_client_configs
+            self.virt,
+            I2C_PROTOCOL_MAGIC,
+            len(self.clients),
+            self.virt_driver_config,
+            virt_client_configs,
         )
-
 
     def generate_config_structs(self):
         # We've already made our structs, just return them as a list for the serialiser
@@ -147,16 +203,23 @@ class sDDFI2C(sDDFDriverClass):
         return driver_resources + virt_resources + self.client_configs
 
     # ### connection config struct factory functions ###
-    def i2c_connection_resource_factory(self, req_q: Map, resp_q: Map, num_bufs: int, id: int) -> ConfigStruct:
+    def i2c_connection_resource_factory(
+        self, req_q: Map, resp_q: Map, num_bufs: int, id: int
+    ) -> ConfigStruct:
         fields = {
             "req_queue": RegionResourceFactory(req_q),
             "resp_queue": RegionResourceFactory(resp_q),
             "num_buffers": num_bufs,
-            "id": id
+            "id": id,
         }
         return ConfigStruct("i2c_connection_resource_t", fields=fields)
 
-    def i2c_client_config_factory(self, client_pd: ProtectionDomain, virt_connection: ConfigStruct, data_region: ConfigStruct) -> ConfigStruct:
+    def i2c_client_config_factory(
+        self,
+        client_pd: ProtectionDomain,
+        virt_connection: ConfigStruct,
+        data_region: ConfigStruct,
+    ) -> ConfigStruct:
         """
         Create i2c_client_config for client_pd with serial id n
         """
@@ -166,11 +229,22 @@ class sDDFI2C(sDDFDriverClass):
         fields = {
             "magic": I2C_PROTOCOL_MAGIC,
             "virt": virt_connection,
-            "data": data_region
+            "data": data_region,
         }
-        return ConfigStruct("i2c_client_config_t", target_file=client_pd.prog_image, section_name="i2c_client_config", fields=fields)
+        return ConfigStruct(
+            "i2c_client_config_t",
+            target_file=client_pd.prog_image,
+            section_name="i2c_client_config",
+            fields=fields,
+        )
 
-    def i2c_virt_client_config_factory(self, client_connection: ConfigStruct, data_size: int, driver_d_vaddr: int, client_d_vaddr: int) -> ConfigStruct:
+    def i2c_virt_client_config_factory(
+        self,
+        client_connection: ConfigStruct,
+        data_size: int,
+        driver_d_vaddr: int,
+        client_d_vaddr: int,
+    ) -> ConfigStruct:
         """
         Create a i2c_virt_client_config for some client.
         """
@@ -178,31 +252,53 @@ class sDDFI2C(sDDFDriverClass):
             "conn": client_connection,
             "data_size": data_size,
             "driver_data_vaddr": driver_d_vaddr,
-            "client_data_vaddr": client_d_vaddr
+            "client_data_vaddr": client_d_vaddr,
         }
         return ConfigStruct("i2c_virt_client_config_t", fields=fields)
 
-    def i2c_virt_config_factory(self, virt_pd: ProtectionDomain, magic: str, num_clients: int, driver_connection: ConfigStruct, client_connections: List[ConfigStruct]) -> ConfigStruct:
+    def i2c_virt_config_factory(
+        self,
+        virt_pd: ProtectionDomain,
+        magic: str,
+        num_clients: int,
+        driver_connection: ConfigStruct,
+        client_connections: List[ConfigStruct],
+    ) -> ConfigStruct:
         fields = {
             "magic": magic,
             "num_clients": num_clients,
             "driver": driver_connection,
-            "clients": client_connections
+            "clients": client_connections,
         }
-        return ConfigStruct("i2c_virt_config_t", target_file=virt_pd.prog_image, section_name="i2c_virt_config", fields=fields)
+        return ConfigStruct(
+            "i2c_virt_config_t",
+            target_file=virt_pd.prog_image,
+            section_name="i2c_virt_config",
+            fields=fields,
+        )
 
-    def i2c_driver_config_factory(self, driver_pd: ProtectionDomain, magic: str, virt_connection: ConfigStruct) -> ConfigStruct:
+    def i2c_driver_config_factory(
+        self, driver_pd: ProtectionDomain, magic: str, virt_connection: ConfigStruct
+    ) -> ConfigStruct:
         fields = {
             "magic": magic,
             "virt": virt_connection,
         }
-        return ConfigStruct("i2c_driver_config_t", target_file=driver_pd.prog_image, section_name="i2c_driver_config", fields=fields)
+        return ConfigStruct(
+            "i2c_driver_config_t",
+            target_file=driver_pd.prog_image,
+            section_name="i2c_driver_config",
+            fields=fields,
+        )
+
 
 # Driver configs
 i2c_driver_configs: Dict[str, List[sDDFDriverConfig]] = defaultdict(list)
 
+
 def add_driver_config(driver_name: str, config: sDDFDriverConfig):
     sDDFDriverManifest().add_driver_config(sDDFI2C, driver_name, config)
+
 
 # meson
 add_driver_config(
@@ -210,8 +306,8 @@ add_driver_config(
     sDDFDriverConfig(
         compatible="amlogic,meson-axg-i2c",
         regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)]
-    )
+        irqs=[DTSIRQ(0), DTSIRQ(1)],
+    ),
 )
 
 # opentitan
@@ -220,6 +316,6 @@ add_driver_config(
     sDDFDriverConfig(
         compatible="eth,i2c",
         regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(4), DTSIRQ(0), DTSIRQ(1), DTSIRQ(7), DTSIRQ(9)]
-    )
+        irqs=[DTSIRQ(4), DTSIRQ(0), DTSIRQ(1), DTSIRQ(7), DTSIRQ(9)],
+    ),
 )
