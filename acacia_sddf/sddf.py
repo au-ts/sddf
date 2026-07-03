@@ -154,7 +154,9 @@ class sDDFDriverClass(Subsystem):
                     )
                 else:
                     # This is new (or overlapping with a different start)
-                    mr = MemoryRegion(region_name, mr_sz, self.sdf, paddr=d_paddr, cached=False)
+                    mr = MemoryRegion(
+                        self.sdf, region_name, mr_sz, paddr=d_paddr, cached=False
+                    )
             else:
                 # This is a MR that doesn't correspond to physical memory
                 # mr = MemoryRegion(region_name, region.size)

@@ -24,18 +24,18 @@ struct imx_i2c_regs {
 };
 
 // I2CR Control Register bits
-#define REG_CR_IEN      (1 << 7)    // I2C Enable
-#define REG_CR_IIEN     (1 << 6)    // I2C Interrupt Enable
-#define REG_CR_MSTA     (1 << 5)    // Master/Slave mode (1=Master, generates START when 0->1)
-#define REG_CR_MTX      (1 << 4)    // Transmit/Receive (1=Transmit, 0=Receive)
-#define REG_CR_TXAK     (1 << 3)    // Transmit Acknowledge (1=No ACK sent)
-#define REG_CR_RSTA     (1 << 2)    // Repeat Start (1=Generate repeated START)
+#define REG_CR_IEN      BIT(7)    // I2C Enable
+#define REG_CR_IIEN     BIT(6)    // I2C Interrupt Enable
+#define REG_CR_MSTA     BIT(5)    // Master/Slave mode (1=Master, generates START when 0->1)
+#define REG_CR_MTX      BIT(4)    // Transmit/Receive (1=Transmit, 0=Receive)
+#define REG_CR_TXAK     BIT(3)    // Transmit Acknowledge (1=No ACK sent)
+#define REG_CR_RSTA     BIT(2)    // Repeat Start (1=Generate repeated START)
 
 // I2SR Status Register bits
-#define REG_SR_ICF      (1 << 7)    // Transfer Complete (set at 9th clock falling edge)
-#define REG_SR_IAAS     (1 << 6)    // Addressed As Slave
-#define REG_SR_IBB      (1 << 5)    // Bus Busy (1=Busy, set by START, cleared by STOP)
-#define REG_SR_IAL      (1 << 4)    // Arbitration Lost
-#define REG_SR_SRW      (1 << 2)    // Slave Read/Write (1=Slave transmit)
-#define REG_SR_IIF      (1 << 1)    // I2C Interrupt (set when byte transfer complete)
-#define REG_SR_RXAK     (1 << 0)    // Received Acknowledge (1=No ACK received, 0=ACK received)
+#define REG_SR_ICF      BIT(7)    // Transfer Complete (set at 9th clock falling edge)
+#define REG_SR_IAAS     BIT(6)    // Addressed As Slave
+#define REG_SR_IBB      BIT(5)    // Bus Busy (1=Busy, set by START, cleared by STOP)
+#define REG_SR_IAL      BIT(4)    // Arbitration Lost
+#define REG_SR_SRW      BIT(2)    // Slave Read/Write (1=Slave transmit)
+#define REG_SR_IIF      BIT(1)    // I2C Interrupt (set when byte transfer complete)
+#define REG_SR_RXAK     BIT(0)    // Received Acknowledge (1=No ACK received, 0=ACK received)

@@ -60,7 +60,6 @@ class sDDFTimer(sDDFDriverClass):
                 self.sdf,
                 Channel.End(c, can_notify=False, can_pp=True),
                 Channel.End(self.driver, can_notify=True, can_pp=False),
-                self.sdf
             )
             self.client_configs.append(
                 self.timer_client_config_factory(c, ch.id_for_pd(c))

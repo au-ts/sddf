@@ -119,7 +119,6 @@ class sDDFI2C(sDDFDriverClass):
             self.sdf,
             Channel.End(self.driver, can_notify=True, can_pp=False),
             Channel.End(self.virt, can_notify=True, can_pp=False),
-            self.sdf
         )
         self.channels.append(driver_virt_ch)
 
@@ -161,14 +160,15 @@ class sDDFI2C(sDDFDriverClass):
                 self.sdf,
                 Channel.End(c, can_notify=True, can_pp=True),
                 Channel.End(self.virt, can_notify=True, can_pp=False),
-                self.sdf
             )
             self.channels.append(ch)
 
             # Add request and response queue
-            c_req_q_mr = MemoryRegion(f"i2c_client_request_{c.name}", 0x1000, self.sdf)
-            c_resp_q_mr = MemoryRegion(f"i2c_client_response_{c.name}", 0x1000, self.sdf)
-            c_data_mr = MemoryRegion(f"i2c_client_data_{c.name}", I2C_DATA_SZ, self.sdf)
+            c_req_q_mr = MemoryRegion(self.sdf, f"i2c_client_request_{c.name}", 0x1000)
+            c_resp_q_mr = MemoryRegion(
+                self.sdf, f"i2c_client_response_{c.name}", 0x1000
+            )
+            c_data_mr = MemoryRegion(self.sdf, f"i2c_client_data_{c.name}", I2C_DATA_SZ)
 
             # Create maps for clients
             c_req_map = c.create_automap(c_req_q_mr, Map.Permissions(r=True, w=True))
@@ -333,5 +333,15 @@ add_driver_config(
         compatible="eth,i2c",
         regions=[DTSRegion("regs", "rw", 4096, 0)],
         irqs=[DTSIRQ(4), DTSIRQ(0), DTSIRQ(1), DTSIRQ(7), DTSIRQ(9)],
+    ),
+)
+
+# imx (8mq only for now? untested on others)
+add_driver_config(
+    "imx",
+    sDDFDriverConfig(
+        compatible=["fsl,imx8mq-i2c", "fsl,imx21-i2c"],
+        regions=[DTSRegion("regs", "rw", 4096, 0)],
+        irqs=[DTSIRQ(0)],
     ),
 )
