@@ -8,35 +8,33 @@ from importlib.metadata import version
 
 from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob, Map
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../")
-)
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
 
 from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_ina = ProtectionDomain("client_ina", "client_ina.elf", priority=1)
 
-    i2c = sDDFI2C(board.i2c.compatible, board.i2c.node_path, sdf, driver_prio=200, virt_prio=199)
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
+    client_ina = ProtectionDomain("client_ina", "client_ina.elf", sdf, priority=1)
+
+    i2c = sDDFI2C(
+        board.i2c.compatible, board.i2c.node_path, sdf, driver_prio=200, virt_prio=199
+    )
     i2c.add_client(client_ina)
-    sdf.add_subsystem(i2c)
 
     timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
     timer.add_client(client_ina)
-    sdf.add_subsystem(timer)
 
     serial = sDDFSerial(
-            board.serial.compatible,
-            board.serial.node_path,
-            sdf,
-            driver_prio=201,
-            virt_tx_prio=200,
-            allow_rx=False,
-            enable_color=False,
-            baud_rate=board.baud_rate if board.baud_rate else 115200
+        board.serial.compatible,
+        board.serial.node_path,
+        sdf,
+        driver_prio=201,
+        virt_tx_prio=200,
+        allow_rx=False,
+        enable_color=False,
+        baud_rate=board.baud_rate if board.baud_rate else 115200,
     )
     serial.add_client(client_ina)
-    sdf.add_subsystem(serial)
 
     if board.name == "odroidc4":
         # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
