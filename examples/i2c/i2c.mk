@@ -18,7 +18,9 @@ endif
 PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
 
-SUPPORTED_BOARDS := odroidc4
+SUPPORTED_BOARDS := \
+		odroidc4 \
+		maaxboard
 
 include ${SDDF}/tools/make/board/common.mk
 
