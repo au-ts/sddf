@@ -10,17 +10,10 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../
 
 from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
-<<<<<<< HEAD
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     client_scan = ProtectionDomain(sdf, "client_scan", "client_scan.elf", priority=1)
 
-=======
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_scan = ProtectionDomain("client_scan", "client_scan.elf", priority=1)
-
->>>>>>> 0cbc47d9 (Lint Python with Acacia additions)
     i2c = sDDFI2C(
         sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
     )

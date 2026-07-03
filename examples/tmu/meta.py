@@ -11,24 +11,12 @@ from acacia_sddf import BOARDS, sDDFSerial, sDDFTimer, sDDFTMU
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client = ProtectionDomain("client", "client.elf", priority=1)
+    client = ProtectionDomain("client", "client.elf", sdf, priority=1)
     tmu = sDDFTMU(board.tmu.compatible, board.tmu.node_path, sdf, driver_prio=7)
     tmu.add_client(client)
-    sdf.add_subsystem(tmu)
-
-    # TODO: replace with sdfgen
-    # if board.name == "maaxboard":
-    #     tmu_mr = MemoryRegion(sdf, "tmu_mr", 0x1000, paddr=0x30260000)
-    #     sdf.add_mr(tmu_mr)
-    #
-    #     tmu_mr_map = Map(tmu_mr, 0x30260000, "rw", cached=False)
-    #     tmu_driver.add_map(tmu_mr_map)
-    #     tmu_driver.add_irq(IrqConventional(49 + 32, IrqConventional.Trigger.EDGE))
-    # Connect TMU client
 
     timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
     timer.add_client(client)
-    sdf.add_subsystem(timer)
 
     serial = sDDFSerial(
         board.serial.compatible,
@@ -41,7 +29,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
         baud_rate=board.baud_rate if board.baud_rate else 115200,
     )
     serial.add_client(client)
-    sdf.add_subsystem(serial)
 
     out_file = f"{output_dir}/{sdf_file}"
     sdf.make_config_structs()

@@ -9,7 +9,6 @@ from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBl
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
 from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
-<<<<<<< HEAD
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     client_pn532 = ProtectionDomain(sdf, "client_pn532", "client_pn532.elf", priority=1)
@@ -17,13 +16,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
         sdf, "client_ds3231", "client_ds3231.elf", priority=1
     )
 
-=======
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
-    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
-
->>>>>>> 4eaca1d8 (Lint Python with Acacia additions)
     i2c = sDDFI2C(
         sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
     )

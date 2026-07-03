@@ -174,6 +174,16 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             {"board": "kria_k26"},
         ],
     },
+    "tmu": {
+        "configs": ["debug", "release"],
+        "build_systems": ["make"],
+        "boards": [
+            "maaxboard",
+        ],
+        "tests_exclude": [
+            {"config": "release"},
+        ],
+    },
     "vswitch": {
         "configs": ["debug", "release"],
         "build_systems": ["make"],

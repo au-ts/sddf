@@ -38,10 +38,10 @@ class sDDFTMU(sDDFDriverClass):
         self.driver = ProtectionDomain(
             "tmu_driver",
             driver_elf,
+            self.sdf,
             scheduling=SchedulingProperties(driver_prio, passive=True),
             cpu=cpu,
         )
-        self.pds.append(self.driver)
         self.cpu = cpu
 
         # Create driver resources before doing anything else
@@ -64,10 +64,10 @@ class sDDFTMU(sDDFDriverClass):
             ch = Channel(
                 Channel.End(c, can_notify=do_fwd, can_pp=True),
                 Channel.End(self.driver, can_notify=True, can_pp=False),
+                self.sdf,
             )
             if do_fwd:
                 fwd_channel = ch
-            self.channels.append(ch)
             self.client_configs.append(
                 self.tmu_client_config_factory(c, ch.id_for_pd(c))
             )
