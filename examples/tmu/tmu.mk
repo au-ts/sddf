@@ -71,11 +71,14 @@ client.elf: $(CLIENT_OBJS) libco.a libsddf_util.a
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=tmu_driver_device_resources.data tmu_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx_serial_virt_tx_config.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=client_serial_client_config.data client.elf
+	$(OBJCOPY) --update-section .timer_client_config=client_timer_client_config.data client.elf
+	$(OBJCOPY) --update-section .tmu_client_config=client_tmu_client_config.data client.elf
+	$(OBJCOPY) --update-section .tmu_driver_config=tmu_driver_tmu_driver_config.data tmu_driver.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

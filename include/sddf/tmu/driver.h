@@ -18,13 +18,12 @@
 
 #define LOG_TMU_DRIVER_ERR(...) do{ sddf_dprintf("TMU DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-
 // TODO: we should extract this quantisation logic to a library. This is really similar
 // to what is currently done in timers, i2c and more. The only difference here is that we
 // use float, but that just means we need a float and non-float variant.
-static inline sddf_temp_celsius_t find_quantised_unit(sddf_temp_celsius_t min_temp,
-                                                      sddf_temp_celsius_t max_temp,
-                                                      uint32_t quantisation) {
+static inline sddf_temp_celsius_t find_quantised_unit(sddf_temp_celsius_t min_temp, sddf_temp_celsius_t max_temp,
+                                                      uint32_t quantisation)
+{
     assert(min_temp < max_temp);
 
     // calculate value of a unit in this quantisation
@@ -34,7 +33,6 @@ static inline sddf_temp_celsius_t find_quantised_unit(sddf_temp_celsius_t min_te
     assert(unit != 0);
     return unit;
 }
-
 
 /**
  *  Given a temperature in degrees, return a quantised value to put in a device register.
@@ -49,8 +47,8 @@ static inline sddf_temp_celsius_t find_quantised_unit(sddf_temp_celsius_t min_te
  *  sddf_tmu_err_t OK if fine, otherwise positive error value.
  */
 sddf_tmu_err_t degrees_to_quantised(sddf_temp_celsius_t val_degrees, sddf_temp_celsius_t min_temp,
-                                    sddf_temp_celsius_t max_temp, uint32_t quantisation,
-                                    uint64_t *quantised_val) {
+                                    sddf_temp_celsius_t max_temp, uint32_t quantisation, uint64_t *quantised_val)
+{
     // Sanity: reject values that are invalid
     if (val_degrees < min_temp || val_degrees > max_temp) {
         return SDDF_TMU_ERR_EINVAL;
@@ -80,9 +78,9 @@ sddf_tmu_err_t degrees_to_quantised(sddf_temp_celsius_t val_degrees, sddf_temp_c
  *  Returns:
  *  sddf_tmu_err_t OK if fine, otherwise positive error value.
  */
-sddf_tmu_err_t quantised_to_degrees(uint64_t val_quantised, sddf_temp_celsius_t min_temp,
-                                    sddf_temp_celsius_t max_temp, uint32_t quantisation,
-                                    sddf_temp_celsius_t *degrees_celsius) {
+sddf_tmu_err_t quantised_to_degrees(uint64_t val_quantised, sddf_temp_celsius_t min_temp, sddf_temp_celsius_t max_temp,
+                                    uint32_t quantisation, sddf_temp_celsius_t *degrees_celsius)
+{
 
     sddf_temp_celsius_t unit = find_quantised_unit(min_temp, max_temp, quantisation);
 

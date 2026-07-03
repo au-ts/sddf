@@ -12,9 +12,11 @@
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/tmu/client.h>
+#include <sddf/tmu/config.h>
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+__attribute__((__section__(".tmu_client_config"))) tmu_client_config_t tmu_config;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -22,7 +24,7 @@ cothread_t t_main;
 static serial_queue_handle_t serial_tx_queue_handle;
 
 // TODO: sdfgen for tmu client channel
-#define TMU_CHANNEL (0)
+#define TMU_CHANNEL (tmu_config.driver_id)
 
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
@@ -69,16 +71,17 @@ void notified(sddf_channel ch)
 
 static uint64_t busywork_magic = 0;
 
-void client_main(void) {
+void client_main(void)
+{
     LOG_CLIENT("Entered main loop.\n");
     int ret;
-    #ifdef SDDF_PMU_ENABLE_IRQ
+#ifdef SDDF_TMU_ENABLE_IRQ
     // Set an average temperature IRQ forward @ 45 deg C
     int ret = sddf_tmu_set_irq_mode(TMU_CHANNEL, SDDF_TMU_IRQ_MODE_AVG);
     assert(!ret);
     ret = sddf_tmu_set_irq_threshold(TMU_CHANNEL, 45.0);
     assert(!ret);
-    #endif
+#endif
 
     sddf_tmu_temp_info_t temp_info;
     for (;;) {
@@ -93,7 +96,6 @@ void client_main(void) {
             LOG_CLIENT("\tInst. valid: %d\n", temp_info.valid_inst);
             LOG_CLIENT("\tInst. temp: %f\n", temp_info.temp_inst);
         }
-        // delay_ms(2000);
         // Busy wait to make heat
         for (uint64_t i = 0; i < 100000000; i++) {
             busywork_magic++;
@@ -102,7 +104,7 @@ void client_main(void) {
             if (busywork_magic < 500) {
                 busywork_magic = busywork_magic * 718;
             } else {
-                busywork_magic = busywork_magic - (300*busywork_magic);
+                busywork_magic = busywork_magic - (300 * busywork_magic);
             }
         }
     }
@@ -116,6 +118,7 @@ void init(void)
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     assert(timer_config_check_magic(&timer_config));
+    assert(tmu_config_check_magic(&tmu_config));
     sddf_printf("CLIENT|INFO: starting\n");
 
     timer_channel = timer_config.driver_id;

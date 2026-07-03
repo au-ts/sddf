@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #pragma once
 #include <sddf/util/util.h>
 
@@ -10,7 +11,7 @@ typedef struct imx8mq_tmu_regs {
     uint32_t tmr;               /* 0x00 - TMU mode register */
     uint32_t tsr;               /* 0x04 - TMU status register */
     uint32_t tmtmir;            /* 0x08 - TMU monitor temperature measurement interval register */
-    uint32_t reserved0[5];        /* 0x0C-0x1F - Reserved */
+    uint32_t reserved0[5];      /* 0x0C-0x1F - Reserved */
     uint32_t tier;              /* 0x20 - TMU interrupt enable register */
     uint32_t tidr;              /* 0x24 - TMU interrupt detect register */
     uint32_t tiscr;             /* 0x28 - TMU interrupt site capture register */
@@ -125,4 +126,3 @@ typedef struct imx8mq_tmu_regs {
 // TRATSRn - TMU Report Average Temperature Site Registers
 #define TMU_TRATSR_V_BIT            (BIT(31))
 #define TMU_TRATSR_TEMP_MASK        (0xFF)
-

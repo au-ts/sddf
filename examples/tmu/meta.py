@@ -4,83 +4,49 @@ import os, sys
 import argparse
 from typing import List
 from dataclasses import dataclass
-from sdfgen import SystemDescription, Sddf, DeviceTree
-from importlib.metadata import version
+from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob, Map
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
-)
-from board import BOARDS
-
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
-
-ProtectionDomain = SystemDescription.ProtectionDomain
-MemoryRegion = SystemDescription.MemoryRegion
-Map = SystemDescription.Map
-Channel = SystemDescription.Channel
-IrqConventional = SystemDescription.IrqConventional
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
+from acacia_sddf import BOARDS, sDDFSerial, sDDFTimer, sDDFTMU
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
-    )
-
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=7)
-    tmu_driver = ProtectionDomain("tmu_driver", "tmu_driver.elf", priority=4)
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     client = ProtectionDomain("client", "client.elf", priority=1)
-
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-
-    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client)
-
-    serial_system = Sddf.Serial(
-        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
-    )
-    serial_system.add_client(client)
-
+    tmu = sDDFTMU(board.tmu.compatible, board.tmu.node_path, sdf, driver_prio=7)
+    tmu.add_client(client)
+    sdf.add_subsystem(tmu)
 
     # TODO: replace with sdfgen
-    if board.name == "maaxboard":
-        tmu_mr = MemoryRegion(sdf, "tmu_mr", 0x1000, paddr=0x30260000)
-        sdf.add_mr(tmu_mr)
-
-        tmu_mr_map = Map(tmu_mr, 0x30260000, "rw", cached=False)
-        tmu_driver.add_map(tmu_mr_map)
-        tmu_driver.add_irq(IrqConventional(49 + 32, IrqConventional.Trigger.EDGE))
-
-    else:
-        print("Unsupported board!")
-        exit(-1)
-
+    # if board.name == "maaxboard":
+    #     tmu_mr = MemoryRegion(sdf, "tmu_mr", 0x1000, paddr=0x30260000)
+    #     sdf.add_mr(tmu_mr)
+    #
+    #     tmu_mr_map = Map(tmu_mr, 0x30260000, "rw", cached=False)
+    #     tmu_driver.add_map(tmu_mr_map)
+    #     tmu_driver.add_irq(IrqConventional(49 + 32, IrqConventional.Trigger.EDGE))
     # Connect TMU client
-    # TODO: sdfgen for this
-    tmu_channel = Channel(tmu_driver, client, pp_b=True)
-    sdf.add_channel(tmu_channel)
 
-    pds = [
-        serial_driver,
-        serial_virt_tx,
-        timer_driver,
-        tmu_driver,
-        client,
-    ]
-    for pd in pds:
-        sdf.add_pd(pd)
+    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer.add_client(client)
+    sdf.add_subsystem(timer)
 
-    assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
-    assert timer_system.connect()
-    assert timer_system.serialise_config(output_dir)
+    serial = sDDFSerial(
+        board.serial.compatible,
+        board.serial.node_path,
+        sdf,
+        driver_prio=201,
+        virt_tx_prio=200,
+        allow_rx=False,
+        enable_color=False,
+        baud_rate=board.baud_rate if board.baud_rate else 115200,
+    )
+    serial.add_client(client)
+    sdf.add_subsystem(serial)
 
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
+    out_file = f"{output_dir}/{sdf_file}"
+    sdf.make_config_structs()
+    print(f"Saving to {out_file}")
+    sdf.write_xml_file(out_file)
 
 
 if __name__ == "__main__":
@@ -95,10 +61,7 @@ if __name__ == "__main__":
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
-    sddf = Sddf(args.sddf)
-
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = DeviceTreeBlob(args.dtb)
+    sdf = System(board.arch, board.paddr_top, dtb)
 
     generate(args.sdf, args.output, dtb)

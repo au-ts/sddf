@@ -67,4 +67,3 @@ typedef struct tmu_temp_info {
 #define SDDF_TMU_GET_TEMP_VALIDITY (0)
 #define SDDF_TMU_GET_TEMP_INST (1)
 #define SDDF_TMU_GET_TEMP_AVG (2)
-

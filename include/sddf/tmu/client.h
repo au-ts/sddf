@@ -65,4 +65,3 @@ static inline int sddf_tmu_get_temp(microkit_channel channel, sddf_tmu_temp_info
 
     return ret;
 }
-
