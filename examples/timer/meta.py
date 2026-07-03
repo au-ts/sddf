@@ -12,7 +12,6 @@ from acacia.arch import x86_64
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 from acacia_sddf import BOARDS, sDDFTimer
 
-
 def generate(sdf_file: str, output_dir: str):
     client = ProtectionDomain(sdf, "client", "client.elf", priority=1)
 
