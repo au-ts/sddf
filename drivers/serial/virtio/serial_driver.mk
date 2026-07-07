@@ -7,8 +7,13 @@
 # the virtio console driver.
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+VIRTIO_TRANSPORT_DIR := $(SDDF)/virtio/transport/
 
-serial_driver.elf: serial/virtio/serial_driver.o libsddf_util_debug.a
+serial/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c | $(SDDF_LIBC_INCLUDE)
+	mkdir -p serial/virtio/mmio
+	${CC} -c ${CFLAGS} -o $@ $<
+
+serial_driver.elf: serial/virtio/serial_driver.o libsddf_util_debug.a serial/virtio/mmio/transport.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 serial/virtio/serial_driver.o: ${SERIAL_DRIVER_DIR}/console.c |serial/virtio $(SDDF_LIBC_INCLUDE)
@@ -17,7 +22,7 @@ serial/virtio/serial_driver.o: ${SERIAL_DRIVER_DIR}/console.c |serial/virtio $(S
 serial/virtio:
 	mkdir -p $@
 
--include serial/virtio/serial_driver.d
+-include serial/virtio/serial_driver.d serial/virtio/mmio/transport.d
 
 clean::
 	rm -f serial/virtio/serial_driver.[do]
