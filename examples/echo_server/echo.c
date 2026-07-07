@@ -85,7 +85,6 @@ void notified(sddf_channel ch)
         sddf_lwip_process_rx();
     } else if (ch == timer_config.driver_id) {
         sddf_lwip_process_timeout();
-        set_timeout();
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {
         // Nothing to do
     } else {
