@@ -9,7 +9,7 @@
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 VIRTIO_TRANSPORT_DIR := $(SDDF)/virtio/transport/
 
-serial/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
+serial/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p serial/virtio/mmio
 	${CC} -c ${CFLAGS} -o $@ $<
 
