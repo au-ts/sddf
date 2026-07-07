@@ -83,7 +83,9 @@ static inline uint16_t net_queue_length(net_queue_t *queue)
  */
 static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail - queue->free->head == 0;
+    uint16_t head = queue->free->head;
+    uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_RELAXED);
+    return tail - head == 0;
 }
 
 /**
@@ -95,7 +97,9 @@ static inline bool net_queue_empty_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail - queue->active->head == 0;
+    uint16_t tail = queue->active->tail;
+    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_RELAXED);
+    return tail - head == 0;
 }
 
 /**
@@ -107,7 +111,10 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail - queue->free->head == queue->capacity;
+    uint16_t tail = queue->free->tail;
+    uint32_t capacity = queue->capacity;
+    uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_RELAXED);
+    return tail - head == capacity;
 }
 
 /**
@@ -119,7 +126,10 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail - queue->active->head == queue->capacity;
+    uint16_t tail = queue->active->tail;
+    uint32_t capacity = queue->capacity;
+    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_RELAXED);
+    return tail - head == capacity;
 }
 
 /**
@@ -132,15 +142,21 @@ static inline bool net_queue_full_active(net_queue_handle_t *queue)
  */
 static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t buffer)
 {
-    if (net_queue_full_free(queue)) {
+    net_queue_t *free = queue->free;
+    uint16_t tail = free->tail;
+    uint32_t capacity = queue->capacity;
+    uint16_t head = __atomic_load_n(&free->head, __ATOMIC_RELAXED);
+    if (tail - head == capacity) {
         return -1;
     }
 
-    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->free->tail++;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    free->buffers[tail % capacity] = buffer;
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
+    __atomic_store_n(&free->tail, tail + 1, __ATOMIC_RELAXED);
 
     return 0;
 }
@@ -155,15 +171,21 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
  */
 static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t buffer)
 {
-    if (net_queue_full_active(queue)) {
+    net_queue_t *active = queue->active;
+    uint16_t tail = active->tail;
+    uint32_t capacity = queue->capacity;
+    uint16_t head = __atomic_load_n(&active->head, __ATOMIC_RELAXED);
+    if (tail - head == capacity) {
         return -1;
     }
 
-    queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->active->tail++;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    active->buffers[tail % capacity] = buffer;
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
+    __atomic_store_n(&active->tail, tail + 1, __ATOMIC_RELAXED);
 
     return 0;
 }
@@ -178,15 +200,21 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
  */
 static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *buffer)
 {
-    if (net_queue_empty_free(queue)) {
+    net_queue_t *free = queue->free;
+    uint16_t head = free->head;
+    uint32_t capacity = queue->capacity;
+    uint16_t tail = __atomic_load_n(&free->tail, __ATOMIC_RELAXED);
+    if (tail - head == 0) {
         return -1;
     }
 
-    *buffer = queue->free->buffers[queue->free->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->free->head++;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    *buffer = free->buffers[head % capacity];
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
+    __atomic_store_n(&free->head, head + 1, __ATOMIC_RELAXED);
 
     return 0;
 }
@@ -201,15 +229,21 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
  */
 static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t *buffer)
 {
-    if (net_queue_empty_active(queue)) {
+    net_queue_t *active = queue->active;
+    uint16_t tail = active->tail;
+    uint32_t capacity = queue->capacity;
+    uint16_t head = __atomic_load_n(&active->head, __ATOMIC_RELAXED);
+    if (tail - head == 0) {
         return -1;
     }
 
-    *buffer = queue->active->buffers[queue->active->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->active->head++;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    *buffer = active->buffers[head % capacity];
+
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
+    __atomic_store_n(&active->head, head + 1, __ATOMIC_RELAXED);
 
     return 0;
 }
