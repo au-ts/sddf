@@ -329,10 +329,6 @@ typedef struct object_lookup_list {
     aml_object_t *next;
 } object_lookup_list_t;
 
-typedef enum {
-    ACPI_TABLE_TYPE_DSDT = 0,
-} acpi_table_type_t;
-
 typedef struct {
     acpi_table_type_t type;
     uintptr_t base_addr;
@@ -366,6 +362,7 @@ extern pci_resources_t *pci_resources;
 extern aml_object_t *lookup_results[100];
 extern uint32_t lookup_cnt;
 
+// TODO: remove these
 extern const char acpi_str_fadt[];
 extern const char acpi_str_mcfg[];
 extern const char acpi_str_hid[];
@@ -411,6 +408,23 @@ typedef struct parse_state {
     bool evaluation;
     bool if_condition;
 } parse_state_t;
+
+#define MAX_NUM_ACPI_TABLES 20
+
+typedef enum {
+    ACPI_TABLE_TYPE_FADT,
+    ACPI_TABLE_TYPE_DSDT,
+    ACPI_TABLE_TYPE_SSDT,
+    ACPI_TABLE_TYPE_MCFG,
+} acpi_table_type_t;
+
+typedef struct {
+    acpi_header_t *tables[MAX_NUM_ACPI_TABLES];
+    uintptr_t tables_end;
+    uintptr_t mem_end;
+    uint32_t alignment;
+    uint32_t num_tables;
+} acpi_tables_summary_t;
 
 extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
