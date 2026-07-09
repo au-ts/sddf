@@ -3,6 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
+#pragma once
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -11,6 +13,7 @@
 #include <sel4/bootinfo_types.h>
 #include <sel4/sel4_arch/mapping.h>
 #include <sel4/sel4_arch/constants.h>
+#include <sddf/util/vspace.h>
 
 #include "acpi.h"
 
@@ -21,18 +24,22 @@ typedef struct {
     seL4_UntypedDesc untypedList[CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS];
 } capDLBootInfo_t;
 
+const char acpi_str_rsdt[] = {'R', 'S', 'D', 'T', 0};
+const char acpi_str_dsdt[] = {'D', 'S', 'D', 'T', 0};
+const char acpi_str_ssdt[] = {'S', 'S', 'D', 'T', 0};
 const char acpi_str_fadt[] = {'F', 'A', 'C', 'P', 0};
 const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
-const char acpi_str_hid[] = {'_', 'H', 'I', 'D', 0};  // Hardware ID
-const char acpi_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
-const char acpi_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
-const char acpi_str_pic[] = {'_', 'P', 'I', 'C', 0};  // PIC mode method
+const char aml_str_hid[] = {'_', 'H', 'I', 'D', 0};  // Hardware ID
+const char aml_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
+const char aml_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
+const char aml_str_pic[] = {'_', 'P', 'I', 'C', 0};  // PIC mode method
 const char eisaid_str_pcie[] = {'P', 'N', 'P', '0', 'A', '0', '8', 0};  // PCI Express Bus
 
 capDLBootInfo_t *capDLBootInfo;
 uintptr_t aml_object_pool_start = 0x30000000;
 uintptr_t aml_object_pool_size = 0x100000;
-pci_resources_t *pci_resources = 0x60000000;
+pci_resources_t *pci_resources = (pci_resources_t *)0x60000000;
+uintptr_t ecam_base_vaddr = 0x20000000;
 
 seL4_CPtr vspace_cptr_pci_driver;
 seL4_CPtr cnode_cptr_remaining_untypeds;
@@ -41,19 +48,20 @@ uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
 seL4_CPtr cnode_pci_resources_free_slot = 1;
 
-scanner_t scanner;
-
 uintptr_t acpi_vaddr = 0x4000000;
 
 cnode_specs_t post_boot_cnode;
-cnode_caps_t *cnode_caps_pci_resources;
+cnode_specs_t *cnode_caps_pci_resources;
 
-acpi_copy_t acpi_tables_copy;
 mempool_t aml_namespace_mempool;
 aml_namespace_node_t namespace_root;
 
+// Lookup results of AML namespace nodes
+#define MAX_NUM_LOOKUP_NODES 128
+aml_namespace_node_t *lookup_results[MAX_NUM_LOOKUP_NODES];
+
 __attribute__((__aligned__(0x1000))) __attribute__((__section__(".acpi_tables"))) uint8_t acpi_tables[500000];
-__attribute__((__aligned__(0x1000))) __attribute__((__section__(".acpi_tables_summary"))) acpi_tables_summary_t acpi_tables_summary;
+__attribute__((__section__(".acpi_tables_summary"))) acpi_tables_summary_t acpi_tables_summary;
 
 void pass_resource_with_range(uint8_t resource_type, uint64_t min_address, uint64_t max_address)
 {
@@ -153,39 +161,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
     }
 }
 
-void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
-{
-    // DefPackage := PackageOp PkgLength NumElements PackageElementList
-    if (prt_data.type != DATA_OBJ_PACKAGE) {
-        sddf_dprintf("[Error] not a package data given\n");
-        return;
-    }
-
-    scanner.current = (uint8_t *)prt_data.value;
-    uint8_t *package_end = (uint8_t *)prt_data.value + prt_data.length;
-    pci_bridge_t *pci_bridge_resource = &pci_resources->bridges[pci_resources->num_bridges];
-
-    uint8_t num_elements = advance();
-    sddf_dprintf("num_elements: %u\n", num_elements);
-
-    while (scanner.current < package_end) {
-        // Check if element is also Package Object
-        if (advance() != PACKAGE_PREFIX) return;
-
-        uint8_t *element_pkt_end = get_pkt_end();
-        uint32_t element_num_elements = advance();
-
-        // Check if num of elements is 4
-        if (element_num_elements != 4) return;
-
-        sddf_dprintf("current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)element_pkt_end);
-        pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
-        eval_data_object(pci_prt, element_pkt_end);
-
-        pci_bridge_resource->num_prt_entries++;
-        sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
-    }
-}
+// TODO: this should be in interpreter.c
 
 bool validate_acpi_table_signature(acpi_header_t *header, const char *signature)
 {
@@ -204,7 +180,7 @@ bool validate_acpi_table_signature(acpi_header_t *header, const char *signature)
 
 bool map_acpi_table_header(uintptr_t paddr, acpi_header_t *header)
 {
-    return map_memory_region(paddr, sizeof(acpi_header_t), (uintptr_t)header);
+    return map_memory_region(&post_boot_cnode, paddr, sizeof(acpi_header_t), (uintptr_t)header);
 }
 
 bool map_acpi_table_content(uintptr_t paddr, acpi_header_t *header)
@@ -212,16 +188,17 @@ bool map_acpi_table_content(uintptr_t paddr, acpi_header_t *header)
     uintptr_t mapped_paddr_end = ROUND_UP(paddr + sizeof(acpi_header_t), PAGE_SIZE);
     uintptr_t mapped_vaddr_end = ROUND_UP((uintptr_t)header + sizeof(acpi_header_t), PAGE_SIZE);
     uintptr_t acpi_table_paddr_end = paddr + header->length;
-    return map_memory_region(mapped_paddr_end, acpi_table_paddr_end - mapped_paddr_end, mapped_vaddr_end);
+    return map_memory_region(&post_boot_cnode, mapped_paddr_end, acpi_table_paddr_end - mapped_paddr_end, mapped_vaddr_end);
 }
 
 void backup_acpi_table(acpi_header_t *header)
 {
-    uintptr_t backup_table_vaddr = ROUND_UP(acpi_tables_summary.tables_end, acpi_tables_summary.alignment);
+    uintptr_t backup_table_vaddr = (uintptr_t)&acpi_tables + ROUND_UP(acpi_tables_summary.tables_end, ACPI_TABLES_ALIGNMENT);
+    sddf_dprintf("backup_table_vaddr: 0x%lx\n", backup_table_vaddr);
     assert(backup_table_vaddr + header->length < acpi_tables_summary.mem_end);
-    memcpy(backup_table_vaddr, header, header->length);
+    memcpy((void *)backup_table_vaddr, (void *)header, header->length);
 
-    uint32_t table_idx = acpi_tables_sumamry.num_tables;
+    uint32_t table_idx = acpi_tables_summary.num_tables;
     acpi_tables_summary.tables[table_idx] = (acpi_header_t *)backup_table_vaddr;
     acpi_tables_summary.num_tables++;
 }
@@ -251,13 +228,14 @@ void load_acpi_tables()
     }
 
     // Map all the frames covering the RSDT table
-    acpi_header_t *rsdt_header = (acpi_header_t *)(acpi_vaddr + PAGE_OFFEST(rsdt_addr));
+    acpi_header_t *rsdt_header = (acpi_header_t *)(acpi_vaddr + PAGE_OFFSET(rsdt_paddr));
     assert(map_acpi_table_header(rsdt_paddr, rsdt_header));
     validate_acpi_table_signature(rsdt_header, acpi_str_rsdt);
 
     assert(map_acpi_table_content(rsdt_paddr, rsdt_header));
+
     backup_acpi_table(rsdt_header);
-    assert(untypeds_revoke() == seL4_NoError());
+    assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
 
     acpi_header_t *acpi_rsdt_header = find_first_acpi_header_by_signature(acpi_str_rsdt);
     assert(acpi_rsdt_header != NULL);
@@ -265,8 +243,8 @@ void load_acpi_tables()
     acpi_rsdt_t *acpi_rsdt = (acpi_rsdt_t *)acpi_rsdt_header;
     // TODO: XSDT has different struct size
     uint32_t num_entries = (acpi_rsdt->header.length - sizeof(acpi_rsdt->header)) / sizeof(uint32_t);
-    sddf_dprintf("entries: %d, rsdt_offset: 0x%x, length: %d\n", num_entries, rsdt_offset, acpi_rsdt->header.length);
-    uint32_t *table_entries = (uint32_t *)acpi_rsdt->entries;
+    sddf_dprintf("entries: %d, length: %d\n", num_entries, acpi_rsdt->header.length);
+    uint32_t *table_entries = (uint32_t *)acpi_rsdt->entry;
 
     // Look up entries in RSDT
     for (int i = 0; i < num_entries; i++) {
@@ -286,10 +264,10 @@ void load_acpi_tables()
             sddf_dprintf("DSDT address: 0x%x\n", fadt_table->dsdt);
             uintptr_t acpi_dsdt_paddr = fadt_table->dsdt;
 
-            assert(untypeds_revoke() == seL4_NoError());
+            assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
             // FADT table has been unmapped, so it's no longer readable
 
-            acpi_header_t *dsdt_header = (acpi_header_t *)(acpi_vaddr + acpi_dsdt_paddr & 0xfff);
+            acpi_header_t *dsdt_header = (acpi_header_t *)(acpi_vaddr + (acpi_dsdt_paddr & 0xfff));
             assert(map_acpi_table_header(acpi_dsdt_paddr, dsdt_header));
             validate_acpi_table_signature(dsdt_header, acpi_str_dsdt);
 
@@ -300,15 +278,15 @@ void load_acpi_tables()
         } else if (strncmp(header->signature, acpi_str_mcfg, 4) == 0) {
             // Map and backup the MCFG table
             assert(map_acpi_table_content(table_entries[i], header));
-            bakcup_acpi_table(header);
+            backup_acpi_table(header);
 
         } else if (strncmp(header->signature, acpi_str_ssdt, 4) == 0) {
             // Map and backup the SSDT table
             assert(map_acpi_table_content(table_entries[i], header));
-            bakcup_acpi_table(header);
+            backup_acpi_table(header);
         }
 
-        assert(untypeds_revoke() == seL4_NoError());
+        assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
     }
 }
 
@@ -316,6 +294,7 @@ void init(void)
 {
     // Init the CNode specs that record all the untypeds passed from the capDL initialiser
     capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds;
+    post_boot_cnode.cptr = cnode_cptr_remaining_untypeds;
     post_boot_cnode.start = capDLBootInfo->untypeds.start;
     // TODO: is end empty?
     for (uint64_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
@@ -323,16 +302,20 @@ void init(void)
         post_boot_cnode.caps[i].end_addr = post_boot_cnode.caps[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits);
         post_boot_cnode.caps[i].is_device = capDLBootInfo->untypedList[i].isDevice;
         post_boot_cnode.caps[i].object_type = seL4_UntypedObject;
-        post_boot_cnode.end++;
+        post_boot_cnode.end = i + 1;
     }
-    update_active_ut_idx(post_boot_cnode);
+    update_active_ut_idx(&post_boot_cnode);
+
+    sddf_dprintf("ACPI tables summary:\n");
+    sddf_dprintf("  num_tables: %d\n", acpi_tables_summary.num_tables);
+    sddf_dprintf("  mem_size: %d\n", acpi_tables_summary.mem_end);
+    sddf_dprintf("  tables_end: %d\n", acpi_tables_summary.tables_end);
 
     if (acpi_tables_summary.num_tables == 0) {
         load_acpi_tables();
     }
 
     sddf_dprintf("======MAP ======\n");
-    pci_resources = (pci_resources_t *)pci_resources_vaddr;
 
     acpi_mcfg_t *mcfg_table = (acpi_mcfg_t *)find_first_acpi_header_by_signature(acpi_str_mcfg);
     assert(mcfg_table != NULL);
@@ -346,38 +329,32 @@ void init(void)
         pci_resources->num_pci_groups++;
     }
 
-    seL4_Error error;
-
-    sddf_dprintf("===============Scanning DSDT===============\n");
+    sddf_dprintf("===============Scanning DSDT and SSDT===============\n");
+    aml_namespace_mempool.start = (void *)aml_object_pool_start;
+    aml_namespace_mempool.next = (void *)aml_object_pool_start;
+    aml_namespace_mempool.end = (void *)aml_object_pool_start + aml_object_pool_size;
 
     acpi_dsdt_t *dsdt_table = (acpi_dsdt_t *)find_first_acpi_header_by_signature(acpi_str_dsdt);
     assert(dsdt_table != NULL);
     uint8_t *dsdt_table_end = (uint8_t *)dsdt_table + dsdt_table->header.length;
-    scanner.current = (uint8_t *)&dsdt_table->content[0];
-    aml_namespace_mempool.start = (void *)aml_object_pool_start;
-    aml_namespace_mempool.next = (void *)aml_object_pool_start;
-    aml_namespace_mempool.end = (void *)aml_object_pool_start + aml_object_pool_size;
-    sddf_dprintf("dsdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)&dsdt_table, (uintptr_t)scanner.current);
-
+    set_scanner_to((uint8_t *)&dsdt_table->content[0]);
     namespace_root.pkt_start = scanner.current;
     namespace_root.op_code = NULL_OP;
     namespace_root.name[0] = '\\';
     scan_namespace_tree(&namespace_root, dsdt_table_end);
 
-    sddf_dprintf("===============Scanning SSDT===============\n");
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
-        if (strncmp(acpi_tables_summary.tables[i].signature, acpi_str_ssdt, 4) == 0) {
+        if (strncmp(acpi_tables_summary.tables[i]->signature, acpi_str_ssdt, 4) == 0) {
             acpi_dsdt_t *ssdt_table = (acpi_dsdt_t *)acpi_tables_summary.tables[i];
             uint8_t *ssdt_table_end = (uint8_t *)ssdt_table + ssdt_table->header.length;
-            scanner.current = (uint8_t *)&acpi_ssdt_table->content[0];
-            sddf_dprintf("ssdt_table: 0x%lx, scanner.start: 0x%lx\n", (uintptr_t)ssdt_table, (uintptr_t)scanner.current);
+            set_scanner_to((uint8_t *)&ssdt_table->content[0]);
             scan_namespace_tree(&namespace_root, ssdt_table_end);
         }
     }
 
-    aml_namespace_node_t *lookup_results[128];
+    // Look for _PIC method
     uint8_t num_results = find_decendant_nodes_by_name(&namespace_root, aml_str_pic, lookup_results, 0);
-    assert(num_results == 1); // There must be only one _PIC method
+    assert(num_results == 1 && num_results < MAX_NUM_LOOKUP_NODES); // There must be only one _PIC method
     sddf_dprintf("Found _PIC method! num: %u\n", num_results);
 
     // Enable APIC mode: pass 1 to method "_PIC"
@@ -385,9 +362,9 @@ void init(void)
     // TODO: fix ret_type
     eval_namespace_node(lookup_results[0], 1, &pic_method_arg);
 
+    // Extract _CRS and _PRT
     sddf_dprintf("===============Extract _CRS===============\n");
-
-    num_results = find_decendant_nodes_by_name(&namespace_root, acpi_str_hid, lookup_results, 0);
+    num_results = find_decendant_nodes_by_name(&namespace_root, aml_str_hid, lookup_results, 0);
     assert(num_results == num_pci_seg_grps); // Num of PCIe bridges should be matched in MCFG and DSDT
 
     for (uint32_t i = 0; i < num_results; i++) {
@@ -396,7 +373,7 @@ void init(void)
         read_eisa_id(node, eisa_id);
         if (!strcmp(eisa_id, eisaid_str_pcie)) {
             sddf_dprintf("=====Found PCIe Bus\n");
-            aml_namespace_node_t *crs_node = find_child_node_by_name(node->parent, acpi_str_crs);
+            aml_namespace_node_t *crs_node = find_child_node_by_name(node->parent, aml_str_crs);
             assert(crs_node != NULL);
 
             /* aml_data_t crs_data_before_eval = {0x21675b, 17, 540}; */
@@ -406,7 +383,7 @@ void init(void)
             pass_crs_and_caps(crs_data, pci_resources->num_bridges);
             sddf_dprintf("======Finish _CRS parsing\n");
 
-            aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, acpi_str_prt);
+            aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, aml_str_prt);
             assert(prt_node != NULL);
 
             aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
@@ -417,7 +394,8 @@ void init(void)
         }
     }
 
-    uintptr_t ecam_base_vaddr = 0x20000000;
+    // Map ECAM space for PCIe driver
+    seL4_Error error;
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
                      pci_resources->pci_seg_groups[i].group_id,
@@ -429,7 +407,7 @@ void init(void)
         uintptr_t cur_paddr = pci_resources->pci_seg_groups[i].base_addr;
         uintptr_t cur_vaddr = ecam_base_vaddr;
         while (cur_paddr < end_paddr) {
-            error = retype_and_map_frame(cur_paddr, cur_vaddr, seL4_CapInitThreadVSpace, seL4_X86_LargePageObject, seL4_ReadWrite);
+            error = retype_and_map_frame(&post_boot_cnode, cur_paddr, cur_vaddr, seL4_CapInitThreadVSpace, seL4_X86_LargePageObject, seL4_ReadWrite);
             if (error != seL4_NoError) {
                 sddf_dprintf("Error: failed to retype or map a frame.\n");
                 return;
