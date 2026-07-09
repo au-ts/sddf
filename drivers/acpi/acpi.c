@@ -193,14 +193,16 @@ bool map_acpi_table_content(uintptr_t paddr, acpi_header_t *header)
 
 void backup_acpi_table(acpi_header_t *header)
 {
-    uintptr_t backup_table_vaddr = (uintptr_t)&acpi_tables + ROUND_UP(acpi_tables_summary.tables_end, ACPI_TABLES_ALIGNMENT);
-    sddf_dprintf("backup_table_vaddr: 0x%lx\n", backup_table_vaddr);
+    uintptr_t backup_table_vaddr = ROUND_UP((uintptr_t)&acpi_tables + acpi_tables_summary.tables_end, ACPI_TABLES_ALIGNMENT);
+    sddf_dprintf("backup_table_vaddr: 0x%lx, len: 0x%x, end: 0x%lx\n", backup_table_vaddr, header->length, backup_table_vaddr + header->length);
     assert(backup_table_vaddr + header->length < acpi_tables_summary.mem_end);
     memcpy((void *)backup_table_vaddr, (void *)header, header->length);
 
     uint32_t table_idx = acpi_tables_summary.num_tables;
     acpi_tables_summary.tables[table_idx] = (acpi_header_t *)backup_table_vaddr;
     acpi_tables_summary.num_tables++;
+    acpi_tables_summary.tables_end = backup_table_vaddr + header->length - (uintptr_t)&acpi_tables;
+    sddf_dprintf("update tables_end to 0x%lx\n", acpi_tables_summary.tables_end);
 }
 
 acpi_header_t *find_first_acpi_header_by_signature(const char *signature)
@@ -233,7 +235,6 @@ void load_acpi_tables()
     validate_acpi_table_signature(rsdt_header, acpi_str_rsdt);
 
     assert(map_acpi_table_content(rsdt_paddr, rsdt_header));
-
     backup_acpi_table(rsdt_header);
     assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
 
@@ -243,8 +244,8 @@ void load_acpi_tables()
     acpi_rsdt_t *acpi_rsdt = (acpi_rsdt_t *)acpi_rsdt_header;
     // TODO: XSDT has different struct size
     uint32_t num_entries = (acpi_rsdt->header.length - sizeof(acpi_rsdt->header)) / sizeof(uint32_t);
-    sddf_dprintf("entries: %d, length: %d\n", num_entries, acpi_rsdt->header.length);
-    uint32_t *table_entries = (uint32_t *)acpi_rsdt->entry;
+    sddf_dprintf("rsdt: 0x%lx, entries: %d, length: %d\n", (uintptr_t)acpi_rsdt_header, num_entries, acpi_rsdt->header.length);
+    uint32_t *table_entries = (uint32_t *)&acpi_rsdt->entry;
 
     // Look up entries in RSDT
     for (int i = 0; i < num_entries; i++) {
@@ -256,6 +257,7 @@ void load_acpi_tables()
                  header->signature[1],
                  header->signature[2],
                  header->signature[3]);
+        sddf_dprintf("Entry pointer: 0x%lx, location: 0x%lx\n", table_entries[i], &table_entries[i]);
 
         if (strncmp(header->signature, acpi_str_fadt, 4) == 0) {
             assert(map_acpi_table_content(table_entries[i], header));
