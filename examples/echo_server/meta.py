@@ -154,6 +154,48 @@ class BenchmarkConfig:
             num_pmu_events,
         )
 
+class AcpiTablesConfig:
+    def __init__(
+        self,
+        max_total_size: int,
+    ):
+        self.max_total_size = max_total_size
+        self.patched_tables_end = 0
+        self.alignment = 0x1000
+        self.max_num_acpi_tables = 20 # This needs to be synced with MAX_NUM_ACPI_TABLES in acpi.h
+        self.num_tables = 0
+        self.acpi_table_bytes = bytearray()
+        self.acpi_table_pointers = [0] * self.max_num_acpi_tables
+
+    # TODO: add the checks
+    def add_acpi_table(self, dsl_file):
+        assert os.path.isfile(dsl_file)
+        with open(data_name, "rb") as data_file:
+            byte_list = list(data_file.read())
+
+            if len(byte_list) + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_bytes.extend(byte_list)
+                self.patched_tables_end = len(self.acpi_table_bytes)
+                self.num_tables += 1
+
+        trailing_len = len(self.acpi_table_bytes) & self.alignment
+        if trailing_len != 0:
+            padding_len = self.alignment - trailing_len
+            if padding_len + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_bytes.extend(b"\x00" * padding_len)
+
+    def summary_serialise(self):
+        pack_str = "<" + "Q" * self.max_num_acpi_tables + "QQII"
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_pointers,
+            self.patched_tables_end,
+            self.max_total_size,
+            self.alignment,
+            self.num_tables,
+        )
+
 
 # Adds ".elf" to elf strings
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
@@ -209,6 +251,8 @@ def generate(
     acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200, stack_size=0x5000)
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
 
+    acpi_tables_config = AcpiTablesConfig(0x500000)
+
     acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
     acpi_driver.add_boot_info(BootInfo("rsdp"))
 
@@ -233,16 +277,6 @@ def generate(
     mr_acpi_tables_copy = MemoryRegion(sdf, "acpi_tables_copy", 0x50000)
     sdf.add_mr(mr_acpi_tables_copy)
     acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
-
-    update_elf_section(
-        "acpi_driver.elf", "test_dsdt_table", "test_dsdt_table"
-    )
-    update_elf_section(
-        "acpi_driver.elf", "test_ssdt_table", "test_ssdt_table"
-    )
-    update_elf_section(
-        "acpi_driver.elf", "test_mcfg_table", "test_mcfg_table"
-    )
 
     mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x8000)
     sdf.add_mr(mr_pci_resources)
@@ -603,6 +637,10 @@ def generate(
         update_elf_section(
             "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
         )
+
+    with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
+        f.write(acpi_tables_config.summary_serialise())
+    update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())

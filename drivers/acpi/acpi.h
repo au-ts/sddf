@@ -7,9 +7,11 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <sddf/util/cspace.h>
 #include <sddf/util/printf.h>
 
 #define HEX_TO_CHAR(hex) ((hex) < 10) ? ((hex) + '0') : ((hex) - 10 + 'A')
+#define ACPI_TABLES_ALIGNMENT 0x1000
 
 // A system could have up to 65536 PCI Segment Groups in theory, but 16 is
 // sufficient in our use cases.
@@ -159,32 +161,6 @@ enum aml_data_resource_type {
     QWORD_AS_DESCRIPTOR = 0x8A,
 };
 
-// Each path segment has exactly 4 characters, up to 25 segments are assumed
-#define AML_MAX_PATH_STR 100
-typedef struct {
-    char name_str[AML_MAX_PATH_STR];
-    uint32_t len;
-} aml_path_seg_t;
-
-typedef struct {
-    uintptr_t base_addr;
-    uintptr_t end_addr;
-    uint8_t is_device;
-    uint8_t object_type;
-    uint32_t parent;
-    uint32_t child;
-    uint32_t next;
-} cap_desc_t;
-
-typedef struct {
-    cap_desc_t desc[256];
-    uint32_t start;
-    uint32_t end;
-} cnode_caps_t;
-
-// see Section 20.2.4 Package Length Encoding
-typedef uint32_t aml_pkg_len_t;
-
 #define MAX_NUM_AS_RESOURCES 10
 #define MAX_NUM_PRT_ENTRIES 256
 
@@ -229,7 +205,7 @@ typedef struct {
     uint32_t num_pci_groups;
     pci_bridge_t bridges[10];
     uint32_t num_bridges;
-    cnode_caps_t cnode_caps;
+    cnode_specs_t cnode_specs;
 } pci_resources_t;
 
 typedef struct {
@@ -303,73 +279,8 @@ typedef struct {
     uint8_t* current;
 } scanner_t;
 
-enum aml_method_ret_type {
-    RET_TYPE_NONE = 0,
-    RET_TYPE_INTEGER = 1,
-    RET_TYPE_OBJECT = 2,
-};
-
-typedef struct aml_object {
-    uint8_t *start;
-    struct aml_object *parent;  // parent
-    struct aml_object *child;   // first child object
-    struct aml_object *next;    // siblings
-    char name[5];               // Name Segment
-    enum aml_encoding_value op_code;
-    uint32_t value;             // Only used for NameObject
-} aml_object_t;
-
-typedef struct aml_object_pool {
-    uintptr_t next;
-    uintptr_t end;
-} aml_object_pool_t;
-
-typedef struct object_lookup_list {
-    aml_object_t *node;
-    aml_object_t *next;
-} object_lookup_list_t;
-
-typedef struct {
-    acpi_table_type_t type;
-    uintptr_t base_addr;
-    uint32_t length;
-} acpi_table_t;
-
-typedef struct {
-    acpi_table_t tables[20];
-    uintptr_t free_addr;
-    uintptr_t end_addr;
-    uint32_t num_tables;
-} acpi_copy_t;
-
-void scan_objects(aml_object_t *parent, uint8_t *next_parent_start);
-void print_object_tree(aml_object_t *node, uint8_t depth);
-acpi_crs_list_t *extract_pcie_crs(aml_object_t *node);
-void print_crs_list(acpi_crs_list_t *crs_list);
-bool extract_pcie_prt(aml_object_t *node, char *package_name);
-void extract_prt_package(aml_object_t *node, pci_bridge_t *pci_bridge_resource);
-void query_all_objects_by_name(aml_object_t *node, const char *name_segment);
-aml_object_t *query_child_object_by_name(aml_object_t *node, const char *name_segment);
-aml_object_t *query_same_domain_object_by_name(aml_object_t *node, const char *name_segment);
-uintptr_t execute_method(aml_object_t *node, enum aml_method_ret_type ret_type, uint32_t argv_0);
-
-extern uintptr_t aml_object_pool_start;
 extern scanner_t scanner;
-extern aml_object_pool_t object_pool;
-extern aml_object_t object_root;
-extern aml_object_t object_current;
 extern pci_resources_t *pci_resources;
-extern aml_object_t *lookup_results[100];
-extern uint32_t lookup_cnt;
-
-// TODO: remove these
-extern const char acpi_str_fadt[];
-extern const char acpi_str_mcfg[];
-extern const char acpi_str_hid[];
-extern const char acpi_str_crs[];
-extern const char acpi_str_prt[];
-extern const char eisaid_str_pcie[];
-
 
 // ====== Refactor =====
 typedef struct {
@@ -435,5 +346,7 @@ uint8_t find_decendant_nodes_by_name(aml_namespace_node_t *node, const char *nam
 void read_eisa_id(aml_namespace_node_t *node, char *eisa_id_str);
 aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml_data_t argv[]);
 uint8_t advance();
+void set_scanner_to(uint8_t *start);
 uint8_t *get_pkt_end();
 void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end);
+void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx);

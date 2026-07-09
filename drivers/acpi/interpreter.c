@@ -1,3 +1,4 @@
+#pragma once
 #include "acpi.h"
 // =========================== Refactor =========================
 
@@ -72,6 +73,8 @@ mempool_t state_stack_mempool = {
     .next = (void *)0x50000000,
     .end = (void *)0x50010000,
 };
+
+scanner_t scanner;
 
 // =============== Memory Pool =============
 
@@ -598,6 +601,11 @@ void state_stack_update()
 
 // ======================= AML Parser ====================
 
+void set_scanner_to(uint8_t *start)
+{
+    scanner.current = start;
+}
+
 uint8_t advance() {
     scanner.current++;
     return scanner.current[-1];
@@ -905,7 +913,7 @@ aml_data_t read_field_value(aml_namespace_node_t *field_node)
     sddf_dprintf("field_register: 0x%lx\n", (uintptr_t)field_register);
 
     uint8_t field_value = 0;
-    if (field_register >= 0x20000000 && field_register < 0x30000000) {
+    if (field_register >= (uint8_t *)0x20000000 && field_register < (uint8_t *)0x30000000) {
     // TODO: fix this by properly mapping target system memory
         field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
 
@@ -1175,4 +1183,38 @@ void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end)
     state_stack_add_argument(ret_buf); // First argument as address of return buffer
 
     parse_namespace_node(true);
+}
+
+void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
+{
+    // DefPackage := PackageOp PkgLength NumElements PackageElementList
+    if (prt_data.type != DATA_OBJ_PACKAGE) {
+        sddf_dprintf("[Error] not a package data given\n");
+        return;
+    }
+
+    set_scanner_to((uint8_t *)prt_data.value);
+    uint8_t *package_end = (uint8_t *)prt_data.value + prt_data.length;
+    pci_bridge_t *pci_bridge_resource = &pci_resources->bridges[pci_resources->num_bridges];
+
+    uint8_t num_elements = advance();
+    sddf_dprintf("num_elements: %u\n", num_elements);
+
+    while (scanner.current < package_end) {
+        // Check if element is also Package Object
+        if (advance() != PACKAGE_PREFIX) return;
+
+        uint8_t *element_pkt_end = get_pkt_end();
+        uint32_t element_num_elements = advance();
+
+        // Check if num of elements is 4
+        if (element_num_elements != 4) return;
+
+        sddf_dprintf("current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)element_pkt_end);
+        pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
+        eval_data_object(pci_prt, element_pkt_end);
+
+        pci_bridge_resource->num_prt_entries++;
+        sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
+    }
 }
