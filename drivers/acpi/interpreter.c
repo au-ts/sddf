@@ -572,6 +572,8 @@ void state_stack_update()
         if (current_state->parent->if_condition) {
             sddf_dprintf("Skip Elseif to 0x%lx\n", (uintptr_t)current_state->pkt_end);
             current_state->stage_idx += 2;
+        } else {
+            current_state->stage_idx += 1;
         }
     } else if (current_state->op_code == BUFFER_PREFIX && op_stage == TERM_INTEGER) {
         sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n",
@@ -707,7 +709,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
     uint8_t name_type = advance();
     aml_namespace_node_t *node = NULL;
 
-    sddf_dprintf("name_type: 0x%x, current: 0x%lx, parent: %s\n", name_type, (uintptr_t)scanner.current, parent_node->name);
+    /* sddf_dprintf("name_type: 0x%x, current: 0x%lx, parent: %s\n", name_type, (uintptr_t)scanner.current, parent_node->name); */
     if (name_type == 0x00) {
         sddf_dprintf("Null Name\n");
         return NULL;
@@ -1069,7 +1071,7 @@ void parse_namespace_node(bool evaluation)
                     scanner.current--;
                     if (evaluation) {
                         // Try looking up the object by name string by name string by name string by name string
-                        sddf_dprintf("parent: %s\n", current_state->node->name);
+                        sddf_dprintf("evaluate a node \n");
                         aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
                         if (node) {
                             sddf_dprintf("Found node %s\n", node->name);
@@ -1157,7 +1159,11 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         current_state->stage_idx = 2;
     } else {
         sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code);
+        state_stack_pop();
         eval_ret = (aml_data_t){(uintptr_t)node, DATA_OBJ_NODE, 0};
+        current_state = recovery_state;
+        scanner.current = recovery_location;
+        return eval_ret;
     }
 
     parse_namespace_node(true);
@@ -1169,13 +1175,13 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
     return eval_ret;
 }
 
-void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end)
+void eval_data_object(aml_namespace_node_t *prt_node, pci_prt_t *prt, uint8_t *pkt_end)
 {
     aml_data_t ret_buf = {(uintptr_t)prt, DATA_OBJ_RET, 0};
 
     // Make a PRT_PACJAGE, and extract PRT data
     state_stack_create(PRT_PACKAGE, true);
-    current_state->node = NULL;
+    current_state->node = prt_node;
     current_state->node_start = 0;
     current_state->pkt_end = pkt_end;
     current_state->stage_idx = 3;
@@ -1185,7 +1191,7 @@ void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end)
     parse_namespace_node(true);
 }
 
-void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
+void parse_prt_package(aml_namespace_node_t *prt_node, aml_data_t prt_data, uint32_t bridge_idx)
 {
     // DefPackage := PackageOp PkgLength NumElements PackageElementList
     if (prt_data.type != DATA_OBJ_PACKAGE) {
@@ -1212,7 +1218,7 @@ void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx)
 
         sddf_dprintf("current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)element_pkt_end);
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
-        eval_data_object(pci_prt, element_pkt_end);
+        eval_data_object(prt_node, pci_prt, element_pkt_end);
 
         pci_bridge_resource->num_prt_entries++;
         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
