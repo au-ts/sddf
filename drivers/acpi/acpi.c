@@ -367,7 +367,7 @@ void init(void)
     // Extract _CRS and _PRT
     sddf_dprintf("===============Extract _CRS===============\n");
     num_results = find_decendant_nodes_by_name(&namespace_root, aml_str_hid, lookup_results, 0);
-    assert(num_results == num_pci_seg_grps); // Num of PCIe bridges should be matched in MCFG and DSDT
+    sddf_dprintf("num_results: %d\n", num_results);
 
     for (uint32_t i = 0; i < num_results; i++) {
         aml_namespace_node_t *node = lookup_results[i];
@@ -395,6 +395,7 @@ void init(void)
             sddf_dprintf("======Finish _PRT parsing\n");
         }
     }
+    assert(pci_resources->num_bridges == num_pci_seg_grps); // Num of PCIe bridges should be matched in MCFG and DSDT
 
     // Map ECAM space for PCIe driver
     seL4_Error error;
