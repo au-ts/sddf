@@ -390,7 +390,7 @@ void init(void)
 
             aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
             sddf_dprintf("value: 0x%lx, type: %u, length: %u\n", prt_data.value, prt_data.type, prt_data.length);
-            parse_prt_package(prt_data, pci_resources->num_bridges);
+            parse_prt_package(prt_node, prt_data, pci_resources->num_bridges);
             pci_resources->num_bridges++;
             sddf_dprintf("======Finish _PRT parsing\n");
         }

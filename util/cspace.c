@@ -59,8 +59,8 @@ seL4_Error get_untyped_at_paddr(cnode_specs_t *cnode_specs,
         sddf_dprintf("Error: Untyped containing physical address 0x%lx is not found\n", target_paddr);
         return seL4_InvalidArgument;
     }
-    sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr);
-    sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cnode_specs->caps[ut_idx].base_addr, cnode_specs->caps[ut_idx].end_addr);
+    /* sddf_dprintf("Found the untyped containing physical address: 0x%lx\n", target_paddr); */
+    /* sddf_dprintf("ut idx: %u, base_addr: 0x%lx, end_addr: 0x%lx\n", ut_idx, cnode_specs->caps[ut_idx].base_addr, cnode_specs->caps[ut_idx].end_addr); */
 
     seL4_Error error;
 
@@ -151,7 +151,7 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
         return error;
     }
 
-    sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx to destination %d\n", object_type, size_bits, cnode_specs->caps[ut_idx].base_addr, cnode_specs->end);
+    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx to destination %d\n", object_type, size_bits, cnode_specs->caps[ut_idx].base_addr, cnode_specs->end); */
 
     cnode_specs->caps[cnode_specs->end].base_addr = cnode_specs->caps[ut_idx].base_addr;
     cnode_specs->caps[cnode_specs->end].end_addr = cnode_specs->caps[ut_idx].base_addr + GET_OBJECT_SIZE(object_type, size_bits);

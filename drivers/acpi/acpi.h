@@ -348,5 +348,4 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
 uint8_t advance();
 void set_scanner_to(uint8_t *start);
 uint8_t *get_pkt_end();
-void eval_data_object(pci_prt_t *prt, uint8_t *pkt_end);
-void parse_prt_package(aml_data_t prt_data, uint32_t bridge_idx);
+void parse_prt_package(aml_namespace_node_t *prt_node, aml_data_t prt_data, uint32_t bridge_idx);
