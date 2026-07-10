@@ -105,16 +105,10 @@ endif
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
 
-test_dsdt_table.dat:
-	cp $(ECHO_SERVER)/dsdt_table.dat $@
+test_%_table.dat: $(ECHO_SERVER)/acpi_tables/%_table.dat
+	cp $^ $@
 
-test_ssdt_table.dat:
-	cp $(ECHO_SERVER)/ssdt_table.dat $@
-
-test_mcfg_table.dat:
-	cp $(ECHO_SERVER)/mcfg_table.dat $@
-
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB) test_dsdt_table.dat test_ssdt_table.dat test_mcfg_table.dat
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
