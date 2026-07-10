@@ -4,6 +4,8 @@
 
 const char acpi_str_adr[] = {'_', 'A', 'D', 'R', 0};  // Address
 const char acpi_str_bbn[] = {'_', 'B', 'B', 'N', 0};  // BIOS Bus Number
+// TODO: share signatures
+const char test_aml_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
 
 typedef enum {
     INIT = 0,
@@ -240,7 +242,7 @@ void state_stack_push(uint16_t op_code, bool evaluation)
 
 void state_stack_add_argument(aml_data_t argument)
 {
-    sddf_dprintf("add argument(%u): {0x%lx, %u, %u} to op 0x%04x\n", current_state->num_args, argument.value, argument.type, argument.length, current_state->op_code);
+    /* sddf_dprintf("add argument(%u): {0x%lx, %u, %u} to op 0x%04x\n", current_state->num_args, argument.value, argument.type, argument.length, current_state->op_code); */
     current_state->arguments[current_state->num_args].value = argument.value;
     current_state->arguments[current_state->num_args].type = argument.type;
     current_state->arguments[current_state->num_args].length = argument.length;
@@ -436,18 +438,20 @@ void state_stack_pop()
             case PRT_PACKAGE: {
                 assert(current_state->num_args == 5);
                 assert(current_state->arguments[0].type == DATA_OBJ_RET);
-                pci_prt_t *prt = (pci_prt_t *)current_state->arguments[0].value;
-                prt->address = (uint32_t)current_state->arguments[1].value;
-                prt->pin = (uint32_t)current_state->arguments[2].value;
-                // TODO: handle multiple IRQ cases
-                if (current_state->arguments[3].type == DATA_OBJ_NODE) {
-                    sddf_dprintf("need to parse source\n");
-                } else if (current_state->arguments[3].value == 0) {
-                    prt->gsi = current_state->arguments[4].value;
-                } else {
-                    prt->gsi = current_state->arguments[3].value;
-                }
-                sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", prt->address, prt->pin, prt->gsi);
+                aml_prt_package_t *prt = (aml_prt_package_t *)current_state->arguments[0].value;
+                prt->address = current_state->arguments[1];
+                prt->pin = current_state->arguments[2];
+                prt->source = current_state->arguments[3];
+                prt->source_index = current_state->arguments[4];
+                /* // TODO: handle multiple IRQ cases */
+                /* if (current_state->arguments[3].type == DATA_OBJ_NODE) { */
+                /*     sddf_dprintf("TODO: parse _CRS\n"); */
+                /* } else if (current_state->arguments[3].value == 0) { */
+                /*     prt->gsi = current_state->arguments[4].value; */
+                /* } else { */
+                /*     prt->gsi = current_state->arguments[3].value; */
+                /* } */
+                /* sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", prt->address, prt->pin, prt->gsi); */
                 break;
             }
             case OP_REGION_OP: {
@@ -523,7 +527,7 @@ void state_stack_pop()
         sddf_dprintf("save pkt_end 0x%lx to node %s\n", (uintptr_t)scanner.current, current_state->node->name);
     }
 
-    sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx, parent: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, (uintptr_t)current_state->parent);
+    /* sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx, parent: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, (uintptr_t)current_state->parent); */
     parse_state_t *completed_state = current_state;
     current_state = current_state->parent;
     mempool_rc(&state_stack_mempool, (void *)completed_state, sizeof(parse_state_t));
@@ -589,7 +593,7 @@ void state_stack_update()
         current_state->stage_idx += 1;
     }
 
-    sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args);
+    /* sddf_dprintf("current op_code: 0x%04x, idx: %u, stage: %u, num_args: %u\n", current_state->op_code, current_state->stage_idx, get_op_stage(), current_state->num_args); */
 
     // Check if the Op has been completely parsed
     op_stage = get_op_stage();
@@ -928,11 +932,11 @@ aml_data_t read_field_value(aml_namespace_node_t *field_node)
 
 void parse_namespace_node(bool evaluation)
 {
-    sddf_dprintf("Evaluation? %s\n", evaluation ? "true" : "false");
+    /* sddf_dprintf("Evaluation? %s\n", evaluation ? "true" : "false"); */
 
     uint16_t op_code = 0;
     uint8_t *namespace_end = current_state->pkt_end;
-    sddf_dprintf("scanner.current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)namespace_end);
+    /* sddf_dprintf("scanner.current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)namespace_end); */
 
     while (scanner.current < namespace_end) {
         if (current_state == NULL) return;
@@ -1062,7 +1066,7 @@ void parse_namespace_node(bool evaluation)
                 case DEVICE_OP:
                 case RETURN_OP: {
                     if (evaluation) {
-                        sddf_dprintf("stack push 0x%04x\n", op_code);
+                        /* sddf_dprintf("stack push 0x%04x\n", op_code); */
                     }
                     state_stack_push(op_code, evaluation);
                     break;
@@ -1071,10 +1075,9 @@ void parse_namespace_node(bool evaluation)
                     scanner.current--;
                     if (evaluation) {
                         // Try looking up the object by name string by name string by name string by name string
-                        sddf_dprintf("evaluate a node \n");
                         aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
                         if (node) {
-                            sddf_dprintf("Found node %s\n", node->name);
+                            /* sddf_dprintf("Found node %s\n", node->name); */
 
                             aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
                             state_stack_add_argument(eval_ret);
@@ -1109,7 +1112,6 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
 
     if (node->op_code == NAME_OP && node->evaluated) {
         eval_ret = node->data;
-        sddf_dprintf("Read node's value: 0x%lx\n", node->data.value);
         return eval_ret;
     }
 
@@ -1123,7 +1125,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         return eval_ret;
     }
 
-    sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end);
+    /* sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end); */
 
     state_stack_create(node->op_code, true);
     current_state->node = node;
@@ -1158,7 +1160,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         skip_name_string(); // NAME STRING
         current_state->stage_idx = 2;
     } else {
-        sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code);
+        /* sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code); */
         state_stack_pop();
         eval_ret = (aml_data_t){(uintptr_t)node, DATA_OBJ_NODE, 0};
         current_state = recovery_state;
@@ -1175,7 +1177,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
     return eval_ret;
 }
 
-void eval_data_object(aml_namespace_node_t *prt_node, pci_prt_t *prt, uint8_t *pkt_end)
+void eval_data_object(aml_namespace_node_t *prt_node, aml_prt_package_t *prt, uint8_t *pkt_end)
 {
     aml_data_t ret_buf = {(uintptr_t)prt, DATA_OBJ_RET, 0};
 
@@ -1216,10 +1218,32 @@ void parse_prt_package(aml_namespace_node_t *prt_node, aml_data_t prt_data, uint
         // Check if num of elements is 4
         if (element_num_elements != 4) return;
 
-        sddf_dprintf("current: 0x%lx, end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)element_pkt_end);
         pci_prt_t *pci_prt = &pci_bridge_resource->prt_entries[pci_bridge_resource->num_prt_entries];
-        eval_data_object(prt_node, pci_prt, element_pkt_end);
+        aml_prt_package_t prt_package;
+        eval_data_object(prt_node, &prt_package, element_pkt_end);
 
+        /* sddf_dprintf("==========\n"); */
+        /* sddf_dprintf("address: 0x%lx, data_type: 0x%x\n", prt_package.address.value, prt_package.address.type); */
+        /* sddf_dprintf("pin: 0x%lx, data_type: 0x%x\n", prt_package.pin.value, prt_package.pin.type); */
+        /* sddf_dprintf("source: 0x%lx, data_type: 0x%x\n", prt_package.source.value, prt_package.source.type); */
+        /* sddf_dprintf("sourceIndex: 0x%lx, data_type: 0x%x\n", prt_package.source_index.value, prt_package.source_index.type); */
+        pci_prt->address = (uint32_t)prt_package.address.value;
+        pci_prt->pin = (uint32_t)prt_package.pin.value;
+        if (prt_package.source.type == DATA_OBJ_NODE) {
+            aml_namespace_node_t *gsi_node = (aml_namespace_node_t *)prt_package.source.value;
+            aml_namespace_node_t *crs_node = find_child_node_by_name(gsi_node, test_aml_str_crs);
+            aml_data_t gsi_crs = eval_namespace_node(crs_node, 0, NULL);
+            assert(gsi_crs.type == DATA_OBJ_BUFFER);
+            uint8_t *irq_descriptor = (uint8_t *)gsi_crs.value;
+            assert(irq_descriptor[0] == EXTENDED_IRQ_DESCRIPTOR);
+            uint32_t gsi = 0;
+            gsi |= (uint32_t)irq_descriptor[5] << 0;
+            gsi |= (uint32_t)irq_descriptor[6] << 8;
+            gsi |= (uint32_t)irq_descriptor[7] << 16;
+            gsi |= (uint32_t)irq_descriptor[8] << 24;
+            pci_prt->gsi = gsi;
+            // TODO: edge/level, assumes there is only one IRQ for now
+        }
         pci_bridge_resource->num_prt_entries++;
         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
     }
