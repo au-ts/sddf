@@ -193,9 +193,9 @@ aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespac
     if (name_segment != NULL) {
         memcpy(&child_node->name, name_segment, 4);
         child_node->name[4] = '\0';
-        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name);
+        /* sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name); */
     } else {
-        sddf_dprintf("Create a type 0x%02X object\n", op_code);
+        /* sddf_dprintf("Create a type 0x%02X object\n", op_code); */
     }
 
     // Insert the new node into the front of list
@@ -543,7 +543,7 @@ void state_stack_pop()
         parse_stage_t op_stage = get_op_stage();
         if (op_stage == TERM_INTEGER || op_stage == BUFFER_DATA || op_stage == DATA_OBJECT) {
             state_stack_add_argument(ret_data);
-            sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+            /* sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
             state_stack_update();
         }
     }
@@ -551,7 +551,7 @@ void state_stack_pop()
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+            /* sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
             state_stack_pop();
         }
     }
@@ -1268,6 +1268,8 @@ void parse_prt_package(aml_namespace_node_t *prt_node, aml_data_t prt_data, uint
             gsi |= (uint32_t)irq_descriptor[8] << 24;
             pci_prt->gsi = gsi;
             // TODO: edge/level, assumes there is only one IRQ for now
+        } else {
+            pci_prt->gsi = (uint32_t)prt_package.source_index.value;
         }
         pci_bridge_resource->num_prt_entries++;
         sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
