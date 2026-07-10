@@ -18,6 +18,8 @@ typedef enum {
     BYTE_DATA,
     WORD_DATA,
     DWORD_DATA,
+    QWORD_DATA,
+    STRING_DATA,
     BUFFER_DATA,
     PACKAGE_DATA,
     DATA_OBJECT,
@@ -50,8 +52,12 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [BYTE_PREFIX] = { INIT, BYTE_DATA, COMPLETE },
     [WORD_PREFIX] = { INIT, WORD_DATA, COMPLETE },
     [DWORD_PREFIX] = { INIT, DWORD_DATA, COMPLETE },
+    [QWORD_PREFIX] = { INIT, QWORD_DATA, COMPLETE },
+    [STRING_PREFIX] = { INIT, STRING_DATA, COMPLETE },
     [BUFFER_PREFIX] = { INIT, PKT_LEN, TERM_INTEGER, BUFFER_DATA, COMPLETE },
     [PACKAGE_PREFIX] = { INIT, PKT_LEN, COMPLETE },
+    [DEREF_OF_OP] = { INIT, TERM_INTEGER, COMPLETE },
+    [INDEX_OP] = { INIT, DATA_OBJECT, TERM_INTEGER, NAME_STRING, COMPLETE },
 };
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -62,6 +68,7 @@ parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [MUTEX_OP & 0xFF] = { INIT, NAME_STRING, BYTE_DATA, COMPLETE },
     [POWER_RESOURCE_OP & 0xFF] = { INIT, PKT_LEN, NAME_STRING, BYTE_DATA, WORD_DATA, TERM_LIST, COMPLETE },
     [PROCESSOR_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
+    [THERMAL_ZONE_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
 };
 
 parse_stage_t op_stage_custom[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -186,9 +193,9 @@ aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespac
     if (name_segment != NULL) {
         memcpy(&child_node->name, name_segment, 4);
         child_node->name[4] = '\0';
-        /* sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name); */
+        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name);
     } else {
-        /* sddf_dprintf("Create a type 0x%02X object\n", op_code); */
+        sddf_dprintf("Create a type 0x%02X object\n", op_code);
     }
 
     // Insert the new node into the front of list
@@ -298,6 +305,7 @@ void store_op_evaluation()
                 break;
             }
             case CREATE_DWORD_FIELD_OP: {
+                sddf_dprintf("save %u to DWord %s\n", current_state->arguments[0].value, target_node->name);
                 write_to_buffer(target_node->data.value, current_state->arguments[0].value, 2);
                 break;
             }
@@ -480,12 +488,9 @@ void state_stack_pop()
                     bus = bus_eval_ret.value;
                     sddf_dprintf("bus node name: %s, addr: 0x%lx\n", bbn_node->name, bus);
 
-                    // TODO: fix this hard-coded value
-                    /* uintptr_t ecam_base_vaddr = 0x20000000; */
                     // TODO: use of region_offset and region_length
-                    sddf_dprintf("field_reg: 0x%lx, bus: 0x%lx, address: 0x%lx\n", field_register, bus, address);
-                    /* field_register = field_register + ecam_base_vaddr + (bus << 20) + address; */
-                    field_register = 0;
+                    sddf_dprintf("field_reg: 0x%lx, bus: 0x%lx, address: 0x%lx, region_offset: 0x%lx\n", field_register, bus, address, region_offset);
+                    field_register = ecam_base_paddr + field_register + (bus << 20) + address;
                 } else {
                     sddf_dprintf("Region space 0x%x is not implemneted\n", region_space);
                 }
@@ -538,7 +543,7 @@ void state_stack_pop()
         parse_stage_t op_stage = get_op_stage();
         if (op_stage == TERM_INTEGER || op_stage == BUFFER_DATA || op_stage == DATA_OBJECT) {
             state_stack_add_argument(ret_data);
-            /* sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx, ret_val: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, ret_val); */
+            sddf_dprintf("after argument adding: Op 0x%04x, idx: %u, current: 0x%lx, pkt_end: 0x%lx\n", current_state->op_code, current_state->stage_idx, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
             state_stack_update();
         }
     }
@@ -546,7 +551,7 @@ void state_stack_pop()
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            /* sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
+            sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
             state_stack_pop();
         }
     }
@@ -804,13 +809,14 @@ uint8_t *get_data_end()
         case DATA_OBJ_QWORD:
             return scanner.current + 8;
         case DATA_OBJ_STRING: {
-            uint32_t i = 0;
             while (advance());
-            return scanner.current + i;
+            return scanner.current;
         case DATA_OBJ_BUFFER:
             return get_pkt_end();
         case DATA_OBJ_PACKAGE:
             return get_pkt_end();
+        default:
+            sddf_dprintf("Unkown prefix: 0x%x\n", first_byte);
         }
     }
     return 0;
@@ -903,7 +909,6 @@ void parse_field_list()
     }
 }
 
-
 aml_data_t read_field_value(aml_namespace_node_t *field_node)
 {
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
@@ -921,11 +926,11 @@ aml_data_t read_field_value(aml_namespace_node_t *field_node)
     sddf_dprintf("field_register: 0x%lx\n", (uintptr_t)field_register);
 
     uint8_t field_value = 0;
-    if (field_register >= (uint8_t *)0x20000000 && field_register < (uint8_t *)0x30000000) {
-    // TODO: fix this by properly mapping target system memory
-        field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1);
-
-    }
+    /* if (field_register >= (uint8_t *)0x20000000 && field_register < (uint8_t *)0x30000000) { */
+        /* field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1); */
+    /* } */
+    // TODO: check the alignemtn of FieldOps
+    // TODO: read the register bit by bit
     sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
     aml_data_t field_data = {field_value, DATA_OBJ_QWORD, 0};
     /* state_stack_add_argument(field_data); */
@@ -945,8 +950,8 @@ void parse_namespace_node(bool evaluation)
         uint8_t op_stage = get_op_stage();
         if (op_stage == PKT_LEN) {
             current_state->pkt_end = get_pkt_end();
-        } else if (!evaluation && op_stage == DATA_OBJECT) {
-            scanner.current = get_data_end();
+        /* } else if (!evaluation && op_stage == DATA_OBJECT) { */
+        /*     scanner.current = get_data_end(); */
         } else if (op_stage == OBJECT_NAME_STRING) {
             aml_namespace_node_t *new_node = make_namespace_node(current_state->parent->node, current_state->op_code);
             current_state->node = new_node;
@@ -964,7 +969,7 @@ void parse_namespace_node(bool evaluation)
                 aml_data_t argument = {(uint64_t)node, DATA_OBJ_NODE, 0};
                 state_stack_add_argument(argument);
             } else {
-                /* sddf_dprintf("Skip the Name String\n"); */
+                /* sddf_dprintf("Skip Name String\n"); */
                 skip_name_string();
             }
         } else if (op_stage == FIELD_LIST) {
@@ -984,6 +989,19 @@ void parse_namespace_node(bool evaluation)
             data |= ((uint32_t)advance() << 24);
             aml_data_t argument = {data, DATA_OBJ_DWORD, 0};
             state_stack_add_argument(argument);
+        } else if (op_stage == QWORD_DATA) {
+            uint64_t data = advance();
+            data |= ((uint64_t)advance() << 8);
+            data |= ((uint64_t)advance() << 16);
+            data |= ((uint64_t)advance() << 24);
+            data |= ((uint64_t)advance() << 32);
+            data |= ((uint64_t)advance() << 40);
+            data |= ((uint64_t)advance() << 48);
+            data |= ((uint64_t)advance() << 56);
+            aml_data_t argument = {data, DATA_OBJ_DWORD, 0};
+            state_stack_add_argument(argument);
+        } else if (op_stage == STRING_DATA) {
+            while (advance());
         } else {
             op_code = op_code | advance();
             if (op_code == 0x5B) {
@@ -1041,6 +1059,7 @@ void parse_namespace_node(bool evaluation)
                 case QWORD_PREFIX:
                 case BUFFER_PREFIX:
                 case PACKAGE_PREFIX:
+                case STRING_PREFIX:
                 case ADD_OP:
                 case SUBTRACT_OP:
                 case SHIFT_LEFT_OP:
@@ -1053,6 +1072,8 @@ void parse_namespace_node(bool evaluation)
                 case EVENT_OP:
                 case FIELD_OP:
                 case INDEX_FIELD_OP:
+                case DEREF_OF_OP:
+                case INDEX_OP:
                 case IF_OP:
                 case ELSE_OP:
                 case STORE_OP:
@@ -1065,6 +1086,7 @@ void parse_namespace_node(bool evaluation)
                 case CREATE_QWORD_FIELD_OP:
                 case POWER_RESOURCE_OP:
                 case PROCESSOR_OP:
+                case THERMAL_ZONE_OP:
                 case DEVICE_OP:
                 case RETURN_OP: {
                     if (evaluation) {
@@ -1087,6 +1109,7 @@ void parse_namespace_node(bool evaluation)
                             sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
                     } else {
+                        sddf_dprintf("skip_name_string, op_code: 0x%x\n", op_code);
                         skip_name_string();
                     }
                 }

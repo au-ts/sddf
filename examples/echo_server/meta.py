@@ -169,7 +169,7 @@ class AcpiTablesConfig:
 
     # TODO: add the checks
     def add_acpi_table(self, acpi_file):
-        acpi_file = "test_" + acpi_file + ".dat"
+        acpi_file = "/Users/terrybai/tmp/acpi_vb105/vb105_acpi/" + acpi_file + ".dat"
         print(acpi_file)
         assert os.path.isfile(acpi_file)
         with open(acpi_file, "rb") as data_file:
@@ -263,9 +263,10 @@ def generate(
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
 
     acpi_tables_config = AcpiTablesConfig(0x500000)
-    acpi_tables_config.add_acpi_table("mcfg_table")
-    acpi_tables_config.add_acpi_table("dsdt_table")
-    acpi_tables_config.add_acpi_table("ssdt_table")
+    # acpi_tables_config.add_acpi_table("mcfg")
+    # acpi_tables_config.add_acpi_table("dsdt")
+    # for i in range(1, 18):
+    #     acpi_tables_config.add_acpi_table("ssdt" + str(i))
 
     acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
     acpi_driver.add_boot_info(BootInfo("rsdp"))

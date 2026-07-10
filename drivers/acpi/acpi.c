@@ -24,6 +24,7 @@ typedef struct {
     seL4_UntypedDesc untypedList[CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS];
 } capDLBootInfo_t;
 
+const char acpi_str_xsdt[] = {'X', 'S', 'D', 'T', 0};
 const char acpi_str_rsdt[] = {'R', 'S', 'D', 'T', 0};
 const char acpi_str_dsdt[] = {'D', 'S', 'D', 'T', 0};
 const char acpi_str_ssdt[] = {'S', 'S', 'D', 'T', 0};
@@ -48,6 +49,7 @@ uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
 
 uintptr_t acpi_vaddr = 0x4000000;
+uintptr_t ecam_base_paddr;
 
 cnode_specs_t post_boot_cnode;
 cnode_specs_t *pci_resources_cnode;
@@ -59,7 +61,7 @@ aml_namespace_node_t namespace_root;
 #define MAX_NUM_LOOKUP_NODES 128
 aml_namespace_node_t *lookup_results[MAX_NUM_LOOKUP_NODES];
 
-__attribute__((__aligned__(0x1000))) __attribute__((__section__(".acpi_tables"))) uint8_t acpi_tables[500000];
+__attribute__((__aligned__(0x1000))) __attribute__((__section__(".acpi_tables"))) uint8_t acpi_tables[1000000];
 __attribute__((__section__(".acpi_tables_summary"))) acpi_tables_summary_t acpi_tables_summary;
 
 void pass_resource_with_range(uint8_t resource_type, uint64_t min_addr, uint64_t max_addr)
@@ -67,8 +69,8 @@ void pass_resource_with_range(uint8_t resource_type, uint64_t min_addr, uint64_t
     switch (resource_type) {
         case 0: {
             pass_ut_with_range(pci_resources_cnode, &post_boot_cnode, min_addr, max_addr);
-            break;
             sddf_dprintf("Memory ");
+            break;
         }
         case 1: {
             sddf_dprintf("IO ");
@@ -207,7 +209,7 @@ void backup_acpi_table(acpi_header_t *header)
 acpi_header_t *find_first_acpi_header_by_signature(const char *signature)
 {
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
-        sddf_dprintf("acpi start: 0x%lx, table pointer: 0x%lx,\n", (uintptr_t)&acpi_tables, acpi_tables_summary.tables_offset[i]);
+        sddf_dprintf("acpi start: 0x%lx, table pointer: 0x%lx\n", (uintptr_t)&acpi_tables, acpi_tables_summary.tables_offset[i]);
         acpi_header_t *header = (acpi_header_t *)(acpi_tables_summary.tables_offset[i] + (uintptr_t)&acpi_tables);
         sddf_dprintf("Signature: %c%c%c%c\n",
                  header->signature[0],
@@ -218,7 +220,6 @@ acpi_header_t *find_first_acpi_header_by_signature(const char *signature)
         if (strncmp(header->signature, signature, 4) == 0) {
             return header;
         }
-        sddf_dprintf("ello\n");
     }
     return NULL;
 }
@@ -239,13 +240,22 @@ void load_acpi_tables()
     // Map all the frames covering the RSDT table
     acpi_header_t *rsdt_header = (acpi_header_t *)(acpi_vaddr + PAGE_OFFSET(rsdt_paddr));
     assert(map_acpi_table_header(rsdt_paddr, rsdt_header));
-    validate_acpi_table_signature(rsdt_header, acpi_str_rsdt);
+    if (bi_rsdp->content.revision >= 2) {
+        validate_acpi_table_signature(rsdt_header, acpi_str_xsdt);
+    } else {
+        validate_acpi_table_signature(rsdt_header, acpi_str_rsdt);
+    }
 
     assert(map_acpi_table_content(rsdt_paddr, rsdt_header));
     backup_acpi_table(rsdt_header);
     assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
 
-    acpi_header_t *acpi_rsdt_header = find_first_acpi_header_by_signature(acpi_str_rsdt);
+    acpi_header_t *acpi_rsdt_header;
+    if (bi_rsdp->content.revision >= 2) {
+        acpi_rsdt_header = find_first_acpi_header_by_signature(acpi_str_xsdt);
+    } else {
+        acpi_rsdt_header = find_first_acpi_header_by_signature(acpi_str_rsdt);
+    }
     assert(acpi_rsdt_header != NULL);
 
     acpi_rsdt_t *acpi_rsdt = (acpi_rsdt_t *)acpi_rsdt_header;
@@ -311,6 +321,7 @@ void init(void)
         post_boot_cnode.caps[i].is_device = capDLBootInfo->untypedList[i].isDevice;
         post_boot_cnode.caps[i].object_type = seL4_UntypedObject;
         post_boot_cnode.end = i + 1;
+        sddf_dprintf("i: %lu, 0x%lx-0x%lx: device? %d\n", i, post_boot_cnode.caps[i].base_addr, post_boot_cnode.caps[i].end_addr, post_boot_cnode.caps[i].is_device);
     }
     update_active_ut_idx(&post_boot_cnode);
 
@@ -332,8 +343,9 @@ void init(void)
     sddf_dprintf("  tables_end: %lu\n", acpi_tables_summary.tables_end);
 
     if (acpi_tables_summary.num_tables == 0) {
-        sddf_dprintf("Test tables are found, skip loading the ACPI tables from the host machine");
         load_acpi_tables();
+    } else {
+        sddf_dprintf("Test tables are found, skip loading the ACPI tables from the host machine\n");
     }
 
     sddf_dprintf("======MAP ======\n");
@@ -349,6 +361,9 @@ void init(void)
         memcpy(dst_table, src_table, sizeof(pci_seg_group_t));
         pci_resources->num_pci_groups++;
     }
+    assert(pci_resources->num_pci_groups > 0);
+    // ACPI ASL assumes that Segment 0 is used for PCI_Config in OpRegion
+    ecam_base_paddr = pci_resources->pci_seg_groups[0].base_addr;
 
     sddf_dprintf("===============Scanning DSDT and SSDT===============\n");
     aml_namespace_mempool.start = (void *)aml_object_pool_start;
@@ -362,11 +377,13 @@ void init(void)
     namespace_root.pkt_start = scanner.current;
     namespace_root.op_code = NULL_OP;
     namespace_root.name[0] = '\\';
+    sddf_dprintf("Scan DSDT\n");
     scan_namespace_tree(&namespace_root, dsdt_table_end);
 
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
         acpi_header_t *header = (acpi_header_t *)((uintptr_t)&acpi_tables + acpi_tables_summary.tables_offset[i]);
         if (strncmp(header->signature, acpi_str_ssdt, 4) == 0) {
+            sddf_dprintf("i: %d, Scan SSDT at offset 0x%lx, acpi_start: 0x%lx\n", i, (uintptr_t)acpi_tables_summary.tables_offset[i], (uintptr_t)&acpi_tables);
             acpi_dsdt_t *ssdt_table = (acpi_dsdt_t *)header;
             uint8_t *ssdt_table_end = (uint8_t *)ssdt_table + ssdt_table->header.length;
             set_scanner_to((uint8_t *)&ssdt_table->content[0]);
@@ -441,7 +458,6 @@ void init(void)
         pci_resources->pci_seg_groups[i].base_addr = ecam_base_vaddr;
         ecam_base_vaddr = cur_vaddr;
     }
-
 
     sddf_dprintf("Finished ECAM mapping!\n");
 

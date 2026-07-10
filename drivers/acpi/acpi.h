@@ -103,6 +103,7 @@ enum aml_encoding_value {
     DEVICE_OP = 0x5B82,
     PROCESSOR_OP = 0x5B83,
     POWER_RESOURCE_OP = 0x5B84,
+    THERMAL_ZONE_OP = 0x5B85,
     INDEX_FIELD_OP = 0x5B86,
     // Something more
     LOCAL0_OP = 0x60,
@@ -125,6 +126,8 @@ enum aml_encoding_value {
     SUBTRACT_OP = 0x74,
     SHIFT_LEFT_OP = 0x79,
     SHIFT_RIGHT_OP = 0x7A,
+    DEREF_OF_OP = 0x83,
+    INDEX_OP = 0x88,
     CREATE_BIT_FIELD_OP = 0x8D,
     CREATE_BYTE_FIELD_OP = 0x8C,
     CREATE_WORD_FIELD_OP = 0x8B,
@@ -346,6 +349,8 @@ typedef struct {
 
 extern mempool_t aml_namespace_mempool;
 extern aml_namespace_node_t namespace_root;
+extern uintptr_t ecam_base_paddr;
+extern cnode_specs_t post_boot_cnode;
 
 void scan_namespace_tree(aml_namespace_node_t *namespace, uint8_t *namespace_end);
 aml_namespace_node_t *find_child_node_by_name(aml_namespace_node_t *node, const char *name_segment);
