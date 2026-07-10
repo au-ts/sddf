@@ -295,6 +295,13 @@ typedef struct {
     uint32_t length;
 } aml_data_t;
 
+typedef struct {
+    aml_data_t address;
+    aml_data_t pin;
+    aml_data_t source;
+    aml_data_t source_index;
+} aml_prt_package_t;
+
 typedef struct aml_namespace_node {
     uint8_t *pkt_start;
     uint8_t *pkt_end;
