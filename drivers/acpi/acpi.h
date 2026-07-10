@@ -337,7 +337,7 @@ typedef enum {
 } acpi_table_type_t;
 
 typedef struct {
-    acpi_header_t *tables[MAX_NUM_ACPI_TABLES];
+    uintptr_t tables_offset[MAX_NUM_ACPI_TABLES];
     uintptr_t tables_end;
     uintptr_t mem_end;
     uint32_t alignment;

@@ -186,9 +186,9 @@ aml_namespace_node_t *namespace_insert_child_node(aml_namespace_node_t *namespac
     if (name_segment != NULL) {
         memcpy(&child_node->name, name_segment, 4);
         child_node->name[4] = '\0';
-        sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name);
+        /* sddf_dprintf("Create a type 0x%02X object: %s at 0x%lx, parent: %s\n", op_code, name_segment, (uintptr_t)scanner.current, namespace->name); */
     } else {
-        sddf_dprintf("Create a type 0x%02X object\n", op_code);
+        /* sddf_dprintf("Create a type 0x%02X object\n", op_code); */
     }
 
     // Insert the new node into the front of list
@@ -481,10 +481,11 @@ void state_stack_pop()
                     sddf_dprintf("bus node name: %s, addr: 0x%lx\n", bbn_node->name, bus);
 
                     // TODO: fix this hard-coded value
-                    uintptr_t ecam_base_vaddr = 0x20000000;
+                    /* uintptr_t ecam_base_vaddr = 0x20000000; */
                     // TODO: use of region_offset and region_length
                     sddf_dprintf("field_reg: 0x%lx, bus: 0x%lx, address: 0x%lx\n", field_register, bus, address);
-                    field_register = field_register + ecam_base_vaddr + (bus << 20) + address;
+                    /* field_register = field_register + ecam_base_vaddr + (bus << 20) + address; */
+                    field_register = 0;
                 } else {
                     sddf_dprintf("Region space 0x%x is not implemneted\n", region_space);
                 }
@@ -515,7 +516,8 @@ void state_stack_pop()
                     field_buffer.value = field_buffer.value + index;
                 }
                 current_state->node->data = field_buffer;
-                sddf_dprintf("CreateFieldOp: {0x%lx, %u, %u}\n", field_buffer.value, field_buffer.type, field_buffer.length);
+                current_state->node->evaluated = true;
+                sddf_dprintf("CreateFieldOp: {0x%lx, %u, %u}, name: %s\n", field_buffer.value, field_buffer.type, field_buffer.length, current_state->node->name);
                 break;
             }
         }
@@ -524,7 +526,7 @@ void state_stack_pop()
     // Update
     if ((current_state->parent == NULL || current_state->parent->node != current_state->node) && current_state->node && current_state->node->pkt_end == 0) {
         current_state->node->pkt_end = scanner.current;
-        sddf_dprintf("save pkt_end 0x%lx to node %s\n", (uintptr_t)scanner.current, current_state->node->name);
+        /* sddf_dprintf("save pkt_end 0x%lx to node %s\n", (uintptr_t)scanner.current, current_state->node->name); */
     }
 
     /* sddf_dprintf("Stack pop Op 0x%04x, current: 0x%lx, pkt_end: 0x%lx, parent: 0x%lx\n", current_state->op_code, (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end, (uintptr_t)current_state->parent); */
@@ -544,7 +546,7 @@ void state_stack_pop()
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+            /* sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
             state_stack_pop();
         }
     }
@@ -715,7 +717,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
 
     /* sddf_dprintf("name_type: 0x%x, current: 0x%lx, parent: %s\n", name_type, (uintptr_t)scanner.current, parent_node->name); */
     if (name_type == 0x00) {
-        sddf_dprintf("Null Name\n");
+        /* sddf_dprintf("Null Name\n"); */
         return NULL;
     }
 
@@ -962,7 +964,7 @@ void parse_namespace_node(bool evaluation)
                 aml_data_t argument = {(uint64_t)node, DATA_OBJ_NODE, 0};
                 state_stack_add_argument(argument);
             } else {
-                sddf_dprintf("Skip the Name String\n");
+                /* sddf_dprintf("Skip the Name String\n"); */
                 skip_name_string();
             }
         } else if (op_stage == FIELD_LIST) {
@@ -1077,7 +1079,7 @@ void parse_namespace_node(bool evaluation)
                         // Try looking up the object by name string by name string by name string by name string
                         aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
                         if (node) {
-                            /* sddf_dprintf("Found node %s\n", node->name); */
+                            sddf_dprintf("Found node %s\n", node->name);
 
                             aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
                             state_stack_add_argument(eval_ret);
@@ -1110,7 +1112,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
 {
     aml_data_t eval_ret;
 
-    if (node->op_code == NAME_OP && node->evaluated) {
+    if (node->evaluated) {
         eval_ret = node->data;
         return eval_ret;
     }
@@ -1125,7 +1127,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         return eval_ret;
     }
 
-    /* sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end); */
+    sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end);
 
     state_stack_create(node->op_code, true);
     current_state->node = node;
@@ -1160,7 +1162,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         skip_name_string(); // NAME STRING
         current_state->stage_idx = 2;
     } else {
-        /* sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code); */
+        sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code);
         state_stack_pop();
         eval_ret = (aml_data_t){(uintptr_t)node, DATA_OBJ_NODE, 0};
         current_state = recovery_state;
