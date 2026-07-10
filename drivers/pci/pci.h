@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/cspace.h>
+#include <sddf/util/vspace.h>
 
 // PCI Capability IDs
 #define PCI_CAP_ID_PM       0x01    // Power Management
@@ -280,25 +282,9 @@ typedef struct {
 } pci_bridge_t;
 
 typedef struct {
-    uintptr_t base_addr;
-    uintptr_t end_addr;
-    uint8_t is_device;
-    uint8_t object_type;
-    uint32_t parent;
-    uint32_t child;
-    uint32_t next;
-} cap_desc_t;
-
-typedef struct {
-    cap_desc_t desc[256];
-    uint32_t start;
-    uint32_t end;
-} cnode_caps_t;
-
-typedef struct {
     pci_seg_group_t pci_seg_groups[MAX_NUM_PCI_SEG_GROUP];
     uint32_t num_pci_groups;
     pci_bridge_t bridges[10];
     uint32_t num_bridges;
-    cnode_caps_t cnode_caps;
+    cnode_specs_t cnode_specs;
 } pci_resources_t;

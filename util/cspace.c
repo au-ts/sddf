@@ -103,7 +103,7 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
     seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
 
     uint32_t retyped_cptr_idx;
-    /* sddf_dprintf("min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
+    /* sddf_dprintf("pass the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
     error = untyped_retype(src_cnode_specs, target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",
@@ -122,7 +122,7 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
-    /* sddf_dprintf("copy ut to slot %lu, start: %u, end: %u\n", cnode_pci_resources_free_slot, cnode_caps_pci_resources->start, cnode_caps_pci_resources->end); */
+    /* sddf_dprintf("pass ut to slot %d in destination CNode\n", dst_cnode_specs->end); */
 
     dst_cnode_specs->caps[dst_cnode_specs->end].base_addr = min_addr;
     dst_cnode_specs->caps[dst_cnode_specs->end].end_addr = min_addr + new_ut_size;
@@ -140,6 +140,7 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
                           seL4_Word size_bits,
                           uint32_t *retyped_cap_idx)
 {
+    sddf_dprintf("Retype: 0x%lx, ut_idx: %u\n", cnode_specs->cptr, ut_idx);
     // @terryb: need to update this if we remove self-ref cap at slot 0
     seL4_Error error = seL4_Untyped_Retype(cnode_specs->cptr + ut_idx,
                                 object_type,

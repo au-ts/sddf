@@ -46,12 +46,11 @@ seL4_CPtr cnode_cptr_remaining_untypeds;
 seL4_CPtr cnode_cptr_pci_resources;
 uintptr_t bootinfo_remaining_untypeds;
 uintptr_t bootinfo_rsdp;
-seL4_CPtr cnode_pci_resources_free_slot = 1;
 
 uintptr_t acpi_vaddr = 0x4000000;
 
 cnode_specs_t post_boot_cnode;
-cnode_specs_t *cnode_caps_pci_resources;
+cnode_specs_t *pci_resources_cnode;
 
 mempool_t aml_namespace_mempool;
 aml_namespace_node_t namespace_root;
@@ -63,11 +62,11 @@ aml_namespace_node_t *lookup_results[MAX_NUM_LOOKUP_NODES];
 __attribute__((__aligned__(0x1000))) __attribute__((__section__(".acpi_tables"))) uint8_t acpi_tables[500000];
 __attribute__((__section__(".acpi_tables_summary"))) acpi_tables_summary_t acpi_tables_summary;
 
-void pass_resource_with_range(uint8_t resource_type, uint64_t min_address, uint64_t max_address)
+void pass_resource_with_range(uint8_t resource_type, uint64_t min_addr, uint64_t max_addr)
 {
     switch (resource_type) {
         case 0: {
-            /* pass_ut_with_range(dev_res->min_addr, dev_res->max_addr); */
+            pass_ut_with_range(pci_resources_cnode, &post_boot_cnode, min_addr, max_addr);
             break;
             sddf_dprintf("Memory ");
         }
@@ -80,7 +79,7 @@ void pass_resource_with_range(uint8_t resource_type, uint64_t min_address, uint6
             break;
         }
     }
-    sddf_dprintf(": [0x%lx-0x%lx]\n", min_address, max_address);
+    sddf_dprintf(": [0x%lx-0x%lx]\n", min_addr, max_addr);
 }
 
 // Section 6.4
@@ -257,7 +256,6 @@ void load_acpi_tables()
                  header->signature[1],
                  header->signature[2],
                  header->signature[3]);
-        sddf_dprintf("Entry pointer: 0x%lx, location: 0x%lx\n", table_entries[i], &table_entries[i]);
 
         if (strncmp(header->signature, acpi_str_fadt, 4) == 0) {
             assert(map_acpi_table_content(table_entries[i], header));
@@ -308,10 +306,22 @@ void init(void)
     }
     update_active_ut_idx(&post_boot_cnode);
 
+    // Init the CNodes that is shared between ACPI and PCIe driver
+    pci_resources_cnode = &pci_resources->cnode_specs;
+    pci_resources_cnode->cptr = cnode_cptr_pci_resources;
+    // TODO: this should be passed by capDL loader
+    seL4_Error error = seL4_CNode_Move(pci_resources_cnode->cptr, 1, 58, post_boot_cnode.cptr, 1, 58);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to copy a the IRQControl Capability\n");
+        return;
+    }
+    pci_resources_cnode->start = 2;
+    pci_resources_cnode->end = 3;
+
     sddf_dprintf("ACPI tables summary:\n");
     sddf_dprintf("  num_tables: %d\n", acpi_tables_summary.num_tables);
-    sddf_dprintf("  mem_size: %d\n", acpi_tables_summary.mem_end);
-    sddf_dprintf("  tables_end: %d\n", acpi_tables_summary.tables_end);
+    sddf_dprintf("  mem_size: %lu\n", acpi_tables_summary.mem_end);
+    sddf_dprintf("  tables_end: %lu\n", acpi_tables_summary.tables_end);
 
     if (acpi_tables_summary.num_tables == 0) {
         load_acpi_tables();
@@ -398,7 +408,6 @@ void init(void)
     assert(pci_resources->num_bridges == num_pci_seg_grps); // Num of PCIe bridges should be matched in MCFG and DSDT
 
     // Map ECAM space for PCIe driver
-    seL4_Error error;
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
         sddf_dprintf("PCI segment group: %u, base addr: 0x%lx, bus_range: [%u-%u]\n",
                      pci_resources->pci_seg_groups[i].group_id,
@@ -410,7 +419,7 @@ void init(void)
         uintptr_t cur_paddr = pci_resources->pci_seg_groups[i].base_addr;
         uintptr_t cur_vaddr = ecam_base_vaddr;
         while (cur_paddr < end_paddr) {
-            error = retype_and_map_frame(&post_boot_cnode, cur_paddr, cur_vaddr, seL4_CapInitThreadVSpace, seL4_X86_LargePageObject, seL4_ReadWrite);
+            error = retype_and_map_frame(&post_boot_cnode, cur_paddr, cur_vaddr, vspace_cptr_pci_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
             if (error != seL4_NoError) {
                 sddf_dprintf("Error: failed to retype or map a frame.\n");
                 return;
@@ -422,8 +431,18 @@ void init(void)
         pci_resources->pci_seg_groups[i].base_addr = ecam_base_vaddr;
         ecam_base_vaddr = cur_vaddr;
     }
+
+
     sddf_dprintf("Finished ECAM mapping!\n");
 
+    error = seL4_CNode_Copy(pci_resources_cnode->cptr, 2, 58, post_boot_cnode.cptr, post_boot_cnode.active_ut_idx, 58, seL4_ReadWrite);
+    if (error != seL4_NoError) {
+        sddf_dprintf("Error: failed to copy a the IRQControl Capability\n");
+        return;
+    }
+    pci_resources_cnode->caps[2].base_addr = post_boot_cnode.caps[post_boot_cnode.active_ut_idx].base_addr;
+    pci_resources_cnode->caps[2].end_addr = post_boot_cnode.caps[post_boot_cnode.active_ut_idx].end_addr;
+    pci_resources_cnode->active_ut_idx = 2;
 
     sddf_deferred_notify(0);
 }
