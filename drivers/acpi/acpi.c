@@ -198,7 +198,7 @@ void backup_acpi_table(acpi_header_t *header)
     memcpy((void *)backup_table_vaddr, (void *)header, header->length);
 
     uint32_t table_idx = acpi_tables_summary.num_tables;
-    acpi_tables_summary.tables[table_idx] = (acpi_header_t *)backup_table_vaddr;
+    acpi_tables_summary.tables_offset[table_idx] = backup_table_vaddr - (uintptr_t)&acpi_tables;
     acpi_tables_summary.num_tables++;
     acpi_tables_summary.tables_end = backup_table_vaddr + header->length - (uintptr_t)&acpi_tables;
     sddf_dprintf("update tables_end to 0x%lx\n", acpi_tables_summary.tables_end);
@@ -207,10 +207,18 @@ void backup_acpi_table(acpi_header_t *header)
 acpi_header_t *find_first_acpi_header_by_signature(const char *signature)
 {
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
-        acpi_header_t *header = acpi_tables_summary.tables[i];
+        sddf_dprintf("acpi start: 0x%lx, table pointer: 0x%lx,\n", (uintptr_t)&acpi_tables, acpi_tables_summary.tables_offset[i]);
+        acpi_header_t *header = (acpi_header_t *)(acpi_tables_summary.tables_offset[i] + (uintptr_t)&acpi_tables);
+        sddf_dprintf("Signature: %c%c%c%c\n",
+                 header->signature[0],
+                 header->signature[1],
+                 header->signature[2],
+                 header->signature[3]);
+
         if (strncmp(header->signature, signature, 4) == 0) {
             return header;
         }
+        sddf_dprintf("ello\n");
     }
     return NULL;
 }
@@ -324,6 +332,7 @@ void init(void)
     sddf_dprintf("  tables_end: %lu\n", acpi_tables_summary.tables_end);
 
     if (acpi_tables_summary.num_tables == 0) {
+        sddf_dprintf("Test tables are found, skip loading the ACPI tables from the host machine");
         load_acpi_tables();
     }
 
@@ -356,8 +365,9 @@ void init(void)
     scan_namespace_tree(&namespace_root, dsdt_table_end);
 
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
-        if (strncmp(acpi_tables_summary.tables[i]->signature, acpi_str_ssdt, 4) == 0) {
-            acpi_dsdt_t *ssdt_table = (acpi_dsdt_t *)acpi_tables_summary.tables[i];
+        acpi_header_t *header = (acpi_header_t *)((uintptr_t)&acpi_tables + acpi_tables_summary.tables_offset[i]);
+        if (strncmp(header->signature, acpi_str_ssdt, 4) == 0) {
+            acpi_dsdt_t *ssdt_table = (acpi_dsdt_t *)header;
             uint8_t *ssdt_table_end = (uint8_t *)ssdt_table + ssdt_table->header.length;
             set_scanner_to((uint8_t *)&ssdt_table->content[0]);
             scan_namespace_tree(&namespace_root, ssdt_table_end);

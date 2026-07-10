@@ -140,7 +140,6 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
                           seL4_Word size_bits,
                           uint32_t *retyped_cap_idx)
 {
-    sddf_dprintf("Retype: 0x%lx, ut_idx: %u\n", cnode_specs->cptr, ut_idx);
     // @terryb: need to update this if we remove self-ref cap at slot 0
     seL4_Error error = seL4_Untyped_Retype(cnode_specs->cptr + ut_idx,
                                 object_type,

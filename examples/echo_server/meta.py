@@ -168,21 +168,32 @@ class AcpiTablesConfig:
         self.acpi_table_pointers = [0] * self.max_num_acpi_tables
 
     # TODO: add the checks
-    def add_acpi_table(self, dsl_file):
-        assert os.path.isfile(dsl_file)
-        with open(data_name, "rb") as data_file:
+    def add_acpi_table(self, acpi_file):
+        acpi_file = "test_" + acpi_file + ".dat"
+        print(acpi_file)
+        assert os.path.isfile(acpi_file)
+        with open(acpi_file, "rb") as data_file:
             byte_list = list(data_file.read())
 
             if len(byte_list) + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_pointers[self.num_tables] = len(self.acpi_table_bytes)
                 self.acpi_table_bytes.extend(byte_list)
                 self.patched_tables_end = len(self.acpi_table_bytes)
                 self.num_tables += 1
 
-        trailing_len = len(self.acpi_table_bytes) & self.alignment
+        trailing_len = len(self.acpi_table_bytes) % self.alignment
         if trailing_len != 0:
             padding_len = self.alignment - trailing_len
             if padding_len + len(self.acpi_table_bytes) < self.max_total_size:
                 self.acpi_table_bytes.extend(b"\x00" * padding_len)
+
+    def tables_serialise(self):
+        pack_str = "<" + "B" * len(self.acpi_table_bytes)
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_bytes
+        )
 
     def summary_serialise(self):
         pack_str = "<" + "Q" * self.max_num_acpi_tables + "QQII"
@@ -252,6 +263,9 @@ def generate(
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
 
     acpi_tables_config = AcpiTablesConfig(0x500000)
+    acpi_tables_config.add_acpi_table("mcfg_table")
+    acpi_tables_config.add_acpi_table("dsdt_table")
+    acpi_tables_config.add_acpi_table("ssdt_table")
 
     acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
     acpi_driver.add_boot_info(BootInfo("rsdp"))
@@ -641,6 +655,10 @@ def generate(
     with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
         f.write(acpi_tables_config.summary_serialise())
     update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
+
+    with open(f"{output_dir}/acpi_tables.data", "wb+") as f:
+        f.write(acpi_tables_config.tables_serialise())
+    update_elf_section("acpi_driver.elf", "acpi_tables", "acpi_tables")
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
