@@ -54,3 +54,8 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
 
 bool update_cnode_specs_after_revoke(cnode_specs_t *cnode_specs,
                                      uint32_t ut_idx);
+
+seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
+                              cnode_specs_t *src_cnode_specs,
+                              uintptr_t min_addr,
+                              uintptr_t max_addr);
