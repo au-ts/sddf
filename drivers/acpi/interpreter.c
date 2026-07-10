@@ -996,7 +996,7 @@ void parse_namespace_node(bool evaluation)
                     break;
                 }
                 case ONE_OP: {
-                    aml_data_t argument = {0, DATA_OBJ_ONE, 0};
+                    aml_data_t argument = {1, DATA_OBJ_ONE, 0};
                     state_stack_add_argument(argument);
                     break;
                 }
