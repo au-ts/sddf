@@ -1109,7 +1109,7 @@ void parse_namespace_node(bool evaluation)
                             sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
                     } else {
-                        sddf_dprintf("skip_name_string, op_code: 0x%x\n", op_code);
+                        /* sddf_dprintf("skip_name_string, op_code: 0x%x\n", op_code); */
                         skip_name_string();
                     }
                 }

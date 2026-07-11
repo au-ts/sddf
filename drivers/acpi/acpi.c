@@ -324,6 +324,7 @@ void init(void)
         sddf_dprintf("i: %lu, 0x%lx-0x%lx: device? %d\n", i, post_boot_cnode.caps[i].base_addr, post_boot_cnode.caps[i].end_addr, post_boot_cnode.caps[i].is_device);
     }
     update_active_ut_idx(&post_boot_cnode);
+    sddf_dprintf("cnode start: %d\n", post_boot_cnode.start);
 
     // Init the CNodes that is shared between ACPI and PCIe driver
     pci_resources_cnode = &pci_resources->cnode_specs;
