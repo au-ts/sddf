@@ -156,7 +156,7 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
     cnode_specs->caps[cnode_specs->end].base_addr = cnode_specs->caps[ut_idx].base_addr;
     cnode_specs->caps[cnode_specs->end].end_addr = cnode_specs->caps[ut_idx].base_addr + GET_OBJECT_SIZE(object_type, size_bits);
     cnode_specs->caps[cnode_specs->end].object_type = object_type;
-    cnode_specs->caps[cnode_specs->end].object_type = cnode_specs->caps[ut_idx].is_device;
+    cnode_specs->caps[cnode_specs->end].is_device = cnode_specs->caps[ut_idx].is_device;
     cnode_specs->caps[cnode_specs->end].parent = ut_idx;
     cnode_specs->caps[cnode_specs->end].child = 0;
     cnode_specs->caps[cnode_specs->end].next = 0;
