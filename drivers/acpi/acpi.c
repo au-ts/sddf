@@ -160,6 +160,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
             buf_cur += (buf_cur[0] & 0x7) + 1;
         }
     }
+    sddf_dprintf("=====Finish CRS untypeds passing=====\n");
 }
 
 // TODO: this should be in interpreter.c
@@ -420,6 +421,7 @@ void init(void)
             /* pass_crs_and_caps(crs_data_before_eval, pci_resources->num_bridges); */
             // TODO: fix ret_type
             aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
+            sddf_dprintf("CRS: 0x%lx, len: 0x%x\n", crs_data.value, crs_data.length);
             pass_crs_and_caps(crs_data, pci_resources->num_bridges);
             sddf_dprintf("======Finish _CRS parsing\n");
 
