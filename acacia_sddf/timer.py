@@ -25,20 +25,20 @@ from typing import List, Dict, Type, Union, Optional
 class sDDFTimer(sDDFDriverClass):
     def __init__(
         self,
+        sdf: System,
         dev_compatible: str,
         dev_dt_path: str,
-        sdf: System,
         driver_prio: int = 254,
         cpu: Optional[int] = None,
         driver_elf: str = "timer_driver.elf",
     ):
         super().__init__(
-            "timer", dev_compatible, dev_dt_path, sdf, magic="sDDF" + chr(1)
+            sdf, "timer", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
         )
         self.driver = ProtectionDomain(
+            self.sdf,
             "timer_driver",
             driver_elf,
-            self.sdf,
             scheduling=SchedulingProperties(driver_prio, passive=True),
         )
         self.cpu = cpu
@@ -57,9 +57,9 @@ class sDDFTimer(sDDFDriverClass):
                     f"Client {c} has higher priority than timer driver!"
                 )
             ch = Channel(
+                self.sdf,
                 Channel.End(c, can_notify=False, can_pp=True),
                 Channel.End(self.driver, can_notify=True, can_pp=False),
-                self.sdf
             )
             self.client_configs.append(
                 self.timer_client_config_factory(c, ch.id_for_pd(c))
