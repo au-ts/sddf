@@ -27,9 +27,9 @@ I2C_PROTOCOL_MAGIC = "sDDF" + chr(0x4)
 class sDDFI2C(sDDFDriverClass):
     def __init__(
         self,
+        sdf: System,
         dev_compatible: str,
         dev_dt_path: str,
-        sdf: System,
         driver_prio: int,
         virt_prio: int,
         cpu: Optional[int] = None,
@@ -37,7 +37,7 @@ class sDDFI2C(sDDFDriverClass):
         driver_elf: str = "i2c_driver.elf",
     ):
         super().__init__(
-            "i2c", dev_compatible, dev_dt_path, sdf, magic="sDDF" + chr(0x1)
+            sdf, "i2c", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
         )
         self.sdf = sdf
         self.cpu = cpu
@@ -52,9 +52,9 @@ class sDDFI2C(sDDFDriverClass):
         # the sDDF with an SDK model, but that is for the future.
         self.virt_elf = virt_elf
         self.driver = ProtectionDomain(
+            self.sdf,
             "i2c_driver",
             driver_elf,
-            self.sdf,
             scheduling=SchedulingProperties(driver_prio),
             cpu=self.cpu,
         )
@@ -77,16 +77,16 @@ class sDDFI2C(sDDFDriverClass):
 
     def construct_infrastructure(self, virt_prio):
         self.virt = ProtectionDomain(
+            self.sdf,
             "i2c_virt",
             self.virt_elf,
-            self.sdf,
             scheduling=SchedulingProperties(virt_prio),
             cpu=self.cpu,
         )
 
         # Make queues
-        driver_req_q_mr = MemoryRegion("i2c_driver_request", 0x1000, self.sdf)
-        driver_resp_q_mr = MemoryRegion("i2c_driver_response", 0x1000, self.sdf)
+        driver_req_q_mr = MemoryRegion(self.sdf, "i2c_driver_request", 0x1000)
+        driver_resp_q_mr = MemoryRegion(self.sdf, "i2c_driver_response", 0x1000)
         driver_req_map = self.driver.create_automap(
             driver_req_q_mr, Map.Permissions(r=True, w=True)
         )
@@ -102,9 +102,9 @@ class sDDFI2C(sDDFDriverClass):
 
         # Create channels
         driver_virt_ch = Channel(
+            self.sdf,
             Channel.End(self.driver, can_notify=True, can_pp=False),
             Channel.End(self.virt, can_notify=True, can_pp=False),
-            self.sdf
         )
         self.channels.append(driver_virt_ch)
 
@@ -143,16 +143,18 @@ class sDDFI2C(sDDFDriverClass):
                 )
             # Make channel
             ch = Channel(
+                self.sdf,
                 Channel.End(c, can_notify=True, can_pp=True),
                 Channel.End(self.virt, can_notify=True, can_pp=False),
-                self.sdf
             )
             self.channels.append(ch)
 
             # Add request and response queue
-            c_req_q_mr = MemoryRegion(f"i2c_client_request_{c.name}", 0x1000, self.sdf)
-            c_resp_q_mr = MemoryRegion(f"i2c_client_response_{c.name}", 0x1000, self.sdf)
-            c_data_mr = MemoryRegion(f"i2c_client_data_{c.name}", I2C_DATA_SZ, self.sdf)
+            c_req_q_mr = MemoryRegion(self.sdf, f"i2c_client_request_{c.name}", 0x1000)
+            c_resp_q_mr = MemoryRegion(
+                self.sdf, f"i2c_client_response_{c.name}", 0x1000
+            )
+            c_data_mr = MemoryRegion(self.sdf, f"i2c_client_data_{c.name}", I2C_DATA_SZ)
 
             # Create maps for clients
             c_req_map = c.create_automap(c_req_q_mr, Map.Permissions(r=True, w=True))

@@ -14,9 +14,9 @@ from acacia_sddf import BOARDS, sDDFTimer
 
 
 def generate(sdf_file: str, output_dir: str):
-    client = ProtectionDomain("client", "client.elf", sdf, priority=1)
+    client = ProtectionDomain(sdf, "client", "client.elf", priority=1)
 
-    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
     timer.add_client(client)
 
     # Add HPET if x86
