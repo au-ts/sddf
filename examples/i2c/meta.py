@@ -11,23 +11,25 @@ from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", sdf, priority=1)
-    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", sdf, priority=1)
+    client_pn532 = ProtectionDomain(sdf, "client_pn532", "client_pn532.elf", priority=1)
+    client_ds3231 = ProtectionDomain(
+        sdf, "client_ds3231", "client_ds3231.elf", priority=1
+    )
 
     i2c = sDDFI2C(
-        board.i2c.compatible, board.i2c.node_path, sdf, driver_prio=200, virt_prio=199
+        sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
     )
     i2c.add_client(client_ds3231)
     i2c.add_client(client_pn532)
 
-    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
     timer.add_client(client_ds3231)
     timer.add_client(client_pn532)
 
     serial = sDDFSerial(
+        sdf,
         board.serial.compatible,
         board.serial.node_path,
-        sdf,
         driver_prio=201,
         virt_tx_prio=200,
         allow_rx=False,
@@ -40,8 +42,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     if board.name == "odroidc4":
         # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
         # direct access.
-        clk_mr = MemoryRegion("clk", 0x1000, sdf, paddr=0xFF63C000, cached=False)
-        gpio_mr = MemoryRegion("gpio", 0x1000, sdf, paddr=0xFF634000, cached=False)
+        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000, cached=False)
+        gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000, cached=False)
         i2c.driver.add_map(Map(clk_mr, 0x30_000_000, "rw"))
         i2c.driver.add_map(Map(gpio_mr, 0x30_100_000, "rw"))
 
