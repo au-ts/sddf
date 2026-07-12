@@ -89,6 +89,10 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
                               uintptr_t min_addr,
                               uintptr_t max_addr)
 {
+    if (min_addr >= max_addr) {
+        return seL4_NoError;
+    }
+
     uint32_t target_ut_idx;
     seL4_Error error = get_untyped_at_paddr(src_cnode_specs, min_addr, &target_ut_idx);
     if (error != seL4_NoError) {
@@ -103,7 +107,7 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
     seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
 
     uint32_t retyped_cptr_idx;
-    /* sddf_dprintf("pass the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
+    sddf_dprintf("Try passing the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr);
     error = untyped_retype(src_cnode_specs, target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",

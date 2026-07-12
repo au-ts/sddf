@@ -1,4 +1,6 @@
 #pragma once
+
+#include <sddf/util/vspace.h>
 #include "acpi.h"
 // =========================== Refactor =========================
 
@@ -82,6 +84,8 @@ mempool_t state_stack_mempool = {
     .next = (void *)0x50000000,
     .end = (void *)0x50010000,
 };
+
+#define READ_BITS(val, m, n) (((val) >> (m)) & ((1ULL << (n)) - 1))
 
 scanner_t scanner;
 
@@ -305,8 +309,7 @@ void store_op_evaluation()
                 break;
             }
             case CREATE_DWORD_FIELD_OP: {
-                sddf_dprintf("save %u to DWord %s\n", current_state->arguments[0].value, target_node->name);
-                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 2);
+                write_to_buffer(target_node->data.value, current_state->arguments[0].value, 4);
                 break;
             }
             case CREATE_QWORD_FIELD_OP: {
@@ -429,17 +432,15 @@ void state_stack_pop()
             }
             case RETURN_OP: {
                 assert(current_state->num_args == 1);
-                sddf_dprintf("complete MethodOp: %s, ret_buf = 0x%lx\n", current_state->parent->node->name, (uint64_t)current_state->arguments[0].value);
+                /* sddf_dprintf("complete MethodOp: %s, ret_buf = 0x%lx\n", current_state->parent->node->name, (uint64_t)current_state->arguments[0].value); */
                 parse_state_t *method_state = current_state->parent;
                 while (method_state && method_state->op_code != METHOD_OP) {
                     method_state = method_state->parent;
                 }
                 if (method_state) {
                     aml_data_t *eval_ret = (aml_data_t *)method_state->arguments[0].value;
-                    sddf_dprintf("completes, ret: 0x%lx\n", (uintptr_t)eval_ret);
                     *eval_ret = current_state->arguments[0];
                     method_state->stage_idx += 1; // MethodOp completes
-                    sddf_dprintf("complets\n");
                 }
                 break;
             }
@@ -451,15 +452,6 @@ void state_stack_pop()
                 prt->pin = current_state->arguments[2];
                 prt->source = current_state->arguments[3];
                 prt->source_index = current_state->arguments[4];
-                /* // TODO: handle multiple IRQ cases */
-                /* if (current_state->arguments[3].type == DATA_OBJ_NODE) { */
-                /*     sddf_dprintf("TODO: parse _CRS\n"); */
-                /* } else if (current_state->arguments[3].value == 0) { */
-                /*     prt->gsi = current_state->arguments[4].value; */
-                /* } else { */
-                /*     prt->gsi = current_state->arguments[3].value; */
-                /* } */
-                /* sddf_dprintf("{ address: 0x%X, pin: 0x%x, gsi: 0x%x}\n", prt->address, prt->pin, prt->gsi); */
                 break;
             }
             case OP_REGION_OP: {
@@ -467,7 +459,7 @@ void state_stack_pop()
                 assert(current_state->arguments[0].type == DATA_OBJ_RET);
                 uint8_t region_space = current_state->arguments[1].value;
                 uintptr_t region_offset = current_state->arguments[2].value;
-                // uint64_t region_length = current_state->arguments[3]; seems useless here, so ignore it
+                uint64_t region_length = current_state->arguments[3].value;
                 assert(current_state->arguments[0].value % 8 == 0);
                 aml_data_t *eval_ret = (aml_data_t *)current_state->arguments[0].value;
 
@@ -480,13 +472,13 @@ void state_stack_pop()
                     uint64_t address;
                     aml_data_t addr_eval_ret = eval_namespace_node(adr_node, 0, NULL);
                     address = addr_eval_ret.value;
-                    sddf_dprintf("address node name: %s, ret_val: 0x%lx\n", adr_node->name, address);
+                    sddf_dprintf("address node name: %s, addr: 0x%lx\n", adr_node->name, address);
 
                     uint64_t bus;
                     aml_namespace_node_t *bbn_node = find_namespace_node_by_name(current_state->node, acpi_str_bbn);
                     aml_data_t bus_eval_ret = eval_namespace_node(bbn_node, 0, NULL);
                     bus = bus_eval_ret.value;
-                    sddf_dprintf("bus node name: %s, addr: 0x%lx\n", bbn_node->name, bus);
+                    sddf_dprintf("bus node name: %s, bus: 0x%lx\n", bbn_node->name, bus);
 
                     // TODO: use of region_offset and region_length
                     sddf_dprintf("field_reg: 0x%lx, bus: 0x%lx, address: 0x%lx, region_offset: 0x%lx\n", field_register, bus, address, region_offset);
@@ -497,9 +489,10 @@ void state_stack_pop()
 
                 sddf_dprintf("field_register: 0x%lx\n", field_register);
                 eval_ret->value = field_register;
+                eval_ret->length = region_length;
                 ret_data = *eval_ret;
 
-                sddf_dprintf("complete OpRegionOp: %s, ret_buf = %lu\n", current_state->node->name, eval_ret->value);
+                /* sddf_dprintf("complete OpRegionOp: %s, ret_buf = %lu\n", current_state->node->name, eval_ret->value); */
                 break;
             }
             case CREATE_BIT_FIELD_OP:
@@ -522,7 +515,7 @@ void state_stack_pop()
                 }
                 current_state->node->data = field_buffer;
                 current_state->node->evaluated = true;
-                sddf_dprintf("CreateFieldOp: {0x%lx, %u, %u}, name: %s\n", field_buffer.value, field_buffer.type, field_buffer.length, current_state->node->name);
+                /* sddf_dprintf("CreateFieldOp: {0x%lx, %u, %u}, name: %s\n", field_buffer.value, field_buffer.type, field_buffer.length, current_state->node->name); */
                 break;
             }
         }
@@ -587,10 +580,10 @@ void state_stack_update()
             current_state->stage_idx += 1;
         }
     } else if (current_state->op_code == BUFFER_PREFIX && op_stage == TERM_INTEGER) {
-        sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n",
-                     (uintptr_t)current_state->node->pkt_start,
-                     (uintptr_t)current_state->pkt_end,
-                     current_state->arguments[0].value);
+        /* sddf_dprintf("buffer pkt_start: 0x%lx, pkt_end: 0x%lx, buffer_size: 0x%lx\n", */
+                     /* (uintptr_t)current_state->node->pkt_start, */
+                     /* (uintptr_t)current_state->pkt_end, */
+                     /* current_state->arguments[0].value); */
         current_state->stage_idx += 2;
     } else if (current_state->op_code == PACKAGE_PREFIX && op_stage == PKT_LEN) {
         aml_data_t package_start = {(uint64_t)scanner.current, DATA_OBJ_QWORD, 0};
@@ -881,24 +874,45 @@ aml_namespace_node_t *make_namespace_node(aml_namespace_node_t *namespace, uint1
 
 void parse_field_list()
 {
-    uint32_t offset = 0;
+    assert(current_state->arguments[0].type == DATA_OBJ_BYTE);
+    uint8_t field_flags = current_state->arguments[0].value;
+    // AccessType: bit 0-3 in FieldFlags
+    uint8_t access_type = field_flags & 0xF;
+    // Save 4-bit AccessType as data type of FieldOp to be used as alignment size
+    aml_data_type_t access_data_type = DATA_OBJ_ZERO;
+    switch (access_type) {
+        case 0: { access_data_type = DATA_OBJ_ZERO; break; } // DATA_OBJ_ZERO indicates AnyAcc
+        case 1: { access_data_type = DATA_OBJ_BYTE; break; }
+        case 2: { access_data_type = DATA_OBJ_WORD; break; }
+        case 3: { access_data_type = DATA_OBJ_DWORD; break; }
+        case 4: { access_data_type = DATA_OBJ_QWORD; break; }
+        case 5: { access_data_type = DATA_OBJ_BUFFER; break; }
+        default: {
+            sddf_dprintf("[Error] Unsupported AccessType: 0x%x\n", access_type);
+        }
+    }
+
+    uint32_t bit_offset = 0;
     while (scanner.current < current_state->pkt_end) {
         uint8_t byte = advance();
         if ((byte >= 'A' && byte <= 'Z') || byte == '_') {
             scanner.current--;
+            // Create FieldOps as direct Children of OpRegionOp
             aml_namespace_node_t *field_node = make_namespace_node(current_state->node, FIELD_OP);
             uint8_t *field_element_start = scanner.current;
             uint32_t bit_width = get_pkt_end() - field_element_start;
-            field_node->data.value = (offset << 8) | bit_width;
-            /* sddf_dprintf("field name: %s, bit_width: %u, offset: 0x%x\n", field_node->name, bit_width, offset); */
-            offset += bit_width;
+            // Save "| 56-bit offset | 8-bit width |" in data of FieldOp
+            field_node->data.value = ((uint64_t)bit_offset << 8) | bit_width;
+            field_node->data.type = access_data_type;
+            /* sddf_dprintf("field name: %s, bit_width: %u, bit_offset: 0x%x\n", field_node->name, bit_width, bit_offset); */
+            bit_offset += bit_width;
         } else if (byte == 0x00) {
             uint8_t *field_element_start = scanner.current;
             uint8_t *reserved_pkt_end = get_pkt_end();
             uint32_t padding_bits = (uint32_t)(reserved_pkt_end - field_element_start);
-            offset += padding_bits;
+            bit_offset += padding_bits;
             /* sddf_dprintf("Reserved: current: 0x%lx, reserved_pkt_end: 0x%lx, width: 0x%x\n", (uintptr_t)scanner.current, (uintptr_t)reserved_pkt_end, padding_bits); */
-            /* sddf_dprintf("offset: 0x%x\n", offset); */
+            /* sddf_dprintf("bit_offset: 0x%x\n", bit_offset); */
         } else if (byte == 0x01) {
             advance(); // Type
             advance(); // Attrib
@@ -914,26 +928,104 @@ aml_data_t read_field_value(aml_namespace_node_t *field_node)
     sddf_dprintf("Try evaluating FieldOp: %s\n", field_node->name);
 
     // TODO: should be DWORD_DATA
-    aml_data_t eval_ret = eval_namespace_node(field_node->parent, 0, NULL);
-    sddf_dprintf("name: %s, ret_value: 0x%lx, op_code: 0x%x\n", field_node->parent->name, eval_ret.value, field_node->parent->op_code);
+    aml_data_t op_region = eval_namespace_node(field_node->parent, 0, NULL);
+    sddf_dprintf("name: %s, ret_value: 0x%lx, op_code: 0x%x\n", field_node->parent->name, op_region.value, field_node->parent->op_code);
 
-    uint32_t offset_bits = field_node->data.value >> 8;
-    uint32_t field_width = field_node->data.value & 0xFF;
-    sddf_dprintf("Field offset: 0x%x, width: %u\n", offset_bits / 8, field_width);
+    // Decode bit_offset and bit_width from data of FieldOp
+    uint64_t field_bit_offset = field_node->data.value >> 8;
+    uint8_t field_bit_width = field_node->data.value & 0xFF;
+    sddf_dprintf("Field offset: 0x%lx, bit_offset: 0x%lx, width: %u\n", field_bit_offset / 8, field_bit_offset % 8, field_bit_width);
 
-    uint8_t *field_register = (uint8_t *)eval_ret.value;
+    // Align the field address to a 1-byte boundary
+    uintptr_t field_paddr = op_region.value + (field_bit_offset / 8);
+    uint8_t bit_offset = field_bit_offset % 8;
 
-    sddf_dprintf("field_register: 0x%lx\n", (uintptr_t)field_register);
+    // TODO: replace this constant value with a macro;
+    uintptr_t field_vaddr = 0x4000000 + PAGE_OFFSET(field_paddr);;
+    map_memory_region(&post_boot_cnode, field_paddr, op_region.length, field_vaddr);
 
-    uint8_t field_value = 0;
-    /* if (field_register >= (uint8_t *)0x20000000 && field_register < (uint8_t *)0x30000000) { */
-        /* field_value = ((*field_register) >> (offset_bits % 8)) & ((1 << field_width) - 1); */
-    /* } */
-    // TODO: check the alignemtn of FieldOps
-    // TODO: read the register bit by bit
-    sddf_dprintf("read field %s value: 0x%x\n", field_node->name, field_value);
-    aml_data_t field_data = {field_value, DATA_OBJ_QWORD, 0};
-    /* state_stack_add_argument(field_data); */
+    uint64_t final_field_value = 0;
+    uint8_t remaining_bit_width = field_bit_width;
+    // TODO: BufferAcc?
+    while (remaining_bit_width) {
+        uint8_t bit_width_to_read = 0;
+        uint64_t reg_val = 0;
+        switch (field_node->data.type) {
+            case DATA_OBJ_ZERO:
+            case DATA_OBJ_BYTE: {
+                bit_width_to_read = MIN(8 - bit_offset, remaining_bit_width);
+
+                uint8_t *read_field_reg = (uint8_t *)field_vaddr;
+                reg_val = (uint64_t)*read_field_reg;
+                reg_val = READ_BITS(reg_val, bit_offset, bit_width_to_read);
+
+                field_paddr += 1;
+                field_vaddr += 1;
+                break;
+            }
+            case DATA_OBJ_WORD: {
+                // Adjust to 2-byte alignment
+                bit_offset = bit_offset + (field_paddr % 2) * 8;
+                field_paddr = ROUND_DOWN(field_paddr, 2);
+                bit_width_to_read = MIN(2 * 8 - bit_offset, remaining_bit_width);
+
+                uint16_t *read_field_reg = (uint16_t *)field_vaddr;
+                reg_val = (uint64_t)*read_field_reg;
+                reg_val = READ_BITS(reg_val, bit_offset, bit_width_to_read);
+
+                field_paddr += 2;
+                field_vaddr += 2;
+                break;
+            }
+            case DATA_OBJ_DWORD: {
+                // Adjust to 4-byte alignment
+                bit_offset = bit_offset + (field_paddr % 4) * 8;
+                field_paddr = ROUND_DOWN(field_paddr, 4);
+                field_vaddr = ROUND_DOWN(field_vaddr, 4);
+                bit_width_to_read = MIN(4 * 8 - bit_offset, remaining_bit_width);
+
+                uint32_t *read_field_reg = (uint32_t *)field_vaddr;
+                reg_val = (uint64_t)*read_field_reg;
+                reg_val = READ_BITS(reg_val, bit_offset, bit_width_to_read);
+
+                field_paddr += 4;
+                field_vaddr += 4;
+                break;
+            }
+            case DATA_OBJ_QWORD: {
+                // Adjust to 8-byte alignment
+                bit_offset = bit_offset + (field_paddr % 8) * 8;
+                field_paddr = ROUND_DOWN(field_paddr, 8);
+                field_vaddr = ROUND_DOWN(field_vaddr, 8);
+                bit_width_to_read = MIN(8 * 8 - bit_offset, remaining_bit_width);
+
+                uint64_t *read_field_reg = (uint64_t *)field_vaddr;
+                reg_val = (uint64_t)*read_field_reg;
+                reg_val = READ_BITS(reg_val, bit_offset, bit_width_to_read);
+
+                field_paddr += 8;
+                field_vaddr += 8;
+                break;
+            }
+            default: {
+                sddf_dprintf("[Error] Unsupported AccessType: 0x%x\n", field_node->data.type);
+            }
+        }
+
+        sddf_dprintf("[READ] paddr: 0x%lx, bit_offset: %u, bit_width: %u, read: 0x%lx, final: 0x%lx\n", field_paddr, bit_offset, bit_width_to_read, reg_val, final_field_value);
+        final_field_value = final_field_value + (reg_val << (field_bit_width - remaining_bit_width));
+        bit_offset = 0; // no offset since round 2
+        remaining_bit_width -= bit_width_to_read;
+        /* final_field_value = (final_field_value << bit_width_to_read) + reg_val; */
+    }
+
+    // Unmap the mapped region
+    assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
+
+    sddf_dprintf("read field %s value: 0x%lx\n", field_node->name, final_field_value);
+
+
+    aml_data_t field_data = {final_field_value, DATA_OBJ_QWORD, 0};
     return field_data;
 }
 
@@ -1101,7 +1193,7 @@ void parse_namespace_node(bool evaluation)
                         // Try looking up the object by name string by name string by name string by name string
                         aml_namespace_node_t *node = find_node_by_name_string(current_state->node, 1);
                         if (node) {
-                            sddf_dprintf("Found node %s\n", node->name);
+                            /* sddf_dprintf("Found node %s\n", node->name); */
 
                             aml_data_t eval_ret = eval_namespace_node(node, 0, NULL);
                             state_stack_add_argument(eval_ret);
@@ -1150,7 +1242,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         return eval_ret;
     }
 
-    sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end);
+    /* sddf_dprintf("Eval node %s, Op: 0x%x, end: 0x%lx\n", node->name, node->op_code, (uintptr_t)node->pkt_end); */
 
     state_stack_create(node->op_code, true);
     current_state->node = node;
@@ -1195,7 +1287,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
 
     parse_namespace_node(true);
 
-    sddf_dprintf("Finish Eval node %s, Op: 0x%x\n", node->name, node->op_code);
+    /* sddf_dprintf("Finish Eval node %s, Op: 0x%x\n", node->name, node->op_code); */
     current_state = recovery_state;
     scanner.current = recovery_location;
 

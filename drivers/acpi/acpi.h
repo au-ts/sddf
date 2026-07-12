@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sddf/util/cspace.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/util.h>
 
 #define HEX_TO_CHAR(hex) ((hex) < 10) ? ((hex) + '0') : ((hex) - 10 + 'A')
 #define ACPI_TABLES_ALIGNMENT 0x1000
