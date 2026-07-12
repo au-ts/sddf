@@ -12,13 +12,13 @@ from acacia_sddf import sDDFSerial, BOARDS
 
 
 def generate(sdf_file: str, output_dir: str):
-    client0 = ProtectionDomain("client0", "client0.elf", sdf, priority=1)
-    client1 = ProtectionDomain("client1", "client1.elf", sdf, priority=1)
+    client0 = ProtectionDomain(sdf, "client0", "client0.elf", priority=1)
+    client1 = ProtectionDomain(sdf, "client1", "client1.elf", priority=1)
 
     serial = sDDFSerial(
+        sdf,
         board.serial.compatible,
         board.serial.node_path,
-        sdf,
         driver_prio=200,
         virt_tx_prio=199,
         allow_rx=True,
