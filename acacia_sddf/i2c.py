@@ -69,6 +69,20 @@ class sDDFI2C(sDDFDriverClass):
         self.client_configs = []
         self.channels = []
 
+        # Special cases for boards. These should be removed once we add infrastructure to support this better.
+        # meson (odroidc4/5)
+        if "amlogic,meson" in dev_compatible:
+            # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
+            # direct access.
+            clk_mr = MemoryRegion(
+                self.sdf, "clk", 0x1000, paddr=0xFF63C000, cached=False
+            )
+            gpio_mr = MemoryRegion(
+                self.sdf, "gpio", 0x1000, paddr=0xFF634000, cached=False
+            )
+            self.driver.add_map(Map(clk_mr, 0x30_000_000, "rw"))
+            self.driver.add_map(Map(gpio_mr, 0x30_100_000, "rw"))
+
         # We create queues etc. AFTER setting up the device resources to ensure that IRQ channels
         # have a lower value than any other channels. This is necessary because Microkit will
         # deliver notifications in ascending channel_id order, which can end up mattering in certain
