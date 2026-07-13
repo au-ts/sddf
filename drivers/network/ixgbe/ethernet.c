@@ -94,14 +94,12 @@ static inline bool hw_rx_ring_full(void)
 
 void clear_interrupts(void)
 {
-    eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
     (void)eth_regs->eicr;
 }
 
 void disable_interrupts(void)
 {
-    // TODO: 8.2.2.6.6 Writing 0b has no impact.
-    eth_regs->eimc = 0;
+    eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
     clear_interrupts();
 }
 
@@ -164,6 +162,7 @@ void tx_provide(void)
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
+            sddf_dprintf("send a packet\n");
 
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
@@ -266,7 +265,6 @@ static void rx_return(void)
     while (!hw_rx_ring_empty()) {
         // @jade: why do we get into this loop all the time even when there is no packets in there?
 
-        sddf_dprintf("packets received!\n");
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         // TODO: simplify the data structures
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
@@ -486,6 +484,22 @@ void init_3(void)
     device.init_stage = 4;
 }
 
+static void handle_irq(void)
+{
+    uint32_t cause = eth_regs->eicr;
+    eth_regs->eicr = cause;
+
+    while (cause) {
+        tx_return();
+        tx_provide();
+        rx_return();
+        rx_provide();
+
+        cause = eth_regs->eicr;
+        eth_regs->eicr = cause;
+    }
+}
+
 void notified(microkit_channel ch)
 {
     if (ch == timer_config.driver_id) {
@@ -499,14 +513,11 @@ void notified(microkit_channel ch)
     } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
         microkit_deferred_irq_ack(ch);
     } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
-        sddf_dprintf("IRQ\n");
+        /* uint32_t cause = eth_regs->eicr; */
+        /* eth_regs->eicr = cause; */
         // write/read-to-clear, no need for auto clear
-        uint32_t cause = eth_regs->eicr;
-        eth_regs->eicr &= ~cause;
-        tx_return();
-        tx_provide();
-        rx_return();
-        rx_provide();
+
+        handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
          * in the seL4CP event handler loop.
@@ -522,4 +533,3 @@ void notified(microkit_channel ch)
         }
     }
 }
-
