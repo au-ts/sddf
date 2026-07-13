@@ -3,8 +3,6 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
-#pragma once
-
 #include "pci.h"
 
 #include <stdint.h>
@@ -63,30 +61,40 @@ void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_
     }
 }
 
-void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id)
+void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
 {
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id + 1, mem_bar[1]);
+    bool memory_64bit = (*mem_bar) & 0x4;
     uintptr_t dev_regs_paddr = *mem_bar;
+    if (memory_64bit) {
+        dev_regs_paddr = mem_bar[0] + ((uint64_t)mem_bar[1] << 32);
+    }
     *mem_bar = 0xFFFFFFFF;
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id + 1, mem_bar[1]);
     uint32_t dev_regs_size = (~(*mem_bar) | 0xF) + 1;
     sddf_dprintf("size: 0x%x\n", dev_regs_size);
-    *mem_bar = dev_regs_paddr;
+    // TODO: allocate memory region from the windows
+    *mem_bar = dev_regs_paddr & 0xFFFFFFFF;
+    if (memory_64bit) {
+        *(mem_bar + 1) = dev_regs_paddr >> 32;
+    }
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
 
     seL4_Error error;
     uintptr_t cur_paddr = dev_regs_paddr;
     uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
-    uintptr_t cur_vaddr = 0x60000000;
+    uintptr_t cur_vaddr = target_vaddr;
     while (cur_paddr < end_paddr) {
-        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_4K, seL4_ReadWrite);
+        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
         if (error != seL4_NoError) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return;
         }
-        cur_paddr += (1 << seL4_PageBits);
-        cur_vaddr += (1 << seL4_PageBits);
+        cur_paddr += (1 << seL4_LargePageBits);
+        cur_vaddr += (1 << seL4_LargePageBits);
     }
 }
 
@@ -123,41 +131,10 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
                 break;
             };
             case irq_msix: {
-                struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
-                if (msix_cap) {
-                    // Bits 2-0 refer to BAR ID
-                    uint8_t bar_id = msix_cap->table_offset_bir & 0x5;
-                    pci_bar_t msix_bar;
-                    msix_bar.bar_id = bar_id;
-                    msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr;
-                    msix_bar.ioport = false;
-
-                    configure_pci_bar(pci_header, bar_id, msix_bar);
-
-                    // Enable MSI-X
-                    struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
-                    msg_ctrl->msix_enable = 1;
-                    sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
-                    sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
-                    sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
-
-                    struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr;
-                    msix_table->msg_addr_low = 0xFEEu << 20;
-                    msix_table->msg_data = 0x4030 + config_request.irqs[i].vector;
-                    msix_table->vec_ctrl = 0x0;
-                    sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
-                    sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
-                    sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
-                    sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
-
-                    uint32_t *msix_pba = (uint32_t *)(device_resources.regions[avail_region_idx].region.vaddr + 0x800);
-                    sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
-
-                    avail_region_idx += 1;
-                } else {
-                    sddf_dprintf("error: device does not support MSI-X\n");
-                }
                 break;
+            };
+            default: {
+                sddf_dprintf("error: device does not support MSI-X\n");
             };
         }
 
@@ -185,6 +162,42 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
 
     // TODO: if it's not found
     return 0;
+}
+
+void configure_msi(struct pci_config_space *pci_header, uint8_t vector)
+{
+    struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
+
+    if (msix_cap) {
+        // Bits 2-0 refer to BAR ID
+        uint8_t bar_id = msix_cap->table_offset_bir & 0x5;
+        pci_bar_t msix_bar;
+        msix_bar.bar_id = bar_id;
+        /* msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr; */
+        msix_bar.ioport = false;
+
+        map_pci_bar(pci_header, bar_id, 0x4000000);
+
+        // Enable MSI-X
+        struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
+        msg_ctrl->msix_enable = 1;
+        sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
+        sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
+        sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
+
+        struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr;
+        msix_table->msg_addr_low = 0xFEEu << 20;
+        msix_table->msg_data = 0x4030 + vector;
+        msix_table->vec_ctrl = 0x0;
+        sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
+        sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
+        sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
+        sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
+
+        uint32_t *msix_pba = (uint32_t *)( + 0x800);
+        sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
+
+    }
 }
 
 void bind_irq(struct pci_config_space *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
@@ -268,9 +281,15 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                 }
 
                 // TODO: convert it to general solution
-                if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
-                    map_pci_bar(pci_header, 4);
-                    bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16);
+                /* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { */
+                /*     map_pci_bar(pci_header, 4); */
+                /*     bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
+                /* } */
+
+                if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) {
+                    map_pci_bar(pci_header, 0, 0x2000000);
+                    /* configure_msi() */
+                    /* bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
                 }
             }
         }

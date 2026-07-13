@@ -1,4 +1,3 @@
-#pragma once
 
 #include <sddf/util/vspace.h>
 #include "acpi.h"

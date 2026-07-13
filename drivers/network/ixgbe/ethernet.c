@@ -100,7 +100,7 @@ void clear_interrupts(void)
 
 void disable_interrupts(void)
 {
-    // TODO: why?
+    // TODO: 8.2.2.6.6 Writing 0b has no impact.
     eth_regs->eimc = 0;
     clear_interrupts();
 }
@@ -266,6 +266,7 @@ static void rx_return(void)
     while (!hw_rx_ring_empty()) {
         // @jade: why do we get into this loop all the time even when there is no packets in there?
 
+        sddf_dprintf("packets received!\n");
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         // TODO: simplify the data structures
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
@@ -349,18 +350,6 @@ void init_1(void)
     device.init_stage = 1;
     // section 4.6.3.1 - disable interrupts again after reset
     disable_interrupts();
-
-    struct pci_config_space *header = (struct pci_config_space *)0x3000000;
-    sddf_dprintf("vendor id: 0x%x\n", header->vendor_id);
-    sddf_dprintf("device id: 0x%x\n", header->device_id);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[0]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[1]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[2]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[3]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[4]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[5]);
-    sddf_dprintf("interrupt pin: %d\n", header->interrupt_pin);
-    sddf_dprintf("interrupt line: %d\n", header->interrupt_line);
 
     uint8_t mac[6];
     get_mac_addr(mac);
@@ -510,6 +499,7 @@ void notified(microkit_channel ch)
     } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
         microkit_deferred_irq_ack(ch);
     } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
+        sddf_dprintf("IRQ\n");
         // write/read-to-clear, no need for auto clear
         uint32_t cause = eth_regs->eicr;
         eth_regs->eicr &= ~cause;
