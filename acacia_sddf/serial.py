@@ -81,9 +81,6 @@ class sDDFSerial(sDDFDriverClass):
             scheduling=SchedulingProperties(driver_prio),
             cpu=self.cpu,
         )
-        # Do x86 stuff
-        if self.sdf.dtb is None:
-            self.add_x86_serial_port()
 
         # We must make the driver BEFORE we get here
         self.driver_dev_resources = self.create_dtb_resources(self.driver)
@@ -328,6 +325,9 @@ class sDDFSerial(sDDFDriverClass):
             )
 
         self.client_configs = client_configs
+
+    def x86_resources(self):
+        self.add_x86_serial_port()
 
     def generate_config_structs(self):
         # We've already made our structs, just return them as a list for the serialiser
