@@ -36,14 +36,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
     )
     serial.add_client(client_ina)
 
-    if board.name == "odroidc4":
-        # Odroid-C4 I2C requires clocks/GPIO setup, for now we give the I2C driver
-        # direct access.
-        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000, cached=False)
-        gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000, cached=False)
-        i2c.driver.add_map(Map(clk_mr, 0x30_000_000, "rw"))
-        i2c.driver.add_map(Map(gpio_mr, 0x30_100_000, "rw"))
-
     out_file = f"{output_dir}/{sdf_file}"
     sdf.make_config_structs()
     print(f"Saving to {out_file}")
