@@ -65,6 +65,9 @@ class sDDFTimer(sDDFDriverClass):
                 self.timer_client_config_factory(c, ch.id_for_pd(c))
             )
 
+    def x86_resources(self):
+        self.add_x86_hpet()
+
     def generate_config_structs(self):
         # We've already made our structs
         return [self.driver_dev_resources] + self.client_configs
@@ -87,7 +90,7 @@ class sDDFTimer(sDDFDriverClass):
     # x86 utility
     # NOTE: is this safe to call automatically? I currently am assuming we want manual
     # control over this since we didn't bake it into sdfgen before.
-    def add_x86_hpet(self, sdf: System):
+    def add_x86_hpet(self):
         # Timer IRQ must be the highest priority (highest vector) to ensure they are delivered
         # as close as possible to the timer expiry. The highest vector is defined by (irq_user_max - irq_user_min) in seL4 source
         # Since our HPET driver uses legacy IRQ routing, comparator 0's IRQ will always arrives at

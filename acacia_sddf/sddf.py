@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 import sys, os
 from typing import List, Optional, Tuple
+from abc import abstractmethod
 from acacia import (
     Subsystem,
     ProtectionDomain,
@@ -103,8 +104,9 @@ class sDDFDriverClass(Subsystem):
         if self.dtb is None:
             print(f"sddf.py: no DTB! Creating dummy device resources.")
             # x86 or otherwise no DTB!
+            print("sddf.py: no DTB! Assuming x86")
+            self.x86_resources()
             # We generate an empty deviceresources despite it being useless, as our build system expects it.
-            # TODO: fix that?
             self.__device_resources = DeviceResourcesFactory(
                 self.driver_magic, [], [], target_file=driver_pd.prog_image
             )
@@ -185,6 +187,16 @@ class sDDFDriverClass(Subsystem):
             self.driver_magic, region_maps, irq_ids, target_file=driver_pd.prog_image
         )
         return self.__device_resources
+
+    def x86_resources(self):
+        """
+        Create any resources needed if running on an x86 platform. Automatically
+        called in the event that no DTB is present. Subclasses should override this
+        method to do whatever they might need.
+
+        By default nothing will happen.
+        """
+        ...
 
 
 def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
