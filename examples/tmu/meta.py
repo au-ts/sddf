@@ -11,17 +11,17 @@ from acacia_sddf import BOARDS, sDDFSerial, sDDFTimer, sDDFTMU
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client = ProtectionDomain("client", "client.elf", sdf, priority=1)
-    tmu = sDDFTMU(board.tmu.compatible, board.tmu.node_path, sdf, driver_prio=7)
+    client = ProtectionDomain(sdf, "client", "client.elf", priority=1)
+    tmu = sDDFTMU(sdf, board.tmu.compatible, board.tmu.node_path, driver_prio=7)
     tmu.add_client(client)
 
-    timer = sDDFTimer(board.timer.compatible, board.timer.node_path, sdf)
+    timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
     timer.add_client(client)
 
     serial = sDDFSerial(
+        sdf,
         board.serial.compatible,
         board.serial.node_path,
-        sdf,
         driver_prio=201,
         virt_tx_prio=200,
         allow_rx=False,

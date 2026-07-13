@@ -27,18 +27,18 @@ TMU_PROTOCOL_MAGIC = "TMU" + chr(2)
 class sDDFTMU(sDDFDriverClass):
     def __init__(
         self,
+        sdf: System,
         dev_compatible: str,
         dev_dt_path: str,
-        sdf: System,
         driver_prio: int,
         cpu: Optional[int] = None,
         driver_elf: str = "tmu_driver.elf",
     ):
-        super().__init__("tmu", dev_compatible, dev_dt_path, sdf, magic="sDDF" + chr(1))
+        super().__init__(sdf, "tmu", dev_compatible, dev_dt_path, magic="sDDF" + chr(1))
         self.driver = ProtectionDomain(
+            self.sdf,
             "tmu_driver",
             driver_elf,
-            self.sdf,
             scheduling=SchedulingProperties(driver_prio, passive=True),
             cpu=cpu,
         )
@@ -62,9 +62,9 @@ class sDDFTMU(sDDFDriverClass):
                 )
             do_fwd = c is self.irq_fwd_client
             ch = Channel(
+                self.sdf,
                 Channel.End(c, can_notify=do_fwd, can_pp=True),
                 Channel.End(self.driver, can_notify=True, can_pp=False),
-                self.sdf,
             )
             if do_fwd:
                 fwd_channel = ch
