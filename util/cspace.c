@@ -100,22 +100,38 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
         return error;
     }
 
+    seL4_Word max_align_size_bits = 0;
+    while (max_align_size_bits < 64) {
+        uint8_t offset_bit = (src_cnode_specs->caps[target_ut_idx].base_addr >> max_align_size_bits) & 0x1;
+        if (offset_bit) break;
+        max_align_size_bits += 1;
+    }
+    seL4_Word max_align_size = (1ULL << max_align_size_bits);
+
     seL4_Word avai_mem_size = src_cnode_specs->caps[target_ut_idx].end_addr - min_addr;
     seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
     seL4_Word max_target_size_bits = max_size_bits(max_addr - min_addr);
-    seL4_Word new_ut_size_bits = MIN(avai_mem_size_bits, max_target_size_bits);
+    seL4_Word new_ut_size_bits = MIN(MIN(avai_mem_size_bits, max_target_size_bits), max_align_size_bits);
     seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
 
     uint32_t retyped_cptr_idx;
-    sddf_dprintf("Try passing the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr);
+    /* sddf_dprintf("Try passing the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
     error = untyped_retype(src_cnode_specs, target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",
                      min_addr,
-                     max_addr,
-                     retyped_cptr_idx,
-                     src_cnode_specs->caps[retyped_cptr_idx].base_addr,
-                     src_cnode_specs->caps[retyped_cptr_idx].end_addr);
+                     min_addr + new_ut_size,
+                     target_ut_idx,
+                     src_cnode_specs->caps[target_ut_idx].base_addr,
+                     src_cnode_specs->caps[target_ut_idx].end_addr);
+        sddf_dprintf("target_size_bits: %u\n", max_target_size_bits);
+        sddf_dprintf("avai_size_bits: %u\n", avai_mem_size_bits);
+        sddf_dprintf("new_ut_size_bits: %u\n", new_ut_size_bits);
+        sddf_dprintf("max_align_size: %u\n", max_align_size_bits);
+
+        for (uint32_t i = src_cnode_specs->start; i < src_cnode_specs->end; i++) {
+            sddf_dprintf("i: %u, 0x%lx-0x%lx, type: %u\n", i, src_cnode_specs->caps[i].base_addr, src_cnode_specs->caps[i].end_addr, src_cnode_specs->caps[i].object_type);
+        }
         return error;
     }
 
@@ -155,7 +171,9 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
         return error;
     }
 
-    /* sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx to destination %d\n", object_type, size_bits, cnode_specs->caps[ut_idx].base_addr, cnode_specs->end); */
+    if (ut_idx == 33) {
+        sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx from ut %u to destination %d\n", object_type, size_bits, cnode_specs->caps[ut_idx].base_addr, ut_idx, cnode_specs->end);
+    }
 
     cnode_specs->caps[cnode_specs->end].base_addr = cnode_specs->caps[ut_idx].base_addr;
     cnode_specs->caps[cnode_specs->end].end_addr = cnode_specs->caps[ut_idx].base_addr + GET_OBJECT_SIZE(object_type, size_bits);
