@@ -4,72 +4,35 @@ import sys, os
 import argparse
 from typing import List
 from dataclasses import dataclass
-from sdfgen import SystemDescription, Sddf, DeviceTree
+from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob
+from acacia.arch import x86_64
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
-)
-from board import BOARDS
-
-ProtectionDomain = SystemDescription.ProtectionDomain
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
+from acacia_sddf import sDDFSerial, BOARDS
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199
-    )
-    serial_virt_rx = ProtectionDomain(
-        "serial_virt_rx", "serial_virt_rx.elf", priority=199
-    )
+def generate(sdf_file: str, output_dir: str):
+    client0 = ProtectionDomain(sdf, "client0", "client0.elf", priority=1)
+    client1 = ProtectionDomain(sdf, "client1", "client1.elf", priority=1)
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
-        serial_driver.add_ioport(serial_port)
-
-        # The serial device does not located on PCIe and the interrupts are
-        # conventionally configured by BIOS. The IRQ number can be read from
-        # Linux or APCI tables.
-        serial_irq = SystemDescription.IrqIoapic(0, 4, 0, id=1)
-        serial_driver.add_irq(serial_irq)
-
-    client0 = ProtectionDomain("client0", "client0.elf", priority=1)
-    client1 = ProtectionDomain("client1", "client1.elf", priority=1)
-
-    serial_node = None
-    if dtb is not None:
-        serial_node = dtb.node(board.serial)
-        assert serial_node is not None
-
-    baud_rate = board.baud_rate
-
-    serial_system = Sddf.Serial(
+    serial = sDDFSerial(
         sdf,
-        serial_node,
-        serial_driver,
-        serial_virt_tx,
-        virt_rx=serial_virt_rx,
+        board.serial.compatible,
+        board.serial.node_path,
+        driver_prio=200,
+        virt_tx_prio=199,
+        allow_rx=True,
         enable_color=True,
-        baud_rate=baud_rate,
+        baud_rate=board.baud_rate if board.baud_rate else 115200,
     )
-    serial_system.add_client(client0)
-    serial_system.add_client(client1)
 
-    pds = [
-        serial_driver,
-        serial_virt_tx,
-        serial_virt_rx,
-        client0,
-        client1,
-    ]
-    for pd in pds:
-        sdf.add_pd(pd)
+    for pd in [client0, client1]:
+        serial.add_client(pd)
 
-    assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
-
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
+    sdf.make_config_structs()
+    out_file = f"{output_dir}/{sdf_file}"
+    print(f"Saving to {out_file}")
+    sdf.write_xml_file(out_file)
 
 
 if __name__ == "__main__":
@@ -83,13 +46,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
+    if board.arch != x86_64:
+        dtb = DeviceTreeBlob(args.dtb)
+    else:
+        dtb = None
+    sdf = System(board.arch, board.paddr_top, dtb)
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
-    sddf = Sddf(args.sddf)
-
-    dtb = None
-    if board.arch != SystemDescription.Arch.X86_64:
-        with open(args.dtb, "rb") as f:
-            dtb = DeviceTree(f.read())
-
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output)
