@@ -49,8 +49,7 @@ static inline int sddf_pmic_disable_reg(microkit_channel channel, uint32_t reg_i
  * @param voltage_uv target voltage in microvolts.
  * @return 0 on success, 1 if regulator invalid, 2 if voltage setting invalid.
  */
-static inline int sddf_pmic_set_vout(microkit_channel channel, uint32_t reg_id,
-                                     uint64_t voltage_uv)
+static inline int sddf_pmic_set_vout(microkit_channel channel, uint32_t reg_id, uint64_t voltage_uv)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_PMIC_SET_VOUT, 3);
     microkit_mr_set(SDDF_PMIC_SET_VOUT_REG_ID, reg_id);
@@ -69,8 +68,7 @@ static inline int sddf_pmic_set_vout(microkit_channel channel, uint32_t reg_id,
  * @param current_ua target current limit in microamps.
  * @return 0 on success, 1 if regulator invalid, 2 if current setting invalid.
  */
-static inline int sddf_pmic_set_climit(microkit_channel channel, uint32_t reg_id,
-                                       uint64_t current_ua)
+static inline int sddf_pmic_set_climit(microkit_channel channel, uint32_t reg_id, uint64_t current_ua)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_PMIC_SET_CLIMIT, 3);
     microkit_mr_set(SDDF_PMIC_SET_CLIMIT_REG_ID, reg_id);
@@ -89,8 +87,7 @@ static inline int sddf_pmic_set_climit(microkit_channel channel, uint32_t reg_id
  * @param info pointer to structure to populate with regulator information.
  * @return 0 on success, 1 if regulator invalid.
  */
-static inline int sddf_pmic_get_reg_info(microkit_channel channel, uint32_t reg_id,
-                                         sddf_pmic_reg_info_t *info)
+static inline int sddf_pmic_get_reg_info(microkit_channel channel, uint32_t reg_id, sddf_pmic_reg_info_t *info)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_PMIC_GET_REG_INFO, 1);
     microkit_mr_set(SDDF_PMIC_GET_REG_INFO_REG_ID, reg_id);
@@ -111,4 +108,3 @@ static inline int sddf_pmic_get_reg_info(microkit_channel channel, uint32_t reg_
 
     return ret;
 }
-

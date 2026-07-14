@@ -12,6 +12,7 @@
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/pmic/client.h>
+#include <sddf/pmic/config.h>
 #ifdef CONFIG_PLAT_MAAXBOARD
 #include <sddf/pmic/bd71837amwv-bindings.h>
 #define TARGET_REGULATOR (BD718XX_BUCK2)    // VDD_ARM
@@ -23,14 +24,14 @@
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+__attribute__((__section__(".pmic_client_config"))) pmic_client_config_t pmic_config;
 
 cothread_t t_event;
 cothread_t t_main;
 
 static serial_queue_handle_t serial_tx_queue_handle;
 
-// TODO: sdfgen for pmic client channel
-#define PMIC_CHANNEL (0)
+#define PMIC_CHANNEL (pmic_config.driver_id)
 
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
@@ -73,7 +74,8 @@ void notified(sddf_channel ch)
     }
 }
 
-void client_main(void) {
+void client_main(void)
+{
     LOG_CLIENT("Entered main loop.\n");
     for (uint32_t i = 0;; i++) {
         // Alternate between setting voltage rail to 0.9 or 1V
@@ -96,6 +98,7 @@ void init(void)
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     assert(timer_config_check_magic(&timer_config));
+    assert(pmic_config_check_magic(&pmic_config));
     sddf_printf("CLIENT|INFO: starting\n");
 
     timer_channel = timer_config.driver_id;

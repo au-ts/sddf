@@ -31,22 +31,29 @@ class sDDFPMIC(sDDFDriverClass):
         dev_dt_path: str,
         i2c: sDDFI2C,
         i2c_addr: Optional[I2CAddress] = None,
-        driver_prio: int = 254,
+        driver_prio: Optional[int] = None,
         cpu: Optional[int] = None,
-        driver_elf: str = "timer_driver.elf",
+        driver_elf: str = "pmic_driver.elf",
     ):
         self.i2c = i2c
+        self.cpu = cpu
         assert not i2c.built  # We need to be a client!
         super().__init__(
             sdf, "pmic", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
         )
+        if driver_prio:
+            assert driver_prio < i2c.virt.priority
+        else:
+            # Default to just below i2c virt
+            driver_prio = i2c.virt.priority - 1
         self.driver = ProtectionDomain(
             self.sdf,
-            "timer_driver",
+            "pmic_driver",
             driver_elf,
-            scheduling=SchedulingProperties(driver_prio, passive=True),
+            scheduling=SchedulingProperties(driver_prio),
+            cpu=self.cpu,
         )
-        self.cpu = cpu
+        i2c.add_client(self.driver)
 
         # PMIC doesn't need device resources (currently)! Just an I2C client for imx.
         # self.driver_dev_resources = self.create_dtb_resources(self.driver)
@@ -55,31 +62,41 @@ class sDDFPMIC(sDDFDriverClass):
         dtb_i2c_addrs = self.i2c.get_i2c_addresses_from_dtb(self.dtb_node)
         if i2c_addr:
             if i2c_addr not in dtb_i2c_addrs:
-                raise ValueError(f"PMIC @ addr={i2c_addr} not present in DTB! Eligible: {dtb_i2c_addrs}")
+                raise ValueError(
+                    f"PMIC @ addr={i2c_addr} not present in DTB! Eligible: {dtb_i2c_addrs}"
+                )
             self.i2c_addr = i2c_addr
         else:
             if len(dtb_i2c_addrs) != 1:
                 # Perhaps we can have better default behaviour?
-                raise RuntimeWarning(f"PMIC doesn't have a single I2C address in DTB (found `{dtb_i2c_addrs}`)! Please specify using i2c_addr=(preferred)")
-            self.i2c_addr = dtb_i2c_addrs[0] # Should only be one!
+                raise RuntimeWarning(
+                    f"PMIC doesn't have a single I2C address in DTB (found `{dtb_i2c_addrs}`)! Please specify using i2c_addr=(preferred)"
+                )
+            self.i2c_addr = dtb_i2c_addrs[0]  # Should only be one!
+
+        if self.i2c_addr.is_ten_bit:
+            raise RuntimeError(
+                "The sDDF does not currently support ten-bit I2C addresses!"
+            )
+
+        # TODO: claim i2c address from i2c driver once support is added to do so
         self.client_configs = []
 
     def connect_clients(self):
         # Clients are connected with:
-        # a. channel allowing PPCs -> driver, notifications -> clienet
-        # ... that's it!
+        # a. channel allowing PPCs -> driver
         for c in self.clients:
             if c.priority > self.driver.priority:
                 raise SubsystemBuildError(
-                    f"Client {c} has higher priority than timer driver!"
+                    f"Client {c} has higher priority than pmic driver!"
                 )
             ch = Channel(
                 self.sdf,
                 Channel.End(c, can_notify=False, can_pp=True),
-                Channel.End(self.driver, can_notify=True, can_pp=False),
+                Channel.End(self.driver, can_notify=False, can_pp=False),
             )
             self.client_configs.append(
-                self.timer_client_config_factory(c, ch.id_for_pd(c))
+                self.pmic_client_config_factory(c, ch.id_for_pd(c))
             )
 
     def x86_resources(self):
@@ -87,20 +104,32 @@ class sDDFPMIC(sDDFDriverClass):
 
     def generate_config_structs(self):
         # We've already made our structs
-        return [self.driver_dev_resources] + self.client_configs
+        return [self.pmic_driver_config_factory()] + self.client_configs
 
-    def timer_client_config_factory(
+    def pmic_driver_config_factory(self) -> ConfigStruct:
+        """
+        create pmic_driver_config_t for driver.
+        """
+        fields = {"magic": "sDDF" + chr(7), "i2c_addr": self.i2c_addr.addr}
+        return ConfigStruct(
+            "pmic_driver_config_t",
+            target_file=self.driver.prog_image,
+            section_name="pmic_driver_config",
+            fields=fields,
+        )
+
+    def pmic_client_config_factory(
         self, client_pd: ProtectionDomain, driver_id: int
     ) -> ConfigStruct:
         """
-        create timer_client_config for client_pd with serial id n
+        create pmic_client_config for client_pd
         """
-        # invariant: this PD only is a client to timer one time.
-        fields = {"magic": "sDDF" + chr(6), "driver_id": driver_id}
+        # invariant: this PD only is a client to pmic one time.
+        fields = {"magic": "sDDF" + chr(7), "driver_id": driver_id}
         return ConfigStruct(
-            "timer_client_config_t",
+            "pmic_client_config_t",
             target_file=client_pd.prog_image,
-            section_name="timer_client_config",
+            section_name="pmic_client_config",
             fields=fields,
         )
 
@@ -110,86 +139,12 @@ def add_driver_config(driver_name: str, config: sDDFDriverConfig):
     sDDFDriverManifest().add_driver_config(sDDFPMIC, driver_name, config)
 
 
-# pulp
+# imx
 add_driver_config(
-    "apb_timer",
+    "bd71837",
     sDDFDriverConfig(
-        compatible="pulp,apb_timer",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1), DTSIRQ(2), DTSIRQ(3)],
-    ),
-)
-# armv8
-add_driver_config(
-    "arm", sDDFDriverConfig(compatible="arm,armv8-timer", regions=[], irqs=[DTSIRQ(1)])
-)
-
-# bcm2835
-add_driver_config(
-    "bcm2835",
-    sDDFDriverConfig(
-        compatible="brcm,bcm2835-system-timer",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(1)],
-    ),
-)
-
-# cdns
-add_driver_config(
-    "cdns",
-    sDDFDriverConfig(
-        compatible="cdns,ttc",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# goldfish
-add_driver_config(
-    "goldfish",
-    sDDFDriverConfig(
-        compatible="google,goldfish-rtc",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# imx8
-add_driver_config(
-    "imx",
-    sDDFDriverConfig(
-        compatible=["fsl,imx8mm-gpt", "fsl,imx8mq-gpt", "fsl,imx8mp-gpt"],
-        regions=[DTSRegion("regs", "rw", 65536, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# jh7110
-add_driver_config(
-    "jh7110",
-    sDDFDriverConfig(
-        compatible="starfive,jh7110-timer",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# meson_gxbb
-add_driver_config(
-    "meson",
-    sDDFDriverConfig(
-        compatible="amlogic,meson-gxbb-wdt",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# rk3568
-add_driver_config(
-    "rk3568",
-    sDDFDriverConfig(
-        compatible="rockchip,rk3568-timer",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
+        "rohm,bd71837",
+        regions=[],
+        irqs=[],
     ),
 )

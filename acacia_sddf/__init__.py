@@ -6,3 +6,4 @@ from .timer import sDDFTimer
 from .serial import sDDFSerial
 from .sddf import sDDFDriverClass, sDDFDriverConfig, sDDFDriverManifest
 from .board import BOARDS, Board
+from .pmic import sDDFPMIC

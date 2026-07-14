@@ -8,19 +8,22 @@
 #include <os/sddf.h>
 #include <sddf/pmic/protocol.h>
 #include <sddf/pmic/driver.h>
+#include <sddf/pmic/config.h>
 #include <sddf/pmic/bd71837amwv-bindings.h>
 #include <sddf/i2c/libi2c.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
+#include <sddf/i2c/queue.h>
 #include "bd71837.h"
 
 __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
+__attribute__((__section__(".pmic_driver_config"))) pmic_driver_config_t pmic_config;
 
 libi2c_conf_t libi2c_conf;
 i2c_queue_handle_t queue;
 uint8_t *i2c_data_region;
 
-// TODO: add support for sdfgen to pass in PMIC i2c address
-#define PMIC_I2C_ADDR (0x4b)
+#define PMIC_I2C_ADDR ((i2c_addr_t)pmic_config.i2c_addr)
 
 #ifndef I2C_DATA_REGION
 #define I2C_DATA_REGION ((uint8_t *)i2c_config.data.vaddr)
@@ -34,20 +37,24 @@ uint8_t *i2c_data_region;
 
 pmic_driver_state_t state;
 
-static inline sddf_pmic_err_t pmic_not_implemented() {
+static inline sddf_pmic_err_t pmic_not_implemented()
+{
     LOG_PMIC_DRIVER_ERR("This PPC not implemented for this platform!\n");
     return SDDF_PMIC_ERR_NOT_IMPLEMENTED;
 }
 
-sddf_pmic_err_t pmic_drv_enable_reg(uint64_t reg_id) {
+sddf_pmic_err_t pmic_drv_enable_reg(uint64_t reg_id)
+{
     return pmic_not_implemented();
 }
 
-sddf_pmic_err_t pmic_drv_disable_reg(uint64_t reg_id) {
+sddf_pmic_err_t pmic_drv_disable_reg(uint64_t reg_id)
+{
     return pmic_not_implemented();
 }
 
-sddf_pmic_err_t pmic_drv_set_vout(uint64_t reg_id, uint64_t voltage_uv) {
+sddf_pmic_err_t pmic_drv_set_vout(uint64_t reg_id, uint64_t voltage_uv)
+{
     // Look up regulator info
     bd71837_reg_t *regulator = &bd71837_regulator_table[reg_id];
 
@@ -89,7 +96,7 @@ sddf_pmic_err_t pmic_drv_set_vout(uint64_t reg_id, uint64_t voltage_uv) {
         LOG_PMIC_DRIVER("Setting voltage to %zu - target value = %zu\n", voltage_uv, target_val);
         assert(target_val <= (1 << regulator->reg.capabilities.voltage.quantisation));
 
-        i2c_reg_val = (uint8_t) (target_val & 0xff);
+        i2c_reg_val = (uint8_t)(target_val & 0xff);
     }
 
     // prepare i2c transaction
@@ -100,19 +107,21 @@ sddf_pmic_err_t pmic_drv_set_vout(uint64_t reg_id, uint64_t voltage_uv) {
     return SDDF_PMIC_ERR_OK;
 }
 
-sddf_pmic_err_t pmic_drv_set_climit(uint64_t reg_id, uint64_t current_ua) {
+sddf_pmic_err_t pmic_drv_set_climit(uint64_t reg_id, uint64_t current_ua)
+{
     return pmic_not_implemented();
 }
 
-sddf_pmic_err_t pmic_drv_get_info(uint64_t reg_id, sddf_pmic_reg_info_t *info) {
+sddf_pmic_err_t pmic_drv_get_info(uint64_t reg_id, sddf_pmic_reg_info_t *info)
+{
     return pmic_not_implemented();
 }
-
 
 void init(void)
 {
     // Setup i2c client connection
     assert(i2c_config_check_magic((void *)&i2c_config));
+    assert(pmic_config_check_magic((void *)&pmic_config));
     i2c_data_region = (uint8_t *)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
@@ -144,7 +153,8 @@ void notified(microkit_channel ch)
         if (ret == I2C_ERR_OK) {
             LOG_PMIC_DRIVER("Completed request for client %u. Opcode = %zu\n", state.curr_client, state.curr_ppc_op);
         } else {
-            LOG_PMIC_DRIVER_ERR("I2C request failed for client %u! Opcode = %zu\n", state.curr_client, state.curr_ppc_op);
+            LOG_PMIC_DRIVER_ERR("I2C request failed for client %u! Opcode = %zu\n", state.curr_client,
+                                state.curr_ppc_op);
         }
 
         // Clean up state for next request.
@@ -170,7 +180,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     case SDDF_PMIC_ENABLE_REG: {
         if (argc != 1) {
             LOG_PMIC_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-                err = SDDF_PMIC_ERR_BAD_PPC_CALL;
+            err = SDDF_PMIC_ERR_BAD_PPC_CALL;
             break;
         }
         uint32_t reg_id = (uint32_t)microkit_mr_get(SDDF_PMIC_ENABLE_REG_REG_ID);
@@ -222,7 +232,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             break;
         }
         uint32_t reg_id = (uint32_t)microkit_mr_get(SDDF_PMIC_GET_REG_INFO_REG_ID);
-        sddf_pmic_reg_info_t info = {0};
+        sddf_pmic_reg_info_t info = { 0 };
         LOG_PMIC_DRIVER("get request pmic_get_reg_info(%d)\n", reg_id);
         state.err = pmic_drv_get_info(reg_id, &info);
         if (err == SDDF_PMIC_GET_REG_INFO_SUCCESS) {
@@ -239,8 +249,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        LOG_PMIC_DRIVER_ERR("Unknown request %lu to PMIC driver from channel %u\n",
-                       microkit_msginfo_get_label(msginfo), ch);
+        LOG_PMIC_DRIVER_ERR("Unknown request %lu to PMIC driver from channel %u\n", microkit_msginfo_get_label(msginfo),
+                            ch);
         err = SDDF_PMIC_ERR_BAD_PPC_CALL;
     }
     if (state.err != SDDF_PMIC_ERR_OK) {
@@ -255,4 +265,3 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 
     return microkit_msginfo_new(err, ret_num);
 }
-
