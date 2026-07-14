@@ -4,68 +4,42 @@ import os, sys
 import argparse
 from typing import List
 from dataclasses import dataclass
-from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
-)
-from board import BOARDS
+from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob, Map
 
-ProtectionDomain = SystemDescription.ProtectionDomain
-MemoryRegion = SystemDescription.MemoryRegion
-Map = SystemDescription.Map
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
+
+from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
+    client_ina = ProtectionDomain(sdf, "client_ina", "client_ina.elf", priority=1)
+
+    i2c = sDDFI2C(
+        sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
     )
+    i2c.add_client(client_ina)
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
-    i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
-    i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_ina = ProtectionDomain("client_ina", "client_ina.elf", priority=1)
+    timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
+    timer.add_client(client_ina)
 
-    i2c_node = dtb.node(board.i2c)
-    assert i2c_node is not None
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-
-    i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    i2c_system.add_client(client_ina)
-
-    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client_ina)
-
-    serial_system = Sddf.Serial(
-        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
+    serial = sDDFSerial(
+        sdf,
+        board.serial.compatible,
+        board.serial.node_path,
+        driver_prio=201,
+        virt_tx_prio=200,
+        allow_rx=False,
+        enable_color=False,
+        baud_rate=board.baud_rate if board.baud_rate else 115200,
     )
-    serial_system.add_client(client_ina)
+    serial.add_client(client_ina)
 
-    pds = [
-        serial_driver,
-        serial_virt_tx,
-        timer_driver,
-        i2c_driver,
-        i2c_virt,
-        client_ina,
-    ]
-    for pd in pds:
-        sdf.add_pd(pd)
-
-    assert i2c_system.connect()
-    assert i2c_system.serialise_config(output_dir)
-    assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
-    assert timer_system.connect()
-    assert timer_system.serialise_config(output_dir)
-
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
+    out_file = f"{output_dir}/{sdf_file}"
+    sdf.make_config_structs()
+    print(f"Saving to {out_file}")
+    sdf.write_xml_file(out_file)
 
 
 if __name__ == "__main__":
@@ -80,10 +54,7 @@ if __name__ == "__main__":
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
-    sddf = Sddf(args.sddf)
-
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = DeviceTreeBlob(args.dtb)
+    sdf = System(board.arch, board.paddr_top, dtb)
 
     generate(args.sdf, args.output, dtb)

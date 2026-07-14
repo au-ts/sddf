@@ -19,33 +19,33 @@ PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
 
 SUPPORTED_BOARDS := \
-		serengeti
+		maaxboard
 
 include ${SDDF}/tools/make/board/common.mk
 
 SDDF_CUSTOM_LIBC := 1
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
-TOP := ${SDDF}/examples/ina219
-I2C := $(SDDF)/i2c
+TOP := ${SDDF}/examples/tmu
 SERIAL := $(SDDF)/serial
-I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIV_DIR}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
+TMU_DRIVER := $(SDDF)/drivers/tmu/${TMU_DRIV_DIR}
 
-IMAGES := i2c_virt.elf \
-	  i2c_driver.elf \
-	  client_ina.elf \
+IMAGES :=\
+	  client.elf \
 	  timer_driver.elf \
 	  serial_driver.elf \
-	  serial_virt_tx.elf
+	  serial_virt_tx.elf \
+	  tmu_driver.elf
+
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 CFLAGS +=  -Wno-unused-function -I${TOP}
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
-SYSTEM_FILE = i2c.system
+SYSTEM_FILE = tmu.system
 
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
@@ -55,34 +55,30 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(SDDF)/include/microkit \
 	-I$(LIBCO) \
-	-DLIBI2C_RAW \
 	-MD \
 	-MP
 
-
-CLIENT_INA_OBJS := client_ina.o
+CLIENT_OBJS := client.o
 
 VPATH := ${TOP}
 all: $(IMAGE_FILE)
 
-client_ina.o: client_ina.c
+client.o: client.c
 
-client_ina.elf: $(CLIENT_INA_OBJS) libco.a libsddf_util.a libi2c.a
+client.elf: $(CLIENT_OBJS) libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .device_resources=i2c_driver_device_resources.data i2c_driver.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver_i2c_driver_config.data i2c_driver.elf
-	$(OBJCOPY) --update-section .i2c_virt_config=i2c_virt_i2c_virt_config.data i2c_virt.elf
-	$(OBJCOPY) --update-section .i2c_client_config=client_ina_i2c_client_config.data client_ina.elf
-	$(OBJCOPY) --update-section .timer_client_config=client_ina_timer_client_config.data client_ina.elf
+	$(OBJCOPY) --update-section .device_resources=tmu_driver_device_resources.data tmu_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx_serial_virt_tx_config.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=client_ina_serial_client_config.data client_ina.elf
-
+	$(OBJCOPY) --update-section .serial_client_config=client_serial_client_config.data client.elf
+	$(OBJCOPY) --update-section .timer_client_config=client_timer_client_config.data client.elf
+	$(OBJCOPY) --update-section .tmu_client_config=client_tmu_client_config.data client.elf
+	$(OBJCOPY) --update-section .tmu_driver_config=tmu_driver_tmu_driver_config.data tmu_driver.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -99,10 +95,8 @@ clobber:: clean
 	rm -f ${REPORT_FILE} ${IMAGE_FILE} *.a .*cflags*
 
 include ${SDDF}/util/util.mk
-include ${I2C}/components/i2c_virt.mk
 include ${SERIAL}/components/serial_components.mk
 include ${SERIAL_DRIVER}/serial_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
-include ${I2C_DRIVER}/i2c_driver.mk
-include ${I2C}/libi2c.mk
+include ${TMU_DRIVER}/tmu_driver.mk
