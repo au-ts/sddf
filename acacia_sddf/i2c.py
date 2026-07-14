@@ -14,14 +14,29 @@ from acacia import (
     ConfigStruct,
 )
 import sys, os
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import List, Dict, Type, Union, Optional
 from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
 from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
-from collections import defaultdict
-from typing import List, Dict, Type, Union, Optional
 
 I2C_DATA_SZ = 0x1000
 I2C_NUM_BUFS = 128  # TODO: add support for dynamically sized queues
 I2C_PROTOCOL_MAGIC = "sDDF" + chr(0x4)
+
+
+@dataclass
+class I2CAddress:
+    addr: int
+
+    def __post_init__(self):
+        if self.addr & (1 << 31):
+            # This bit is set in DTS I2C addresses to mark 10 bit addresses.
+            # If found, we strip it out and store a bool.
+            self.is_ten_bit = True
+            self.addr &= ~(1 << 31)
+        else:
+            self.is_ten_bit = False
 
 
 class sDDFI2C(sDDFDriverClass):
@@ -217,6 +232,28 @@ class sDDFI2C(sDDFDriverClass):
         driver_resources = [self.driver_dev_resources, self.driver_config]
         virt_resources = [self.virt_config]
         return driver_resources + virt_resources + self.client_configs
+
+    # ### dtb utility functions for drivers that depend on i2c ###
+    def get_i2c_addresses_from_dtb(self, device_node: DTBNode) -> List[I2CAddress]:
+        """
+        Try and get the i2c addresses of a device on the bus controlled by this driver.
+
+        If the path given is not for this I2C bus or the device is not present, a
+        ValueError will be raised.
+        Args:
+            device_node: DTBNode - peripheral node
+        Returns:
+            List[I2CAddress]
+        """
+        # first: check that this path belongs to us
+        if self.dtb_node.path not in device_node.path:
+            raise ValueError(
+                f"{device_node} doesn't belong to this I2C bus ({self.dtb_node.path})!"
+            )
+
+        # reg property contains addresses.
+        reg = [x[0] for x in self.dtb.get_node_regs(device_node)]
+        return [I2CAddress(int(x)) for x in reg]
 
     # ### connection config struct factory functions ###
     def i2c_connection_resource_factory(
