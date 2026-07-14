@@ -2655,6 +2655,61 @@ This section describes drivers which are used for system management. All of
 these drivers use a simple, low-throughput interface.
 
 
+\subsection{PMIC}\label{s:pmic}
+
+Many SoCs have an external \emph{Power Management IC}
+(PMIC) controlled via I2C. This is a chip that is responsible for feeding in
+several power lines to the chip and controlling their output with an array of
+regulators.
+
+The PMIC
+contains 15 programmable regulators, each generating a voltage rail for
+various board functions.
+Each regulator has different:
+\begin{enumerate}
+    \item voltage output ranges (different minima and maxima),
+    \item ability to set a current limit, with different maxima and minima,
+    \item ability to be turned on or off, and
+    \item step sizes for configuring voltages and currents.
+\end{enumerate}
+
+The PMIC driver must be able to deal with manipulating these heterogeneous
+regulators programmatically because clients may generate requests
+that are not possible to implement, or that conflict with the
+requirements for other clients.
+
+The core of the PMIC driver is a table of regulator descriptions, parameterised
+by regulator IDs that are stored in a shared PMIC bindings header file for the
+specific PMIC. The bindings header file is available to clients of the PMIC
+driver as a way to identify specific regulators. The regulator description
+table encodes all capabilities of every register such that our driver can
+return descriptive errors for incorrect requests and avoid unnecessary \gls{i2c}
+operations.
+
+The PMIC protocol provides a \emph{Protected Procedure Call} (PPC) interface to
+clients, with the following methods available:
+\begin{enumerate}
+\item Enable or disable a target regulator,
+\item Set the output voltage of a regulator,
+\item Set the current limit of a regulator,
+\item Get info about the state of a regulator.
+\end{enumerate}
+
+In the current version, we have implemented only the ability to
+set the output voltage for now.
+
+Upon receipt of a PPC from a client, the driver will validate that any
+arguments supplied are valid before attempting an \gls{i2c} transaction. If the
+arguments supplied are not within the bounds of the regulator description
+table, the driver returns an error to the client. Otherwise, it will
+generate an \gls{i2c} request to read or write appropriate state to the PMIC.
+
+Unlike most other classes, the PMIC driver is itself a client to the \gls{i2c}
+driver class.
+The PMIC driver issues requests to the \gls{i2c} virtualiser via a queue
+in a shared
+memory interface, abstracted using \emph{libi2c}.
+
 \chapter{Hotplugging}\label{s:hotplugging}
 
 \section{Overview}
