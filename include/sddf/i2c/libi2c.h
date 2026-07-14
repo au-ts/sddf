@@ -12,6 +12,11 @@
 // necessary in most cases! If your usage requires more commands per request, do not use
 // this library and instead implement direct calls to the protocol in <sddf/i2c/queue.h>
 //
+// Three operating modes are supplied based on coroutine support:
+// a. libmicrokitco: use libmicrokitco.h for blocking API
+// b. libi2c_raw: use raw libco for blocking API
+// c. libi2c_noco: blocking API fully disabled for use in drivers
+//
 // See i2c/queue.h for details about the I2C transport layer.
 
 #pragma once
@@ -19,6 +24,7 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/i2c/config.h>
+#ifndef LIBI2C_NOCO
 #ifdef LIBI2C_RAW
 #include <libco.h>
 // Client must define and set up these cothreads for this interface to function.
@@ -26,6 +32,7 @@ extern cothread_t t_event;
 extern cothread_t t_main;
 #else
 #include <libmicrokitco.h>
+#endif
 #endif
 
 // Client must define this. E.g.
@@ -56,11 +63,13 @@ typedef struct libi2c_conf {
 
 int libi2c_init(libi2c_conf_t *conf_struct, i2c_queue_handle_t *queue_handle);
 
+#ifndef LIBI2C_NOCO
 // Blocking interface
 int sddf_i2c_write(libi2c_conf_t *conf, i2c_addr_t address, void *write_buf, uint16_t len);
 int sddf_i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t len);
 int sddf_i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_address, void *read_buf, uint16_t len);
 int sddf_i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16_t len, uint8_t flag_mask);
+#endif
 
 // Non-blocking interface. Separates dispatch and completion for applications
 // with custom concurrency models instead of libco/libmicrokitco (e.g. micropython)

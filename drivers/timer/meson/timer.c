@@ -120,8 +120,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
-        uint64_t offset_ticks = ns_to_ticks(sddf_get_mr(0), MESON_TIMER_CLK_FREQ);
-        timeouts[ch] = curr_time + offset_ticks;
+        uint64_t offset_us = sddf_get_mr(0) / NS_IN_US;
+        timeouts[ch] = curr_time + offset_us;
         process_timeouts(curr_time);
         break;
     }
