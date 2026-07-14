@@ -24,7 +24,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
 
     # HACK: sdfgen doesn't support multiple regions for a device resource yet
     #       or the clk class. This will be removed in the pending sdfgen refactor.
-    regions = []    # tuples of (mr, map var name)
+    regions = []  # tuples of (mr, map var name)
     if board.name == "maaxboard":
         # HACK: override DTS node to enable external I2C bus (I2C2).
         # This should also be fixed in the sdfgen refactor
