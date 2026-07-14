@@ -13,12 +13,7 @@
 // ideally measuring the CPU or SoC temp.
 
 typedef double sddf_temp_celsius_t;
-typedef enum {
-    SDDF_TMU_SET_ENABLED,
-    SDDF_TMU_SET_IRQ_MODE,
-    SDDF_TMU_SET_IRQ_THRESHOLD,
-    SDDF_TMU_GET_TEMP
-} sddf_tmu_ppc_codes_t;
+typedef enum { SDDF_TMU_SET_IRQ_MODE, SDDF_TMU_SET_IRQ_THRESHOLD, SDDF_TMU_GET_TEMP } sddf_tmu_ppc_codes_t;
 
 typedef enum {
     SDDF_TMU_IRQ_MODE_DISABLED,

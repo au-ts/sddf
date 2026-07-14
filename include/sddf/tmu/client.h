@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "protocol.h"
 #include <microkit.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -32,7 +33,7 @@ static inline int sddf_tmu_set_irq_mode(microkit_channel channel, sddf_tmu_irq_m
  * @param threshold high temperature threshold in degrees celsius.
  * @return 0 on success, 1 on failure.
  */
-static inline int sddf_tmu_set_irq_threshold(microkit_channel channel, int64_t threshold)
+static inline int sddf_tmu_set_irq_threshold(microkit_channel channel, sddf_temp_celsius_t threshold)
 {
     microkit_msginfo msginfo = microkit_msginfo_new(SDDF_TMU_SET_IRQ_THRESHOLD, 1);
     microkit_mr_set(0, threshold);

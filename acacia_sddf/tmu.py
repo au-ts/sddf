@@ -32,6 +32,7 @@ class sDDFTMU(sDDFDriverClass):
         dev_dt_path: str,
         driver_prio: int,
         cpu: Optional[int] = None,
+        allow_irq_fwd: bool = True,
         driver_elf: str = "tmu_driver.elf",
     ):
         super().__init__(sdf, "tmu", dev_compatible, dev_dt_path, magic="sDDF" + chr(1))
@@ -48,7 +49,7 @@ class sDDFTMU(sDDFDriverClass):
         self.driver_dev_resources = self.create_dtb_resources(self.driver)
         self.driver_config = None
         self.client_configs = []
-        self.irq_fwd_client = None  # One client may receive forwarded IRQs
+        self.controller_client = None  # One client may receive forwarded IRQs
 
     def connect_clients(self):
         # Clients are connected with:
@@ -60,7 +61,7 @@ class sDDFTMU(sDDFDriverClass):
                 raise SubsystemBuildError(
                     f"Client {c} has higher priority than tmu driver!"
                 )
-            do_fwd = c is self.irq_fwd_client
+            do_fwd = c is self.controller_client
             ch = Channel(
                 self.sdf,
                 Channel.End(c, can_notify=do_fwd, can_pp=True),
@@ -74,11 +75,11 @@ class sDDFTMU(sDDFDriverClass):
         # Make driver config
         self.driver_config = self.tmu_driver_config_factory(fwd_channel)
 
-    def add_client(self, client: ProtectionDomain, rcv_forwarded_irq=False):
-        if rcv_forwarded_irq:
-            if self.irq_fwd_client is not None:
+    def add_client(self, client: ProtectionDomain, is_controller=False):
+        if is_controller:
+            if self.controller_client is not None:
                 raise RuntimeError("TMU only supports forwarding IRQs to one client!")
-                self.irq_fwd_client = client
+                self.controller_client = client
         if client not in self.clients:
             self.clients.append(client)
 
@@ -86,17 +87,17 @@ class sDDFTMU(sDDFDriverClass):
         # We've already made our structs
         return [self.driver_dev_resources, self.driver_config] + self.client_configs
 
-    def tmu_driver_config_factory(self, irq_fwd_channel: Channel) -> ConfigStruct:
+    def tmu_driver_config_factory(self, controller_channel: Channel) -> ConfigStruct:
         """
         Create driver config
         """
         # invariant: this PD only is a client to tmu one time.
         fields = {"magic": TMU_PROTOCOL_MAGIC}
-        if self.irq_fwd_client:
-            fields["irq_fwd_channel"] = irq_fwd_channel.ch_for_pd(self.driver)
+        if self.controller_client:
+            fields["controller_channel"] = controller_channel.ch_for_pd(self.driver)
             fields["do_irq_fwd"] = True
         else:
-            fields["irq_fwd_channel"] = 0
+            fields["controller_channel"] = 0
             fields["do_irq_fwd"] = False
         return ConfigStruct(
             "tmu_driver_config_t",

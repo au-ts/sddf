@@ -24,7 +24,6 @@
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".tmu_driver_config"))) tmu_driver_config_t driver_config;
 #define IRQ_CHANNEL (device_resources.irqs[0].id)
-#define IRQ_FORWARD_CHANNEL (1)
 #define CRITICAL_TEMP ((uint32_t) 85) // Warnings will be printed if this is exceeded
 
 volatile imx8mq_tmu_regs_t *regs;
@@ -110,7 +109,7 @@ void notified(microkit_channel ch)
         assert(false);  // If you get this, increase the interval setting in init()
     }
 
-    if (ch == IRQ_FORWARD_CHANNEL) {
+    if (ch == driver_config.controller_channel) {
         LOG_TMU_DRIVER_ERR("IRQ forward channel should not notify driver!");
         return;
     } else if (ch == IRQ_CHANNEL) {
@@ -137,7 +136,7 @@ void notified(microkit_channel ch)
             irq_landed = true;
         }
         if (driver_config.do_irq_fwd && irq_landed) {
-            microkit_notify(driver_config.irq_fwd_channel);
+            microkit_notify(driver_config.controller_channel);
         }
     } else {
         LOG_TMU_DRIVER_ERR("Unknown channel 0x%x!\n", ch);
@@ -175,7 +174,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     sddf_tmu_temp_info_t temp;
     switch (microkit_msginfo_get_label(msginfo)) {
     case SDDF_TMU_SET_IRQ_MODE:
-        if (ch != IRQ_FORWARD_CHANNEL) {
+        if (ch != driver_config.controller_channel) {
             LOG_TMU_DRIVER_ERR("Client %u is not permitted to TMU_SET_IRQ_MODE!\n", ch);
             err = SDDF_TMU_ERR_UNPERMITTED;
             break;
@@ -192,7 +191,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
 
     case SDDF_TMU_SET_IRQ_THRESHOLD:
-        if (ch != IRQ_FORWARD_CHANNEL) {
+        if (ch != driver_config.controller_channel) {
             LOG_TMU_DRIVER_ERR("Client %u is not permitted to TMU_SET_IRQ_THRESHOLD!\n", ch);
             err = SDDF_TMU_ERR_UNPERMITTED;
             break;
