@@ -18,6 +18,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
+IrqIoapic = SystemDescription.IrqIoapic
 
 
 """
@@ -222,6 +223,7 @@ def generate(
 
     uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = ProtectionDomain(
+
         "serial_virt_tx", "serial_virt_tx.elf", priority=99
     )
     uart_driver = ProtectionDomain(
@@ -350,7 +352,9 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8)
+        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8, trigger=IrqIoapic.Trigger.LEVEL,
+                                              polarity=IrqIoapic.Polarity.ACTIVELOW)
+
         ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
