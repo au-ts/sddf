@@ -20,7 +20,6 @@ ifeq (${X86_BOARD},qemu_virt_x86)
     BLK_DRIV_DIR ?= virtio/pci
     NET_DRIV_DIR ?= virtio/pci
     ETH_DRIV ?= eth_driver_virtio.elf
-    TIMER_DRIV_DIR ?= hpet
     UART_DRIV_DIR ?= pc99
 
     CPU := generic
@@ -43,7 +42,6 @@ ifeq (${X86_BOARD},qemu_virt_x86)
     QEMU_BLK_ARGS ?= -device virtio-blk-pci,drive=hd,addr=0x3.0
 
 else ifeq ($(X86_BOARD), $(filter ${X86_BOARD},makatea vb_105))
-    TIMER_DRIV_DIR := hpet
     NET_DRIV_DIR := ixgbe
     ETH_DRIV := eth_driver_ixgbe.elf
     UART_DRIV_DIR := pc99
