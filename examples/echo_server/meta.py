@@ -21,6 +21,7 @@ Map = SystemDescription.Map
 CapMap = SystemDescription.CapMap
 BootInfo = SystemDescription.BootInfo
 Channel = SystemDescription.Channel
+IrqIoapic = SystemDescription.IrqIoapic
 
 
 """
@@ -308,15 +309,6 @@ def generate(
     if board.arch == SystemDescription.Arch.X86_64:
         add_x86_hpet(sdf, timer_driver)
 
-        hpet_regs = SystemDescription.MemoryRegion(
-            sdf, "hpet_regs", 0x1000, paddr=board.timer
-        )
-        hpet_regs_map = SystemDescription.Map(
-            hpet_regs, 0x5000_0000, "rw", cached=False
-        )
-        timer_driver.add_map(hpet_regs_map)
-        sdf.add_mr(hpet_regs)
-
     uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=99
@@ -457,7 +449,11 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8)
+        eth_irq = IrqIoapic(ioapic_id=0,
+                            pin=16,
+                            vector=8,
+                            trigger=IrqIoapic.Trigger.LEVEL,
+                            polarity=IrqIoapic.Polarity.ACTIVELOW)
         ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(

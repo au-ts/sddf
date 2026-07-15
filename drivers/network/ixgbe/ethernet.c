@@ -162,7 +162,6 @@ void tx_provide(void)
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
-            sddf_dprintf("send a packet\n");
 
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
@@ -484,22 +483,6 @@ void init_3(void)
     device.init_stage = 4;
 }
 
-static void handle_irq(void)
-{
-    uint32_t cause = eth_regs->eicr;
-    eth_regs->eicr = cause;
-
-    while (cause) {
-        tx_return();
-        tx_provide();
-        rx_return();
-        rx_provide();
-
-        cause = eth_regs->eicr;
-        eth_regs->eicr = cause;
-    }
-}
-
 void notified(microkit_channel ch)
 {
     if (ch == timer_config.driver_id) {
@@ -513,11 +496,13 @@ void notified(microkit_channel ch)
     } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
         microkit_deferred_irq_ack(ch);
     } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
-        /* uint32_t cause = eth_regs->eicr; */
-        /* eth_regs->eicr = cause; */
         // write/read-to-clear, no need for auto clear
+        (void)eth_regs->eicr;
+        tx_return();
+        tx_provide();
+        rx_return();
+        rx_provide();
 
-        handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
          * in the seL4CP event handler loop.
