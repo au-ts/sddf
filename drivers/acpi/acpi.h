@@ -99,6 +99,7 @@ enum aml_encoding_value {
     EXT_OP_PREFIX = 0x5B,
     MUTEX_OP = 0x5B01,
     EVENT_OP = 0x5B02,
+    CREATE_FIELD_OP = 0x5B13,
     OP_REGION_OP = 0x5B80,
     FIELD_OP = 0x5B81,
     DEVICE_OP = 0x5B82,

@@ -63,6 +63,7 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
 
 parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [FIELD_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, BYTE_DATA, FIELD_LIST, COMPLETE},
+    [CREATE_FIELD_OP & 0xFF] = { INIT, BUFFER_DATA, TERM_INTEGER, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [INDEX_FIELD_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE},
     [OP_REGION_OP & 0xFF] = { INIT, OBJECT_NAME_STRING, BYTE_DATA, TERM_INTEGER, TERM_INTEGER, COMPLETE},
     [DEVICE_OP & 0xFF] = { INIT, PKT_LEN, OBJECT_NAME_STRING, TERM_LIST, COMPLETE },
@@ -543,7 +544,7 @@ void state_stack_pop()
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            /* sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
+            sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
             state_stack_pop();
         }
     }
@@ -842,7 +843,7 @@ aml_namespace_node_t *make_namespace_node(aml_namespace_node_t *namespace, uint1
         return namespace_insert_child_node(namespace, NULL, op_code);
     }
 
-    if ((name_type >= 'A' && name_type < 'Z') || name_type == '_') {
+    if ((name_type >= 'A' && name_type <= 'Z') || name_type == '_') {
         scanner.current--;
         char name_segment[5];
         read_name_segment(name_segment);
@@ -860,7 +861,7 @@ aml_namespace_node_t *make_namespace_node(aml_namespace_node_t *namespace, uint1
     } else if (name_type == 0x2F) {
         name_segment_cnt = advance();
     } else {
-        sddf_dprintf("[Error] invalid encoding \'0x%02x\' for expected NameString\n", name_type);
+        sddf_dprintf("[Error] invalid encoding \'0x%02x\' for expected NameString at 0x%lx\n", name_type, (uintptr_t)scanner.current);
         return NULL;
     }
 
@@ -1170,6 +1171,7 @@ void parse_namespace_node(bool evaluation)
                 case STORE_OP:
                 case LEQUAL_OP:
                 case OP_REGION_OP:
+                case CREATE_FIELD_OP:
                 case CREATE_BIT_FIELD_OP:
                 case CREATE_BYTE_FIELD_OP:
                 case CREATE_WORD_FIELD_OP:
@@ -1200,7 +1202,7 @@ void parse_namespace_node(bool evaluation)
                             sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
                     } else {
-                        /* sddf_dprintf("skip_name_string, op_code: 0x%x\n", op_code); */
+                        sddf_dprintf("skip_name_string, op_code: 0x%x at 0x%lx\n", op_code, (uintptr_t)scanner.current);
                         skip_name_string();
                     }
                 }
