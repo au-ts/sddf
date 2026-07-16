@@ -378,7 +378,7 @@ void init(void)
     namespace_root.pkt_start = scanner.current;
     namespace_root.op_code = NULL_OP;
     namespace_root.name[0] = '\\';
-    sddf_dprintf("Scan DSDT\n");
+    sddf_dprintf("Scan DSDT, start at: 0x%lx\n", (uintptr_t)scanner.current);
     scan_namespace_tree(&namespace_root, dsdt_table_end);
 
     for (int i = 0; i < acpi_tables_summary.num_tables; i++) {
