@@ -544,7 +544,7 @@ void state_stack_pop()
     if (current_state != NULL) {
         parse_stage_t op_stage = get_op_stage();
         if ((current_state->pkt_end && scanner.current >= current_state->pkt_end) || op_stage == COMPLETE) {
-            sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end);
+            /* sddf_dprintf("pop at end current: 0x%lx, pkt_end: 0x%lx\n", (uintptr_t)scanner.current, (uintptr_t)current_state->pkt_end); */
             state_stack_pop();
         }
     }
@@ -1202,7 +1202,7 @@ void parse_namespace_node(bool evaluation)
                             sddf_dprintf("[Error] Op \'0x%04x\' is not implemented\n", op_code);
                         }
                     } else {
-                        sddf_dprintf("skip_name_string, op_code: 0x%x at 0x%lx\n", op_code, (uintptr_t)scanner.current);
+                        /* sddf_dprintf("skip_name_string, op_code: 0x%x at 0x%lx\n", op_code, (uintptr_t)scanner.current); */
                         skip_name_string();
                     }
                 }

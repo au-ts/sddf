@@ -25,10 +25,9 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
-#define RX_IRQ  1
+#define RX_IRQ_VECTOR 0
+#define TX_IRQ_VECTOR 1
 
-// Minimum inter-interrupt interval specified in 2.048 us units
-// at 1 GbE and 10 GbE link
 #define IRQ_INTERVAL 40
 
 const uint64_t hw_rx_ring_paddr = 0x10000000;
@@ -45,8 +44,8 @@ struct ixgbe_device {
     size_t rx_head, rx_tail;
     volatile ixgbe_adv_tx_desc_t *tx_ring;
     size_t tx_head, tx_tail;
-    net_buff_desc_t rx_descr_mdata[NUM_RX_DESCS];
-    net_buff_desc_t tx_descr_mdata[NUM_TX_DESCS];
+    net_buff_desc_t rx_desc_mdata[NUM_RX_DESCS];
+    net_buff_desc_t tx_desc_mdata[NUM_TX_DESCS];
     int init_stage;
 } device;
 
@@ -62,7 +61,7 @@ typedef struct {
     uint32_t tail; /* index to insert at */
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
-    volatile struct descriptor *descr; /* buffer descriptor array */
+    volatile struct descriptor *desc; /* buffer descriptor array */
 } hw_ring_t;
 
 net_queue_handle_t rx_queue;
@@ -105,12 +104,19 @@ void disable_interrupts(void)
 
 void enable_interrupts(void)
 {
-    // TODO: Enable IRQ for RX queue 0, and map the cause to bit 1 in EICR?
-    eth_regs->ivar[0] = RX_IRQ | BIT(7);
+    // Section 8.2.2.6.10
+    //   - Bit[5:0] vector number for RX_QUEUE 0, BIT(vector number) is set on EICR if triggered
+    //   - Bit[7] enable IRQ for RX_QUEUE 0
+    //   - Bit[13:8] vector number for TX_QUEUE 0
+    //   - Bit[15] enable IRQ for TX_QUEUE 0
+    eth_regs->ivar[0] = RX_IRQ_VECTOR | BIT(7) | (TX_IRQ_VECTOR << 8) | BIT(15);
 
-    // TODO: separate operations for legacy mode and MSI/MSI-X mode
+    // Section 7.3.1.6 - No need to enable auto-clear
     eth_regs->eiac = 0;
-    // @jade: enable auto clear (actually, what is it?)
+
+    // Section 8.2.2.6.4
+    //   - Bits[11:3] Minimum inter-interrupt interval specified in 2.048us units
+    //   at 1 GbE and 10 GbE link
     eth_regs->eitr[0] = IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL;
     clear_interrupts();
 
@@ -134,7 +140,6 @@ void get_mac_addr(uint8_t mac[6])
 
 uint32_t get_link_speed(void)
 {
-    // TODO: replace all constants with macros in header file
     uint32_t speed = eth_regs->links;
     if ((speed & IXGBE_LINKS_UP) == 0) {
         return 0;
@@ -148,72 +153,6 @@ uint32_t get_link_speed(void)
         return 10000;
     default:
         return 0;
-    }
-}
-
-void tx_provide(void)
-{
-    bool reprocess = true;
-    while (reprocess) {
-        bool provided = false;
-
-        while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
-
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
-
-            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
-            desc->read.buffer_addr = buffer.io_or_offset;
-            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
-                                    | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
-            desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
-
-            device.tx_descr_mdata[device.tx_tail] = buffer;
-
-            device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
-            provided = true;
-        }
-        // @jade: should I move this to the outer block?
-        if (provided) {
-            THREAD_MEMORY_RELEASE();
-            eth_regs->tx_dma[0].tdt = device.tx_tail;
-            eth_regs->tx_dma[0].tdt; // Write flush
-        }
-
-        net_request_signal_active(&tx_queue);
-        reprocess = false;
-
-        // @jade: we optimised this on RX, should we do it on TX as well?
-        if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
-            net_cancel_signal_active(&tx_queue);
-            reprocess = true;
-        }
-    }
-}
-
-void tx_return(void)
-{
-    bool enqueued = false;
-    while (!hw_tx_ring_empty()) {
-        /* Ensure that this buffer has been sent by the device */
-        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
-
-        // performance optimisation suggested: https://github.com/au-ts/sddf/pull/682
-        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
-            break;
-
-        net_buff_desc_t descr_mdata = device.tx_descr_mdata[device.tx_head];
-        int err = net_enqueue_free(&tx_queue, descr_mdata);
-        assert(!err);
-        enqueued = true;
-
-        device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
-    }
-
-    if (enqueued && net_require_signal_free(&tx_queue)) {
-        net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
     }
 }
 
@@ -232,7 +171,7 @@ void rx_provide(void)
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
-            device.rx_descr_mdata[device.rx_tail] = buffer;
+            device.rx_desc_mdata[device.rx_tail] = buffer;
 
             device.rx_tail = (device.rx_tail + 1) % NUM_RX_DESCS;
             provided = true;
@@ -240,6 +179,7 @@ void rx_provide(void)
 
         if (provided) {
             THREAD_MEMORY_RELEASE();
+            // Update tail if filled hardware ring with empty descriptors
             eth_regs->rx_dma[0].rdt = device.rx_tail;
         }
 
@@ -262,20 +202,21 @@ static void rx_return(void)
 {
     bool packets_transferred = false;
     while (!hw_rx_ring_empty()) {
-        // @jade: why do we get into this loop all the time even when there is no packets in there?
-
-        /* If buffer slot is still empty, we have processed all packets the device has filled */
-        // TODO: simplify the data structures
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) {
+            // The desciptor hasn't been used by hardware, implying no more available packets received
             break;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0)
+        }
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0) {
+            // See Table 7-16: DD=1 and EOP=0
+            sddf_dprintf("ETH|ERROR: The packet spans across multiple descriptors.\n");
             break;
+        }
 
         // The access to `status_error` field should be ordered before the access to the `length` field
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
+        net_buff_desc_t buffer = device.rx_desc_mdata[device.rx_head];
         buffer.len = desc.upper.length;
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
@@ -287,6 +228,70 @@ static void rx_return(void)
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(config.virt_rx.id);
+    }
+}
+
+void tx_provide(void)
+{
+    bool reprocess = true;
+    while (reprocess) {
+        bool provided = false;
+
+        while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
+
+            net_buff_desc_t buffer;
+            int err = net_dequeue_active(&tx_queue, &buffer);
+            assert(!err);
+
+            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
+            desc->read.buffer_addr = buffer.io_or_offset;
+            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
+                                    | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
+            desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
+
+            device.tx_desc_mdata[device.tx_tail] = buffer;
+
+            device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
+            provided = true;
+        }
+
+        if (provided) {
+            THREAD_MEMORY_RELEASE();
+            eth_regs->tx_dma[0].tdt = device.tx_tail;
+            eth_regs->tx_dma[0].tdt; // Write flush
+        }
+
+        net_request_signal_active(&tx_queue);
+        reprocess = false;
+
+        if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
+            net_cancel_signal_active(&tx_queue);
+            reprocess = true;
+        }
+    }
+}
+
+void tx_return(void)
+{
+    bool enqueued = false;
+    while (!hw_tx_ring_empty()) {
+        /* check if this buffer has been sent by the device */
+        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
+
+        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
+            break;
+
+        net_buff_desc_t desc_mdata = device.tx_desc_mdata[device.tx_head];
+        int err = net_enqueue_free(&tx_queue, desc_mdata);
+        assert(!err);
+        enqueued = true;
+
+        device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
+    }
+
+    if (enqueued && net_require_signal_free(&tx_queue)) {
+        net_cancel_signal_free(&tx_queue);
+        microkit_notify(config.virt_tx.id);
     }
 }
 
@@ -350,7 +355,6 @@ void init_1(void)
 
     uint8_t mac[6];
     get_mac_addr(mac);
-    sddf_dprintf("mac - %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // section 4.6.3 - wait for EEPROM auto read completion
     while((eth_regs->eec & IXGBE_EEC_ARD) != IXGBE_EEC_ARD);
@@ -359,7 +363,7 @@ void init_1(void)
     while ((eth_regs->rdrxctl & IXGBE_RDRXCTL_DMAIDONE) != IXGBE_RDRXCTL_DMAIDONE);
 
     // section 4.6.4 - initialize link (auto negotiation)
-    // link auto-configuration register should already be set correctly
+    // link auto-configuration register should have been set correctly
 
     // negotiate link
     /* datasheet wants us to wait for the link here, but we can continue and wait afterwards */
@@ -383,15 +387,13 @@ void init_1(void)
         // disable rx while re-configuring it
         eth_regs->rxctrl &= (~IXGBE_RXCTRL_RXEN);
 
-        // TODO: No DCB, No RSS: Queue 0 is used for all packets.
-        // eth_regs->mrqc = 0;
-
-        // TODO: why?
+        // set buffer size for only RX queue 0
         eth_regs->rxpbsize[0] = IXGBE_RXPBSIZE_128KB;
         for (int i = 1; i < 8; i++) {
             eth_regs->rxpbsize[i] = 0;
         }
 
+        // enable CRC offloading
         eth_regs->hlreg0 |= IXGBE_HLREG0_RXCRCSTRP;
         eth_regs->rdrxctl |= IXGBE_RDRXCTL_CRCSTRIP;
 
@@ -415,7 +417,7 @@ void init_1(void)
 
     // section 4.6.8 - init tx
     {
-        // TODO: disable DCB
+        // set buffer size for only TX queue 0
         eth_regs->txpbsize[0] = IXGBE_TXPBSIZE_40KB;
         for (int i = 1; i < 8; i++) {
             eth_regs->txpbsize[i] = 0;
@@ -441,7 +443,6 @@ void init_1(void)
         // there are no defines for this in ixgbe.rs for some reason
         // pthresh: 6:0, hthresh: 14:8, wthresh: 22:16
 
-        // TODO: look at this
         eth_regs->tx_dma[0].txdctl &= ~(0x7F | (0x7F << 8) | (0x7F << 16)); // clear bits
         eth_regs->tx_dma[0].txdctl |= (36 | (8 << 8) | (4 << 16)); // from DPDK
 
@@ -467,6 +468,7 @@ void init_2(void)
 
     // sleep for 10 seconds. Just stabilize the hardware
     // Well. this ugliness costed us two days of debugging.
+    // https://github.com/mars-research/atmosphere/blob/bd485f22f1d5e4d1623e133700dc233086059603/ixgbe_driver/src/device.rs#L258
     sddf_timer_set_timeout(timer_config.driver_id, 10 * NS_IN_S);
 }
 
@@ -495,25 +497,26 @@ void notified(microkit_channel ch)
         }
     } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
         microkit_deferred_irq_ack(ch);
-    } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
-        // write/read-to-clear, no need for auto clear
-        (void)eth_regs->eicr;
-        tx_return();
-        tx_provide();
-        rx_return();
-        rx_provide();
+    } else if (device.init_stage == 4) {
+        if (ch == device_resources.irqs[0].id) {
+            // read-to-clear
+            uint32_t cause = eth_regs->eicr;
+            if (cause & BIT(RX_IRQ_VECTOR)) {
+                rx_return();
+                rx_provide();
+            } else if (cause & BIT(TX_IRQ_VECTOR)) {
+                tx_return();
+                tx_provide();
+            }
 
-        /*
-         * Delay calling into the kernel to ack the IRQ until the next loop
-         * in the seL4CP event handler loop.
-         */
-        microkit_deferred_irq_ack(ch);
-    } else if (ch == config.virt_tx.id) {
-        if (device.init_stage == 4) {
+            /*
+             * Delay calling into the kernel to ack the IRQ until the next loop
+             * in the event handler loop.
+             */
+            sddf_deferred_irq_ack(ch);
+        } else if (ch == config.virt_tx.id) {
             tx_provide();
-        }
-    } else if (ch == config.virt_rx.id) {
-        if (device.init_stage == 4) {
+        } else if (ch == config.virt_rx.id) {
             rx_provide();
         }
     }
