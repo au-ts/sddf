@@ -1292,7 +1292,7 @@
 				clocks = <0x02 0xb9>;
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				status = "okay";
+				status = "disabled";
 				clock-frequency = <0x61a80>;
 				pinctrl-names = "default";
 				pinctrl-0 = <0x32>;
@@ -1315,7 +1315,7 @@
 				clocks = <0x02 0xba>;
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				status = "okay";
+				status = "disabled";
 				clock-frequency = <0x186a0>;
 				pinctrl-names = "default";
 				pinctrl-0 = <0x34>;
