@@ -101,9 +101,9 @@ static inline void imx_i2c_start(bool repeat)
     // Update dummy read flag upon switch to MTX
     dummy_read = false;
     if (!repeat) {
-        regs->i2cr |= REG_CR_MSTA;
         // wait until bus is clear
         for (uint32_t i = 0; (i < 10000) && (regs->i2sr & REG_SR_IBB); i++) {}
+        regs->i2cr |= REG_CR_MSTA;
 
         // if our short busy wait failed, die
         if (regs->i2sr & REG_SR_IBB) {
@@ -119,19 +119,6 @@ static inline void imx_i2c_start(bool repeat)
 
     // Always enable TXAK at start of a transaction.
     regs->i2cr &= ~REG_CR_TXAK;
-}
-
-/**
- * After sending an address+start OR a data byte, call this function
- * to check if an acknowledgement is received.
- *
- * This is required as the hardware will only generate an interrupt on
- * the successful completion of a transfer.
- */
-static inline bool imx_i2c_ackd(void)
-{
-    // TODO: figure out if a busy wait is required
-    return ((regs->i2sr & REG_SR_RXAK) == 0);
 }
 
 /**
