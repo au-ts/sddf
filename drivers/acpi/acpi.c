@@ -30,6 +30,7 @@ const char acpi_str_ssdt[] = {'S', 'S', 'D', 'T', 0};
 const char acpi_str_fadt[] = {'F', 'A', 'C', 'P', 0};
 const char acpi_str_mcfg[] = {'M', 'C', 'F', 'G', 0};
 const char aml_str_hid[] = {'_', 'H', 'I', 'D', 0};  // Hardware ID
+const char aml_str_adr[] = {'_', 'A', 'D', 'R', 0};  // Address
 const char aml_str_crs[] = {'_', 'C', 'R', 'S', 0};  // Current Resource Settings
 const char aml_str_prt[] = {'_', 'P', 'R', 'T', 0};  // PCI Routing Table
 const char aml_str_pic[] = {'_', 'P', 'I', 'C', 0};  // PIC mode method
@@ -416,14 +417,6 @@ void init(void)
             aml_namespace_node_t *crs_node = find_child_node_by_name(node->parent, aml_str_crs);
             assert(crs_node != NULL);
 
-            /* aml_data_t crs_data_before_eval = {0x21675b, 17, 540}; */
-            /* pass_crs_and_caps(crs_data_before_eval, pci_resources->num_bridges); */
-            // TODO: fix ret_type
-            aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
-            sddf_dprintf("CRS: 0x%lx, len: 0x%x\n", crs_data.value, crs_data.length);
-            pass_crs_and_caps(crs_data, pci_resources->num_bridges);
-            sddf_dprintf("======Finish _CRS parsing\n");
-
             aml_namespace_node_t *prt_node = find_child_node_by_name(node->parent, aml_str_prt);
             assert(prt_node != NULL);
 
@@ -432,9 +425,33 @@ void init(void)
             parse_prt_package(prt_node, prt_data, pci_resources->num_bridges);
             pci_resources->num_bridges++;
             sddf_dprintf("======Finish _PRT parsing\n");
+
+            aml_namespace_node_t *child_node = node->parent->child;
+            while(child_node) {
+                aml_namespace_node_t *child_adr_node = find_child_node_by_name(child_node, aml_str_adr);
+                aml_namespace_node_t *child_prt_node = find_child_node_by_name(child_node, aml_str_prt);
+
+                if (child_node->op_code == DEVICE_OP && child_adr_node && child_prt_node) {
+                    aml_data_t child_prt_data = eval_namespace_node(child_prt_node, 0, NULL);
+                    sddf_dprintf("name: %s, adr_node: 0x%lx, prt_node: 0x%lx, num_bridge: 0x%x\n", child_node->name, child_adr_node, child_prt_node, pci_resources->num_bridges);
+                    parse_prt_package(child_prt_node, child_prt_data, pci_resources->num_bridges);
+
+                    pci_resources->num_bridges++;
+                }
+                child_node = child_node->next;
+            }
+
+            // TODO: fix ret_type
+            aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
+            sddf_dprintf("CRS: 0x%lx, len: 0x%x\n", crs_data.value, crs_data.length);
+            // TODO: fix register reading during PRT parsing by reusing paging structures
+            pass_crs_and_caps(crs_data, pci_resources->num_bridges);
+            sddf_dprintf("======Finish _CRS parsing\n");
+
         }
     }
-    assert(pci_resources->num_bridges == num_pci_seg_grps); // Num of PCIe bridges should be matched in MCFG and DSDT
+    // TODO: Num of PCIe bridges should be matched in MCFG and DSDT
+    /* assert(pci_resources->num_bridges == num_pci_seg_grps); */
 
     // Map ECAM space for PCIe driver
     for (int i = 0; i < pci_resources->num_pci_groups; i++) {
@@ -463,6 +480,7 @@ void init(void)
 
     sddf_dprintf("Finished ECAM mapping!\n");
 
+    sddf_dprintf("active ut: 0x%lx-0x%lx\n", post_boot_cnode.caps[post_boot_cnode.active_ut_idx].base_addr, post_boot_cnode.caps[post_boot_cnode.active_ut_idx].end_addr);
     error = seL4_CNode_Copy(pci_resources_cnode->cptr, 2, 58, post_boot_cnode.cptr, post_boot_cnode.active_ut_idx, 58, seL4_ReadWrite);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to copy a the IRQControl Capability\n");

@@ -46,6 +46,7 @@ parse_stage_t op_stage_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [CREATE_DWORD_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [CREATE_QWORD_FIELD_OP] = { INIT, BUFFER_DATA, TERM_INTEGER, OBJECT_NAME_STRING, COMPLETE },
     [LEQUAL_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
+    [AND_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [ADD_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [SUBTRACT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
     [SHIFT_LEFT_OP] = { INIT, TERM_INTEGER, TERM_INTEGER, NAME_STRING, COMPLETE },
@@ -71,6 +72,12 @@ parse_stage_t op_stage_5b_table[MAX_OPCODE][MAX_OP_STAGES] = {
     [POWER_RESOURCE_OP & 0xFF] = { INIT, PKT_LEN, NAME_STRING, BYTE_DATA, WORD_DATA, TERM_LIST, COMPLETE },
     [PROCESSOR_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
     [THERMAL_ZONE_OP & 0xFF] = { INIT, PKT_LEN, COMPLETE },
+};
+
+parse_stage_t op_stage_lnot_table[MAX_OPCODE][MAX_OP_STAGES] = {
+    [LNOT_EQUAL_OP & 0xFF] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
+    [LLESS_EQUAL_OP & 0xFF] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
+    [LGREATER_EQUAL_OP & 0xFF] = { INIT, TERM_INTEGER, TERM_INTEGER, COMPLETE },
 };
 
 parse_stage_t op_stage_custom[MAX_OPCODE][MAX_OP_STAGES] = {
@@ -219,10 +226,13 @@ parse_stage_t get_op_stage()
         return INIT;
     }
 
-    if ((current_state->op_code & 0x5B00) == 0x5B00) {
+    if ((current_state->op_code & 0xFF00) == 0x5B00) {
         uint8_t second_op_code = current_state->op_code & 0xFF;
         return op_stage_5b_table[second_op_code][current_state->stage_idx];
-    } else if ((current_state->op_code & 0xFE00) == 0xFE00) {
+    } else if ((current_state->op_code & 0xFF00) == 0x9200) {
+        uint8_t second_op_code = current_state->op_code & 0xFF;
+        return op_stage_lnot_table[second_op_code][current_state->stage_idx];
+    } else if ((current_state->op_code & 0xFF00) == 0xFE00) {
         uint8_t second_op_code = current_state->op_code & 0xFF;
         return op_stage_custom[second_op_code][current_state->stage_idx];
     }
@@ -348,11 +358,42 @@ void state_stack_pop()
                 ret_data.value = current_state->arguments[0].value == current_state->arguments[1].value;
                 break;
             }
+            case LNOT_EQUAL_OP: {
+                assert(current_state->num_args == 2);
+                sddf_dprintf("Equal: %lu != %lu\n", current_state->arguments[0].value, current_state->arguments[1].value);
+                ret_data.value = current_state->arguments[0].value != current_state->arguments[1].value;
+                break;
+            }
+            case LLESS_EQUAL_OP: {
+                assert(current_state->num_args == 2);
+                sddf_dprintf("Equal: %lu <= %lu\n", current_state->arguments[0].value, current_state->arguments[1].value);
+                ret_data.value = current_state->arguments[0].value <= current_state->arguments[1].value;
+                break;
+            }
+            case LGREATER_EQUAL_OP: {
+                assert(current_state->num_args == 2);
+                sddf_dprintf("Equal: %lu >= %lu\n", current_state->arguments[0].value, current_state->arguments[1].value);
+                ret_data.value = current_state->arguments[0].value >= current_state->arguments[1].value;
+                break;
+            }
+            case AND_OP: {
+                assert(current_state->num_args == 3);
+                assert(current_state->arguments[2].type == DATA_OBJ_NODE);
+                ret_data.value = current_state->arguments[0].value & current_state->arguments[1].value;
+                sddf_dprintf("and: 0x%lx & 0x%lx = 0x%lx\n", current_state->arguments[0].value, current_state->arguments[1].value, ret_data.value);
+                aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2].value;
+                if (supername_node) {
+                    supername_node->data = ret_data;
+                    supername_node->evaluated = true;
+                    sddf_dprintf("save value %lu to node %s\n", supername_node->data.value, supername_node->name);
+                }
+                break;
+            }
             case ADD_OP: {
                 assert(current_state->num_args == 3);
                 assert(current_state->arguments[2].type == DATA_OBJ_NODE);
                 ret_data.value = current_state->arguments[0].value + current_state->arguments[1].value;
-                sddf_dprintf("subtract: 0x%lx - 0x%lx = 0x%lx\n", current_state->arguments[0].value, current_state->arguments[1].value, ret_data.value);
+                sddf_dprintf("add: 0x%lx + 0x%lx = 0x%lx\n", current_state->arguments[0].value, current_state->arguments[1].value, ret_data.value);
                 aml_namespace_node_t *supername_node = (aml_namespace_node_t *)current_state->arguments[2].value;
                 if (supername_node) {
                     supername_node->data = ret_data;
@@ -419,7 +460,7 @@ void state_stack_pop()
             case NAME_OP: {
                 assert(current_state->num_args == 2);
                 assert(current_state->arguments[0].type == DATA_OBJ_RET);
-                sddf_dprintf("complete NameOp: addr: 0x%lx, ret_buf = %u\n", (uintptr_t)current_state->arguments[0].value, (uint32_t)current_state->arguments[2].value);
+                sddf_dprintf("complete NameOp %s: addr: 0x%lx, ret_buf = %u\n", current_state->node->name, (uintptr_t)current_state->arguments[0].value, (uint32_t)current_state->arguments[2].value);
                 // TODO: check ret_type
                 aml_data_t *eval_ret = (aml_data_t *)current_state->arguments[0].value;
                 *eval_ret = current_state->arguments[1];
@@ -432,15 +473,17 @@ void state_stack_pop()
             }
             case RETURN_OP: {
                 assert(current_state->num_args == 1);
-                /* sddf_dprintf("complete MethodOp: %s, ret_buf = 0x%lx\n", current_state->parent->node->name, (uint64_t)current_state->arguments[0].value); */
-                parse_state_t *method_state = current_state->parent;
-                while (method_state && method_state->op_code != METHOD_OP) {
-                    method_state = method_state->parent;
+                sddf_dprintf("complete MethodOp: %s, ret_buf = 0x%lx\n", current_state->parent->node->name, (uint64_t)current_state->arguments[0].value);
+                aml_data_t method_ret = current_state->arguments[0];
+                while (current_state && current_state->op_code != METHOD_OP) {
+                    parse_state_t *completed_state = current_state;
+                    current_state = current_state->parent;
+                    mempool_rc(&state_stack_mempool, (void *)completed_state, sizeof(parse_state_t));
                 }
-                if (method_state) {
-                    aml_data_t *eval_ret = (aml_data_t *)method_state->arguments[0].value;
-                    *eval_ret = current_state->arguments[0];
-                    method_state->stage_idx += 1; // MethodOp completes
+                if (current_state) {
+                    aml_data_t *eval_ret = (aml_data_t *)current_state->arguments[0].value;
+                    *eval_ret = method_ret;
+                    current_state->stage_idx += 1; // MethodOp completes
                 }
                 break;
             }
@@ -770,7 +813,7 @@ aml_namespace_node_t *find_node_by_name_string(aml_namespace_node_t *parent_node
     }
 
     if (left_num_segments > 0) {
-        sddf_dprintf("  Parent: %s, Name segment: %s, left_num_segments: %u\n", node->name, name_segment, left_num_segments);
+        /* sddf_dprintf("  Parent: %s, Name segment: %s, left_num_segments: %u\n", node->name, name_segment, left_num_segments); */
         return find_node_by_name_string(node, left_num_segments);
     }
 
@@ -1016,14 +1059,12 @@ aml_data_t read_field_value(aml_namespace_node_t *field_node)
         final_field_value = final_field_value + (reg_val << (field_bit_width - remaining_bit_width));
         bit_offset = 0; // no offset since round 2
         remaining_bit_width -= bit_width_to_read;
-        /* final_field_value = (final_field_value << bit_width_to_read) + reg_val; */
     }
 
     // Unmap the mapped region
     assert(cnode_untypeds_revoke(&post_boot_cnode) == seL4_NoError);
 
     sddf_dprintf("read field %s value: 0x%lx\n", field_node->name, final_field_value);
-
 
     aml_data_t field_data = {final_field_value, DATA_OBJ_QWORD, 0};
     return field_data;
@@ -1096,8 +1137,8 @@ void parse_namespace_node(bool evaluation)
             while (advance());
         } else {
             op_code = op_code | advance();
-            if (op_code == 0x5B) {
-                op_code = 0x5B00;
+            if (op_code == 0x5B || op_code == 0x92) {
+                op_code = op_code << 8;
                 continue;
             }
 
@@ -1156,6 +1197,7 @@ void parse_namespace_node(bool evaluation)
                 case SUBTRACT_OP:
                 case SHIFT_LEFT_OP:
                 case SHIFT_RIGHT_OP:
+                case AND_OP:
                 case ALIAS_OP:
                 case SCOPE_OP:
                 case METHOD_OP:
@@ -1177,6 +1219,9 @@ void parse_namespace_node(bool evaluation)
                 case CREATE_WORD_FIELD_OP:
                 case CREATE_DWORD_FIELD_OP:
                 case CREATE_QWORD_FIELD_OP:
+                case LNOT_EQUAL_OP:
+                case LLESS_EQUAL_OP:
+                case LGREATER_EQUAL_OP:
                 case POWER_RESOURCE_OP:
                 case PROCESSOR_OP:
                 case THERMAL_ZONE_OP:
@@ -1278,7 +1323,7 @@ aml_data_t eval_namespace_node(aml_namespace_node_t *node, uint8_t num_args, aml
         skip_name_string(); // NAME STRING
         current_state->stage_idx = 2;
     } else {
-        sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code);
+        /* sddf_dprintf("Evaluation of op 0x%04x is not implmented, return node\n", node->op_code); */
         state_stack_pop();
         eval_ret = (aml_data_t){(uintptr_t)node, DATA_OBJ_NODE, 0};
         current_state = recovery_state;
