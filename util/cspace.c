@@ -140,15 +140,6 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
     dst_cnode_specs->caps[dst_cnode_specs->end].end_addr = min_addr + new_ut_size;
     dst_cnode_specs->end++;
 
-    if (min_addr == 0x4000000000) {
-        sddf_dprintf("test cptr: 0x%lx\n", (uintptr_t)dst_cnode_specs->cptr + dst_cnode_specs->end - 1);
-        error = untyped_retype(dst_cnode_specs, dst_cnode_specs->end - 1, seL4_UntypedObject, 10, &retyped_cptr_idx);
-        if (error) {
-            sddf_dprintf("Error: failed to invoke the test cap\n");
-            return error;
-        }
-    }
-
     if (min_addr + new_ut_size < max_addr) {
         pass_ut_with_range(dst_cnode_specs, src_cnode_specs, min_addr + new_ut_size, max_addr);
     }

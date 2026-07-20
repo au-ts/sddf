@@ -88,10 +88,6 @@ void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t 
     uintptr_t cur_paddr = dev_regs_paddr;
     uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
     uintptr_t cur_vaddr = target_vaddr;
-    seL4_CPtr test_idx;
-    error = retype_at_paddr(cnode_specs, 0x0fd000000, seL4_UntypedObject, 10, &test_idx);
-    return;
-
     while (cur_paddr < end_paddr) {
         error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
         if (error != seL4_NoError) {
