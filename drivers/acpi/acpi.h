@@ -128,6 +128,7 @@ enum aml_encoding_value {
     SUBTRACT_OP = 0x74,
     SHIFT_LEFT_OP = 0x79,
     SHIFT_RIGHT_OP = 0x7A,
+    AND_OP = 0x7B,
     DEREF_OF_OP = 0x83,
     INDEX_OP = 0x88,
     CREATE_BIT_FIELD_OP = 0x8D,
@@ -135,6 +136,9 @@ enum aml_encoding_value {
     CREATE_WORD_FIELD_OP = 0x8B,
     CREATE_DWORD_FIELD_OP = 0x8A,
     CREATE_QWORD_FIELD_OP = 0x8F,
+    LNOT_EQUAL_OP = 0x9293,
+    LLESS_EQUAL_OP = 0x9294,
+    LGREATER_EQUAL_OP = 0x9295,
     LEQUAL_OP = 0x93,
     IF_OP = 0xA0,
     ELSE_OP = 0xA1,
@@ -195,20 +199,19 @@ typedef struct {
 } pci_prt_t;
 
 typedef struct {
-    /* char path_name[AML_MAX_PATH_STR]; */
-    /* uint32_t path_len; */
     uint32_t bus_start;
     uint32_t bus_end;
     device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
     uint8_t num_dev_resources;
     pci_prt_t prt_entries[MAX_NUM_PRT_ENTRIES];
     uint8_t num_prt_entries;
+    uint8_t segment_id;
 } pci_bridge_t;
 
 typedef struct {
     pci_seg_group_t pci_seg_groups[MAX_NUM_PCI_SEG_GROUP];
     uint32_t num_pci_groups;
-    pci_bridge_t bridges[10];
+    pci_bridge_t bridges[30]; // Host bridges
     uint32_t num_bridges;
     cnode_specs_t cnode_specs;
 } pci_resources_t;

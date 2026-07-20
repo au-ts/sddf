@@ -124,14 +124,6 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
                      target_ut_idx,
                      src_cnode_specs->caps[target_ut_idx].base_addr,
                      src_cnode_specs->caps[target_ut_idx].end_addr);
-        sddf_dprintf("target_size_bits: %u\n", max_target_size_bits);
-        sddf_dprintf("avai_size_bits: %u\n", avai_mem_size_bits);
-        sddf_dprintf("new_ut_size_bits: %u\n", new_ut_size_bits);
-        sddf_dprintf("max_align_size: %u\n", max_align_size_bits);
-
-        for (uint32_t i = src_cnode_specs->start; i < src_cnode_specs->end; i++) {
-            sddf_dprintf("i: %u, 0x%lx-0x%lx, type: %u\n", i, src_cnode_specs->caps[i].base_addr, src_cnode_specs->caps[i].end_addr, src_cnode_specs->caps[i].object_type);
-        }
         return error;
     }
 
@@ -142,11 +134,20 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
         sddf_dprintf("Error: failed to copy a capability\n");
         return error;
     }
-    /* sddf_dprintf("pass ut to slot %d in destination CNode\n", dst_cnode_specs->end); */
+    /* sddf_dprintf("pass ut to slot %d in destination CNode from slot %d in src\n", dst_cnode_specs->end, target_ut_idx); */
 
     dst_cnode_specs->caps[dst_cnode_specs->end].base_addr = min_addr;
     dst_cnode_specs->caps[dst_cnode_specs->end].end_addr = min_addr + new_ut_size;
     dst_cnode_specs->end++;
+
+    if (min_addr == 0x4000000000) {
+        sddf_dprintf("test cptr: 0x%lx\n", (uintptr_t)dst_cnode_specs->cptr + dst_cnode_specs->end - 1);
+        error = untyped_retype(dst_cnode_specs, dst_cnode_specs->end - 1, seL4_UntypedObject, 10, &retyped_cptr_idx);
+        if (error) {
+            sddf_dprintf("Error: failed to invoke the test cap\n");
+            return error;
+        }
+    }
 
     if (min_addr + new_ut_size < max_addr) {
         pass_ut_with_range(dst_cnode_specs, src_cnode_specs, min_addr + new_ut_size, max_addr);
@@ -167,12 +168,8 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
                                 cnode_specs->cptr, 0, 0,
                                 cnode_specs->end, 1);
     if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to retype an object type %lu, size_bits: %lu - error: %d\n", object_type, size_bits, error);
+        sddf_dprintf("Error: failed to retype an object type %lu, cptr: 0x%lx, size_bits: %lu - error: %d\n", object_type, cnode_specs->cptr + ut_idx, size_bits, error);
         return error;
-    }
-
-    if (ut_idx == 33) {
-        sddf_dprintf("Retyped object type %lu, size_bits=%lu at 0x%lx from ut %u to destination %d\n", object_type, size_bits, cnode_specs->caps[ut_idx].base_addr, ut_idx, cnode_specs->end);
     }
 
     cnode_specs->caps[cnode_specs->end].base_addr = cnode_specs->caps[ut_idx].base_addr;
