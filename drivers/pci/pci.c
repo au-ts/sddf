@@ -31,7 +31,7 @@ __attribute__((__section__(".ecam_configs"))) pci_ecam_config_t pci_ecam_config;
 /**
  * Look for the capability of a device by ID
  * */
-static struct shared_pci_cap *find_pci_cap_by_id(struct pci_config_space *config_space, uint8_t cap_id)
+static struct shared_pci_cap *find_pci_cap_by_id(struct pci_header_type0 *config_space, uint8_t cap_id)
 {
     struct shared_pci_cap *cap = (struct shared_pci_cap *)((uintptr_t)config_space + config_space->cap_ptr);
     while (cap != (struct shared_pci_cap *)config_space) {
@@ -43,7 +43,7 @@ static struct shared_pci_cap *find_pci_cap_by_id(struct pci_config_space *config
     return NULL;
 }
 
-void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_bar_t pci_bar_cfg)
+void configure_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, pci_bar_t pci_bar_cfg)
 {
     sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, pci_bar_cfg.base_addr);
     if (pci_bar_cfg.base_addr) {
@@ -61,7 +61,7 @@ void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_
     }
 }
 
-void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
+void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
 {
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
@@ -83,10 +83,15 @@ void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, uintptr_t 
     }
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
 
+
     seL4_Error error;
     uintptr_t cur_paddr = dev_regs_paddr;
     uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
     uintptr_t cur_vaddr = target_vaddr;
+    seL4_CPtr test_idx;
+    error = retype_at_paddr(cnode_specs, 0x0fd000000, seL4_UntypedObject, 10, &test_idx);
+    return;
+
     while (cur_paddr < end_paddr) {
         error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
         if (error != seL4_NoError) {
@@ -98,7 +103,7 @@ void map_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, uintptr_t 
     }
 }
 
-void configure_irqs(struct pci_config_space *pci_header, config_request_t config_request)
+void configure_irqs(struct pci_header_type0 *pci_header, config_request_t config_request)
 {
     bool ioapic_enabled = true;
     for (int i = 0; i < config_request.num_irqs; i++) {
@@ -164,7 +169,7 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
     return 0;
 }
 
-void configure_msi(struct pci_config_space *pci_header, uint8_t vector)
+void configure_msi(struct pci_header_type0 *pci_header, uint8_t vector)
 {
     struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
 
@@ -200,7 +205,7 @@ void configure_msi(struct pci_config_space *pci_header, uint8_t vector)
     }
 }
 
-void bind_irq(struct pci_config_space *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
+void bind_irq(struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
 {
     uint8_t base_irq_cap = 138;
     uint8_t bridge_idx = get_pci_bridge_idx_by_bus(pci_bus);
@@ -263,6 +268,38 @@ void bind_irq(struct pci_config_space *pci_header, uint8_t pci_bus, uint8_t pci_
     sddf_deferred_notify(1);
 }
 
+struct pci_header_type1 *find_parent_pci_bridge(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end, uint8_t child_bus)
+{
+    struct pci_header_type1 *parent_bridge = NULL;
+
+    for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
+        for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
+            for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
+                struct pci_header_type1 *bridge_header = (struct pci_header_type1 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
+                // Bits[6:0] - Header Layout specifying header type
+                if ((bridge_header->header_type & 0x3F) == 1) {
+                    sddf_dprintf("  - primary bus num: 0x%x\n", bridge_header->primary_bus_num);
+                    sddf_dprintf("  - secondary bus num: 0x%x\n", bridge_header->secondary_bus_num);
+                    sddf_dprintf("  - subordinate bus num: 0x%x\n", bridge_header->subordinate_bus_num);
+
+                    if (parent_bridge == NULL) {
+                        parent_bridge = bridge_header;
+                        sddf_dprintf("update\n");
+                    } else {
+                        if (bridge_header->secondary_bus_num >= parent_bridge->secondary_bus_num &&
+                            bridge_header->subordinate_bus_num <= parent_bridge->subordinate_bus_num) {
+                            sddf_dprintf("update\n");
+                            parent_bridge = bridge_header;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return parent_bridge;
+}
+
 
 // TODO: pass bus start and end as arguments
 void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
@@ -270,15 +307,17 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
     for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
         for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
             for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
-                struct pci_config_space *pci_header = (struct pci_config_space *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
+                struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
                 if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) {
-                    sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vedor_id: 0x%x, device_id: 0x%x\n",
+                    sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n",
                                  (((uintptr_t)pci_header >> 20) & 0xff),
                                  (((uintptr_t)pci_header >> 15) & 0x1f),
                                  (((uintptr_t)pci_header >> 12) & 0x7),
                                  pci_header->vendor_id,
-                                 pci_header->device_id);
+                                 pci_header->device_id,
+                                 pci_header->header_type & 0x3F);
                 }
+
 
                 // TODO: convert it to general solution
                 /* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { */
@@ -287,10 +326,12 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                 /* } */
 
                 if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) {
+                    find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus);
                     map_pci_bar(pci_header, 0, 0x2000000);
                     /* configure_msi() */
                     /* bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
                 }
+
             }
         }
     }
@@ -326,6 +367,8 @@ void init(void)
 
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
+    sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)cnode_cptr_pci_resources);
+    sddf_dprintf("cptr_ethernet_driver: 0x%lx\n", (uintptr_t)cnode_cptr_ethernet_driver);
     cnode_specs->cptr = cnode_cptr_pci_resources;
 
     sddf_dprintf("=========PCI driver is running==========\n");
