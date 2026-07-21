@@ -201,6 +201,7 @@ typedef struct {
 typedef struct {
     uint32_t bus_start;
     uint32_t bus_end;
+    uintptr_t adr;
     device_resource_t dev_resources[MAX_NUM_AS_RESOURCES];
     uint8_t num_dev_resources;
     pci_prt_t prt_entries[MAX_NUM_PRT_ENTRIES];

@@ -453,7 +453,8 @@ def generate(
                             pin=16,
                             vector=8,
                             trigger=IrqIoapic.Trigger.LEVEL,
-                            polarity=IrqIoapic.Polarity.ACTIVELOW)
+                            polarity=IrqIoapic.Polarity.ACTIVELOW,
+                            id=16)
         ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
