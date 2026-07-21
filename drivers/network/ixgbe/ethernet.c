@@ -495,10 +495,12 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
         }
-    } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
+    /* } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) { */
+    } else if (device.init_stage != 4 && ch == 16) {
         microkit_deferred_irq_ack(ch);
     } else if (device.init_stage == 4) {
-        if (ch == device_resources.irqs[0].id) {
+        /* if (ch == device_resources.irqs[0].id) { */
+        if (ch == 16) {
             // read-to-clear
             uint32_t cause = eth_regs->eicr;
             if (cause & BIT(RX_IRQ_VECTOR)) {

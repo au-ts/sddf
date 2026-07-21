@@ -436,6 +436,10 @@ void init(void)
                     sddf_dprintf("name: %s, adr_node: 0x%lx, prt_node: 0x%lx, num_bridge: 0x%x\n", child_node->name, child_adr_node, child_prt_node, pci_resources->num_bridges);
                     parse_prt_package(child_prt_node, child_prt_data, pci_resources->num_bridges);
 
+                    aml_data_t child_adr_data = eval_namespace_node(child_adr_node, 0, NULL);
+                    sddf_dprintf("ADR: 0x%lx\n", child_adr_data.value);
+                    pci_resources->bridges[pci_resources->num_bridges].adr = child_adr_data.value;
+
                     pci_resources->num_bridges++;
                 }
                 child_node = child_node->next;

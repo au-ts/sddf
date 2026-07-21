@@ -201,16 +201,38 @@ void configure_msi(struct pci_header_type0 *pci_header, uint8_t vector)
     }
 }
 
-void bind_irq(struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
+pci_bridge_t *find_pci_bridge(uintptr_t header_addr, uintptr_t ecam_base)
+{
+    uintptr_t header_offset = header_addr - ecam_base;
+    uint32_t dev_slot = header_offset >> 15;
+    uint32_t func_slot = header_offset & 0xFFFF;
+    uintptr_t target_bridge_adr = dev_slot << 16 + func_slot;
+
+    if (header_addr == 0x0) {
+        target_bridge_adr = 0x0;
+    }
+    sddf_dprintf("Target PCI bridge addr: 0x%lx\n", header_offset);
+    uint32_t num_bridges = pci_resources->num_bridges;
+    for (int i = 0; i < num_bridges; i++) {
+        pci_bridge_t *pci_bridge = &pci_resources->bridges[i];
+        sddf_dprintf("pci_bridge addr: 0x%lx\n", pci_bridge->adr);
+        if (target_bridge_adr == pci_bridge->adr) {
+            return pci_bridge;
+        }
+    }
+
+    return NULL;
+}
+
+void bind_irq(pci_bridge_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
 {
     uint8_t base_irq_cap = 138;
-    uint8_t bridge_idx = get_pci_bridge_idx_by_bus(pci_bus);
 
-    uint8_t num_prt_entries = pci_resources->bridges[bridge_idx].num_prt_entries;
+    uint8_t num_prt_entries = pci_bridge->num_prt_entries;
     sddf_dprintf("num_prt_entries: %u\n", num_prt_entries);
     uint8_t gsi_number = 0;
     for (int j = 0; j < num_prt_entries; j++) {
-        pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[bridge_idx].prt_entries[j];
+        pci_prt_t *pci_prt = (pci_prt_t *)&pci_bridge->prt_entries[j];
         sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi);
         uint32_t dev_num = (pci_prt->address >> 16) & 0x1F;
         uint32_t func_num = pci_prt->address & 0xFFFF;
@@ -280,7 +302,7 @@ struct pci_header_type1 *find_parent_pci_bridge(uintptr_t bus_base, uint8_t bus_
 
                     if (parent_bridge == NULL) {
                         parent_bridge = bridge_header;
-                        sddf_dprintf("update\n");
+                        sddf_dprintf("update, header: 0x%x, ecam_base: 0x%lx\n", (uintptr_t)bridge_header, bus_base);
                     } else {
                         if (bridge_header->secondary_bus_num >= parent_bridge->secondary_bus_num &&
                             bridge_header->subordinate_bus_num <= parent_bridge->subordinate_bus_num) {
@@ -317,15 +339,19 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 
                 // TODO: convert it to general solution
                 /* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { */
-                /*     map_pci_bar(pci_header, 4); */
-                /*     bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
+                /*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
+                /*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
+                /*     pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
+                /*     map_pci_bar(pci_header, 4, 0x60000000); */
+                /*     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
                 /* } */
 
                 if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) {
-                    find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus);
+                    struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus);
+                    sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header);
+                    pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base);
                     map_pci_bar(pci_header, 0, 0x2000000);
-                    /* configure_msi() */
-                    /* bind_irq(pci_header, pci_bus, pci_dev, pci_func, 16); */
+                    /* bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
                 }
 
             }
