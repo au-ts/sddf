@@ -300,10 +300,10 @@ def generate(
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
 
-    if board.name == "vb_105":
-        ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
-        sdf.add_mr(ecam_mr)
-        ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
+    if board.name == "vb_105" or board.name == "viscous":
+        # ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xF0100000)
+        # sdf.add_mr(ecam_mr)
+        # ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
 
         eth_region_0 = MemoryRegion(
             sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
@@ -344,7 +344,7 @@ def generate(
 
         # Legacy I/O APIC
         eth_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=16, vector=8, trigger=IrqIoapic.Trigger.LEVEL,
-                                              polarity=IrqIoapic.Polarity.ACTIVELOW)
+                                              polarity=IrqIoapic.Polarity.ACTIVELOW, id=16)
 
         ethernet_driver.add_irq(eth_irq)
 

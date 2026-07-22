@@ -232,4 +232,13 @@ BOARDS: List[Board] = [
         timer=0xFED00000,
         ethernet=0x6000C00000,
     ),
+    Board(
+        name="viscous",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x70000000,
+        serial=0x3F8,
+        timer=0xFED00000,
+        ethernet=0x90200000,
+    ),
+
 ]

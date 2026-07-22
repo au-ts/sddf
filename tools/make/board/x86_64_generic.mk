@@ -41,7 +41,7 @@ ifeq (${X86_BOARD},qemu_virt_x86)
     QEMU_NET_ARGS ?= -device virtio-net-pci,netdev=netdev0,addr=0x2.0
     QEMU_BLK_ARGS ?= -device virtio-blk-pci,drive=hd,addr=0x3.0
 
-else ifeq ($(X86_BOARD), $(filter ${X86_BOARD},makatea vb_105))
+else ifeq ($(X86_BOARD), $(filter ${X86_BOARD},makatea vb_105 viscous))
     NET_DRIV_DIR := ixgbe
     ETH_DRIV := eth_driver_ixgbe.elf
     UART_DRIV_DIR := pc99

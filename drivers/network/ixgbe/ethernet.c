@@ -25,7 +25,8 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
-#define RX_IRQ  1
+#define RX_IRQ_VECTOR 0
+#define TX_IRQ_VECTOR 1
 
 // Minimum inter-interrupt interval specified in 2.048 us units
 // at 1 GbE and 10 GbE link
@@ -94,25 +95,30 @@ static inline bool hw_rx_ring_full(void)
 
 void clear_interrupts(void)
 {
-    eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
     (void)eth_regs->eicr;
 }
 
 void disable_interrupts(void)
 {
-    // TODO: why?
-    eth_regs->eimc = 0;
+    eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
     clear_interrupts();
 }
 
 void enable_interrupts(void)
 {
-    // TODO: Enable IRQ for RX queue 0, and map the cause to bit 1 in EICR?
-    eth_regs->ivar[0] = RX_IRQ | BIT(7);
+    // Section 8.2.2.6.10
+    //   - Bit[5:0] vector number for RX_QUEUE 0, BIT(vector number) is set on EICR if triggered
+    //   - Bit[7] enable IRQ for RX_QUEUE 0
+    //   - Bit[13:8] vector number for TX_QUEUE 0
+    //   - Bit[15] enable IRQ for TX_QUEUE 0
+    eth_regs->ivar[0] = RX_IRQ_VECTOR | BIT(7) | (TX_IRQ_VECTOR << 8) | BIT(15);
 
-    // TODO: separate operations for legacy mode and MSI/MSI-X mode
+    // Section 7.3.1.6 - No need to enable auto-clear
     eth_regs->eiac = 0;
-    // @jade: enable auto clear (actually, what is it?)
+
+    // Section 8.2.2.6.4
+    //   - Bits[11:3] Minimum inter-interrupt interval specified in 2.048us units
+    //   at 1 GbE and 10 GbE link
     eth_regs->eitr[0] = IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL;
     clear_interrupts();
 
@@ -350,18 +356,6 @@ void init_1(void)
     // section 4.6.3.1 - disable interrupts again after reset
     disable_interrupts();
 
-    struct pci_config_space *header = (struct pci_config_space *)0x3000000;
-    sddf_dprintf("vendor id: 0x%x\n", header->vendor_id);
-    sddf_dprintf("device id: 0x%x\n", header->device_id);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[0]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[1]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[2]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[3]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[4]);
-    sddf_dprintf("BAR: 0x%x\n", header->bar[5]);
-    sddf_dprintf("interrupt pin: %d\n", header->interrupt_pin);
-    sddf_dprintf("interrupt line: %d\n", header->interrupt_line);
-
     uint8_t mac[6];
     get_mac_addr(mac);
     sddf_dprintf("mac - %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -507,27 +501,28 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
         }
-    } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) {
-        microkit_deferred_irq_ack(ch);
-    } else if (device.init_stage == 4 && ch == device_resources.irqs[0].id) {
-        // write/read-to-clear, no need for auto clear
-        uint32_t cause = eth_regs->eicr;
-        eth_regs->eicr &= ~cause;
-        tx_return();
-        tx_provide();
-        rx_return();
-        rx_provide();
-        /*
-         * Delay calling into the kernel to ack the IRQ until the next loop
-         * in the seL4CP event handler loop.
-         */
-        microkit_deferred_irq_ack(ch);
-    } else if (ch == config.virt_tx.id) {
-        if (device.init_stage == 4) {
+    } else if (device.init_stage != 4 && ch == 16) {
+        sddf_deferred_irq_ack(ch);
+    } else if (device.init_stage == 4) {
+        if (ch == 16) {
+            // read-to-clear
+            uint32_t cause = eth_regs->eicr;
+            if (cause & BIT(RX_IRQ_VECTOR)) {
+                rx_return();
+                rx_provide();
+            } else if (cause & BIT(TX_IRQ_VECTOR)) {
+                tx_return();
+                tx_provide();
+            }
+
+            /*
+             * Delay calling into the kernel to ack the IRQ until the next loop
+             * in the event handler loop.
+             */
+            sddf_deferred_irq_ack(ch);
+        } else if (ch == config.virt_tx.id) {
             tx_provide();
-        }
-    } else if (ch == config.virt_rx.id) {
-        if (device.init_stage == 4) {
+        } else if (ch == config.virt_rx.id) {
             rx_provide();
         }
     }
