@@ -22,7 +22,6 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
-
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
 #define RX_IRQ_VECTOR 0
@@ -43,9 +42,9 @@ const uint64_t hw_tx_ring_vaddr = 0x2404000;
 
 struct ixgbe_device {
     volatile ixgbe_adv_rx_desc_t *rx_ring;
-    size_t rx_head, rx_tail;
+    uint32_t rx_head, rx_tail;
     volatile ixgbe_adv_tx_desc_t *tx_ring;
-    size_t tx_head, tx_tail;
+    uint32_t tx_head, tx_tail;
     net_buff_desc_t rx_descr_mdata[NUM_RX_DESCS];
     net_buff_desc_t tx_descr_mdata[NUM_TX_DESCS];
     int init_stage;
@@ -80,7 +79,7 @@ static inline bool hw_tx_ring_empty(void)
 
 static inline bool hw_tx_ring_full(void)
 {
-    return (device.tx_tail + 2) % NUM_TX_DESCS == device.tx_head;
+    return device.tx_tail - device.tx_head == NUM_TX_DESCS;
 }
 
 static inline bool hw_rx_ring_empty(void)
@@ -90,7 +89,7 @@ static inline bool hw_rx_ring_empty(void)
 
 static inline bool hw_rx_ring_full(void)
 {
-    return (device.rx_tail + 2) % NUM_RX_DESCS == device.rx_head;
+    return device.rx_tail - device.rx_head == NUM_RX_DESCS;
 }
 
 void clear_interrupts(void)
@@ -122,8 +121,9 @@ void enable_interrupts(void)
     eth_regs->eitr[0] = IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL;
     clear_interrupts();
 
-    // bit 15:0 for Receive/Transmit Queue Interrupts. We only enable those IRQs
-    // because the driver doesn't know how to handle IRQs caused by other reasons.
+    // Section 8.2.2.6.1
+    //   - Bit[15:0] for Receive/Transmit Queue Interrupts. We only enable those IRQs
+    //   because the driver doesn't know how to handle IRQs caused by other reasons.
     eth_regs->eims = 0xFF;
 }
 
@@ -142,7 +142,6 @@ void get_mac_addr(uint8_t mac[6])
 
 uint32_t get_link_speed(void)
 {
-    // TODO: replace all constants with macros in header file
     uint32_t speed = eth_regs->links;
     if ((speed & IXGBE_LINKS_UP) == 0) {
         return 0;
@@ -159,72 +158,6 @@ uint32_t get_link_speed(void)
     }
 }
 
-void tx_provide(void)
-{
-    bool reprocess = true;
-    while (reprocess) {
-        bool provided = false;
-
-        while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
-
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
-
-            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
-            desc->read.buffer_addr = buffer.io_or_offset;
-            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
-                                    | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
-            desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
-
-            device.tx_descr_mdata[device.tx_tail] = buffer;
-
-            device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
-            provided = true;
-        }
-        // @jade: should I move this to the outer block?
-        if (provided) {
-            THREAD_MEMORY_RELEASE();
-            eth_regs->tx_dma[0].tdt = device.tx_tail;
-            eth_regs->tx_dma[0].tdt; // Write flush
-        }
-
-        net_request_signal_active(&tx_queue);
-        reprocess = false;
-
-        // @jade: we optimised this on RX, should we do it on TX as well?
-        if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
-            net_cancel_signal_active(&tx_queue);
-            reprocess = true;
-        }
-    }
-}
-
-void tx_return(void)
-{
-    bool enqueued = false;
-    while (!hw_tx_ring_empty()) {
-        /* Ensure that this buffer has been sent by the device */
-        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
-
-        // performance optimisation suggested: https://github.com/au-ts/sddf/pull/682
-        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
-            break;
-
-        net_buff_desc_t descr_mdata = device.tx_descr_mdata[device.tx_head];
-        int err = net_enqueue_free(&tx_queue, descr_mdata);
-        assert(!err);
-        enqueued = true;
-
-        device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
-    }
-
-    if (enqueued && net_require_signal_free(&tx_queue)) {
-        net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
-    }
-}
-
 void rx_provide(void)
 {
     bool reprocess = true;
@@ -236,13 +169,14 @@ void rx_provide(void)
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
 
-            volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
+            uint32_t idx = device.rx_tail % NUM_RX_DESCS;
+            volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[idx];
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
-            device.rx_descr_mdata[device.rx_tail] = buffer;
+            device.rx_descr_mdata[idx] = buffer;
 
-            device.rx_tail = (device.rx_tail + 1) % NUM_RX_DESCS;
+            device.rx_tail++;
             provided = true;
         }
 
@@ -252,7 +186,7 @@ void rx_provide(void)
         }
 
         /* Only request a notification from multiplexer if HW ring is empty */
-        if (hw_rx_ring_empty()) {
+        if (!hw_rx_ring_full()) {
             net_request_signal_free(&rx_queue);
         } else {
             net_cancel_signal_free(&rx_queue);
@@ -270,31 +204,100 @@ static void rx_return(void)
 {
     bool packets_transferred = false;
     while (!hw_rx_ring_empty()) {
-        // @jade: why do we get into this loop all the time even when there is no packets in there?
-
-        /* If buffer slot is still empty, we have processed all packets the device has filled */
-        // TODO: simplify the data structures
-        ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0)
+        uint32_t idx = device.rx_head % NUM_RX_DESCS;
+        ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[idx].wb;
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) {
+            // The desciptor hasn't been used by hardware, implying no more available packets received
             break;
-        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0)
+        }
+        if ((desc.upper.status_error & IXGBE_RXDADV_STAT_EOP) == 0) {
+            // See Table 7-16: DD=1 and EOP=0
+            sddf_dprintf("ETH|ERROR: The packet spans across multiple descriptors.\n");
             break;
+        }
 
         // The access to `status_error` field should be ordered before the access to the `length` field
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
+        net_buff_desc_t buffer = device.rx_descr_mdata[idx];
         buffer.len = desc.upper.length;
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
         packets_transferred = true;
-        device.rx_head = (device.rx_head + 1) % NUM_RX_DESCS;
+        device.rx_head++;
     }
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(config.virt_rx.id);
+    }
+}
+
+void tx_provide(void)
+{
+    bool reprocess = true;
+    while (reprocess) {
+        bool provided = false;
+
+        while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
+
+            net_buff_desc_t buffer;
+            int err = net_dequeue_active(&tx_queue, &buffer);
+            assert(!err);
+
+            uint32_t idx = device.tx_tail % NUM_RX_DESCS;
+            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[idx];
+            desc->read.buffer_addr = buffer.io_or_offset;
+            desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
+                                    | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
+            desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
+
+            device.tx_descr_mdata[idx] = buffer;
+
+            device.tx_tail++;
+            provided = true;
+        }
+
+        if (provided) {
+            THREAD_MEMORY_RELEASE();
+            eth_regs->tx_dma[0].tdt = device.tx_tail;
+            eth_regs->tx_dma[0].tdt; // Write flush
+        }
+
+        net_request_signal_active(&tx_queue);
+        reprocess = false;
+
+        if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
+            net_cancel_signal_active(&tx_queue);
+            reprocess = true;
+        }
+    }
+}
+
+void tx_return(void)
+{
+    bool enqueued = false;
+    while (!hw_tx_ring_empty()) {
+        /* Ensure that this buffer has been sent by the device */
+        uint32_t idx = device.tx_head % NUM_RX_DESCS;
+        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[idx].wb;
+
+        // performance optimisation suggested: https://github.com/au-ts/sddf/pull/682
+        if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
+            break;
+
+        net_buff_desc_t descr_mdata = device.tx_descr_mdata[idx];
+        int err = net_enqueue_free(&tx_queue, descr_mdata);
+        assert(!err);
+        enqueued = true;
+
+        device.tx_head++;
+    }
+
+    if (enqueued && net_require_signal_free(&tx_queue)) {
+        net_cancel_signal_free(&tx_queue);
+        microkit_notify(config.virt_tx.id);
     }
 }
 
