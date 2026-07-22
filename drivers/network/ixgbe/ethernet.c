@@ -50,21 +50,6 @@ struct ixgbe_device {
     int init_stage;
 } device;
 
-/* HW ring descriptor (shared with device) */
-struct descriptor {
-    uint16_t len;
-    uint16_t stat;
-    uint32_t addr;
-};
-
-/* HW ring buffer data type */
-typedef struct {
-    uint32_t tail; /* index to insert at */
-    uint32_t head; /* index to remove from */
-    uint32_t capacity; /* capacity of the ring */
-    volatile struct descriptor *descr; /* buffer descriptor array */
-} hw_ring_t;
-
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
@@ -174,6 +159,8 @@ void rx_provide(void)
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
+            // Section 7.1.5.2.2 - We need a local copy becasue RX descriptor
+            // does not contain the address at write-back phase.
             device.rx_descr_mdata[idx] = buffer;
 
             device.rx_tail++;
@@ -253,6 +240,7 @@ void tx_provide(void)
                                     | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
             desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
 
+            // Section 7.2.3.2.3 - same reason with Rx descriptors to have a local copy
             device.tx_descr_mdata[idx] = buffer;
 
             device.tx_tail++;
@@ -283,7 +271,6 @@ void tx_return(void)
         uint32_t idx = device.tx_head % NUM_RX_DESCS;
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[idx].wb;
 
-        // performance optimisation suggested: https://github.com/au-ts/sddf/pull/682
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
             break;
 
@@ -394,10 +381,9 @@ void init_1(void)
         // disable rx while re-configuring it
         eth_regs->rxctrl &= (~IXGBE_RXCTRL_RXEN);
 
-        // TODO: No DCB, No RSS: Queue 0 is used for all packets.
-        // eth_regs->mrqc = 0;
+        // Section 8.2.2.8.23
+        //   - Default MRQC: No DCB, No RSS: Queue 0 is used for all packets.
 
-        // TODO: why?
         eth_regs->rxpbsize[0] = IXGBE_RXPBSIZE_128KB;
         for (int i = 1; i < 8; i++) {
             eth_regs->rxpbsize[i] = 0;
@@ -426,13 +412,11 @@ void init_1(void)
 
     // section 4.6.8 - init tx
     {
-        // TODO: disable DCB
         eth_regs->txpbsize[0] = IXGBE_TXPBSIZE_40KB;
         for (int i = 1; i < 8; i++) {
             eth_regs->txpbsize[i] = 0;
         }
 
-        // TODO: why?
         eth_regs->txpbthresh[0] = 0xA0;
         for (int i = 1; i < 8; i++) {
             eth_regs->txpbthresh[i] = 0;
