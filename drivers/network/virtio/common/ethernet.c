@@ -107,8 +107,11 @@ static void rx_provide(void)
             rx_virtq.desc[buffer_idx].len = NET_BUFFER_SIZE;
             rx_virtq.desc[buffer_idx].flags = VIRTQ_DESC_F_WRITE;
 
+            cache_clean_and_invalidate(&rx_virtq.desc[0], &rx_virtq.desc[rx_virtq.num]);
+
             /* Insert the header into the available ring */
             rx_virtq.avail->ring[rx_virtq.avail->idx % rx_virtq.num] = hdr_idx;
+            cache_clean_and_invalidate(&rx_virtq.avail[0], &rx_virtq.avail[rx_virtq.num]);
 
             /* Ensure all writes to the descriptor are ordered before we set the flags
             * that makes hardware aware of this slot.
@@ -138,12 +141,14 @@ static void rx_return(void)
     /* Extract RX buffers from the 'used' and pass them up to the client by putting them
      * in our sDDF 'active' queues. */
     bool transferred = false;
+    cache_clean_and_invalidate(&rx_virtq.used->ring[0], &rx_virtq.used->ring[rx_virtq.num]);
     while (rx_virtq.used_head != rx_virtq.used->idx) {
         /*
          * The following barrier orders the following reads from the descriptor to be after
          * the read to the 'idx' field of the virt queue.
          */
         rrmb();
+        cache_clean_and_invalidate(&rx_virtq.used->ring[0], &rx_virtq.used->ring[rx_virtq.num]);
         uint32_t hdr_idx = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].id;
         uint32_t len = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].len;
 
@@ -205,8 +210,12 @@ static void tx_provide(void)
             tx_virtq.desc[buffer_idx].len = buffer.len;
             tx_virtq.desc[buffer_idx].flags = 0;
 
+            cache_clean_and_invalidate(&tx_virtq.desc[0], &tx_virtq.desc[tx_virtq.num]);
+
             /* Insert the header into the available ring */
             tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = hdr_idx;
+
+            cache_clean_and_invalidate(&tx_virtq.avail->ring[0], &tx_virtq.avail->ring[tx_virtq.num]);
 
             /* Ensure all writes to the descriptor are ordered before we set the flags
             * that makes hardware aware of this slot.
@@ -235,12 +244,14 @@ static void tx_provide(void)
 static void tx_return(void)
 {
     bool transferred = false;
+    cache_clean_and_invalidate(&tx_virtq.used->ring[0], &tx_virtq.used->ring[tx_virtq.num]);
     while (tx_virtq.used_head != tx_virtq.used->idx) {
         /*
          * The following barrier orders the following reads from the descriptor to be after
          * the read to the 'idx' field of the virt queue.
          */
         rrmb();
+        cache_clean_and_invalidate(&tx_virtq.used->ring[0], &tx_virtq.used->ring[tx_virtq.num]);
         uint32_t hdr_idx = tx_virtq.used->ring[tx_virtq.used_head % tx_virtq.num].id;
 
         /* Extract the buffer index from the header */
