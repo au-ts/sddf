@@ -64,7 +64,7 @@ static inline bool hw_tx_ring_empty(void)
 
 static inline bool hw_tx_ring_full(void)
 {
-    return device.tx_tail - device.tx_head == NUM_TX_DESCS;
+    return (device.tx_tail + 1) % NUM_TX_DESCS == device.tx_head;
 }
 
 static inline bool hw_rx_ring_empty(void)
@@ -74,7 +74,7 @@ static inline bool hw_rx_ring_empty(void)
 
 static inline bool hw_rx_ring_full(void)
 {
-    return device.rx_tail - device.rx_head == NUM_RX_DESCS;
+    return (device.rx_tail + 1) % NUM_RX_DESCS == device.rx_head;
 }
 
 void clear_interrupts(void)
@@ -154,16 +154,15 @@ void rx_provide(void)
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
 
-            uint32_t idx = device.rx_tail % NUM_RX_DESCS;
-            volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[idx];
+            volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
             // Section 7.1.5.2.2 - We need a local copy becasue RX descriptor
             // does not contain the address at write-back phase.
-            device.rx_descr_mdata[idx] = buffer;
+            device.rx_descr_mdata[device.rx_tail] = buffer;
 
-            device.rx_tail++;
+            device.rx_tail = (device.rx_tail + 1) % NUM_RX_DESCS;
             provided = true;
         }
 
@@ -191,8 +190,7 @@ static void rx_return(void)
 {
     bool packets_transferred = false;
     while (!hw_rx_ring_empty()) {
-        uint32_t idx = device.rx_head % NUM_RX_DESCS;
-        ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[idx].wb;
+        ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) {
             // The desciptor hasn't been used by hardware, implying no more available packets received
             break;
@@ -206,13 +204,13 @@ static void rx_return(void)
         // The access to `status_error` field should be ordered before the access to the `length` field
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = device.rx_descr_mdata[idx];
+        net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
         buffer.len = desc.upper.length;
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
         packets_transferred = true;
-        device.rx_head++;
+        device.rx_head = (device.rx_head + 1) % NUM_RX_DESCS;
     }
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
@@ -233,17 +231,16 @@ void tx_provide(void)
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
-            uint32_t idx = device.tx_tail % NUM_RX_DESCS;
-            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[idx];
+            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
             desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
                                     | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
             desc->read.olinfo_status = ((uint32_t)buffer.len << IXGBE_ADVTXD_PAYLEN_SHIFT);
 
             // Section 7.2.3.2.3 - same reason with Rx descriptors to have a local copy
-            device.tx_descr_mdata[idx] = buffer;
+            device.tx_descr_mdata[device.tx_tail] = buffer;
 
-            device.tx_tail++;
+            device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
             provided = true;
         }
 
@@ -268,18 +265,17 @@ void tx_return(void)
     bool enqueued = false;
     while (!hw_tx_ring_empty()) {
         /* Ensure that this buffer has been sent by the device */
-        uint32_t idx = device.tx_head % NUM_RX_DESCS;
-        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[idx].wb;
+        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
 
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
             break;
 
-        net_buff_desc_t descr_mdata = device.tx_descr_mdata[idx];
+        net_buff_desc_t descr_mdata = device.tx_descr_mdata[device.tx_head];
         int err = net_enqueue_free(&tx_queue, descr_mdata);
         assert(!err);
         enqueued = true;
 
-        device.tx_head++;
+        device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
     }
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
@@ -494,12 +490,13 @@ void notified(microkit_channel ch)
         if (ch == 16) {
             // read-to-clear
             uint32_t cause = eth_regs->eicr;
+            if (cause & BIT(TX_IRQ_VECTOR)) {
+                tx_return();
+                tx_provide();
+            }
             if (cause & BIT(RX_IRQ_VECTOR)) {
                 rx_return();
                 rx_provide();
-            } else if (cause & BIT(TX_IRQ_VECTOR)) {
-                tx_return();
-                tx_provide();
             }
 
             /*
