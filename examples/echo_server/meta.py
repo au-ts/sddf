@@ -16,8 +16,12 @@ from board import BOARDS, add_x86_hpet
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
+CNode = SystemDescription.CNode
 Map = SystemDescription.Map
+CapMap = SystemDescription.CapMap
+BootInfo = SystemDescription.BootInfo
 Channel = SystemDescription.Channel
+IrqIoapic = SystemDescription.IrqIoapic
 
 
 """
@@ -151,6 +155,59 @@ class BenchmarkConfig:
             num_pmu_events,
         )
 
+class AcpiTablesConfig:
+    def __init__(
+        self,
+        max_total_size: int,
+    ):
+        self.max_total_size = max_total_size
+        self.patched_tables_end = 0
+        self.alignment = 0x1000
+        self.max_num_acpi_tables = 20 # This needs to be synced with MAX_NUM_ACPI_TABLES in acpi.h
+        self.num_tables = 0
+        self.acpi_table_bytes = bytearray()
+        self.acpi_table_pointers = [0] * self.max_num_acpi_tables
+
+    # TODO: add the checks
+    def add_acpi_table(self, acpi_file):
+        acpi_file = "/Users/terrybai/tmp/acpi_vb105/vb105_acpi/" + acpi_file + ".dat"
+        print(acpi_file)
+        assert os.path.isfile(acpi_file)
+        with open(acpi_file, "rb") as data_file:
+            byte_list = list(data_file.read())
+
+            if len(byte_list) + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_pointers[self.num_tables] = len(self.acpi_table_bytes)
+                self.acpi_table_bytes.extend(byte_list)
+                self.patched_tables_end = len(self.acpi_table_bytes)
+                self.num_tables += 1
+
+        trailing_len = len(self.acpi_table_bytes) % self.alignment
+        if trailing_len != 0:
+            padding_len = self.alignment - trailing_len
+            if padding_len + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_bytes.extend(b"\x00" * padding_len)
+
+    def tables_serialise(self):
+        pack_str = "<" + "B" * len(self.acpi_table_bytes)
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_bytes
+        )
+
+    def summary_serialise(self):
+        pack_str = "<" + "Q" * self.max_num_acpi_tables + "QQII"
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_pointers,
+            self.patched_tables_end,
+            self.max_total_size,
+            self.alignment,
+            self.num_tables,
+        )
+
 
 # Adds ".elf" to elf strings
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
@@ -190,6 +247,7 @@ def generate(
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
     pmu_event_ids: List[int],
+    net_need_timer: bool,
 ):
     uart_node = None
     ethernet_node = None
@@ -202,14 +260,59 @@ def generate(
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
+    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=200, stack_size=0x5000)
+    pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=199)
+
+    acpi_tables_config = AcpiTablesConfig(0x500000)
+    # acpi_tables_config.add_acpi_table("mcfg")
+    # acpi_tables_config.add_acpi_table("dsdt")
+    # for i in range(1, 18):
+    #     acpi_tables_config.add_acpi_table("ssdt" + str(i))
+
+    acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
+    acpi_driver.add_boot_info(BootInfo("rsdp"))
+
+    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 9)
+    sdf.add_cnode(cnode_remaining_untypeds)
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
+
+    cnode_pci_resources = CNode("pci_resources", False, 8)
+    sdf.add_cnode(cnode_pci_resources)
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
+
+    mr_aml_object_pool = MemoryRegion(sdf, "aml_object_pool", 0x100000)
+    sdf.add_mr(mr_aml_object_pool)
+    acpi_driver.add_map(Map(mr_aml_object_pool, 0x30000000, "rw"))
+
+    mr_aml_state_stack = MemoryRegion(sdf, "aml_state_stack", 0x10000)
+    sdf.add_mr(mr_aml_state_stack)
+    acpi_driver.add_map(Map(mr_aml_state_stack, 0x50000000, "rw"))
+
+    mr_acpi_tables_copy = MemoryRegion(sdf, "acpi_tables_copy", 0x50000)
+    sdf.add_mr(mr_acpi_tables_copy)
+    acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
+
+    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x20000)
+    sdf.add_mr(mr_pci_resources)
+    acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+    pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+
+    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
+
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=253, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     if board.arch == SystemDescription.Arch.X86_64:
         add_x86_hpet(sdf, timer_driver)
 
+    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=99
+    )
     uart_driver = ProtectionDomain(
         "serial_driver",
         "serial_driver.elf",
@@ -234,7 +337,8 @@ def generate(
     )
 
     if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
+        print("board: ", board)
+        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
         uart_driver.add_ioport(serial_port)
 
     ethernet_driver = ProtectionDomain(
@@ -273,22 +377,19 @@ def generate(
         sdf.add_mr(mbox)
         ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        hw_net_rings = SystemDescription.MemoryRegion(
-            sdf, "hw_net_rings", 65536, paddr=0x7A000000
-        )
+    if board.name == "qemu_virt_x86":
+        hw_net_rings = MemoryRegion(sdf, "hw_net_rings", 65536, paddr=0x7A000000)
         sdf.add_mr(hw_net_rings)
-        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
-        ethernet_driver.add_map(hw_net_rings_map)
+        ethernet_driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
 
-        virtio_net_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
-        )
-        sdf.add_mr(virtio_net_regs)
-        virtio_net_regs_map = SystemDescription.Map(
-            virtio_net_regs, 0x6000_0000, "rw", cached=False
-        )
-        ethernet_driver.add_map(virtio_net_regs_map)
+        # virtio_net_regs = SystemDescription.MemoryRegion(
+        #     sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        # )
+        # sdf.add_mr(virtio_net_regs)
+        # virtio_net_regs_map = SystemDescription.Map(
+        #     virtio_net_regs, 0x6000_0000, "rw", cached=False
+        # )
+        # ethernet_driver.add_map(virtio_net_regs_map)
 
         virtio_net_irq = SystemDescription.IrqIoapic(
             ioapic_id=0, pin=11, vector=1, id=16
@@ -300,6 +401,61 @@ def generate(
 
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
+
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, ethernet_driver, None, 2))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, ethernet_driver, None, 3))
+    sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
+
+    if board.name == "vb_105":
+        # ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
+        # sdf.add_mr(ecam_mr)
+        # ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
+
+        # eth_region_0 = MemoryRegion(
+        #     sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
+        # )
+        # sdf.add_mr(eth_region_0)
+        # ethernet_driver.add_map(
+        #     Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
+        # )
+
+        hw_rx_ring_buffer = MemoryRegion(
+            sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
+        )
+        sdf.add_mr(hw_rx_ring_buffer)
+        ethernet_driver.add_map(Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw", cached=False))
+
+        hw_tx_ring_buffer = MemoryRegion(
+            sdf, name="hw_tx_ring_buffer", size=0x4000, paddr=0x10004000
+        )
+        sdf.add_mr(hw_tx_ring_buffer)
+        ethernet_driver.add_map(Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw", cached=False))
+
+        # MSI
+        # eth_irq = SystemDescription.IrqMsi(
+        #     pci_bus=65, pci_device=0, pci_func=0, vector=1, handle=0
+        # )
+
+        # MSI-X
+        # eth_msix_table = MemoryRegion(
+        #     sdf, name="eth_msix_table", size=0x8000, paddr=0x6000e04000
+        # )
+        # sdf.add_mr(eth_msix_table)
+        # ethernet_driver.add_map(
+        #     Map(eth_msix_table, vaddr=0x4000000, perms="rw")
+        # )
+        # eth_irq = SystemDescription.IrqMsi(
+        #     pci_bus=65, pci_device=0, pci_func=0, vector=2, handle=0
+        # )
+
+        # Legacy I/O APIC
+        eth_irq = IrqIoapic(ioapic_id=0,
+                            pin=16,
+                            vector=8,
+                            trigger=IrqIoapic.Trigger.LEVEL,
+                            polarity=IrqIoapic.Polarity.ACTIVELOW,
+                            id=16)
+        ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
@@ -343,6 +499,9 @@ def generate(
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
+    if net_need_timer:
+        print("need a timer")
+        timer_system.add_client(ethernet_driver)
     net_system.add_client_with_copier(client0, client0_net_copier)
     net_system.add_client_with_copier(client1, client1_net_copier)
 
@@ -351,6 +510,8 @@ def generate(
 
     # Echo server protection domains
     child_pds = [
+        acpi_driver,
+        pci_driver,
         uart_driver,
         serial_virt_tx,
         ethernet_driver,
@@ -489,6 +650,14 @@ def generate(
             "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
         )
 
+    with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
+        f.write(acpi_tables_config.summary_serialise())
+    update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
+
+    with open(f"{output_dir}/acpi_tables.data", "wb+") as f:
+        f.write(acpi_tables_config.tables_serialise())
+    update_elf_section("acpi_driver.elf", "acpi_tables", "acpi_tables")
+
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
     update_elf_section(
@@ -562,6 +731,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
     parser.add_argument("--bench_pmu_events", required=False)
@@ -618,4 +788,4 @@ if __name__ == "__main__":
 
         pmu_event_ids.append(bench_pmu_events[pmu_events[i]][0])
 
-    generate(args.sdf, args.output, dtb, get_core, pmu_event_ids)
+    generate(args.sdf, args.output, dtb, get_core, pmu_event_ids, args.need_timer)
