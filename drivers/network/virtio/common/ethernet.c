@@ -107,17 +107,20 @@ static void rx_provide(void)
             rx_virtq.desc[buffer_idx].len = NET_BUFFER_SIZE;
             rx_virtq.desc[buffer_idx].flags = VIRTQ_DESC_F_WRITE;
 
-            cache_clean_and_invalidate(&rx_virtq.desc[0], &rx_virtq.desc[rx_virtq.num]);
+            cache_clean_and_invalidate(&rx_virtq.desc[hdr_idx], &rx_virtq.desc[hdr_idx+1]);
+            cache_clean_and_invalidate(&rx_virtq.desc[buffer_idx], &rx_virtq.desc[buffer_idx+1]);
 
             /* Insert the header into the available ring */
-            rx_virtq.avail->ring[rx_virtq.avail->idx % rx_virtq.num] = hdr_idx;
-            cache_clean_and_invalidate(&rx_virtq.avail[0], &rx_virtq.avail[rx_virtq.num]);
+            uint32_t avail_idx = rx_virtq.avail->idx % rx_virtq.num;
+            rx_virtq.avail->ring[avail_idx] = hdr_idx;
+            cache_clean_and_invalidate(&rx_virtq.avail[avail_idx], &rx_virtq.avail[avail_idx+1]);
 
             /* Ensure all writes to the descriptor are ordered before we set the flags
             * that makes hardware aware of this slot.
             */
             wwmb();
             rx_virtq.avail->idx++;
+            cache_clean_and_invalidate(&rx_virtq.avail->idx, &rx_virtq.avail->idx+1);
             transferred = true;
         }
 
@@ -141,20 +144,23 @@ static void rx_return(void)
     /* Extract RX buffers from the 'used' and pass them up to the client by putting them
      * in our sDDF 'active' queues. */
     bool transferred = false;
-    cache_clean_and_invalidate(&rx_virtq.used->ring[0], &rx_virtq.used->ring[rx_virtq.num]);
+    cache_clean_and_invalidate(&rx_virtq.used->idx, &rx_virtq.used->idx + 1);
     while (rx_virtq.used_head != rx_virtq.used->idx) {
         /*
          * The following barrier orders the following reads from the descriptor to be after
          * the read to the 'idx' field of the virt queue.
          */
         rrmb();
-        cache_clean_and_invalidate(&rx_virtq.used->ring[0], &rx_virtq.used->ring[rx_virtq.num]);
-        uint32_t hdr_idx = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].id;
-        uint32_t len = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].len;
+
+        uint32_t used_idx = rx_virtq.used_head % rx_virtq.num;
+        cache_clean_and_invalidate(&rx_virtq.used->ring[used_idx], &rx_virtq.used->ring[used_idx+1]);
+        uint32_t hdr_idx = rx_virtq.used->ring[used_idx].id;
+        uint32_t len = rx_virtq.used->ring[used_idx].len;
 
         /* Extract the buffer index from the header */
         assert(rx_virtq.desc[hdr_idx].flags & VIRTQ_DESC_F_NEXT);
         uint32_t buffer_idx = rx_virtq.desc[hdr_idx].next;
+        cache_clean_and_invalidate(&rx_virtq.used->ring[buffer_idx], &rx_virtq.used->ring[buffer_idx+1]);
 
         /* Length in header include virtIO header length as well */
         len -= sizeof(virtio_net_hdr_t);
