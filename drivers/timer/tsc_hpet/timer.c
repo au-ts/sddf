@@ -97,19 +97,6 @@ uint64_t tsc_freq = 0;
 uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;
 
-static inline uint64_t rdtsc(void)
-{
-    uint32_t lo, hi, unused;
-    __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(unused));
-    __asm__ __volatile__("lfence" ::: "memory");
-    return ((uint64_t)hi << 32) | lo;
-}
-
-static inline void cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d)
-{
-    __asm__ __volatile__("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "a"(leaf), "c"(subleaf));
-}
-
 uint64_t get_hpet_ticks(void)
 {
     return *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
