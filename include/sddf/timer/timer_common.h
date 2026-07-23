@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#pragma once
 #include <stdint.h>
-#include <sddf/timer/timer_driver.h>
-#include <sddf/timer/config.h>
-#include <sddf/util/util.h>
+#include <sddf/timer/protocol.h>
+#include <sddf/util/si_units.h>
+
+/* Header-only time-conversion helpers shared between timer drivers and clients. */
 
 // Time conversion functions
 #define ONE_GHZ ((sddf_timer_freq_hz_t) (1ULL * GIGA))
@@ -74,7 +76,7 @@ static inline uint64_t period_transform(uint64_t period, uint64_t target_freq, u
 /**
  *  Convert some number of `ticks` @ `freq` to nanoseconds.
  */
-uint64_t ticks_to_ns(uint64_t ticks, sddf_timer_freq_hz_t freq)
+static inline uint64_t ticks_to_ns(uint64_t ticks, sddf_timer_freq_hz_t freq)
 {
     return period_transform(ticks, ONE_GHZ, freq);
 }
@@ -82,7 +84,7 @@ uint64_t ticks_to_ns(uint64_t ticks, sddf_timer_freq_hz_t freq)
 /**
  *  Convert a time in `ns` to ticks @ `freq`.
  */
-uint64_t ns_to_ticks(uint64_t ns, sddf_timer_freq_hz_t freq)
+static inline uint64_t ns_to_ticks(uint64_t ns, sddf_timer_freq_hz_t freq)
 {
     return period_transform(ns, freq, ONE_GHZ);
 }
@@ -91,10 +93,10 @@ uint64_t ns_to_ticks(uint64_t ns, sddf_timer_freq_hz_t freq)
 
 /**
  *  Convert a time in `ns` to ticks @ `freq`, with a log2 prescaler value (like typically
- *  used by hardware when setting prescaler regs). See `timer_common.c:find_true_freq` for more
+ *  used by hardware when setting prescaler regs). See `find_true_freq` above for more
  *  details.
  */
-uint64_t ticks_to_ns_prescaled(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t freq)
+static inline uint64_t ticks_to_ns_prescaled(uint64_t ticks, uint64_t prescaler, sddf_timer_freq_hz_t freq)
 {
     sddf_timer_freq_hz_t true_freq = find_true_freq(freq, prescaler);
     return ticks_to_ns(ticks, true_freq);
@@ -102,10 +104,10 @@ uint64_t ticks_to_ns_prescaled(uint64_t ticks, uint64_t prescaler, sddf_timer_fr
 
 /**
  *  Convert a time in `ns` to ticks @ `freq`, with a log2 prescaler value (like typically
- *  used by hardware when setting prescaler regs). See `timer_common.c:find_true_freq` for more
+ *  used by hardware when setting prescaler regs). See `find_true_freq` above for more
  *  details.
  */
-uint64_t ns_to_ticks_prescaled(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t freq)
+static inline uint64_t ns_to_ticks_prescaled(uint64_t ns, uint64_t prescaler, sddf_timer_freq_hz_t freq)
 {
     sddf_timer_freq_hz_t true_freq = find_true_freq(freq, prescaler);
     return ns_to_ticks(ns, true_freq);
