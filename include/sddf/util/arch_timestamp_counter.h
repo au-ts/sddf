@@ -9,14 +9,6 @@
 #include <stdbool.h>
 #include <microkit.h>
 
-#if defined(CONFIG_ARCH_X86)
-bool is_intel_cpu(void);
-/* On intel x86 if the TSC is not invariant then if the processor is put into sleep states or is overclocked then the
- * result of reading it may be invalid.
- */
-bool is_invariant_tsc(void);
-#endif //x86 specific helper functions
-
 /*
  * Return the current architecture counter value.
  *
@@ -25,7 +17,13 @@ bool is_invariant_tsc(void);
  * and the risc-v is the mapping of the ARM barriers from https://docs.riscv.org/reference/isa/unpriv/mm-eplan.html#armmappings
  */
 uint64_t read_counter(void);
-/* This may return 0 if frequency was not available */
+
+/**
+ * Return the current architecture counter frequency.
+ *
+ * Returns a nonzero frequency iff the counter is a trustworthy, invariant
+ * clocksource with detectable frequency, or 0 otherwise.
+ */
 uint64_t read_freq(void);
 
 #if defined(CONFIG_ARCH_RISCV)
