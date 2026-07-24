@@ -1,5 +1,5 @@
 /*
- * Copyright 2025, UNSW
+ * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -23,12 +23,9 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/ialloc.h>
-#include <sddf/virtio/transport/common.h>
-#include <sddf/virtio/transport/pci.h>
-#include <sddf/virtio/queue.h>
-#include <sddf/virtio/feature.h>
+#include <sddf/virtio/virtio.h>
+#include <sddf/virtio/virtio_queue.h>
 #include <sddf/resources/device.h>
-#include <sddf/pci/conf_space.h>
 
 #include "ethernet.h"
 
@@ -73,7 +70,7 @@ uintptr_t virtio_net_tx_headers_paddr;
 uintptr_t virtio_net_rx_headers_paddr;
 virtio_net_hdr_t *virtio_net_tx_headers;
 
-virtio_device_handle_t dev;
+volatile virtio_mmio_regs_t *regs;
 
 ialloc_t rx_ialloc_desc;
 uint32_t rx_descriptors[RX_COUNT];
@@ -146,7 +143,7 @@ static void rx_provide(void)
 
     if (transferred) {
         /* We have added more avail buffers, so notify the device */
-        virtio_transport_queue_notify(&dev, VIRTIO_NET_RX_QUEUE);
+        regs->QueueNotify = VIRTIO_NET_RX_QUEUE;
     }
 }
 
@@ -158,6 +155,7 @@ static void rx_return(void)
     uint16_t i = rx_last_seen_used;
     uint16_t curr_idx = rx_virtq.used->idx;
     while (i != curr_idx) {
+        LOG_DRIVER("i: 0x%lx\n", i);
         struct virtq_used_elem hdr_used = rx_virtq.used->ring[i % rx_virtq.num];
         assert(rx_virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
@@ -187,6 +185,7 @@ static void rx_return(void)
     rx_last_seen_used += packets_transferred;
 
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
+        LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
         sddf_notify(config.virt_rx.id);
     }
@@ -247,7 +246,7 @@ static void tx_provide(void)
     if (packets_transferred) {
         /* Finally, need to notify the queue if we have transferred data */
         /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
-        virtio_transport_queue_notify(&dev, VIRTIO_NET_TX_QUEUE);
+        regs->QueueNotify = VIRTIO_NET_TX_QUEUE;
     }
 }
 
@@ -294,10 +293,10 @@ static void tx_return(void)
 
 static void handle_irq()
 {
-    uint32_t irq_status = virtio_transport_read_isr(&dev);
-    if (irq_status & VIRTIO_IRQ_VQUEUE) {
+    uint32_t irq_status = regs->InterruptStatus;
+    if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         // ACK the interrupt first before handling responses
-        virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
+        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
 
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
@@ -306,42 +305,61 @@ static void handle_irq()
         rx_return();
     }
 
-    if (irq_status & VIRTIO_IRQ_CONFIG) {
+    if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
         LOG_DRIVER_ERR("ETH|ERROR: unexpected change in configuration %u\n", irq_status);
     }
 }
 
 static void eth_setup(void)
 {
-    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_NET));
+    // Do MMIO device init (section 4.2.3.1)
+    if (!virtio_mmio_check_magic(regs)) {
+        LOG_DRIVER_ERR("invalid virtIO magic value!\n");
+        assert(false);
+    }
+
+    if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
+        LOG_DRIVER_ERR("not correct virtIO version!\n");
+        assert(false);
+    }
+
+    if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_NET)) {
+        LOG_DRIVER_ERR("not a virtIO network device!\n");
+        assert(false);
+    }
+
+    LOG_DRIVER("version: 0x%x\n", virtio_mmio_version(regs));
 
     // Do normal device initialisation (section 3.2)
 
     // First reset the device
-    virtio_transport_set_status(&dev, 0);
+    regs->Status = 0;
+
     // Set the ACKNOWLEDGE bit to say we have noticed the device
-    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
+    regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
     // Set the DRIVER bit to say we know how to drive the device
-    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
+    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
 
 #ifdef DEBUG_DRIVER
-    uint32_t feature_low = virtio_transport_get_device_features(&dev, 0);
-    uint32_t feature_high = virtio_transport_get_device_features(&dev, 1);
+    uint32_t feature_low = regs->DeviceFeatures;
+    regs->DeviceFeaturesSel = 1;
+    uint32_t feature_high = regs->DeviceFeatures;
     uint64_t feature = feature_low | ((uint64_t)feature_high << 32);
     virtio_net_print_features(feature);
 #endif
 
-    virtio_transport_set_driver_features(&dev, 0, VIRTIO_NET_F_MAC);
-    virtio_transport_set_driver_features(&dev, 1, VIRTIO_F_VERSION_1);
+    regs->DriverFeatures = VIRTIO_NET_F_MAC;
+    regs->DriverFeaturesSel = 1;
+    regs->DriverFeatures = VIRTIO_F_VERSION_1;
 
-    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_FEATURES_OK);
+    regs->Status = VIRTIO_DEVICE_STATUS_FEATURES_OK;
 
-    if (!(virtio_transport_get_status(&dev) & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
+    if (!(regs->Status & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
         LOG_DRIVER_ERR("device status features is not OK!\n");
         return;
     }
 
-    volatile virtio_net_config_t *config = (virtio_net_config_t *)virtio_transport_get_device_config(&dev);
+    volatile virtio_net_config_t *config = (virtio_net_config_t *)regs->Config;
 #ifdef DEBUG_DRIVER
     virtio_net_print_config(config);
 #endif
@@ -374,10 +392,18 @@ static void eth_setup(void)
     assert((uintptr_t)tx_virtq.avail % 2 == 0);
     assert((uintptr_t)tx_virtq.used % 4 == 0);
 
+    sddf_dprintf("The initial values for our stuff is: %d, %d, %d, %d", (rx_virtq.used)->idx, (tx_virtq.used)->idx, (rx_virtq.avail)->idx, (tx_virtq.avail)->idx);
+
+    // reset the index so that the ethernet driver can reload
+    (rx_virtq.used)->idx = 0;
+    (tx_virtq.used)->idx = 0;
+    (rx_virtq.avail)->idx = 0;
+    (tx_virtq.avail)->idx = 0;
+
     /* Virtio TX headers will proceed the virtq structures. Then RX headers. */
     virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + virtq_size;
     virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + virtq_size;
-    virtio_net_tx_headers = (virtio_net_hdr_t *)virtio_net_tx_headers_vaddr;
+    virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
     size_t tx_headers_size = ((TX_COUNT / 2) * sizeof(virtio_net_hdr_t));
     virtio_net_rx_headers_paddr = virtio_net_tx_headers_paddr + tx_headers_size;
     size_t rx_headers_size = ((RX_COUNT / 2) * sizeof(virtio_net_hdr_t));
@@ -388,12 +414,28 @@ static void eth_setup(void)
     tx_provide();
 
     // Setup RX queue first
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_RX_QUEUE, RX_COUNT, hw_ring_buffer_paddr + rx_desc_off,
-                                        hw_ring_buffer_paddr + rx_avail_off, hw_ring_buffer_paddr + rx_used_off));
+    assert(regs->QueueNumMax >= RX_COUNT);
+    regs->QueueSel = VIRTIO_NET_RX_QUEUE;
+    regs->QueueNum = RX_COUNT;
+    regs->QueueDescLow = (hw_ring_buffer_paddr + rx_desc_off) & 0xFFFFFFFF;
+    regs->QueueDescHigh = (hw_ring_buffer_paddr + rx_desc_off) >> 32;
+    regs->QueueDriverLow = (hw_ring_buffer_paddr + rx_avail_off) & 0xFFFFFFFF;
+    regs->QueueDriverHigh = (hw_ring_buffer_paddr + rx_avail_off) >> 32;
+    regs->QueueDeviceLow = (hw_ring_buffer_paddr + rx_used_off) & 0xFFFFFFFF;
+    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + rx_used_off) >> 32;
+    regs->QueueReady = 1;
 
     // Setup TX queue
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_TX_QUEUE, TX_COUNT, hw_ring_buffer_paddr + tx_desc_off,
-                                        hw_ring_buffer_paddr + tx_avail_off, hw_ring_buffer_paddr + tx_used_off));
+    assert(regs->QueueNumMax >= TX_COUNT);
+    regs->QueueSel = VIRTIO_NET_TX_QUEUE;
+    regs->QueueNum = TX_COUNT;
+    regs->QueueDescLow = (hw_ring_buffer_paddr + tx_desc_off) & 0xFFFFFFFF;
+    regs->QueueDescHigh = (hw_ring_buffer_paddr + tx_desc_off) >> 32;
+    regs->QueueDriverLow = (hw_ring_buffer_paddr + tx_avail_off) & 0xFFFFFFFF;
+    regs->QueueDriverHigh = (hw_ring_buffer_paddr + tx_avail_off) >> 32;
+    regs->QueueDeviceLow = (hw_ring_buffer_paddr + tx_used_off) & 0xFFFFFFFF;
+    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + tx_used_off) >> 32;
+    regs->QueueReady = 1;
 
     // Set the MAC address
     config->mac[0] = 0x52;
@@ -404,29 +446,23 @@ static void eth_setup(void)
     config->mac[5] = 0x07;
 
     // Set the DRIVER_OK status bit
-    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER_OK);
-    virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
+    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER_OK;
+    regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
 }
 
 void init(void)
 {
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
-
-// @billn fix ridiculousness
-#if !defined(CONFIG_ARCH_X86_64)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 2);
-#endif
 
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    hw_ring_buffer_vaddr = 0x70000000;
-    hw_ring_buffer_paddr = 0x7a000000;
-#else
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
+    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
-#endif
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
@@ -436,33 +472,12 @@ void init(void)
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
                    config.virt_tx.num_buffers);
 
-    dev.pci_bus = 0;
-    dev.pci_dev = 2;
-    dev.pci_func = 0;
-    dev.pci_class_code = PCI_CLASS_NETWORK_CONTROLLER;
-    dev.pci_subclass = PCI_CLASS_NETWORK_SUBCLASS_ETHERNET;
-    dev.pci_vendor_id = VIRTIO_PCI_VEN_ID;
-    dev.pci_device_id = VIRTIO_NET_PCI_DEV_ID;
-
     eth_setup();
-
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    sddf_irq_ack(16);
-#else
-    sddf_irq_ack(device_resources.irqs[0].id);
-#endif
 }
 
 void notified(sddf_channel ch)
 {
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    if (ch == 16) {
-#else
     if (ch == device_resources.irqs[0].id) {
-#endif
-
         handle_irq();
         sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
