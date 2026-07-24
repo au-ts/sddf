@@ -51,14 +51,14 @@ static inline void cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *a, uint32_t 
     asm volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "a"(leaf), "c"(subleaf));
 }
 
-bool is_intel_cpu(void)
+static bool is_intel_cpu(void)
 {
     uint32_t a, b, c, d;
     cpuid(CPUID_VENDOR_ID_LEAF, 0, &a, &b, &c, &d);
     return b == CPUID_VENDOR_ID_INTEL_EBX && d == CPUID_VENDOR_ID_INTEL_EDX && c == CPUID_VENDOR_ID_INTEL_ECX;
 }
 
-bool is_invariant_tsc(void)
+static bool is_invariant_tsc(void)
 {
     /* [1] page "Vol. 2A 3-245" */
     /* Check "Maximum Input Value for Extended Function CPUID Information." */
@@ -142,8 +142,7 @@ uint64_t read_counter(void)
 }
 
 static bool checked_tsc_frequency = false;
-static bool cached_frequency = false;
-static uint64_t cached_tsc_frequency;
+static uint64_t cached_tsc_frequency = 0;
 /*
  * On x86 calculating the frequency of the tsc uses cpuid which is a serialising instruction
  * https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://cdrdv2-public.intel.com/789589/334569-sdm-vol-2d.pdf&ved=2ahUKEwi4qufojomVAxUPUPUHHVNyElwQFnoECB0QAQ&usg=AOvVaw2qnfp2RSVGg-7BJcEpfHIn
@@ -155,16 +154,22 @@ static uint64_t cached_tsc_frequency;
 uint64_t read_freq(void)
 {
     if (!checked_tsc_frequency) {
-        if (is_invariant_tsc()) {
+        /* We only trust the TSC as a clocksource on an Intel CPU with an invariant TSC.
+         *
+         * On a non-Intel CPU it can be measured, but the measurement procedure is
+         * complicated if we want to be accurate. See `quick_pit_calibrate()` or
+         * `pit_hpet_ptimer_calibrate_cpu()` in Linux arch/x86/kernel/tsc.c.
+         *
+         * A non-invariant TSC can change frequency dynamically, so it cannot be used
+         * as a reliable clocksource. In both cases we report a frequency of 0 and the
+         * caller falls back to another timer.
+         */
+        if (is_intel_cpu() && is_invariant_tsc()) {
             cached_tsc_frequency = get_tsc_frequency();
-            cached_frequency = true;
         }
         checked_tsc_frequency = true;
     }
-    if (likely(cached_frequency)) {
-        return cached_tsc_frequency;
-    }
-    return get_tsc_frequency();
+    return cached_tsc_frequency;
 }
 
 #elif defined(CONFIG_ARCH_AARCH64)

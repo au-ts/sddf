@@ -189,30 +189,19 @@ void init(void)
     microkit_deferred_irq_ack(IRQ_CH);
 
     /* Detect TSC */
-    if (!is_intel_cpu()) {
-        LOG_TIMER_DRIVER_ERR("Not an Intel CPU, can't detect TSC frequency, expect performance degradation.\n");
-        /* It can be measured, but the measurement procedure is complicated if we want to be accurate.
-           See `quick_pit_calibrate()` or `pit_hpet_ptimer_calibrate_cpu()` in Linux arch/x86/kernel/tsc.c */
+    tsc_freq = read_freq();
+    if (!tsc_freq) {
+        LOG_TIMER_DRIVER_ERR("Cannot detect or use TSC frequency, expect performance degradation.\n");
+        /* Because SDDF_TIMER_GET_TIME calls will go to the HPET rather than from the TSC.
+         * Which is very slow to read. See:
+         * https://docs.redhat.com/en/documentation/red_hat_enterprise_linux_for_real_time/7/html/reference_guide/chap-timestamping
+         * Their benchmark is reading the timestamp 10,000,000 times.
+         * TSC took 0.601s, HPET took 12.263s!
+         */
     } else {
-        if (!is_invariant_tsc()) {
-            LOG_TIMER_DRIVER_ERR("Invariant TSC not supported, expect performance degradation.\n");
-            /* Because SDDF_TIMER_GET_TIME calls will go to the HPET rather than from the TSC.
-             * Which is very slow to read. See:
-             * https://docs.redhat.com/en/documentation/red_hat_enterprise_linux_for_real_time/7/html/reference_guide/chap-timestamping
-             * Their benchmark is reading the timestamp 10,000,000 times.
-             * TSC took 0.601s, HPET took 12.263s!
-             */
-        } else {
-            tsc_freq = read_freq();
-            if (!tsc_freq) {
-                LOG_TIMER_DRIVER_ERR("cannot detect TSC frequency via cpuid, expect performance degradation.\n");
-                /* Because same reason as above. */
-            } else {
-                LOG_TIMER_DRIVER("using TSC as clocksource, HPET as clockevent\n");
-                /* Great! Can fastpath time read PPCs. But we still use the HPET for interrupts,
-                 * as seL4 uses already used the TSC interrupt mechanism (Local APIC timer) for scheduling. */
-            }
-        }
+        LOG_TIMER_DRIVER("using TSC as clocksource, HPET as clockevent\n");
+        /* Great! Can fastpath time read PPCs. But we still use the HPET for interrupts,
+         * as seL4 uses already used the TSC interrupt mechanism (Local APIC timer) for scheduling. */
     }
 }
 
