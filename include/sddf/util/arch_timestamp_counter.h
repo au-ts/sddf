@@ -1,13 +1,20 @@
 /*
- * Copyright 2022, UNSW
+ * Copyright 2026, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #pragma once
 
 #include <stdint.h>
-#include <stdbool.h>
-#include <microkit.h>
+
+/**
+ * Architecture counter accessors.
+ *
+ * Clients should use sddf_timer_time_now(), which uses these for a local
+ * fast-path when the counter is usable and otherwise falls back to a PPC
+ * into the timer driver. These raw accessors are exposed so that drivers
+ * may also use them.
+ */
 
 /*
  * Return the current architecture counter value.
@@ -25,12 +32,3 @@ uint64_t sddf_read_counter(void);
  * clocksource with detectable frequency, or 0 otherwise.
  */
 uint64_t sddf_read_freq(void);
-
-#if defined(CONFIG_ARCH_RISCV)
-#define COUNTER_UTIL_MAGIC_LEN 5
-static char COUNTER_UTIL_MAGIC[COUNTER_UTIL_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x4 };
-typedef struct riscv_timestamp_counter_config {
-    char magic[COUNTER_UTIL_MAGIC_LEN];
-    uint64_t frequency;
-} riscv_timestamp_counter_config_t;
-#endif
