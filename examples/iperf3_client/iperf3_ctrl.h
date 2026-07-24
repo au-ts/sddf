@@ -1,7 +1,3 @@
-/*
- * Copyright 2022, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
- */
 #ifndef IPERF3_CTRL_H
 #define IPERF3_CTRL_H
 
@@ -26,7 +22,6 @@ typedef struct iperf_ctrl {
     struct tcp_pcb *pcb;
     uint8_t cookie[IPERF3_COOKIE_LEN];
 
-    /* iperf3 server port (control + data), from the injected app config */
     uint16_t server_port;
 
     iperf3_stream_t streams[MAX_STREAMS];         /* TCP data streams */
@@ -37,10 +32,15 @@ typedef struct iperf_ctrl {
     uint32_t json_len;
     uint32_t json_rx;
 
+    uint8_t send_streams_accepted;
+    uint8_t rec_streams_accepted;
+
     uint8_t json_len_buf[4];
     uint8_t json_len_rx;
     uint8_t payload[PAYLOAD_SIZE];
     uint8_t result_json[65536];
+
+    uint8_t cookie_recv;
 
     uint8_t num_streams;
     uint64_t bytes_sent;
@@ -56,7 +56,7 @@ typedef struct iperf_ctrl {
 
     /* TCP-only: result JSON built at EXCHANGE_RESULTS */
     double cpu_util_percent;
-    char json_send_buf[512];
+    char json_send_buf[4096];
 
     uint32_t omit_ms;
     uint32_t omit_end_ms;
@@ -65,16 +65,27 @@ typedef struct iperf_ctrl {
     uint32_t duration_ms;
     uint32_t end_time_ms;
 
-    /* Runtime test parameters, set from the serial `start` command before the
-     * control connection is opened (see iperf3_begin_test in iperf3_client.c).
-     * These drive the param-exchange JSON and the per-stream rate limiting,
-     * replacing the old compile-time NUM_STREAMS / TARGET_BW_MBPS macros. */
+    /* is_reverse */
+    bool is_reverse;
+
+    /* is_bidirectional */
+    bool is_bidirectional;
+
     bool is_udp;             /* protocol for THIS test (runtime, from `start`) */
     uint32_t duration_s;     /* test duration in seconds */
     uint32_t omit_s;         /* warm-up (omit) seconds, excluded from results */
     uint32_t target_bw_mbps; /* per-test rate target, 0 = unlimited */
     uint16_t payload_len;    /* UDP datagram payload length (bytes) */
-    char param_json[256];    /* built param-exchange JSON */
+    char param_json[4096];    /* built param-exchange JSON */
+
+    /* role */
+    char role;
+
+    /* ctrl_set if ctrl established connection with opposite */
+    int8_t set;
+
+    /* listen prot_listen */
+    struct tcp_pcb *prot_listen;
 } iperf_ctrl_t;
 
 void iperf3_ctrl_init(iperf_ctrl_t *ctrl);
@@ -86,5 +97,14 @@ void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms);
 void iperf3_tcp_check_deadline(iperf_ctrl_t *ctrl, uint32_t now_ms);
 void iperf3_tcp_rtt_aggregate(iperf_ctrl_t *ctrl, uint32_t *o_min, uint32_t *o_mean,
                               uint32_t *o_max, uint32_t *o_sd, uint64_t *o_n);
+
+/* Server: count a data stream once its cookie is received; starts the test when
+ * all expected streams have arrived. Called from iperf3_server_stream_recv. */
+void iperf3_server_stream_ready(iperf_ctrl_t *ctrl);
+
+// server callbacks
+void iperf3_server_listen(iperf_ctrl_t *ctrl, uint32_t port);
+err_t iperf3_server_accept_ctrl(void *arg, struct tcp_pcb *new_pcb, err_t err);
+err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
 
 #endif

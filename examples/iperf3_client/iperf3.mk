@@ -48,27 +48,13 @@ CFLAGS += \
 
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
-# NUM_STREAMS / TARGET_BW_MBPS used to be compile-time; they are now runtime
-# arguments to the serial `start` command (ctrl.num_streams / ctrl.target_bw_mbps),
-# so no -D flags are needed for them anymore.
-
-# Both protocols are compiled into every image; the protocol is chosen at runtime
-# by the serial `start [tcp|udp] ...` command. PROTOCOL= only sets the default
-# used when the token is omitted (udp => -DIPERF3_DEFAULT_UDP).
-PROTOCOL ?= udp
-ifeq ($(PROTOCOL),udp)
-CFLAGS += -DIPERF3_DEFAULT_UDP
-endif
-
-# Note: SERVER_IP is still forwarded to meta.py (it injects per-client
-# app_config.server_ip/server_port). The old -DSERVER_IP_A..D compile-time
-# fallback was removed — the server address is now a runtime `start` argument.
+CFLAGS += -D'MJSON_REALLOC(p,s)=((void*)0)' -Dalloca=__builtin_alloca
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
-IPERF_OBJS := iperf3_client.o iperf3_ctrl.o iperf3_stream_tcp.o iperf3_stream_udp.o utilization_socket.o
+IPERF_OBJS := iperf3_client.o iperf3_ctrl.o iperf3_stream_tcp.o iperf3_stream_udp.o utilization_socket.o  mjson.o
 
 DEPS := $(IPERF_OBJS:.o=.d)
 
@@ -79,11 +65,8 @@ iperf3_client.elf: $(IPERF_OBJS) libsddf_util.a lib_sddf_lwip_iperf_client.a
 
 ${IMAGES}: libsddf_util_debug.a
 
-# meta.py performs all per-client and per-core benchmark objcopy (the number of
-# client/benchmark/idle ELFs varies with the core-allocation file). Only the
-# single-instance driver/virtualiser sections are patched here.
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	SERVER_IP=$(SERVER_IP) $(PYTHON)\
+	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
@@ -112,9 +95,8 @@ include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) $(QEMU_ARCH_ARGS) \
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
-		-device virtio-net-device,netdev=netdev0 \
 		-netdev user,id=netdev0 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors -smp 4
@@ -122,10 +104,7 @@ qemu: $(IMAGE_FILE)
 clean::
 	${RM} -f *.elf .depend* $
 	find . -name \*.[do] |xargs --no-run-if-empty rm
-	# lib_sddf_lwip.mk's clean only wipes the suffix-less lib_sddf_lwip_out/.
-	# We link the suffixed variant lib_sddf_lwip_iperf_client.a, whose objects
-	# live in lib_sddf_lwip_out_iperf_client/ and whose .a is only removed by
-	# clobber. Remove both here so lwipopts.h edits always take effect on rebuild.
+
 	${RM} -rf lib_sddf_lwip_out_iperf_client
 	${RM} -f lib_sddf_lwip_iperf_client.a
 

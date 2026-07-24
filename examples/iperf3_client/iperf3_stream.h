@@ -1,7 +1,3 @@
-/*
- * Copyright 2022, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
- */
 #ifndef IPERF3_STREAM_H
 #define IPERF3_STREAM_H
 
@@ -25,9 +21,13 @@ typedef enum {
 typedef struct {
     struct tcp_pcb *pcb;
     uint8_t *cookie;
+    uint8_t cookie_rx_len;
 
     uint64_t bytes;
+    uint64_t rx_bytes;
     const uint8_t *tx_buf;
+
+    bool is_sender;
 
     uint16_t tx_len;
     uint16_t tx_off;
@@ -36,10 +36,6 @@ typedef struct {
     uint32_t bytes_this_tick;
     uint32_t tick_byte_limit;   /* 0 = unlimited */
 
-    /* Self-measured RTT (microseconds) via ACK round-trips. lwIP's own RTT
-     * estimate is 500ms-granular (useless for LAN), so we time one outstanding
-     * sample at a time: record send time at a byte offset, complete when that
-     * offset is ACKed. min/max/mean/stddev need no sample storage. */
     uint64_t rtt_sent;      /* cumulative bytes handed to tcp_write */
     uint64_t rtt_acked;     /* cumulative bytes ACKed */
     uint64_t rtt_target;    /* byte offset of the sample being timed */
@@ -66,6 +62,17 @@ typedef struct {
     uint32_t burst_max;
     uint32_t packets_this_tick;
     iperf_ctrl_t *ctrl;
+
+    uint64_t rx_bytes;
+    uint64_t rx_packets;
+
+    bool is_sender;
+
+    uint32_t rx_first_seq;     /* sender seq of first counted datagram */
+    uint32_t rx_last_seq;      /* highest sender seq seen */
+    uint8_t  rx_have_first;    /* whether rx_first_seq is set */
+    double   rx_jitter;        /* RFC1889 jitter estimate, seconds */
+    double   rx_prev_transit;  /* previous transit time, seconds */
 } iperf3_udp_stream_t;
 
 /* TCP stream functions */
@@ -76,9 +83,14 @@ err_t iperf3_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
 err_t iperf3_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
 void iperf3_stream_err(void *arg, err_t err);
 
+
+
 /* UDP stream functions */
 void udp_pump(iperf3_udp_stream_t *stream);
 void udp_stream_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
                      const ip_addr_t *addr, u16_t port);
+
+/* Server data-stream recv (TCP forward) */
+err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
 
 #endif // IPERF3_STREAM_H

@@ -3,7 +3,12 @@
 #include "iperf3_ctrl.h"
 #include <sddf/timer/client.h>
 
+
+
 #define IPERF3_COOKIE_LEN 37  
+#define CREATE_STREAMS 10
+#define TEST_START       1
+#define TEST_RUNNING     2
 
 extern timer_client_config_t timer_config;
 
@@ -28,9 +33,12 @@ void iperf3_stream_init(iperf3_stream_t *stream, uint8_t *cookie, iperf_ctrl_t *
     stream->rtt_count = 0;
     stream->rtt_sum_us = 0;
     stream->rtt_sumsq_us = 0;
+
+    stream->rx_bytes = 0;
+    stream->is_sender = true;
 }
 
-// maybe transmit data on this stream - loops to fill the send buffer in one call
+// maybe transmit data on this stream loops to fill the send buffer in one call
 void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   if (stream->pcb == NULL) return;
   if (stream->phase == STOPPED) return;
@@ -72,7 +80,7 @@ void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   }
   if (wrote) {
     tcp_output(stream->pcb);
-    /* Start an RTT sample if none is in flight (one outstanding => ~1 per RTT). */
+    /* Start an RTT sample */
     if (!stream->rtt_pending && stream->ctrl && !stream->ctrl->omitting) {
       stream->rtt_pending = true;
       stream->rtt_target = stream->rtt_sent;
@@ -81,14 +89,14 @@ void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   }
 }
 
- err_t iperf3_stream_connect(void *arg, struct tcp_pcb *tpcb, err_t err) {
+err_t iperf3_stream_connect(void *arg, struct tcp_pcb *tpcb, err_t err) {
     iperf3_stream_t *s = (iperf3_stream_t *)arg;
     if (err != ERR_OK) return err;
 
     s->pcb = tpcb;
     tcp_arg(tpcb, s);
     tcp_sent(tpcb, iperf3_stream_sent);
-    tcp_recv(tpcb, iperf3_stream_recv);   // can be NULL if you truly never read
+    tcp_recv(tpcb, iperf3_stream_recv);
     tcp_err(tpcb, iperf3_stream_err);
 
     // queue cookie to send on this stream
@@ -107,7 +115,7 @@ err_t iperf3_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
         stream->bytes += len;
     }
 
-    /* Complete an RTT sample once the timed byte offset has been ACKed. */
+    /* rtt sample */
     stream->rtt_acked += len;
     if (stream->rtt_pending && stream->rtt_acked >= stream->rtt_target) {
         uint64_t now = sddf_timer_time_now(timer_config.driver_id);
@@ -124,6 +132,47 @@ err_t iperf3_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     return ERR_OK;
 }
 
+err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
+    iperf3_stream_t *stream = (iperf3_stream_t *)arg;
+    iperf_ctrl_t *ctrl = stream->ctrl;
+
+    if (err != ERR_OK) {
+        return err;
+    }
+    if (p == NULL) {
+        stream->pcb = NULL;
+        return ERR_OK;
+    }
+
+    struct pbuf *q = p;
+    while (q != NULL) {
+        uint8_t *data = (uint8_t *)q->payload;
+        uint16_t n = q->len;
+        uint16_t i = 0;
+        while (stream->cookie_rx_len < IPERF3_COOKIE_LEN && i < n) {
+
+            // error check
+            if (data[i] != ctrl->cookie[stream->cookie_rx_len]) {
+                sddf_printf("[iperf3] stream cookie mismatch at byte %u\n",
+                            (unsigned)stream->cookie_rx_len);
+            }
+            stream->cookie_rx_len++;
+            i++;
+            if (stream->cookie_rx_len == IPERF3_COOKIE_LEN) {
+                iperf3_server_stream_ready(ctrl);
+            }
+        }
+
+        // Everything after the cookie is measured
+        stream->bytes += (uint64_t)(n - i);
+        q = q->next;
+    }
+
+    tcp_recved(tpcb, p->tot_len);
+    pbuf_free(p);
+    return ERR_OK;
+}
+
 err_t iperf3_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf3_stream_t *stream = (iperf3_stream_t *)arg;
     (void)tpcb;
@@ -137,7 +186,13 @@ err_t iperf3_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t 
         return ERR_OK;
     }
 
-    // process received data in pbuf chain p
+
+    if (!stream->is_sender && !stream->ctrl->omitting) {
+      stream->rx_bytes += p->tot_len;
+    }
+
+    /* Tell lwIP we've consumed the data */
+    tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
     return ERR_OK;
 }

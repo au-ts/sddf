@@ -59,7 +59,7 @@
  * The size of the heap memory. If the application will send
  * a lot of data that needs to be copied, this should be set high.
  */
-#define MEM_SIZE                        0x4000000
+#define MEM_SIZE                        0x2000000
 
 /**
  * Enable code to support static ARP table entries (using
@@ -120,14 +120,15 @@
 #define TCP_MSS 1460
 
 /**
- * The size of a TCP window - Maximum data we can receive at once. This
- * must be at least (2 * TCP_MSS) for things to work well. In an iperf3
- * uplink test this client is the *sender*, so the receive window is not
- * the throughput limiter; aggregate throughput is driven by running
- * multiple parallel streams. Kept identical to the iperf3_four_streams
- * example so the two can be compared apples-to-apples.
+ * The size of a TCP window - Maximum data we can receive at once. This is the
+ * receive-side flow-control limit and is the dominant lever for REVERSE
+ * (download, server->client) throughput: the server may never have more than
+ * TCP_WND bytes in flight to us, so reverse throughput ~= TCP_WND / RTT.
+ * To exceed the 16-bit TCP window field's 65535-byte ceiling we must enable
+ * receive-side window scaling (TCP_RCV_SCALE > 0 below). lwIP enforces
+ * TCP_WND <= (0xFFFF << TCP_RCV_SCALE), so 256 KB needs TCP_RCV_SCALE >= 3.
  */
-#define TCP_WND 10000
+#define TCP_WND (256 * 1024)
 
 /**
  * TCP sender buffer space (bytes) — how much unacked data one connection may
@@ -170,7 +171,7 @@
  * When LWIP_WND_SCALE is enabled but TCP_RCV_SCALE is 0, we can use a large
  * send window while having a small receive window only.
  */
-#define TCP_RCV_SCALE 0
+#define TCP_RCV_SCALE 3
 
 /**
  * Support the TCP timestamp option.
@@ -180,7 +181,7 @@
 /**
  * The number of buffers in the pbuf pool.
  */
-#define PBUF_POOL_SIZE 10000
+#define PBUF_POOL_SIZE 1000
 
 /**
  * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF). If the
@@ -198,7 +199,7 @@
  * memory, thus there is a scaling factor added based on the number of TCP echo
  * sockets we concurrently support.
  */
-#define MEMP_NUM_TCP_SEG 10000
+#define MEMP_NUM_TCP_SEG (3 * TCP_SND_QUEUELEN)
 
 //memp_malloc: out of memory in pool TCP_SEG
 // tcp_create_segment: no memory.
@@ -210,7 +211,7 @@
  * Statistics collection. We enable it (normally off for performance) to get an
  * exact TCP packet count, which is otherwise a byte stream with no datagram
  * count: read lwip_stats.tcp.xmit (segments sent, counted in core tcp_output).
- * LWIP_STATS_LARGE=1 makes the counters u32 (default u16 wraps at 65535 — far
+ * LWIP_STATS_LARGE=1 makes the counters u32 (default u16 wraps at 65535 - far
  * too small for a bulk transfer). Everything else is left off to keep the
  * hot-path perturbation minimal. (LINK_STATS is useless here: sDDF's custom
  * netif output bypasses lwIP's link layer, so link.xmit never advances.)

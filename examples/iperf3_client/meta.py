@@ -16,8 +16,6 @@ sys.path.append(
 )
 from board import BOARDS
 
-
-
 assert version("sdfgen").split(".")[1] == "33", "Unexpected sdfgen version"  # enforced by board.py
 
 ProtectionDomain = SystemDescription.ProtectionDomain
@@ -25,36 +23,17 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
-# iperf3 server, injected per-client into .iperf3_app_config. Each client targets
-# SERVER_PORT_BASE + client_index so N clients can be served by N `iperf3 -s`
-# instances on consecutive ports. SERVER_IP comes from the environment (passed by
-# iperf3.mk from the make SERVER_IP=... flag) so hardware builds can point at the
-# real test server (e.g. 172.16.0.101); defaults to QEMU's 10.0.2.2.
-def _parse_server_ip():
-    s = os.environ.get("SERVER_IP", "").strip()
-    parts = s.split(".") if s else []
-    if len(parts) == 4:
-        try:
-            return tuple(int(p) for p in parts)
-        except ValueError:
-            pass
-    return (10, 0, 2, 2)
-
-SERVER_IP = _parse_server_ip()
-SERVER_PORT_BASE = int(os.environ.get("SERVER_PORT_BASE", "5202"))
-
-
 """
-Serialisation classes for the benchmarking component configuration.
-All values are little-endian; pointers are 64-bit.
+Below are classes to serialise into custom configuration for the benchmarking component.
+All serialised definitions are little endian and pointers are 64-bit integers.
+Structs are serialised to match 64-bit alignment.
 """
-
 
 class BenchmarkIdleConfig:
     def __init__(self, cycle_counters: int, ch_init: int):
         self.cycle_counters = cycle_counters
         self.ch_init = ch_init
-
+        
     def serialise(self) -> bytes:
         return struct.pack(
             "<qc", self.cycle_counters, self.ch_init.to_bytes(1, "little")
@@ -126,27 +105,18 @@ class BenchmarkConfig:
 
 
 class IperfAppConfig:
-    """Per-client app config injected into the .iperf3_app_config section.
-    Matches struct iperf3_app_config { uint8_t ip[4]; uint16_t port; uint8_t id; }"""
 
-    def __init__(self, server_ip: Tuple[int, int, int, int], server_port: int, client_id: int):
-        self.server_ip = server_ip
-        self.server_port = server_port
+    def __init__(self, client_id: int):
         self.client_id = client_id
 
     def serialise(self) -> bytes:
-        return struct.pack(
-            "<4sHBx", bytes(self.server_ip), self.server_port, self.client_id
-        )
+        return struct.pack("<B", self.client_id)
 
 
-IPERF3_MAX_PEERS = 8
+IPERF3_MAX_PEERS = 4
 
 
 class IperfMultiConfig:
-    """Per-client multi-client coordination config, injected into the
-    .iperf3_multi_config section. Matches struct iperf3_multi_config
-    { uint8_t is_controller, num_peers, listen_channel; uint8_t peer_channels[8]; }."""
 
     def __init__(self, is_controller: int, listen_channel: int, peer_channels: List[int]):
         self.is_controller = is_controller
@@ -162,17 +132,15 @@ class IperfMultiConfig:
         )
 
 
-# Copies <source>.elf -> <new><number>.elf and returns the new filename.
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     source_elf += ".elf"
-    if elf_number is not None:
+    if elf_number != None:
         new_elf += str(elf_number)
     new_elf += ".elf"
     assert os.path.isfile(source_elf)
     return shutil.copyfile(source_elf, new_elf)
 
 
-# objcopy --update-section .<section_name>=<data_name>.data <elf_name>
 def update_elf_section(elf_name: str, section_name: str, data_name: str, data_number=None):
     assert os.path.isfile(elf_name)
     if data_number is not None:
@@ -188,12 +156,7 @@ def update_elf_section(elf_name: str, section_name: str, data_name: str, data_nu
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
-    def get_core(name: str) -> int:
-        if name not in core_dict:
-            raise ValueError(
-                f"PD {name} is missing from your core allocation configuration file!"
-            )
-        return core_dict[name]
+    get_core = lambda name: core_dict[name]
 
     # Which clients exist is driven by the core-allocation file: any key of the
     # form "clientN" (with a matching "clientN_net_copier") is instantiated.
@@ -213,6 +176,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
+
     timer_driver = ProtectionDomain(
         "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
     )
@@ -224,10 +188,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=99, cpu=get_core("serial_virt_tx")
     )
-    # serial_virt_rx lets the client receive keyboard input over the serial console
-    # so a test can be started at runtime (`start <ip> ...`) instead of baked in at
-    # compile time. Keyboard input is routed to one serial client at a time; client0
-    # (the first serial client added) is the default active receiver.
     serial_virt_rx = ProtectionDomain(
         "serial_virt_rx", "serial_virt_rx.elf", priority=99, cpu=get_core("serial_virt_rx")
     )
@@ -275,11 +235,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
             "copier_elf": copier_elf, "copier_pd": copier_pd, "lwip": lwip,
         })
 
-    # Multi-client coordination: client0 is the controller (the only serial
-    # receiver). A shared params region is mapped into every client at a fixed
-    # vaddr; the controller writes the parsed `start` params there and notifies
-    # each peer over a dedicated channel so all clients run the same test
-    # concurrently. (Cross-core notifications work on hardware, not QEMU SMP.)
+    # Multi-client coordination: client0 is the controller
+    # A shared params region is mapped into every client at a fixed
+    # vaddr and notifies each peer over a dedicated channel
     SHARED_PARAMS_VADDR = 0x30_000_000
     multi_cfg_by_i = {}
     if len(clients) > 1:
@@ -409,7 +367,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
         update_elf_section(c["elf"], "lib_sddf_lwip_config", f"lib_sddf_lwip_config_client{i}")
         update_elf_section(c["copier_elf"], "net_copy_config", f"net_copy_client{i}_net_copier")
 
-        app_config = IperfAppConfig(SERVER_IP, SERVER_PORT_BASE + i, i)
+        app_config = IperfAppConfig(i)
         with open(f"{output_dir}/iperf3_app_config{i}.data", "wb+") as f:
             f.write(app_config.serialise())
         update_elf_section(c["elf"], "iperf3_app_config", "iperf3_app_config", i)
