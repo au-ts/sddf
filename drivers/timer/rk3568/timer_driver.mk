@@ -11,9 +11,8 @@
 #  Expects libsddf_util_debug.a to be in ${LIBS}
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-include ${TIMER_DIR}/../timer_common.mk
 
-timer_driver.elf: timer/timer_driver.o timer/timer_common.o
+timer_driver.elf: timer/timer_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 timer/timer_driver.o: CFLAGS+=-I${TIMER_DIR}
