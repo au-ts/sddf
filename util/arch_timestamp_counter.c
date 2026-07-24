@@ -136,7 +136,7 @@ static uint64_t get_tsc_frequency(void)
     return tsc_hz;
 }
 
-uint64_t read_counter(void)
+uint64_t sddf_read_counter(void)
 {
     return rdtsc();
 }
@@ -151,7 +151,7 @@ static uint64_t cached_tsc_frequency = 0;
  *
  * NOTE: Do not use this function in a concurrent environment.
  */
-uint64_t read_freq(void)
+uint64_t sddf_read_freq(void)
 {
     if (!checked_tsc_frequency) {
         /* We only trust the TSC as a clocksource on an Intel CPU with an invariant TSC.
@@ -173,7 +173,7 @@ uint64_t read_freq(void)
 }
 
 #elif defined(CONFIG_ARCH_AARCH64)
-uint64_t read_counter(void)
+uint64_t sddf_read_counter(void)
 {
     uint64_t v;
     asm volatile("isb" ::: "memory");
@@ -182,7 +182,7 @@ uint64_t read_counter(void)
     return v;
 }
 
-uint64_t read_freq(void)
+uint64_t sddf_read_freq(void)
 {
     uint64_t v;
     asm volatile("mrs %0, cntfrq_el0" : "=r"(v));
@@ -192,7 +192,7 @@ uint64_t read_freq(void)
 #elif defined(CONFIG_ARCH_RISCV)
 __attribute__((__section__(".arch_counter_config"))) riscv_timestamp_counter_config_t timestamp_counter_config;
 
-uint64_t read_counter(void)
+uint64_t sddf_read_counter(void)
 {
     uint64_t v;
     asm volatile("fence.i" ::: "memory");
@@ -204,7 +204,7 @@ uint64_t read_counter(void)
 }
 
 static bool checked_config = false;
-uint64_t read_freq(void)
+uint64_t sddf_read_freq(void)
 {
     if (likely(checked_config)) {
         return timestamp_counter_config.frequency;
