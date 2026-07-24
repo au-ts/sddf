@@ -189,7 +189,7 @@ void init(void)
     microkit_deferred_irq_ack(IRQ_CH);
 
     /* Detect TSC */
-    tsc_freq = read_freq();
+    tsc_freq = sddf_read_freq();
     if (!tsc_freq) {
         LOG_TIMER_DRIVER_ERR("Cannot detect or use TSC frequency, expect performance degradation.\n");
         /* Because SDDF_TIMER_GET_TIME calls will go to the HPET rather than from the TSC.
@@ -211,7 +211,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
     case SDDF_TIMER_GET_TIME: {
         if (tsc_freq) {
-            microkit_mr_set(0, tsc_ticks_to_ns(read_counter()));
+            microkit_mr_set(0, tsc_ticks_to_ns(sddf_read_counter()));
         } else {
             microkit_mr_set(0, hpet_ticks_to_ns(get_hpet_ticks()));
         }
