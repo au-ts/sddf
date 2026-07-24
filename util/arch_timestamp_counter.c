@@ -4,7 +4,6 @@
  */
 
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/arch_timestamp_counter.h>
 
@@ -190,6 +189,13 @@ uint64_t sddf_read_freq(void)
 }
 
 #elif defined(CONFIG_ARCH_RISCV)
+#define COUNTER_UTIL_MAGIC_LEN 5
+static const char COUNTER_UTIL_MAGIC[COUNTER_UTIL_MAGIC_LEN] __attribute__((unused)) = { 's', 'D', 'D', 'F', 0x4 };
+typedef struct riscv_timestamp_counter_config {
+    char magic[COUNTER_UTIL_MAGIC_LEN];
+    uint64_t frequency;
+} riscv_timestamp_counter_config_t;
+
 __attribute__((__section__(".arch_counter_config"))) riscv_timestamp_counter_config_t timestamp_counter_config;
 
 uint64_t sddf_read_counter(void)
