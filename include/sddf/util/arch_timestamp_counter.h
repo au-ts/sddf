@@ -16,7 +16,7 @@
  * an accurate counter read is returned. The ARM barriers try to reflect the x86 synchronisation
  * and the risc-v is the mapping of the ARM barriers from https://docs.riscv.org/reference/isa/unpriv/mm-eplan.html#armmappings
  */
-uint64_t read_counter(void);
+uint64_t sddf_read_counter(void);
 
 /**
  * Return the current architecture counter frequency.
@@ -24,7 +24,7 @@ uint64_t read_counter(void);
  * Returns a nonzero frequency iff the counter is a trustworthy, invariant
  * clocksource with detectable frequency, or 0 otherwise.
  */
-uint64_t read_freq(void);
+uint64_t sddf_read_freq(void);
 
 #if defined(CONFIG_ARCH_RISCV)
 #define COUNTER_UTIL_MAGIC_LEN 5
