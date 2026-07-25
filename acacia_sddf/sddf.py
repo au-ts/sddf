@@ -199,19 +199,19 @@ class sDDFDriverClass(Subsystem):
         ...
 
 
-def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
-    fields = {"vaddr": map.vaddr + offset, "size": map.mr.size}
-    return ConfigStruct("region_resource_t", section_name=section_name, fields=fields)
+def RegionResourceFactory(map: "Map", section_name: Optional[str] = None):
+    fields = {"vaddr": map.vaddr, "size": map.mr.size}
+    return ConfigStruct(fields, type_name="region_resource_t", section_name=section_name)
 
 
 def DeviceRegionResourceFactory(region: ConfigStruct, io_addr: int):
     fields = {"region": region, "io_addr": io_addr}
-    return ConfigStruct("device_region_resource_t", fields=fields)
+    return ConfigStruct(fields, type_name="device_region_resource_t")
 
 
 def DeviceIRQResourceFactory(id: int):
     fields = {"id": id}
-    return ConfigStruct("device_irq_resource_t", fields=fields)
+    return ConfigStruct(fields, type_name="device_irq_resource_t")
 
 
 def DeviceResourcesFactory(
@@ -234,8 +234,8 @@ def DeviceResourcesFactory(
         "irqs": irq_structs,
     }
     return ConfigStruct(
-        "device_resources_t",
+        fields,
+        type_name="device_resources_t",
         section_name=section_name,
-        fields=fields,
         target_file=target_file,
     )

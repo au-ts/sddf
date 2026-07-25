@@ -349,7 +349,7 @@ class sDDFSerial(sDDFDriverClass):
             "data": RegionResourceFactory(data_map),
             "id": ch_id,
         }
-        return ConfigStruct("serial_connection_resource_t", fields=fields)
+        return ConfigStruct(fields, type_name="serial_connection_resource_t")
 
     def serial_driver_config_factory(
         self,
@@ -368,10 +368,10 @@ class sDDFSerial(sDDFDriverClass):
             "rx": rx_connection if rx_connection else 0,
         }
         return ConfigStruct(
-            "serial_driver_config_t",
+            fields,
+            type_name="serial_driver_config_t",
             target_file=driver_pd.prog_image,
             section_name="serial_driver_config",
-            fields=fields,
         )
 
     def serial_virt_rx_config_factory(
@@ -391,10 +391,10 @@ class sDDFSerial(sDDFDriverClass):
             "terminate_num_char": "\r",
         }
         return ConfigStruct(
-            "serial_virt_rx_config_t",
+            fields,
+            type_name="serial_virt_rx_config_t",
             target_file=virt_rx_pd.prog_image,
             section_name="serial_virt_rx_config",
-            fields=fields,
         )
 
     def serial_virt_tx_client_config_factory(
@@ -404,7 +404,7 @@ class sDDFSerial(sDDFDriverClass):
             "conn": conn,
             "name": name,
         }
-        return ConfigStruct("serial_virt_tx_client_t", fields=fields)
+        return ConfigStruct(fields, type_name="serial_virt_tx_client_t")
 
     def serial_virt_tx_config_factory(
         self,
@@ -427,10 +427,10 @@ class sDDFSerial(sDDFDriverClass):
             "enable_rx": enable_rx,
         }
         return ConfigStruct(
-            "serial_virt_tx_config_t",
+            fields,
+            type_name="serial_virt_tx_config_t",
             target_file=virt_tx_pd.prog_image,
             section_name="serial_virt_tx_config",
-            fields=fields,
         )
 
     def serial_client_config_factory(
@@ -446,10 +446,10 @@ class sDDFSerial(sDDFDriverClass):
             "rx": rx_connection if rx_connection else 0,
         }
         return ConfigStruct(
-            "serial_client_config_t",
+            fields,
+            type_name="serial_client_config_t",
             target_file=client_pd.prog_image,
             section_name="serial_client_config",
-            fields=fields,
         )
 
     # x86 Util
