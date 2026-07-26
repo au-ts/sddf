@@ -4,6 +4,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <microkit.h>
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
@@ -20,6 +21,56 @@
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+
+// This could be moved to a vm config.h file
+#define BENCH_VM_MAGIC_LEN 5
+static const char BENCH_VM_MAGIC[BENCH_VM_MAGIC_LEN] = { 'B', 'V', 'M', 'C', 0x1 };
+
+typedef struct {
+    uint64_t results_vaddr;
+    char magic[BENCH_VM_MAGIC_LEN];
+    uint8_t ch_start;
+    uint8_t ch_stop;
+    uint8_t ch_done;
+    uint8_t vcpu_id;
+    char vm_name[SDDF_NAME_LENGTH];
+    char _pad[7];
+} benchmark_vm_config_t;
+
+/* Number of uint64_t results the VMM writes into the shared page. */
+#define BENCH_VM_NUM_RESULTS 4
+
+__attribute__((__section__(".benchmark_vm_config"))) benchmark_vm_config_t bench_vm_config;
+
+/* Microkit maps this in, read only for bench and rw for the vmm */
+uintptr_t bench_vm_results;
+
+/* VM utilisation only means anything when per-thread tracking is compiled in. */
+#if defined(CONFIG_BENCHMARK_TRACK_UTILISATION) && ENABLE_BENCHMARKING
+#define BENCH_VM_UTIL 1
+#else
+#define BENCH_VM_UTIL 0
+#endif
+
+typedef struct {
+    uint64_t total;
+    uint64_t kernel;
+    uint64_t schedules;
+    uint64_t entries;
+} util_sample_t;
+
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+    static util_sample_t total_sample;
+    static util_sample_t child_samples[BENCHMARK_MAX_CHILDREN];
+    static util_sample_t vm_sample;
+
+    static uint64_t overflow_status;
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    static uint64_t kernel_log_entries;
+#endif
+
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
@@ -60,29 +111,57 @@ static char *child_name(uint8_t child_id)
     return "unknown child PD";
 }
 
+// Could be moved to a config.h
+static bool bench_vm_config_check_magic(void)
+{
+    for (int i = 0; i < BENCH_VM_MAGIC_LEN; i++) {
+        if (bench_vm_config.magic[i] != BENCH_VM_MAGIC[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-static void print_total_util(uint64_t *buffer)
+static void save_util(util_sample_t *s, uint64_t *buf, bool is_total)
 {
-    uint64_t total = buffer[BENCHMARK_TOTAL_UTILISATION];
-    uint64_t number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
-    uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
-    uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
-    sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
-                "%lu\nTotalUtilisation: %lu\n}\n",
-                kernel, entries, number_schedules, total);
+    if (is_total) {
+        s->total     = buf[BENCHMARK_TOTAL_UTILISATION];
+        s->kernel    = buf[BENCHMARK_TOTAL_KERNEL_UTILISATION];
+        s->schedules = buf[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
+        s->entries   = buf[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
+    } else {
+        s->total     = buf[BENCHMARK_TCB_UTILISATION];
+        s->kernel    = buf[BENCHMARK_TCB_KERNEL_UTILISATION];
+        s->schedules = buf[BENCHMARK_TCB_NUMBER_SCHEDULES];
+        s->entries   = buf[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
+    }
 }
 
-static void print_child_util(uint64_t *buffer, uint8_t id)
+static void print_util_body(util_sample_t *s)
 {
-    uint64_t total = buffer[BENCHMARK_TCB_UTILISATION];
-    uint64_t number_schedules = buffer[BENCHMARK_TCB_NUMBER_SCHEDULES];
-    uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
-    uint64_t entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
-    sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
+    sddf_printf("KernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
                 "%lu\nTotalUtilisation: %lu\n}\n",
-                child_name(id), id, kernel, entries, number_schedules, total);
+                s->kernel, s->entries, s->schedules, s->total);
 }
 
+static void print_total_util(util_sample_t *s)
+{
+    sddf_printf("Total utilisation details: \n{\n");
+    print_util_body(s);
+}
+
+static void print_child_util(const char *name, uint8_t id, util_sample_t *s)
+{
+    sddf_printf("Utilisation details for PD: %s (%u)\n{\n", name, id);
+    print_util_body(s);
+}
+
+static void print_vm_util(const char *name, uint8_t vcpu_id, util_sample_t *s)
+{
+    sddf_printf("Utilisation details for VM: %s (vcpu %u)\n{\n", name, vcpu_id);
+    print_util_body(s);
+}
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -98,6 +177,13 @@ static void dump_log_summary(uint64_t log_size)
     seL4_Word vmfault_entries = 0;
     seL4_Word debug_fault = 0;
     seL4_Word other = 0;
+
+    /* log_buffer is never assigned a mapping in this component. Bail out rather
+     * than dereference NULL. */
+    if (log_buffer == NULL) {
+        sddf_printf("BENCH|ERROR: no kernel log buffer mapped, skipping summary\n");
+        return;
+    }
 
     while (log_buffer[index].start_time != 0 && index < log_size) {
         if (log_buffer[index].entry.path == Entry_Syscall) {
@@ -159,6 +245,8 @@ static void benchmark_init(void)
 #endif
 }
 
+static void benchmark_report(void);
+
 static void benchmark_start(void)
 {
 #if !ENABLE_BENCHMARKING
@@ -179,6 +267,12 @@ static void benchmark_start(void)
     for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
         seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
     }
+
+    // The VMM has control over the VM's TCB and resets it for us
+#ifdef BENCH_VM_ENABLED
+    microkit_notify(bench_vm_config.ch_start);
+#endif
+
     seL4_BenchmarkResetLog();
 #endif
 
@@ -192,6 +286,8 @@ static void benchmark_start(void)
     }
 }
 
+// Stop all counters. If we are using a vm then we must wait for it to finish,
+// otherwise we can report immediately
 static void benchmark_stop(void)
 {
 #if !ENABLE_BENCHMARKING
@@ -199,51 +295,88 @@ static void benchmark_stop(void)
     return;
 #endif
 
-    sddf_printf("BENCHMARK: begin output\n");
-    sddf_printf("---\n");
-
 #if ENABLE_PMU_EVENTS
     sel4bench_get_counters(benchmark_bf, &counter_values[0]);
     sel4bench_stop_counters(benchmark_bf);
     /* Check the overflow status flag register so we can discard any 32-bit
     counts which have overflowed */
-    uint64_t overflow_status;
     PMU_READ(PMOVSCLR, overflow_status);
+#endif
 
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+    seL4_BenchmarkFinalizeLog();
+
+    seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
+    save_util(&total_sample, (uint64_t *)&seL4_GetIPCBuffer()->msg[0], true);
+
+    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
+        seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
+        save_util(&child_samples[i], (uint64_t *)&seL4_GetIPCBuffer()->msg[0], false);
+    }
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    kernel_log_entries = seL4_BenchmarkFinalizeLog();
+#endif
+
+#ifdef BENCH_VM_ENABLED
+    microkit_notify(bench_vm_config.ch_stop);
+#else
+    benchmark_report();
+#endif
+}
+
+static void benchmark_report(void)
+{
+#if BENCH_VM_ENABLED
+    uint64_t *vm = (uint64_t *)(uintptr_t)bench_vm_config.results_vaddr;
+    vm_sample.total     = vm[0];
+    vm_sample.kernel    = vm[1];
+    vm_sample.schedules = vm[2];
+    vm_sample.entries   = vm[3];
+#endif
+
+    sddf_printf("BENCHMARK: begin output\n");
+    sddf_printf("---\n");
+
+#if ENABLE_PMU_EVENTS
     sddf_printf("{CORE %u: \n", benchmark_config.core);
-    uint8_t i = 0;
-    while (i < benchmark_config.num_pmu_events) {
-        if (i + 1 < benchmark_config.num_pmu_events && benchmark_config.pmu_events[i + 1] == CHAIN) {
-            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name,
-                        counter_values[i] + (counter_values[i + 1] << 32));
-            i += 2;
+    uint8_t pmu_i = 0;
+    while (pmu_i < benchmark_config.num_pmu_events) {
+        if (pmu_i + 1 < benchmark_config.num_pmu_events
+            && benchmark_config.pmu_events[pmu_i + 1] == CHAIN) {
+            sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[pmu_i]].event_name,
+                        counter_values[pmu_i] + (counter_values[pmu_i + 1] << 32));
+            pmu_i += 2;
         } else {
-            if (overflow_status & 1 << i) {
+            if (overflow_status & 1 << pmu_i) {
                 sddf_printf("%s: Overflow occurred during benchmark, event count is invalid!\n",
-                            pmu_event_table[benchmark_config.pmu_events[i]].event_name);
+                            pmu_event_table[benchmark_config.pmu_events[pmu_i]].event_name);
             } else {
-                sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[i]].event_name, counter_values[i]);
+                sddf_printf("%s: %lu\n", pmu_event_table[benchmark_config.pmu_events[pmu_i]].event_name,
+                            counter_values[pmu_i]);
             }
-            i += 1;
+            pmu_i += 1;
         }
     }
     sddf_printf("}\n");
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-    seL4_BenchmarkFinalizeLog();
-    seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
-    print_total_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0]);
+    print_total_util(&total_sample);
     for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
-        seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
-        print_child_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0], benchmark_config.children[i].child_id);
+        print_child_util(benchmark_config.children[i].name,
+                         benchmark_config.children[i].child_id,
+                         &child_samples[i]);
     }
+#if BENCH_VM_ENABLED
+        print_vm_util(bench_vm_config.vm_name, bench_vm_config.vcpu_id, &vm_sample);
+#endif
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-    uint64_t entries = seL4_BenchmarkFinalizeLog();
-    sddf_printf("KernelEntries:  %lu\n", entries);
-    dump_log_summary(entries);
+    sddf_printf("KernelEntries:  %lu\n", kernel_log_entries);
+    dump_log_summary(kernel_log_entries);
 #endif
 
     sddf_printf("---\n");
@@ -263,6 +396,10 @@ void notified(microkit_channel ch)
         benchmark_start();
     } else if (ch == benchmark_config.rx_stop_ch) {
         benchmark_stop();
+#if BENCH_VM_ENABLED
+    } else if (ch == bench_vm_config.ch_done) {
+        benchmark_report();
+#endif
     } else {
         sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);
     }
@@ -273,6 +410,11 @@ void init(void)
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+
+#if BENCH_VM_ENABLED
+    sddf_printf("BENCH|LOG: VM utilisation tracking enabled for \"%s\" (vcpu %u)\n",
+                bench_vm_config.vm_name, bench_vm_config.vcpu_id);
+#endif
 
 #if ENABLE_BENCHMARKING
     sddf_printf("BENCH|LOG: ENABLE_BENCHMARKING defined\n");

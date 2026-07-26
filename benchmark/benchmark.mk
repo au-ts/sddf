@@ -12,6 +12,7 @@ LIBUTIL_DBG := libsddf_util_debug.a
 LIBUTIL := libsddf_util.a
 
 ${BENCH_OBJS} ${IDLE_OBJS}: |benchmark $(SDDF_LIBC_INCLUDE)
+${BENCH_OBJS}: CFLAGS += -DBENCH_VM_ENABLED
 benchmark:
 	mkdir -p benchmark
 
