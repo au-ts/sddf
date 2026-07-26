@@ -45,13 +45,6 @@ __attribute__((__section__(".benchmark_vm_config"))) benchmark_vm_config_t bench
 /* Microkit maps this in, read only for bench and rw for the vmm */
 uintptr_t bench_vm_results;
 
-/* VM utilisation only means anything when per-thread tracking is compiled in. */
-#if defined(CONFIG_BENCHMARK_TRACK_UTILISATION) && ENABLE_BENCHMARKING
-#define BENCH_VM_UTIL 1
-#else
-#define BENCH_VM_UTIL 0
-#endif
-
 typedef struct {
     uint64_t total;
     uint64_t kernel;
@@ -59,6 +52,7 @@ typedef struct {
     uint64_t entries;
 } util_sample_t;
 
+// How to make this noit have to be behind an ifdef
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
     static util_sample_t total_sample;
     static util_sample_t child_samples[BENCHMARK_MAX_CHILDREN];
