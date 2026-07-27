@@ -56,6 +56,12 @@ void parse_test_params(const char *json, iperf_ctrl_t *ctrl) {
     double d;
     int b;
 
+    /* The peer's params are authoritative - anything it leaves out is off,
+     * not whatever iperf3_ctrl_init() left behind from a previous role. */
+    ctrl->omit_s = 0;
+    ctrl->omit_ms = 0;
+    ctrl->num_streams = 1;
+
     ctrl->is_udp = (mjson_get_bool(json, len, "$.udp", &b) && b);
 
     if (mjson_get_number(json, len, "$.time", &d)) {
@@ -236,12 +242,175 @@ static err_t iperf_set_send_state(iperf_ctrl_t *ctrl, signed int state) {
     return ERR_OK;
 }
 
+/* Queue [4-byte BE length][body] as ONE control-channel write. The body must
+ * already sit at json_send_buf + 4. */
+static void iperf3_ctrl_send_json(iperf_ctrl_t *ctrl, uint32_t body_len) {
+    uint32_t be = htonl(body_len);
+    memcpy(ctrl->json_send_buf, &be, 4);
+    ctrl->tx_buf = (const int8_t *)ctrl->json_send_buf;
+    ctrl->tx_len = (uint16_t)(4 + body_len);
+    ctrl->tx_off = 0;
+    iperf3_ctrl_maybe_tx(ctrl);
+}
+
+/* Build this end's TCP results into json_send_buf + 4; returns the body length.
+ * Sender streams report bytes written plus RTT, receiver streams report bytes
+ * read. The measured window is duration_s: omit is warm-up that runs before
+ * the peer starts its timer. */
+static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
+    char *buf = ctrl->json_send_buf + 4;
+    size_t cap = sizeof(ctrl->json_send_buf) - 4;
+    int off = 0;
+
+    off += sddf_snprintf(buf + off, cap - off,
+        "{\"cpu_util_total\":%.2f,\"cpu_util_user\":%.2f,"
+        "\"cpu_util_system\":0.00,\"sender_has_retransmits\":0,"
+        "\"congestion_used\":\"cubic\",\"streams\":[",
+        ctrl->cpu_util_percent, ctrl->cpu_util_percent);
+
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+    for (uint32_t s = 0; s < total; s++) {
+        iperf3_stream_t *st = &ctrl->streams[s];
+        /* iperf_add_stream() numbers streams 1, 3, 4, 5 ... - the peer looks
+         * streams up by this id, so it has to match exactly. */
+        int id = (s == 0) ? 1 : (int)(2 + s);
+        uint64_t bytes = st->is_sender ? st->bytes : st->rx_bytes;
+        if (st->is_sender) {
+            uint32_t rmean = st->rtt_count ? (uint32_t)(st->rtt_sum_us / st->rtt_count) : 0;
+            off += sddf_snprintf(buf + off, cap - off,
+                "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
+                "\"min_rtt\":%u,\"max_rtt\":%u,\"mean_rtt\":%u,"
+                "\"jitter\":0.0,\"errors\":0,\"omitted_errors\":0,"
+                "\"packets\":0,\"omitted_packets\":0,"
+                "\"start_time\":0.0,\"end_time\":%u.0}",
+                s == 0 ? "" : ",", id, (unsigned long long)bytes,
+                st->rtt_count ? st->rtt_min_us : 0, st->rtt_max_us, rmean,
+                ctrl->duration_s);
+        } else {
+            off += sddf_snprintf(buf + off, cap - off,
+                "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
+                "\"jitter\":0.0,\"errors\":0,\"omitted_errors\":0,"
+                "\"packets\":0,\"omitted_packets\":0,"
+                "\"start_time\":0.0,\"end_time\":%u.0}",
+                s == 0 ? "" : ",", id, (unsigned long long)bytes,
+                ctrl->duration_s);
+        }
+    }
+    off += sddf_snprintf(buf + off, cap - off, "],\"server_output_text\":\"\"}");
+    return (uint32_t)off;
+}
+
+static double iperf3_mbps(uint64_t bytes, double secs) {
+    return secs > 0.0 ? (double)bytes * 8.0 / 1000000.0 / secs : 0.0;
+}
+
+/* Pull one stream's byte count out of the peer's results JSON */
+static uint64_t iperf3_peer_stream_bytes(const char *json, int len, uint32_t idx) {
+    char path[40];
+    double d = 0.0;
+    sddf_snprintf(path, sizeof(path), "$.streams[%u].bytes", idx);
+    if (!mjson_get_number(json, len, path, &d)) return 0;
+    return (uint64_t)d;
+}
+
+static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
+    double secs = (double)ctrl->duration_s;
+    int jlen = (int)strlen((char *)ctrl->result_json);
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+    uint64_t tx_sum = 0, rx_sum = 0;
+
+    sddf_printf("\n[iperf3] ---------- summary (server) ----------\n");
+    sddf_printf("[iperf3] proto=TCP streams=%u time=%u s omit=%u s\n",
+                ctrl->num_streams, ctrl->duration_s, ctrl->omit_s);
+    for (uint32_t s = 0; s < total; s++) {
+        int id = (s == 0) ? 1 : (int)(2 + s);
+        uint64_t rx = ctrl->streams[s].rx_bytes;
+        uint64_t tx = iperf3_peer_stream_bytes((char *)ctrl->result_json, jlen, s);
+        tx_sum += tx;
+        rx_sum += rx;
+        sddf_printf("[iperf3] [%2d] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
+                    id, (unsigned long long)tx, iperf3_mbps(tx, secs),
+                    (unsigned long long)rx, iperf3_mbps(rx, secs));
+    }
+    if (total > 1) {
+        sddf_printf("[iperf3] [SUM] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
+                    (unsigned long long)tx_sum, iperf3_mbps(tx_sum, secs),
+                    (unsigned long long)rx_sum, iperf3_mbps(rx_sum, secs));
+    }
+    sddf_printf("[iperf3] --------------------------------------\n\n");
+}
+
+/* The client's results are in: send ours, then move it to DISPLAY_RESULTS. */
+static void iperf3_server_send_results(iperf_ctrl_t *ctrl) {
+    uint32_t body = iperf3_build_tcp_results(ctrl);
+    sddf_printf("[results-tx] %s\n", ctrl->json_send_buf + 4);
+
+    iperf3_ctrl_send_json(ctrl, body);
+    
+    if (ctrl->tx_off != ctrl->tx_len) {
+        sddf_printf("[iperf3] results JSON short-wrote %u/%u bytes\n",
+                    ctrl->tx_off, ctrl->tx_len);
+    }
+    iperf_set_send_state(ctrl, DISPLAY_RESULTS);
+
+    iperf3_server_print_summary(ctrl);
+}
+
+/* Tear the finished test down; keep listening for the next one. */
+static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
+    for (int s = 0; s < MAX_STREAMS; s++) {
+        iperf3_stream_t *st = &ctrl->streams[s];
+        if (st->pcb) {
+            tcp_arg(st->pcb, NULL);
+            tcp_recv(st->pcb, NULL);
+            tcp_err(st->pcb, NULL);
+            tcp_close(st->pcb);
+            st->pcb = NULL;
+        }
+        st->bytes = 0;
+        st->rx_bytes = 0;
+        st->cookie_rx_len = 0;
+        st->phase = STOPPED;
+    }
+    if (ctrl->pcb) {
+        tcp_arg(ctrl->pcb, NULL);
+        tcp_recv(ctrl->pcb, NULL);
+        tcp_sent(ctrl->pcb, NULL);
+        tcp_err(ctrl->pcb, NULL);
+        tcp_close(ctrl->pcb);
+        ctrl->pcb = NULL;
+    }
+
+    ctrl->set = -1;
+    ctrl->server_state = 0;
+    ctrl->rx_phase = CTRL_WAIT_STATE;
+    ctrl->cookie_recv = 0;
+    ctrl->json_len = 0;
+    ctrl->json_rx = 0;
+    ctrl->json_len_rx = 0;
+    ctrl->tx_len = 0;
+    ctrl->tx_off = 0;
+    ctrl->send_streams_accepted = 0;
+    ctrl->rec_streams_accepted = 0;
+    ctrl->test_active = false;
+    ctrl->test_done = false;
+    ctrl->omitting = false;
+    sddf_printf("[iperf3] server ready for next test\n");
+}
+
 /* Called from the data-stream recv once a stream's cookie is fully received */
 void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
     ctrl->rec_streams_accepted++;
     sddf_printf("[iperf3] stream ready %u/%u\n",
                 ctrl->rec_streams_accepted, ctrl->num_streams);
     if (ctrl->rec_streams_accepted == ctrl->num_streams) {
+        /* Run our own omit window so our byte count covers the same interval
+         * the client is measuring. */
+        uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+        ctrl->omitting = ctrl->omit_ms > 0;
+        ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
         sddf_printf("[iperf3] all streams ready -> TEST_START/TEST_RUNNING\n");
         iperf_set_send_state(ctrl, TEST_START);
         iperf_set_send_state(ctrl, TEST_RUNNING);
@@ -253,10 +422,13 @@ void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
 err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     struct pbuf *q = p;
+    bool finished = false;
 
     if (err != ERR_OK) return err;
     if (p == NULL) {
-        ctrl->pcb = NULL;
+        /* Peer closed */
+        sddf_printf("[iperf3] control connection closed by peer\n");
+        if (ctrl->pcb == tpcb) iperf3_server_reset(ctrl);
         return ERR_OK;
     }
 
@@ -315,6 +487,13 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
             } else if (ctrl->server_state == TEST_RUNNING) {
                 uint8_t st = data[i++];
                 if (st == TEST_END) {
+                    ctrl->test_active = false;
+                    sddf_printf("[iperf3] TEST_END -> EXCHANGE_RESULTS\n");
+                    /* The client sends its results first, then reads ours, so
+                     * arm the JSON reader before asking for them. */
+                    ctrl->rx_phase = CTRL_WAIT_JSON_LEN;
+                    ctrl->json_len_rx = 0;
+                    ctrl->json_rx = 0;
                     iperf_set_send_state(ctrl, EXCHANGE_RESULTS);
                 }
             } else if (ctrl->server_state == EXCHANGE_RESULTS) {
@@ -325,6 +504,12 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
                         ctrl->json_len = read_be32(ctrl->json_len_buf);
                         ctrl->json_rx = 0;
                         ctrl->json_len_rx = 0;
+                        if (ctrl->json_len >= sizeof(ctrl->result_json)) {
+                            sddf_printf("[iperf3] results JSON too big (%u bytes) - aborting\n",
+                                        ctrl->json_len);
+                            finished = true;
+                            break;
+                        }
                         ctrl->rx_phase = CTRL_WAIT_JSON_BODY;
                     }
                 } else if (ctrl->rx_phase == CTRL_WAIT_JSON_BODY) {
@@ -340,18 +525,30 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
                                     ctrl->json_len, ctrl->result_json);
                         ctrl->rx_phase = CTRL_WAIT_STATE;
                         ctrl->json_rx = 0;
+                        /* Our results go back, then DISPLAY_RESULTS */
+                        iperf3_server_send_results(ctrl);
                     }
+                } else {
+                    i++;
                 }
-                
-                // create results and send them
-
-                // send iperf_done
+            } else if (ctrl->server_state == DISPLAY_RESULTS) {
+                uint8_t st = data[i++];
+                if (st == IPERF_DONE) {
+                    sddf_printf("[iperf3] IPERF_DONE - test complete\n");
+                    finished = true;
+                    break;
+                }
+            } else {
+                i++;
             }
         }
+        if (finished) break;
         q = q->next;
     }
+    /* Must ack the data before the reset closes the pcb */
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
+    if (finished) iperf3_server_reset(ctrl);
     return ERR_OK;
 }
 
@@ -443,7 +640,6 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                     iperf3_ctrl_maybe_tx(ctrl);
 
                 } else if (st == CREATE_STREAMS) {
-                    /* ctrl->num_streams was set by the serial `start` command. */
                   if (ctrl->is_udp) {
                     for (int s = 0; s < (ctrl->is_bidirectional + 1) * ctrl->num_streams; s++) {
                         iperf3_udp_stream_t *udp_stream = &ctrl->udp_streams[s];

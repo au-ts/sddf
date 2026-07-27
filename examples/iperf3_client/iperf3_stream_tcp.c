@@ -144,6 +144,19 @@ err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
         return ERR_OK;
     }
 
+    /* Warm-up over: drop what we counted so far so our byte count covers the
+     * same window the client is reporting. Only costs a timer read while
+     * omitting, which is over within the first few seconds. */
+    if (ctrl->omitting) {
+        uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+        if (now_ms >= ctrl->omit_end_ms) {
+            for (int s = 0; s < MAX_STREAMS; s++) {
+                ctrl->streams[s].rx_bytes = 0;
+            }
+            ctrl->omitting = false;
+        }
+    }
+
     struct pbuf *q = p;
     while (q != NULL) {
         uint8_t *data = (uint8_t *)q->payload;
