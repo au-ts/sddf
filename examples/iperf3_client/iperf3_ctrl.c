@@ -124,8 +124,6 @@ void iperf3_server_listen(iperf_ctrl_t *ctrl, uint32_t port) {
 /* server accept client ctrl */
 err_t iperf3_server_accept_ctrl(void* arg, struct tcp_pcb *new_pcb, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
-    sddf_printf("[iperf3] accept fired: err=%d state=%u set=%d\n",
-                (int)err, ctrl ? ctrl->server_state : 999, ctrl ? ctrl->set : 999);
     if (err != ERR_OK || new_pcb == NULL) return ERR_VAL;
 
     /* Control connection has set == -1 */
@@ -397,6 +395,7 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
     ctrl->test_active = false;
     ctrl->test_done = false;
     ctrl->omitting = false;
+    ctrl->sent_test_end = false;
     sddf_printf("[iperf3] server ready for next test\n");
 }
 
@@ -411,7 +410,7 @@ void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
         uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
         ctrl->omitting = ctrl->omit_ms > 0;
         ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
-        sddf_printf("[iperf3] all streams ready -> TEST_START/TEST_RUNNING\n");
+        sddf_printf("[iperf3] all streams ready -> TEST_START\n");
         iperf_set_send_state(ctrl, TEST_START);
         iperf_set_send_state(ctrl, TEST_RUNNING);
         ctrl->test_active = true;
@@ -475,8 +474,6 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
                         /* Parse params then tell client to create streams */
                         parse_test_params(ctrl->param_json, ctrl);
                         sddf_printf("[iperf3] params: json=%s\n", ctrl->param_json);
-                        sddf_printf("[iperf3] parsed udp=%d streams=%u dur=%u -> CREATE_STREAMS\n",
-                                    ctrl->is_udp, ctrl->num_streams, ctrl->duration_s);
                         ctrl->send_streams_accepted = 0;
                         ctrl->rec_streams_accepted = 0;
                         iperf_set_send_state(ctrl, CREATE_STREAMS);
@@ -488,6 +485,11 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
                 uint8_t st = data[i++];
                 if (st == TEST_END) {
                     ctrl->test_active = false;
+                    /* Closes the measurement window: notified() reports
+                     * [cpu_util] off this flag. It fires after the results
+                     * JSON is already sent, so cpu_util_total stays 0.00 for
+                     * the peer - the number lands on our serial only. */
+                    ctrl->sent_test_end = true;
                     sddf_printf("[iperf3] TEST_END -> EXCHANGE_RESULTS\n");
                     /* The client sends its results first, then reads ours, so
                      * arm the JSON reader before asking for them. */

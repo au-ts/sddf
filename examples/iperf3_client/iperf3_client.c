@@ -199,7 +199,7 @@ static void print_help(void)
     sddf_printf(
         "commands:\n"
         "  SERVER: \n"
-        "  start server <ip> [port]\n"
+        "  start server [port]\n"
         "  CLIENT:\n"
         "  start [tcp|udp] <ip> [port] [dur_s] [streams] [bw_mbps] [len]\n"
         "        run a test against <ip>. optional args (left to right):\n"
@@ -213,7 +213,7 @@ static void print_help(void)
         "          bidirectional   server sends data        (default false)\n"
         "  status   show whether a test is running\n"
         "  help     show this message\n"
-        "example: start tcp 172.16.0.101 5202 10 1 1000 reverse bidirectional\n",
+        "example: start tcp 172.16.0.101 5202 10 1 1000 bidirectional\n",
         "example: start server 5202\n",
         proto_str(DEFAULT_IS_UDP), MAX_STREAMS);
 }
@@ -450,6 +450,12 @@ void notified(sddf_channel ch)
 
     sddf_lwip_maybe_notify();
 
+    /* re-arm for the next test */
+    if (!ctrl.test_active && bench_reported) {
+        bench_snapshotted = bench_reported = false;
+        pkts_snapshotted = pkts_reported = false;
+    }
+
     /* Snapshot every active core's idle-PD counters */
     if (ctrl.test_active && !ctrl.omitting && !bench_snapshotted && benchmark_config.num_cores > 0) {
         for (uint8_t c = 0; c < benchmark_config.num_cores; c++) {
@@ -466,6 +472,7 @@ void notified(sddf_channel ch)
         pkts_segs_start = lwip_stats.tcp.xmit;
         pkts_snapshotted = true;
     }
+
     if (pkts_snapshotted && ctrl.sent_test_end && !pkts_reported) {
         pkts_reported = true;
         sddf_printf("[pkts] client=%u tx_segs=%u\n", app_config.client_id,
