@@ -12,7 +12,8 @@
             },
             {
                 "name": "hw_ring_buffer",
-                "size": 65536
+                "size": 65536,
+                "cached": true
             }
         ],
         "irqs": [
