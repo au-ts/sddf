@@ -253,8 +253,7 @@ static void iperf3_ctrl_send_json(iperf_ctrl_t *ctrl, uint32_t body_len) {
 
 /* Build this end's TCP results into json_send_buf + 4; returns the body length.
  * Sender streams report bytes written plus RTT, receiver streams report bytes
- * read. The measured window is duration_s: omit is warm-up that runs before
- * the peer starts its timer. */
+ * read. */
 static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
     char *buf = ctrl->json_send_buf + 4;
     size_t cap = sizeof(ctrl->json_send_buf) - 4;
@@ -270,8 +269,7 @@ static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
     if (total > MAX_STREAMS) total = MAX_STREAMS;
     for (uint32_t s = 0; s < total; s++) {
         iperf3_stream_t *st = &ctrl->streams[s];
-        /* iperf_add_stream() numbers streams 1, 3, 4, 5 ... - the peer looks
-         * streams up by this id, so it has to match exactly. */
+        /* stream ids are 1,3,4,5... */
         int id = (s == 0) ? 1 : (int)(2 + s);
         uint64_t bytes = st->is_sender ? st->bytes : st->rx_bytes;
         if (st->is_sender) {
@@ -298,6 +296,7 @@ static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
     off += sddf_snprintf(buf + off, cap - off, "],\"server_output_text\":\"\"}");
     return (uint32_t)off;
 }
+
 
 static double iperf3_mbps(uint64_t bytes, double secs) {
     return secs > 0.0 ? (double)bytes * 8.0 / 1000000.0 / secs : 0.0;

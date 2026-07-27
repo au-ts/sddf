@@ -69,7 +69,7 @@ void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
     if (chunk == 0) break;
 
     if (tcp_write(stream->pcb, stream->tx_buf + stream->tx_off, chunk, TCP_WRITE_FLAG_COPY) != ERR_OK) {
-      sddf_printf("[tcp_dbg] tcp_write FAIL sndbuf=%u chunk=%u\n", tcp_sndbuf(stream->pcb), chunk);
+      sddf_printf(" tcp_write FAIL sndbuf=%u chunk=%u\n", tcp_sndbuf(stream->pcb), chunk);
       break;
     }
 

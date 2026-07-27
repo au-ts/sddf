@@ -36,3 +36,9 @@ Example:
 start server 5202
 ```
 
+## Support
+
+- Single Core Client: omit, multiple streams, reverse, bidrectional, target bitrate, TCP and UDP tests
+
+- Server: TCP forward direction
+
