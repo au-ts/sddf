@@ -405,8 +405,7 @@ void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
     sddf_printf("[iperf3] stream ready %u/%u\n",
                 ctrl->rec_streams_accepted, ctrl->num_streams);
     if (ctrl->rec_streams_accepted == ctrl->num_streams) {
-        /* Run our own omit window so our byte count covers the same interval
-         * the client is measuring. */
+        /* Run our own omit window so byte count same as client */
         uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
         ctrl->omitting = ctrl->omit_ms > 0;
         ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
