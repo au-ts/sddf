@@ -4,25 +4,18 @@ import os, sys
 import argparse
 from typing import List
 from dataclasses import dataclass
-from importlib.metadata import version
 
 from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob, Map
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
-
-from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer
+from acacia_sddf import BOARDS, sDDFI2C, sDDFSerial, sDDFTimer, sDDFPMIC
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
-    client_ina = ProtectionDomain(sdf, "client_ina", "client_ina.elf", priority=1)
-
-    i2c = sDDFI2C(
-        sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
-    )
-    i2c.add_client(client_ina)
+    client = ProtectionDomain(sdf, "client", "client.elf", priority=1)
 
     timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
-    timer.add_client(client_ina)
+    timer.add_client(client)
 
     serial = sDDFSerial(
         sdf,
@@ -34,7 +27,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTreeBlob):
         enable_color=False,
         baud_rate=board.baud_rate if board.baud_rate else 115200,
     )
-    serial.add_client(client_ina)
+    serial.add_client(client)
+
+    i2c = sDDFI2C(
+        sdf, board.i2c.compatible, board.i2c.node_path, driver_prio=200, virt_prio=199
+    )
+
+    pmic = sDDFPMIC(sdf, board.pmic.compatible, board.pmic.node_path, i2c)
+    pmic.add_client(client)
 
     out_file = f"{output_dir}/{sdf_file}"
     sdf.make_config_structs()
