@@ -60,7 +60,7 @@ Files: libco/*
 Copyright: byuu and the higan team
 License: ISC
 
-Files: network/ipstacks/lwip/*
+Files: components/network/ipstacks/lwip/*
 Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
 License: LicenseRef-BSD-LWIP
 

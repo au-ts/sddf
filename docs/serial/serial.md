@@ -372,7 +372,7 @@ libraries. The serial components that are required to use the subsystem are:
   [here](/drivers/serial/).
 * The serial virtualisers. The receive virtualiser is optional depending on
   whether your system requires receive access. The C code and makefile snippet
-  can be found [here](/serial/components/serial_components.mk).
+  can be found [here](/components/serial/serial_components.mk).
 
 You will need to include these snippets in your makefile to build the UART
 driver and serial virtualisers.

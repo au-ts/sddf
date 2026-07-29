@@ -37,7 +37,7 @@
 
 LIB_SDDF_LWIP_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-LWIPDIR := $(SDDF)/network/ipstacks/lwip/src
+LWIPDIR := $(SDDF)/components/network/ipstacks/lwip/src
 include $(LWIPDIR)/Filelists.mk
 
 LIB_SDDF_LWIP_LWIP_FILES := \

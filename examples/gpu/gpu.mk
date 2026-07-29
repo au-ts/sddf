@@ -44,7 +44,7 @@ REPORT_FILE := report.txt
 SYSTEM_FILE := ${TOP}/board/${MICROKIT_BOARD}/gpu.system
 
 GPU_DRIVER := ${SDDF}/drivers/gpu/${GPU_DRIV_DIR}
-GPU_COMPONENTS := ${SDDF}/gpu/components
+GPU_COMPONENTS := ${SDDF}/components/gpu
 TIMER_DRIVER := ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}
 
 ifneq ($(strip ${BLOB}), 0)

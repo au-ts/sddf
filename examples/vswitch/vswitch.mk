@@ -35,13 +35,13 @@ include ${SDDF}/tools/make/board/common.mk
 
 VSWITCH:= ${SDDF}/examples/vswitch
 METAPROGRAM := $(VSWITCH)/meta.py
-LWIPDIR := network/ipstacks/lwip/src
+LWIPDIR := $(SDDF)/components/network/ipstacks/lwip/src
 UTIL := $(SDDF)/util
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
-SERIAL_COMPONENTS := $(SDDF)/serial/components
+SERIAL_COMPONENTS := $(SDDF)/components/serial
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
-NETWORK_COMPONENTS := $(SDDF)/network/components
+NETWORK_COMPONENTS := $(SDDF)/components/network
 
 SDDF_CUSTOM_LIBC := 1
 
@@ -136,8 +136,8 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 
 
 include ${SDDF}/util/util.mk
-include ${SDDF}/network/components/network_components.mk
-include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
+include ${SDDF}/components/network/network_components.mk
+include ${SDDF}/components/network/lib_sddf_lwip/lib_sddf_lwip.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/serial_driver.mk

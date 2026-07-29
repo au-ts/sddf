@@ -352,19 +352,19 @@ our experimentation and development has been done with the
 #### Updating lwIP
 
 The source for lwIP is currently vendored in the source for sDDF, to update lwIP
-see this [script](/network/ipstacks/update_lwip.sh).
+see this [script](/components/network/ipstacks/update_lwip.sh).
 
 #### Lib sDDF lwIP
 
 The sDDF lwIP library provides an interface layer between sDDF network queues
 and the lwIP `pbuf` interface. The header for the library can be found
 [here](/include/sddf/network/lib_sddf_lwip.h), and the code
-[here](/network/lib_sddf_lwip/).
+[here](/components/network/lib_sddf_lwip/).
 
 The library can be used with any lwIP configuration and API level, and only
 requires a handful of functions to be called in the Microkit `init` and
 `notified` functions. If you wish to use the library, follow these steps:
-1. Include the [makefile snippet](/network/lib_sddf_lwip/lib_sddf_lwip.mk) in
+1. Include the [makefile snippet](/components/network/lib_sddf_lwip/lib_sddf_lwip.mk) in
    your system's makefile. The snippet allows you to create an archive for each
    library user to be linked with.
 
@@ -430,8 +430,8 @@ functionalities like device information.
 To add a *network system* in your Python metaprogram, you must first create
 protection domains for each of the system components:
 * The [ethernet driver](/drivers/network/) for your platform.
-* The [receive](/network/components/virt_rx.c) and
-[transmit](/network/components/virt_tx.c) network virtualisers.
+* The [receive](/components/network/virt_rx.c) and
+[transmit](/components/network/virt_tx.c) network virtualisers.
 
 Once these components have been declared, a sdfgen network subsystem can be
 created:
@@ -466,7 +466,7 @@ net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt
 ```
 
 Once the system has been created, clients can be added along with their
-respective [copy](/network/components/copy.c) components:
+respective [copy](/components/network/copy.c) components:
 
 ```py
 
@@ -607,7 +607,7 @@ libraries. The network components that need to be built are:
   snippet for the driver can be found in the platform directory
   [here](/drivers/network/).
 * The network virtualisers and copiers, whose makefile snippet can be found
-  [here](network/components/network_components.mk).
+  [here](components/network/network_components.mk).
 
 These snippets will need to be included in your makefile.
 
@@ -619,7 +619,7 @@ to be linked with it. The snippet for building the library can be found
 
 If components in your system are using [lib sDDF lwIP](#lib-sddf-lwip), you will
 also need to build an archive of the library for each component using this
-[snippet](/network/lib_sddf_lwip/lib_sddf_lwip.mk). As well as this, you will
+[snippet](/components/network/lib_sddf_lwip/lib_sddf_lwip.mk). As well as this, you will
 need to build the corresponding timer driver for your platform using the
 makefile snippets found [here](/drivers/timer/).
 
@@ -656,7 +656,7 @@ include](/include/) in their `CFLAGS` to access sDDF library functions as well
 as network configuration structs.
 
 Components using lwIP will also require the lwIP include directories
-`network/ipstacks/lwip/src/include`, `network/ipstacks/lwip/src/include/ipv4`.
+`components/network/ipstacks/lwip/src/include`, `components/network/ipstacks/lwip/src/include/ipv4`.
 
 ## Running and using
 

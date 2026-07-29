@@ -46,7 +46,7 @@ include ${SDDF}/tools/make/board/common.mk
 TOP := ${SDDF}/examples/serial
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
-SERIAL_COMPONENTS := $(SDDF)/serial/components
+SERIAL_COMPONENTS := $(SDDF)/components/serial
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SYSTEM_FILE := serial.system
 SDDF_CUSTOM_LIBC := 1

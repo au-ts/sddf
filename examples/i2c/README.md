@@ -16,7 +16,7 @@ pins 3 and 5 for SDA and SCL respectively.
 
 The I2C virtualiser (currently) hard-codes the number of clients and so
 depending on the configuration of the system, you may have to change
-`sddf/i2c/components/virt.c`.
+`sddf/components/i2c/virt.c`.
 
 ## Building
 
