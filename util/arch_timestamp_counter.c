@@ -144,7 +144,7 @@ static bool checked_tsc_frequency = false;
 static uint64_t cached_tsc_frequency = 0;
 /*
  * On x86 calculating the frequency of the tsc uses cpuid which is a serialising instruction
- * https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://cdrdv2-public.intel.com/789589/334569-sdm-vol-2d.pdf&ved=2ahUKEwi4qufojomVAxUPUPUHHVNyElwQFnoECB0QAQ&usg=AOvVaw2qnfp2RSVGg-7BJcEpfHIn
+ * https://cdrdv2-public.intel.com/789589/334569-sdm-vol-2d.pdf
  * Therefore if the TSC is invariant i.e. will not change dynamically then
  * we cache the frequency for performance reasons.
  *
