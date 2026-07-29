@@ -10,11 +10,11 @@
 // #define DEBUG_ARCH_COUNTER
 #ifdef DEBUG_ARCH_COUNTER
 #define LOG_ARCH_COUNTER(...) do{ sddf_printf("ARCH_COUNTER|INFO: ");sddf_printf(__VA_ARGS__); }while(0)
-#define LOG_ARCH_COUNTER_ERR(...) do{ sddf_printf("ARCH_COUNTER|ERROR: ");sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_ARCH_COUNTER(...) do{}while(0)
-#define LOG_ARCH_COUNTER_ERR(...) do{}while(0)
 #endif /* DEBUG_ARCH_COUNTER */
+
+#define LOG_ARCH_COUNTER_ERR(...) do{ sddf_printf("ARCH_COUNTER|ERROR: ");sddf_printf(__VA_ARGS__); }while(0)
 
 #if defined(CONFIG_ARCH_X86)
 /* Documents referenced:
