@@ -97,7 +97,7 @@ ifneq ($(strip $(DTS)),)
 		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
 		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
 endif
