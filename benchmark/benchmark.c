@@ -16,6 +16,10 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+#define BENCH_VM_ENABLED
+#endif
+
 #define LOG_BUFFER_CAP 7
 
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
@@ -322,7 +326,7 @@ static void benchmark_stop(void)
 
 static void benchmark_report(void)
 {
-#if BENCH_VM_ENABLED
+#ifdef BENCH_VM_ENABLED
     uint64_t *vm = (uint64_t *)(uintptr_t)bench_vm_config.results_vaddr;
     vm_sample.total     = vm[0];
     vm_sample.kernel    = vm[1];
@@ -363,7 +367,7 @@ static void benchmark_report(void)
                          benchmark_config.children[i].child_id,
                          &child_samples[i]);
     }
-#if BENCH_VM_ENABLED
+#ifdef BENCH_VM_ENABLED
         print_vm_util(bench_vm_config.vm_name, bench_vm_config.vcpu_id, &vm_sample);
 #endif
 #endif
@@ -390,7 +394,7 @@ void notified(microkit_channel ch)
         benchmark_start();
     } else if (ch == benchmark_config.rx_stop_ch) {
         benchmark_stop();
-#if BENCH_VM_ENABLED
+#ifdef BENCH_VM_ENABLED
     } else if (ch == bench_vm_config.ch_done) {
         benchmark_report();
 #endif
@@ -405,7 +409,7 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-#if BENCH_VM_ENABLED
+#ifdef BENCH_VM_ENABLED
     sddf_printf("BENCH|LOG: VM utilisation tracking enabled for \"%s\" (vcpu %u)\n",
                 bench_vm_config.vm_name, bench_vm_config.vcpu_id);
 #endif
