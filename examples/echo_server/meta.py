@@ -18,6 +18,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
+IrqIoapic = SystemDescription.IrqIoapic
 
 
 """
@@ -234,7 +235,7 @@ def generate(
     )
 
     if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
+        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
         uart_driver.add_ioport(serial_port)
 
     ethernet_driver = ProtectionDomain(
@@ -273,7 +274,7 @@ def generate(
         sdf.add_mr(mbox)
         ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
-    if board.arch == SystemDescription.Arch.X86_64:
+    if board.name == "qemu_virt_x86":
         hw_net_rings = SystemDescription.MemoryRegion(
             sdf, "hw_net_rings", 65536, paddr=0x7A000000
         )
@@ -300,6 +301,42 @@ def generate(
 
         pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
         ethernet_driver.add_ioport(pci_config_data_port)
+
+    if board.name == "vb_105" or board.name == "viscous":
+        # Ethernet driver requires timer access to wait for reconfiguration
+        timer_system.add_client(ethernet_driver)
+
+        eth_region_0 = MemoryRegion(
+            sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
+        )
+        sdf.add_mr(eth_region_0)
+        ethernet_driver.add_map(
+            Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
+        )
+
+        # Note: `write-back` cache is good and performant for hw_ring, so cached=True
+        hw_rx_ring_buffer = MemoryRegion(
+            sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
+        )
+        sdf.add_mr(hw_rx_ring_buffer)
+        ethernet_driver.add_map(Map(hw_rx_ring_buffer, vaddr=0x2400000, perms="rw"))
+
+        hw_tx_ring_buffer = MemoryRegion(
+            sdf, name="hw_tx_ring_buffer", size=0x4000, paddr=0x10004000
+        )
+        sdf.add_mr(hw_tx_ring_buffer)
+        ethernet_driver.add_map(Map(hw_tx_ring_buffer, vaddr=0x2404000, perms="rw"))
+
+        # Legacy I/O APIC
+        eth_irq = SystemDescription.IrqIoapic(
+            ioapic_id=0,
+            pin=16,
+            vector=8,
+            trigger=IrqIoapic.Trigger.LEVEL,
+            polarity=IrqIoapic.Polarity.ACTIVELOW,
+            id=16,
+        )
+        ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
@@ -484,7 +521,7 @@ def generate(
     assert client1_lib_sddf_lwip.connect()
     assert client1_lib_sddf_lwip.serialise_config(output_dir)
 
-    if board.name == "rpi4b_1gb":
+    if board.name == "rpi4b_1gb" or board.name == "vb_105" or board.name == "viscous":
         update_elf_section(
             "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
         )
