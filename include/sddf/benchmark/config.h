@@ -10,18 +10,17 @@
 #include <stdbool.h>
 #include "bench.h"
 
-/* At the moment we run systems that contain this benchmarking code on architectures
- * where we cannot properly do benchmarking. We also include the benchmarking PD
- * on non-benchmarking configurations.
- * This defines whether we actually try to benchmark, setup the PMU etc.
+/*
+ * This defines whether we actually try to benchmark.
+ * If the PMU is available that will be enabled below.
  */
-#if defined(CONFIG_ENABLE_BENCHMARKS) && (defined(CONFIG_ARCH_ARM) || defined(CONFIG_ARCH_RISCV))
+#if defined(CONFIG_ENABLE_BENCHMARKS)
 #define ENABLE_BENCHMARKING 1
 #else
 #define ENABLE_BENCHMARKING 0
 #endif
 
-/* While we can get cycle count and utilisation results on RISC-V, we cannot yet get
+/* While we can get cycle count and utilisation results on RISC-V and x86, we cannot yet get
  * PMU event information (cache misses, instruction counts etc) */
 #if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
 #define ENABLE_PMU_EVENTS 1
@@ -47,8 +46,6 @@ typedef struct benchmark_config {
     /* Channel a benchmark PD transmits the benchmark stop notification on
     (stop signal is propagated to benchmark PDs on each core). */
     uint8_t tx_stop_ch;
-    /* Initialisation channel shared with the idle thread on the same core. */
-    uint8_t init_ch;
     /* Core a benchmark PD resides on. Used for displaying benchmark results. */
     uint8_t core;
     /* Whether a benchmark PD is on the last core to receive start and stop
@@ -65,14 +62,6 @@ typedef struct benchmark_config {
     uint8_t num_pmu_events;
 } benchmark_config_t;
 
-typedef struct benchmark_idle_config {
-    /* Address to store the core's cycle counts. Shared with the benchmarking
-    client PD. */
-    void *cycle_counters;
-    /* Initialisation channel shared with the benchmark PD on the same core. */
-    uint8_t init_channel;
-} benchmark_idle_config_t;
-
 typedef struct benchmark_client_config {
     /* Channel to notify the first benchmark PD that a benchmark has started.
     Each benchmark PD propagates this notification to the benchmark PD on the
@@ -82,9 +71,6 @@ typedef struct benchmark_client_config {
     Each benchmark PD propagates this notification to the benchmark PD on the
     next core. */
     uint8_t stop_ch;
-    /* Number of active cores in the system. */
-    uint8_t num_cores;
-    /* Addresses of each active core's cycle counts maintained by and shared
-    with the idle thread on that core. */
-    void *core_ccounts[CONFIG_MAX_NUM_NODES];
+    /* Flag set to true if this is the benchmark controller. */
+    uint8_t is_benchmark_controller;
 } benchmark_client_config_t;

@@ -93,9 +93,16 @@ static void print_total_util(uint64_t *buffer)
     uint64_t number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
+    uint64_t idle_local_cpu = buffer[BENCHMARK_IDLE_LOCALCPU_UTILISATION];
+    uint64_t idle_tcb_cpu = buffer[BENCHMARK_IDLE_TCBCPU_UTILISATION];
+    uint64_t idle_number_schedules = buffer[BENCHMARK_IDLE_NUMBER_SCHEDULES];
+    uint64_t idle_kernel = buffer[BENCHMARK_IDLE_KERNEL_UTILISATION];
+    uint64_t idle_entries = buffer[BENCHMARK_IDLE_NUMBER_KERNEL_ENTRIES];
     sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
-                "%lu\nTotalUtilisation: %lu\n}\n",
-                kernel, entries, number_schedules, total);
+                "%lu\nTotalUtilisation: %lu\nIdleLocalCPUUtilisation: %lu\nIdleTCBCPUUtilisation: "
+                "%lu\nIdleNumberSchedules: %lu\nIdleKernelUtilisation: %lu\nIdleNumberKernelEntries: %lu\n}\n",
+                kernel, entries, number_schedules, total, idle_local_cpu, idle_tcb_cpu, idle_number_schedules,
+                idle_kernel, idle_entries);
 }
 
 static void print_child_util(uint64_t *buffer, uint8_t id)
@@ -325,8 +332,6 @@ void init(void)
 #endif
 
     benchmark_init();
-    /* Notify the idle thread that the sel4bench library is initialised. */
-    microkit_notify(benchmark_config.init_ch);
 }
 
 seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)

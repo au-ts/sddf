@@ -69,41 +69,9 @@ static struct tcp_pcb *utiliz_socket;
 
 benchmark_client_config_t *bench;
 
-uint64_t core_ccount_start[CONFIG_MAX_NUM_NODES];
-uint64_t idle_ccount_start[CONFIG_MAX_NUM_NODES];
-
 #define MAX_TCP_DATA_LEN 1460
 
 char data_packet_str[MAX_TCP_DATA_LEN];
-
-static inline void my_reverse(char s[])
-{
-    unsigned int i, j;
-    char c;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-        c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}
-
-static inline void my_itoa(uint64_t n, char s[])
-{
-    unsigned int i;
-    uint64_t sign;
-
-    if ((sign = n) < 0)  /* record sign */
-        n = -n;          /* make n positive */
-    i = 0;
-    do {       /* generate digits in reverse order */
-        s[i++] = n % 10 + '0';   /* get next digit */
-    } while ((n /= 10) > 0);     /* delete it */
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    my_reverse(s);
-}
 
 static err_t utilization_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
@@ -131,48 +99,21 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
         sddf_printf("%s measurement starting...\n", sddf_get_pd_name());
-        /* Only benchmark controller client will have bench->num_cores > 0 */
-        if (bench->num_cores) {
-            for (uint8_t i = 0; i < bench->num_cores; i++) {
-                struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
-                core_ccount_start[i] = __atomic_load_n(&ccounts->core_ccount, __ATOMIC_RELAXED);
-                idle_ccount_start[i] = __atomic_load_n(&ccounts->idle_ccount, __ATOMIC_RELAXED);
-            }
+        /* Only benchmark controller client will have bench->is_benchmark_controller > 0 */
+        if (bench->is_benchmark_controller) {
             sddf_notify(bench->start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         sddf_printf("%s measurement finished \n", sddf_get_pd_name());
 
-        uint64_t total = 0, idle = 0;
-        for (uint8_t i = 0; i < bench->num_cores; i++) {
-            struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
-            total += __atomic_load_n(&ccounts->core_ccount, __ATOMIC_RELAXED) - core_ccount_start[i];
-            idle += __atomic_load_n(&ccounts->idle_ccount, __ATOMIC_RELAXED) - idle_ccount_start[i];
-        }
-
-        char tbuf[21];
-        my_itoa(total, tbuf);
-
-        char ibuf[21];
-        my_itoa(idle, ibuf);
-
-        /* Message format: ",total,idle\0" */
-        int len = strlen(tbuf) + strlen(ibuf) + 3;
-        char lbuf[16];
-        my_itoa(len, lbuf);
-
         char buffer[120];
-        strcat(strcpy(buffer, "220 VALID DATA (Data to follow)\nContent-length: "), lbuf);
-        strcat(buffer, "\n,");
-        strcat(buffer, ibuf);
-        strcat(buffer, ",");
-        strcat(buffer, tbuf);
+        strcpy(buffer, RES(5, 0, 0));
 
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        /* Only benchmark controller client will have bench->num_cores > 0 */
-        if (bench->num_cores) {
+        /* Only benchmark controller client will have bench->is_benchmark_controller > 0 */
+        if (bench->is_benchmark_controller) {
             sddf_notify(bench->stop_ch);
         }
     } else if (msg_match(data_packet_str, QUIT)) {
