@@ -5,12 +5,14 @@
 #include <lwip/udp.h>
 
 #define UDP_CONNECT_REPLY 0x39383736
+#define UDP_CONNECT_MSG 0x36373839
 
 extern timer_client_config_t timer_config;
 
 void udp_pump(iperf3_udp_stream_t *stream) {
   if (!stream || !stream->pcb || stream->phase != SEND_PAYLOAD) return;
-  if (stream->ctrl && stream->ctrl->is_reverse) return;
+
+  if (!stream->is_sender) return;
 
   while (stream->packets_this_tick < stream->burst_max) {
     // time
@@ -35,7 +37,7 @@ void udp_pump(iperf3_udp_stream_t *stream) {
 
     uint32_t sec_be  = htonl(sec);
     uint32_t usec_be = htonl(usec);
-    uint32_t id      = htonl(seq); 
+    uint32_t id      = htonl(seq);
     uint32_t id2     = htonl(0);
 
     memcpy(buf + 0,  &sec_be,  4);
@@ -43,12 +45,11 @@ void udp_pump(iperf3_udp_stream_t *stream) {
     memcpy(buf + 8,  &id,      4);
     memcpy(buf + 12, &id2,     4);
 
-
     memcpy(buf + hdr_len, stream->tx_buf, stream->payload_len - hdr_len);
-    err_t err = udp_sendto(stream->pcb, p, &stream->server_addr, stream->server_port);
+    err_t err = udp_sendto(stream->pcb, p, &stream->peer_addr, stream->peer_port);
     pbuf_free(p);
     if (err == ERR_MEM) {
-      break; /* TX ring full; retry next tick */
+      break;
     }
     if (err != ERR_OK) {
       sddf_printf("[udp] sendto err=%d seq=%u\n", (int)err, seq);
@@ -61,27 +62,152 @@ void udp_pump(iperf3_udp_stream_t *stream) {
   }
 }
 
+/* Acknowledge a stream handshake */
+static void udp_send_connect_reply(struct udp_pcb *pcb, const ip_addr_t *addr, u16_t port) {
+    struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, sizeof(uint32_t), PBUF_RAM);
+    if (!pb) {
+        sddf_printf("[udp] reply pbuf_alloc failed\n");
+        return;
+    }
+
+    uint32_t reply = UDP_CONNECT_REPLY;
+    memcpy(pb->payload, &reply, sizeof(reply));
+    err_t err = udp_sendto(pcb, pb, addr, port);
+    pbuf_free(pb);
+    if (err != ERR_OK) sddf_printf("[udp] reply send err=%d\n", (int)err);
+}
+
+static bool udp_is_connect_msg(struct pbuf *p) {
+    if (p->len < 4) return false;
+    uint32_t msg;
+    memcpy(&msg, p->payload, sizeof(msg));
+    return (msg == UDP_CONNECT_MSG || ntohl(msg) == UDP_CONNECT_MSG);
+}
+
+struct udp_pcb *udp_new_listener(iperf_ctrl_t *ctrl) {
+    struct udp_pcb *pcb = udp_new();
+    if (pcb == NULL) {
+        sddf_printf("[udp] udp_new failed\n");
+        return NULL;
+    }
+    
+    ip_set_option(pcb, SOF_REUSEADDR);
+    uint16_t dport = ctrl->server_port ? ctrl->server_port : 5202;
+    err_t err = udp_bind(pcb, IP4_ADDR_ANY, dport);
+    if (err != ERR_OK) {
+        sddf_printf("[udp] bind %u failed: %d\n", dport, (int)err);
+        udp_remove(pcb);
+        return NULL;
+    }
+    udp_recv(pcb, udp_listener_recv, ctrl);
+    return pcb;
+}
+
+/**
+ * the listener pcb is converted into this client's stream pcb and
+ * a replacement listener is bound to the same port for the next stream.
+ *
+ * @param arg the control block
+ * @param pcb the listener pcb, about to become a stream pcb
+ * @param p pbuf containing the setup datagram
+ * @param addr ip address of the peer
+ * @param port source port of the peer
+ *
+**/
+void udp_listener_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
+                       const ip_addr_t *addr, u16_t port) {
+    iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
+    if (!p) return;
+    if (!ctrl) { pbuf_free(p); return; }
+
+    /* How many streams we expect in each direction */
+    uint8_t to_rec  = ctrl->is_bidirectional ? ctrl->num_streams
+                                             : (ctrl->is_reverse ? 0 : ctrl->num_streams);
+    uint8_t to_send = ctrl->is_bidirectional ? ctrl->num_streams
+                                             : (ctrl->is_reverse ? ctrl->num_streams : 0);
+    uint8_t total   = to_rec + to_send;
+    uint8_t claimed = ctrl->rec_streams_accepted + ctrl->send_streams_accepted;
+
+    if (!udp_is_connect_msg(p) || claimed >= total || claimed >= MAX_STREAMS) {
+        pbuf_free(p);   /* stray traffic on the listener */
+        return;
+    }
+
+    /* Direction is assigned by arrival order */
+    bool as_sender;
+    if (ctrl->rec_streams_accepted < to_rec) {
+        as_sender = false;
+        ctrl->rec_streams_accepted++;
+    } else {
+        as_sender = true;
+        ctrl->send_streams_accepted++;
+    }
+
+    /* Promote the listener into this clients stream. */
+    uint8_t s = claimed;
+    iperf3_udp_stream_t *stream = &ctrl->udp_streams[s];
+    stream->ctrl = ctrl;
+    stream->pcb = pcb;
+    stream->peer_addr = *addr;
+    stream->peer_port = port;
+    stream->is_sender = as_sender;
+    stream->phase = STOPPED;
+
+    if (udp_connect(pcb, addr, port) != ERR_OK) {
+        sddf_printf("[udp] connect stream %u failed\n", s);
+    }
+    udp_recv(pcb, udp_stream_recv, stream);
+    claimed++;
+    sddf_printf("[udp] stream %u/%u from port %u (%s)\n",
+                claimed, total, port, as_sender ? "TX" : "RX");
+
+    ctrl->udp_listen = (claimed < total) ? udp_new_listener(ctrl) : NULL;
+
+    udp_send_connect_reply(pcb, addr, port);
+    pbuf_free(p);
+
+    if (claimed == total) {
+        iperf3_udp_server_start(ctrl);
+    }
+}
+
+/**
+ * Data path for an established stream.
+ * 
+ * @param arg udp stream handle
+ * @param pcb pcb containing the underlying connection
+ * @param p pbuf containing the msg/data from the peer
+ * @param addr ip address of the peer
+ * @param port port of the peer
+ *
+**/
 void udp_stream_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
                      const ip_addr_t *addr, u16_t port) {
     iperf3_udp_stream_t *stream = (iperf3_udp_stream_t *)arg;
-    (void)pcb; (void)addr; (void)port;
+    (void)pcb;
 
     if (!p) return;
+    if (!stream || !stream->ctrl) { pbuf_free(p); return; }
     iperf_ctrl_t *ctrl = stream->ctrl;
 
-    /* Connect handshake */
-    if (p->len >= 4) {
-        uint32_t reply;
-        memcpy(&reply, p->payload, sizeof(reply));
-        if (reply == UDP_CONNECT_REPLY || ntohl(reply) == UDP_CONNECT_REPLY) {
-            stream->phase = SEND_PAYLOAD;   /* forward mode begin pumping */
-            pbuf_free(p);
-            return;
-        }
+    if (ctrl->role == 's') {
+      if (udp_is_connect_msg(p)) {
+        udp_send_connect_reply(stream->pcb, addr, port);
+        pbuf_free(p);
+        return;
+      }
+    } else if (p->len >= 4) {
+      /* Connect handshake */
+      uint32_t reply;
+      memcpy(&reply, p->payload, sizeof(reply));
+      if (reply == UDP_CONNECT_REPLY || ntohl(reply) == UDP_CONNECT_REPLY) {
+        stream->phase = SEND_PAYLOAD;   /* forward mode begin pumping */
+        pbuf_free(p);
+        return;
+      }
     }
-    
 
-    if (ctrl && !stream->is_sender && !ctrl->omitting && p->len >= 16) {
+    if (!stream->is_sender && !ctrl->omitting && p->len >= 16) {
         uint8_t *b = (uint8_t *)p->payload;
         uint32_t sec_be, usec_be, seq_be;
         memcpy(&sec_be,  b + 0, 4);

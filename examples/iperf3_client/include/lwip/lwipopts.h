@@ -254,6 +254,15 @@
 // causes memp_malloc: out of memory in pool TCP_PCB
 // iperf3_ctrl_recv: failed to create stream PCB
 
-#define MEMP_NUM_UDP_PCB 20
+/* One pcb per UDP stream plus the spare listener. Bidirectional doubles the
+ * stream count, so this must be at least 2 * MAX_STREAMS + 1. */
+#define MEMP_NUM_UDP_PCB 32
+
+/* iperf3 has no UDP accept(): the listener pcb is converted into the stream pcb
+ * and a replacement listener is bound to the same data port. udp_bind rejects a
+ * duplicate local port unless every pcb on it sets SOF_REUSEADDR (udp.c:993).
+ * Harmless for TCP - tcp_bind applies the same both-pcbs rule and nothing here
+ * sets SOF_REUSEADDR on a TCP pcb. */
+#define SO_REUSE 1
 
 

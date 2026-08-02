@@ -20,20 +20,18 @@
 #include "iperf3_ctrl.h"
 #include "iperf3_app.h"
 #include "iperf3_multi.h"
-/* iperf3_util.h declares the ipbench utilization socket + port (protocol
- * agnostic), wanted for both TCP and UDP builds. */
+
 #include "iperf3_util.h"
 
 __attribute__((__section__(".iperf3_app_config"))) iperf3_app_config_t app_config;
 
-/* Multi-client coordination: in a multi-client build only client0 (the
- * controller) gets serial input; it broadcasts the parsed test params to the
- * other clients via the shared region + per-peer notifications (WIP) */
+/* Multi-client coordination (WIP) */
 __attribute__((__section__(".iperf3_multi_config"))) iperf3_multi_config_t multi_config;
 static volatile iperf3_shared_params_t *shared_params =
     (volatile iperf3_shared_params_t *)IPERF3_SHARED_PARAMS_VADDR;
 static uint32_t shared_gen_local;
 static uint32_t shared_gen_seen;
+
 
 static uint64_t bench_core_start[CONFIG_MAX_NUM_NODES];
 static uint64_t bench_idle_start[CONFIG_MAX_NUM_NODES];
@@ -44,11 +42,13 @@ static bool bench_reported;
 static uint32_t pkts_segs_start;
 static bool pkts_snapshotted, pkts_reported;
 
+// configs to be injected into elf
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 __attribute__((__section__(".benchmark_client_config"))) benchmark_client_config_t benchmark_config;
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lib_sddf_lwip_config;
+
 
 serial_queue_handle_t serial_tx_queue_handle;
 serial_queue_handle_t serial_rx_queue_handle;
@@ -59,6 +59,7 @@ static iperf_ctrl_t ctrl;
 
 #define LWIP_TICK_MS 100
 
+// make cookie logic
 static uint32_t prng_state = 0x12345678;
 
 static uint32_t prng_next(void) {
@@ -92,11 +93,12 @@ static void print_prompt(void)
     serial_write_unbuffered("\niperf3> ");
 }
 
-/* Open the control connection and kick off a test against server */
+/* Open and initialises control connection and kick off a test against a server */
 static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
                               uint16_t port, uint32_t duration_s,
                               uint8_t num_streams, uint32_t bw_mbps,
-                              uint16_t payload_len, bool is_udp, bool is_reverse, bool is_bidirectional)
+                              uint16_t payload_len, bool is_udp, bool is_reverse, bool is_bidirectional,
+                              uint32_t blocks)
 {
     if (!netif_ready) {
         sddf_printf("network is not up yet - wait for the DHCP message\n");
@@ -127,6 +129,7 @@ static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
     ctrl.duration_s = duration_s;
     ctrl.num_streams = num_streams;
     ctrl.target_bw_mbps = bw_mbps;
+    ctrl.target_blocks = blocks;
     ctrl.payload_len = payload_len;
     ctrl.omit_s = is_udp ? 0 : 5;
     ctrl.is_reverse = is_reverse;
@@ -150,7 +153,8 @@ static void iperf3_begin_test(uint8_t a, uint8_t b, uint8_t c, uint8_t d,
 }
 
 /* If line matches word return a
- * pointer just past the word; otherwise NULL. */
+ * pointer just past the word otherwise NULL.
+ */
 static char *match_word(char *line, const char *word)
 {
     int i = 0;
@@ -162,7 +166,7 @@ static char *match_word(char *line, const char *word)
     return line + i;
 }
 
-/* Parse a decimal uint, skipping leading spaces. *ok is false if no digit. */
+/* Parse a decimal uint. *ok is false if no digit. */
 static char *parse_uint(char *p, uint32_t *out, bool *ok)
 {
     while (*p == ' ') p++;
@@ -226,6 +230,7 @@ static void handle_command(char *line)
     if (*p == '\0') return;
 
     char *rest;
+    // help or ? or start match
     if ((rest = match_word(p, "help")) || (rest = match_word(p, "?"))) {
         print_help();
     } else if ((rest = match_word(p, "status"))) {
@@ -246,7 +251,7 @@ static void handle_command(char *line)
         bool ok;
         
         char *q;
-
+        // protocol or server
         if ((after = match_word(tok, "udp"))) { is_udp = true; rest = after; }
         else if ((after = match_word(tok, "tcp"))) { is_udp = false; rest = after; }
         else if (after = match_word(tok, "server")) { 
@@ -267,6 +272,7 @@ static void handle_command(char *line)
         uint8_t streams = 1;
         uint32_t bw = 0;
         uint16_t len = 1460;
+        uint32_t blocks = 0;
         bool reverse = false;
         bool is_bidirectional = false;
         
@@ -277,6 +283,14 @@ static void handle_command(char *line)
         if ((q = parse_uint(rest, &v, &ok)), ok) { len = (uint16_t)v; rest = q; }
 
         
+        /* "blocks N" replaces the duration: stop after N blocks of <len>. */
+        while (*rest == ' ') rest++;
+        if ((q = match_word(rest, "blocks"))) {
+            rest = q;
+            if ((q = parse_uint(rest, &v, &ok)), ok) { blocks = v; rest = q; }
+            else sddf_printf("blocks needs a count!\n");
+        }
+
         while (*rest == ' ') rest++;
         if ((q = match_word(rest, "reverse"))) { reverse = true; rest = q; }
         else if (q = match_word(rest, "bidirectional")) {is_bidirectional = true, rest = q;}
@@ -300,6 +314,7 @@ static void handle_command(char *line)
             shared_params->is_udp = is_udp ? 1 : 0;
             shared_params->is_reverse = reverse ? 1 : 0;
             shared_params->is_bidirectional = is_bidirectional ? 1 : 0;
+            shared_params->blocks = blocks;
             __atomic_store_n(&shared_params->generation, ++shared_gen_local, __ATOMIC_RELEASE);
             for (uint8_t pi = 0; pi < multi_config.num_peers; pi++) {
                 microkit_notify(multi_config.peer_channels[pi]);
@@ -308,13 +323,14 @@ static void handle_command(char *line)
         }
 
         iperf3_begin_test(ip[0], ip[1], ip[2], ip[3],
-                          port + app_config.client_id, dur, streams, bw, len, is_udp, reverse, is_bidirectional);
+                          port + app_config.client_id, dur, streams, bw, len, is_udp, reverse,
+                          is_bidirectional, blocks);
     } else {
         sddf_printf("unknown command - type 'help'\n");
     }
 }
 
-/* Accumulate serial RX into a line buffer; dispatch on CR/LF. */
+/* Accumulate serial RX into a line buffer finish on CR/LF. */
 #define CMD_BUF_SIZE 128
 static char cmd_buf[CMD_BUF_SIZE];
 static uint32_t cmd_len = 0;
@@ -387,8 +403,13 @@ void init(void)
 void notified(sddf_channel ch)
 {
     if (ch == net_config.rx.id) {
+        // lwip process receive
         sddf_lwip_process_rx();
     } else if (ch == timer_config.driver_id) {
+        /** LWIP processes timeout.
+         * check timers
+         * 
+         */
         sddf_lwip_process_timeout();
   
         uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
@@ -401,6 +422,8 @@ void notified(sddf_channel ch)
                 net_request_signal_free(&net_tx_handle);
             }
         } else {
+       
+            iperf3_tcp_check_deadline(&ctrl, now_ms);
             for (int s = 0; s < MAX_STREAMS; s++) {
                 if (ctrl.streams[s].pcb != NULL && ctrl.streams[s].phase == SEND_PAYLOAD) {
                     ctrl.streams[s].bytes_this_tick = 0;
@@ -422,13 +445,13 @@ void notified(sddf_channel ch)
                               shared_params->base_port + app_config.client_id,
                               shared_params->duration_s, shared_params->num_streams,
                               shared_params->bw_mbps, shared_params->payload_len,
-                              shared_params->is_udp != 0, shared_params->is_reverse, shared_params->is_bidirectional);
+                              shared_params->is_udp != 0, shared_params->is_reverse,
+                              shared_params->is_bidirectional, shared_params->blocks);
         }
     } else if (ch == serial_config.tx.id) {
         /* TX free notification - nothing to do */
     } else if (ch == net_config.tx.id) {
-        /* TX buffers freed - UDP continues pumping its remaining tick budget.
-         * (TCP is ACK-clocked and ignores this.) */
+        /* TX buffers freed UDP continues pumping*/
         if (ctrl.is_udp) {
             uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
             iperf3_on_timer_tick(&ctrl, now_ms);

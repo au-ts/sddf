@@ -29,4 +29,5 @@ typedef struct iperf3_shared_params {
     uint32_t payload_len;    /* UDP datagram bytes */
     uint32_t is_reverse;
     uint32_t is_bidirectional;
+    uint32_t blocks;         /* 0 = time-based, else stop after N blocks */
 } iperf3_shared_params_t;

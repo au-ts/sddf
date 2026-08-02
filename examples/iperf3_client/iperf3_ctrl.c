@@ -50,17 +50,21 @@ static uint32_t isqrt64(uint64_t x) {
     return (uint32_t)r;
 }
 
-/* parse json into ctrl arguments*/
+/**
+ * Parse test params (used by the server)
+ * 
+ * @param json the json to parse using mjson
+ * @param ctrl
+ */
 void parse_test_params(const char *json, iperf_ctrl_t *ctrl) {
     int len = (int)strlen(json);
     double d;
     int b;
 
-    /* The peer's params are authoritative - anything it leaves out is off,
-     * not whatever iperf3_ctrl_init() left behind from a previous role. */
     ctrl->omit_s = 0;
     ctrl->omit_ms = 0;
     ctrl->num_streams = 1;
+    ctrl->target_bw_mbps = 0;
 
     ctrl->is_udp = (mjson_get_bool(json, len, "$.udp", &b) && b);
 
@@ -82,7 +86,7 @@ void parse_test_params(const char *json, iperf_ctrl_t *ctrl) {
         ctrl->payload_len = (uint16_t)d;
     }
 
-    if (mjson_get_number(json, len, "$.bitrate", &d)) {
+    if (mjson_get_number(json, len, "$.bandwidth", &d)) {
         ctrl->target_bw_mbps = (uint32_t)(d / 1000000.0);
     }
 
@@ -90,12 +94,20 @@ void parse_test_params(const char *json, iperf_ctrl_t *ctrl) {
     ctrl->is_bidirectional = (mjson_get_bool(json, len, "$.bidirectional", &b) && b);
 }
 
-/* listen on server */
+/**
+ * Listen for incoming client connections on server
+ * 
+ * @param ctrl 
+ * @param port listen on this port
+ */
 void iperf3_server_listen(iperf_ctrl_t *ctrl, uint32_t port) {
 
     iperf3_ctrl_init(ctrl);
     ctrl->role = 's';
+    /* Data streams share the control port in iperf3, udp listner binds here too*/
+    ctrl->server_port = (uint16_t)port;
 
+    // new data stream
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
     if (pcb == NULL) {
         sddf_printf("iperf3_server_listen: failed to create PCB\n");
@@ -121,7 +133,13 @@ void iperf3_server_listen(iperf_ctrl_t *ctrl, uint32_t port) {
     sddf_printf("[iperf3] server listening on port %u\n", (unsigned)port);
 }
 
-/* server accept client ctrl */
+/**
+ * Accept the incoming connect from a client and creates new_pcb which is the 
+ * new ctrl connection or a accept new tcp data stream connection
+ * 
+ * @param arg ctrl
+ * @param new_pcb connection object delegated by lwip upon an accept
+ */
 err_t iperf3_server_accept_ctrl(void* arg, struct tcp_pcb *new_pcb, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     if (err != ERR_OK || new_pcb == NULL) return ERR_VAL;
@@ -151,23 +169,45 @@ err_t iperf3_server_accept_ctrl(void* arg, struct tcp_pcb *new_pcb, err_t err) {
                 tcp_abort(new_pcb);
                 return ERR_ABRT;
             }
+            /* Direction is assigned by arrival order nothing on the wire
+             * identifies it. Receiver first, then sender slots */
+            uint8_t to_rec  = ctrl->is_bidirectional ? ctrl->num_streams
+                                                     : (ctrl->is_reverse ? 0 : ctrl->num_streams);
+            uint8_t to_send = ctrl->is_bidirectional ? ctrl->num_streams
+                                                     : (ctrl->is_reverse ? ctrl->num_streams : 0);
+            bool as_sender;
+            if (ctrl->rec_streams_accepted < to_rec) {
+                as_sender = false;
+                ctrl->rec_streams_accepted++;
+            } else if (ctrl->send_streams_accepted < to_send) {
+                as_sender = true;
+                ctrl->send_streams_accepted++;
+            } else {
+                tcp_abort(new_pcb); /* more streams than the params asked for */
+                return ERR_ABRT;
+            }
+
+            /* init stream */
             iperf3_stream_t *stream = &ctrl->streams[idx];
-            stream->pcb = new_pcb;
-            stream->cookie_rx_len = 0;
-            stream->bytes = 0;
-            stream->rx_bytes = 0;
-            stream->is_sender = false;
-            stream->phase = STOPPED;
-            stream->ctrl = ctrl;
+            iperf3_stream_init(stream, ctrl->cookie, ctrl);
+            stream->pcb       = new_pcb;   /* init leaves this NULL */
+            stream->is_sender = as_sender;
+            stream->phase     = STOPPED;
             tcp_arg(new_pcb, stream);
             tcp_recv(new_pcb, iperf3_server_stream_recv);
             tcp_err(new_pcb, iperf3_stream_err);
+
+            tcp_sent(new_pcb,iperf3_stream_sent);
         }
     }
     return ERR_OK;
 }
 
-/* Aggregate RTT (us) across all TCP streams */
+/** Aggregate RTT statistics across all TCP streams 
+ * 
+ * @param ctrl
+ * @param o_min 
+*/
 void iperf3_tcp_rtt_aggregate(iperf_ctrl_t *ctrl, uint32_t *o_min, uint32_t *o_mean,
                               uint32_t *o_max, uint32_t *o_sd, uint64_t *o_n) {
     uint32_t rmin = 0xFFFFFFFFu, rmax = 0;
@@ -184,11 +224,17 @@ void iperf3_tcp_rtt_aggregate(iperf_ctrl_t *ctrl, uint32_t *o_min, uint32_t *o_m
     uint32_t rmean = rcnt ? (uint32_t)(rsum / rcnt) : 0;
     *o_min  = rcnt ? rmin : 0;
     *o_mean = rmean;
-    *o_max  = rmax;
+    *o_max = rmax;
     *o_sd   = rcnt ? isqrt64(rsumsq / rcnt - (uint64_t)rmean * rmean) : 0;
     *o_n    = rcnt;
 }
 
+/**
+ * Initialises the ctrl block with default states
+ * 
+ * @param ctrl the ctrl to initialise
+ * 
+ */
 void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     ctrl->pcb = NULL;
     memset(ctrl->cookie, 0, IPERF3_COOKIE_LEN);
@@ -205,6 +251,10 @@ void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     ctrl->omitting = false;
     ctrl->num_streams = 1;
     ctrl->target_bw_mbps = 0;
+    ctrl->target_blocks = 0;
+    ctrl->send_streams_accepted = 0;
+    ctrl->rec_streams_accepted = 0;
+    ctrl->streams_ready = 0;
     ctrl->payload_len = 1460;
     ctrl->is_udp = false;
     ctrl->duration_s = 10;
@@ -218,6 +268,14 @@ void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     }
 }
 
+/**
+ * Try to send whats in the buffer for ctrl plane (states, 4-byte json length or
+ * the actual json or results)
+ * 
+ * @param ctrl the ctrl stream that currently buffers next states/msgs to send
+ * to the server/client
+ * 
+ */
 static void iperf3_ctrl_maybe_tx(iperf_ctrl_t *ctrl) {
     if (ctrl->pcb == NULL) return;
     if (ctrl->tx_len == ctrl->tx_off) return;
@@ -231,6 +289,15 @@ static void iperf3_ctrl_maybe_tx(iperf_ctrl_t *ctrl) {
     tcp_output(ctrl->pcb);
 }
 
+
+/**
+ * Set to the current state to parameter state and send off to the peer.
+ * Queues up the tx_len and tx_buf
+ * 
+ * @param ctrl 
+ * @param state state to move to
+ * 
+ */
 static err_t iperf_set_send_state(iperf_ctrl_t *ctrl, signed int state) {
     ctrl->server_state = state;
     ctrl->tx_buf = (const int8_t *)&ctrl->server_state;
@@ -298,11 +365,75 @@ static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
 }
 
 
+/**  UDP results, same shape as the TCP builder. Senders report the datagrams they
+ * pumped; receivers report what arrived, plus loss (from the sender-seq span)
+ * and RFC1889 jitter. Body goes at json_send_buf + 4. 
+ * 
+ * @param ctrl the ctrl struct
+ * 
+ * */
+static uint32_t iperf3_build_udp_results(iperf_ctrl_t *ctrl) {
+    char *buf = ctrl->json_send_buf + 4;
+    size_t cap = sizeof(ctrl->json_send_buf) - 4;
+    int off = 0;
+
+    off += sddf_snprintf(buf + off, cap - off,
+        "{\"cpu_util_total\":%.2f,\"cpu_util_user\":%.2f,"
+        "\"cpu_util_system\":0.00,\"sender_has_retransmits\":0,"
+        "\"congestion_used\":\"cubic\",\"streams\":[",
+        ctrl->cpu_util_percent, ctrl->cpu_util_percent);
+
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+    for (uint32_t s = 0; s < total; s++) {
+        iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+        /* stream ids are 1,3,4,5... */
+        int id = (s == 0) ? 1 : (int)(2 + s);
+        uint64_t bytes, packets;
+        int lost = 0;
+        double jitter = 0.0;
+        if (us->is_sender) {
+            bytes = us->bytes_sent;
+            packets = us->packets_sent;
+        } else {
+            bytes = us->rx_bytes;
+            packets = us->rx_packets;
+            jitter = us->rx_jitter;
+            if (us->rx_have_first) {
+                int expected = (int)(us->rx_last_seq - us->rx_first_seq) + 1;
+                lost = expected - (int)us->rx_packets;
+                if (lost < 0) lost = 0;
+            }
+        }
+        off += sddf_snprintf(buf + off, cap - off,
+            "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
+            "\"jitter\":%.6f,\"errors\":%d,\"omitted_errors\":0,"
+            "\"packets\":%llu,\"omitted_packets\":0,"
+            "\"start_time\":0.0,\"end_time\":%u.0}",
+            s == 0 ? "" : ",", id, (unsigned long long)bytes, jitter, lost,
+            (unsigned long long)packets, ctrl->duration_s);
+    }
+    off += sddf_snprintf(buf + off, cap - off, "],\"server_output_text\":\"\"}");
+    return (uint32_t)off;
+}
+
+/**
+ * Simple helper to get mbps by dividing bytes sent over the secs 
+ * 
+ * @param bytes bytes
+ * @param secs secs
+ * 
+ */
 static double iperf3_mbps(uint64_t bytes, double secs) {
     return secs > 0.0 ? (double)bytes * 8.0 / 1000000.0 / secs : 0.0;
 }
 
-/* Pull one stream's byte count out of the peer's results JSON */
+/** Pull one stream's byte count out of the peer's results JSON 
+ * 
+ * @param char json
+ * @param int len
+ * @param uint32_t idx
+*/
 static uint64_t iperf3_peer_stream_bytes(const char *json, int len, uint32_t idx) {
     char path[40];
     double d = 0.0;
@@ -311,6 +442,12 @@ static uint64_t iperf3_peer_stream_bytes(const char *json, int len, uint32_t idx
     return (uint64_t)d;
 }
 
+
+/**
+ * Prints a summary for the server stats after a test ends
+ * 
+ * @param ctrl ctrl
+ */
 static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
     double secs = (double)ctrl->duration_s;
     int jlen = (int)strlen((char *)ctrl->result_json);
@@ -319,17 +456,30 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
     uint64_t tx_sum = 0, rx_sum = 0;
 
     sddf_printf("\n[iperf3] ---------- summary (server) ----------\n");
-    sddf_printf("[iperf3] proto=TCP streams=%u time=%u s omit=%u s\n",
+    sddf_printf("[iperf3] proto=%s streams=%u time=%u s omit=%u s\n",
+                ctrl->is_udp ? "UDP" : "TCP",
                 ctrl->num_streams, ctrl->duration_s, ctrl->omit_s);
     for (uint32_t s = 0; s < total; s++) {
         int id = (s == 0) ? 1 : (int)(2 + s);
-        uint64_t rx = ctrl->streams[s].rx_bytes;
+        uint64_t rx = ctrl->is_udp ? ctrl->udp_streams[s].rx_bytes
+                                   : ctrl->streams[s].rx_bytes;
         uint64_t tx = iperf3_peer_stream_bytes((char *)ctrl->result_json, jlen, s);
         tx_sum += tx;
         rx_sum += rx;
         sddf_printf("[iperf3] [%2d] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
                     id, (unsigned long long)tx, iperf3_mbps(tx, secs),
                     (unsigned long long)rx, iperf3_mbps(rx, secs));
+        if (ctrl->is_udp) {
+            iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+            int lost = 0;
+            if (us->rx_have_first) {
+                lost = (int)(us->rx_last_seq - us->rx_first_seq) + 1 - (int)us->rx_packets;
+                if (lost < 0) lost = 0;
+            }
+            sddf_printf("[iperf3] [%2d] packets=%llu lost=%d jitter=%.4f ms\n",
+                        id, (unsigned long long)us->rx_packets, lost,
+                        us->rx_jitter * 1000.0);
+        }
     }
     if (total > 1) {
         sddf_printf("[iperf3] [SUM] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
@@ -339,9 +489,11 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
     sddf_printf("[iperf3] --------------------------------------\n\n");
 }
 
-/* The client's results are in: send ours, then move it to DISPLAY_RESULTS. */
+/* The client's results are in: send ours, then set/send DISPLAY_RESULTS back to 
+   client */
 static void iperf3_server_send_results(iperf_ctrl_t *ctrl) {
-    uint32_t body = iperf3_build_tcp_results(ctrl);
+    uint32_t body = ctrl->is_udp ? iperf3_build_udp_results(ctrl)
+                                 : iperf3_build_tcp_results(ctrl);
     sddf_printf("[results-tx] %s\n", ctrl->json_send_buf + 4);
 
     iperf3_ctrl_send_json(ctrl, body);
@@ -355,8 +507,10 @@ static void iperf3_server_send_results(iperf_ctrl_t *ctrl) {
     iperf3_server_print_summary(ctrl);
 }
 
-/* Tear the finished test down; keep listening for the next one. */
+/* Tear the finished test down and initialise 
+all the streams but keep listening for the next client connection*/
 static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
+    // TCP stream teardown
     for (int s = 0; s < MAX_STREAMS; s++) {
         iperf3_stream_t *st = &ctrl->streams[s];
         if (st->pcb) {
@@ -366,11 +520,27 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
             tcp_close(st->pcb);
             st->pcb = NULL;
         }
-        st->bytes = 0;
-        st->rx_bytes = 0;
-        st->cookie_rx_len = 0;
+        /* init each stream */
+        iperf3_stream_init(st, ctrl->cookie, ctrl);
         st->phase = STOPPED;
     }
+    // UDP stream teardown
+    for (int s = 0; s < MAX_STREAMS; s++) {
+        if (ctrl->udp_streams[s].pcb) {
+            udp_remove(ctrl->udp_streams[s].pcb);
+        }
+        memset(&ctrl->udp_streams[s], 0, sizeof(ctrl->udp_streams[s]));
+        ctrl->udp_streams[s].ctrl = ctrl;
+        ctrl->udp_streams[s].phase = STOPPED;
+    }
+
+    // udp listener
+    if (ctrl->udp_listen) {
+        udp_remove(ctrl->udp_listen);
+        ctrl->udp_listen = NULL;
+    }
+
+    // ctrl
     if (ctrl->pcb) {
         tcp_arg(ctrl->pcb, NULL);
         tcp_recv(ctrl->pcb, NULL);
@@ -391,6 +561,7 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
     ctrl->tx_off = 0;
     ctrl->send_streams_accepted = 0;
     ctrl->rec_streams_accepted = 0;
+    ctrl->streams_ready = 0;
     ctrl->test_active = false;
     ctrl->test_done = false;
     ctrl->omitting = false;
@@ -398,24 +569,105 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
     sddf_printf("[iperf3] server ready for next test\n");
 }
 
-/* Called from the data-stream recv once a stream's cookie is fully received */
+/**
+ * 
+ * Once a TCP stream connects then we increment a num_ready counter in the ctrl.
+ * When we connect the requested number of streams negotiated prior in the test
+ * params then we set up each streams payload and iterate to blast data in each
+ *  stream
+ * 
+ * @param ctrl ctrl
+ */
 void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
-    ctrl->rec_streams_accepted++;
-    sddf_printf("[iperf3] stream ready %u/%u\n",
-                ctrl->rec_streams_accepted, ctrl->num_streams);
-    if (ctrl->rec_streams_accepted == ctrl->num_streams) {
-        /* Run our own omit window so byte count same as client */
-        uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
-        ctrl->omitting = ctrl->omit_ms > 0;
-        ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
-        sddf_printf("[iperf3] all streams ready -> TEST_START\n");
-        iperf_set_send_state(ctrl, TEST_START);
-        iperf_set_send_state(ctrl, TEST_RUNNING);
-        ctrl->test_active = true;
+    /* Bidirectional doubles the stream count. */
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+
+    ctrl->streams_ready++;
+    sddf_printf("[iperf3] stream ready %u/%u\n", ctrl->streams_ready, total);
+    if (ctrl->streams_ready != total) return;
+
+    /* Run our own omit window so byte count same as client */
+    uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+    ctrl->omitting = ctrl->omit_ms > 0;
+    ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
+    sddf_printf("[iperf3] all streams ready -> TEST_START\n");
+
+    for (int k = 0; k < PAYLOAD_SIZE; k++) {
+        ctrl->payload[k] = (uint8_t)(k & 0xFF);
     }
+    for (uint32_t s = 0; s < total; s++) {
+        iperf3_stream_t *stream = &ctrl->streams[s];
+        if (stream->pcb == NULL || !stream->is_sender) continue;
+        stream->phase = SEND_PAYLOAD;
+        stream->tx_buf = ctrl->payload;
+        stream->tx_len = PAYLOAD_SIZE;
+        stream->tx_off = 0;
+        stream->bytes_this_tick = 0;
+        /* Bytes per 100ms tick to hit the rate target. 0 = unlimited. */
+        stream->tick_byte_limit = ctrl->target_bw_mbps
+            ? (uint32_t)(((uint64_t)ctrl->target_bw_mbps * 1000000UL) / (8UL * 10UL))
+            : 0;
+        iperf3_stream_maybe_tx(stream);
+    }
+
+    iperf_set_send_state(ctrl, TEST_START);
+    iperf_set_send_state(ctrl, TEST_RUNNING);
+    ctrl->test_active = true;
 }
 
-// add a read length function
+/**
+ * 
+ * Once all UDP streams are ready and have recevied cookie then ready the stream
+ * and set and send test start and test running
+ * 
+ * @param ctrl ctrl
+ */
+void iperf3_udp_server_start(iperf_ctrl_t *ctrl) {
+    uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+
+    ctrl->omitting = ctrl->omit_ms > 0;
+    ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
+    /* Diagnostics sake since client owns timers */
+    ctrl->end_time_ms = ctrl->omit_end_ms + ctrl->duration_ms;
+
+    /* Arm every stream we own the sending half of for bidirectional tests*/
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+
+    for (int k = 0; k < PAYLOAD_SIZE; k++) {
+        ctrl->payload[k] = (uint8_t)(k & 0xFF);
+    }
+    for (uint32_t s = 0; s < total; s++) {
+        iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+        if (us->pcb == NULL || !us->is_sender) continue;
+        us->phase       = SEND_PAYLOAD;
+        us->tx_buf      = ctrl->payload;
+        us->payload_len = ctrl->payload_len;
+        /* Datagrams per 100ms tick to hit the rate target. */
+        us->burst_max   = ctrl->target_bw_mbps
+            ? (uint32_t)(((uint64_t)ctrl->target_bw_mbps * 1000000ULL)
+                         / (8ULL * (uint64_t)ctrl->payload_len * 10ULL))
+            : 10000;
+        if (us->burst_max == 0) us->burst_max = 1;
+    }
+
+    sddf_printf("[iperf3] all UDP streams ready -> TEST_START\n");
+    iperf_set_send_state(ctrl, TEST_START);
+    iperf_set_send_state(ctrl, TEST_RUNNING);
+    ctrl->test_active = true;
+}
+
+/**
+ * State machine for receving states and orchestrating test to a client peer as
+ * a callback function for the server recv on the ctrl struct
+ * 
+ * @param arg ctrl
+ * @param tpcb the connection with the clietn
+ * @param p the pbufs that point to the data received from the client side
+ * @param err error if occured
+ * 
+ */
 err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     struct pbuf *q = p;
@@ -432,6 +684,7 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
     while (q != NULL) {
         uint8_t *data = (uint8_t *)q->payload;
         uint16_t n = q->len;
+        // udp vs tcp build results
         uint16_t i = 0;
         while (i < n) {
             if (ctrl->server_state == IPERF_START) {
@@ -474,6 +727,18 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
                         sddf_printf("[iperf3] params: json=%s\n", ctrl->param_json);
                         ctrl->send_streams_accepted = 0;
                         ctrl->rec_streams_accepted = 0;
+
+                        /* Bind the listener before announcing CREATE_STREAMS so
+                         * the data port is up before the client's first hello. */
+                        if (ctrl->role == 's' && ctrl->is_udp) {
+                            for (int s = 0; s < MAX_STREAMS; s++) {
+                                iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+                                memset(us, 0, sizeof(*us));
+                                us->ctrl  = ctrl;
+                                us->phase = STOPPED;
+                            }
+                            ctrl->udp_listen = udp_new_listener(ctrl);
+                        }
                         iperf_set_send_state(ctrl, CREATE_STREAMS);
                     }
                 } else {
@@ -545,13 +810,24 @@ err_t iperf_ctrl_recv_server(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
         if (finished) break;
         q = q->next;
     }
-    /* Must ack the data before the reset closes the pcb */
+    /* ack */
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
     if (finished) iperf3_server_reset(ctrl);
     return ERR_OK;
 }
 
+/**
+ * State machine for receving states from a server peer as
+ * a callback function for the server recv on the ctrl struct once connection 
+ * already established
+ * 
+ * @param arg ctrl
+ * @param tpcb the connection with the clietn
+ * @param p the pbufs that point to the data received from the client side
+ * @param err error if occured
+ * 
+ */
 err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     struct pbuf *q = p;
@@ -576,57 +852,39 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
 
                     char *json = ctrl->param_json;
 
-                    const char *rev = ctrl->is_reverse ? ",\"reverse\":true" : "";
+                    const char *mode = ctrl->is_reverse       ? ",\"reverse\":true"
+                                     : ctrl->is_bidirectional ? ",\"bidirectional\":true"
+                                     : "";
+                                     
+                    /* Optional fields */
+                    char opt[96];
+                    int o = 0;
+                    if (ctrl->target_bw_mbps) {
+                        o += sddf_snprintf(opt + o, sizeof(opt) - o,
+                                           ",\"bandwidth\":%u000000", ctrl->target_bw_mbps);
+                    }
+                    if (ctrl->target_blocks) {
+                        o += sddf_snprintf(opt + o, sizeof(opt) - o,
+                                           ",\"blockcount\":%u", ctrl->target_blocks);
+                    }
+                    opt[o] = '\0';
+
+                    /* len as well */
                     if (ctrl->is_udp) {
-                        if (ctrl->target_bw_mbps) {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u,\"bitrate\":%u000000%s}",
-                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len,
-                                ctrl->target_bw_mbps, rev);
-                        } else {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u%s}",
-                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len, rev);
-                        }
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u%s%s}",
+                            ctrl->duration_s, ctrl->num_streams, ctrl->payload_len, opt, mode);
                     } else {
-                        if (ctrl->target_bw_mbps) {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"bitrate\":%u000000%s}",
-                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
-                                ctrl->target_bw_mbps, rev);
-                        } else {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u%s}",
-                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams, rev);
-                        }
+                        sddf_snprintf(json, sizeof(ctrl->param_json),
+                            "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"len\":%u%s%s}",
+                            ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
+                            ctrl->payload_len, opt, mode);
                     }
 
-                    const char *bi = ctrl->is_bidirectional ? ",\"bidirectional\":true" : "";
-                    if (ctrl->is_udp) {
-                        if (ctrl->target_bw_mbps) {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u,\"bitrate\":%u000000%s}",
-                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len,
-                                ctrl->target_bw_mbps, bi);
-                        } else {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"udp\":true,\"time\":%u,\"parallel\":%u,\"len\":%u%s}",
-                                ctrl->duration_s, ctrl->num_streams, ctrl->payload_len, bi);
-                        }
-                    } else {
-                        if (ctrl->target_bw_mbps) {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u,\"bitrate\":%u000000%s}",
-                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams,
-                                ctrl->target_bw_mbps, bi);
-                        } else {
-                            sddf_snprintf(json, sizeof(ctrl->param_json),
-                                "{\"tcp\":true,\"time\":%u,\"omit\":%u,\"parallel\":%u%s}",
-                                ctrl->duration_s, ctrl->omit_s, ctrl->num_streams, bi);
-                        }
-                    }
                     ctrl->duration_ms = ctrl->duration_s * 1000;
                     ctrl->omit_ms = ctrl->omit_s * 1000;
+
+                    // send off the test params to the server
                     uint32_t json_length = strlen(json);
                     uint32_t be = htonl(json_length);
                     memcpy(ctrl->json_len_buf, &be, 4);
@@ -651,8 +909,8 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         }
                         udp_bind(udp_stream->pcb, IP4_ADDR_ANY, 5210 + s);
                         udp_recv(udp_stream->pcb, udp_stream_recv, udp_stream);
-                        udp_stream->server_addr = tpcb->remote_ip;
-                        udp_stream->server_port = ctrl->server_port ? ctrl->server_port : 5202;
+                        udp_stream->peer_addr = tpcb->remote_ip;
+                        udp_stream->peer_port = ctrl->server_port ? ctrl->server_port : 5202;
                         udp_stream->bytes_sent = 0;
                         udp_stream->seq_num = 0;
                         udp_stream->ctrl = ctrl;
@@ -673,7 +931,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         }
                         uint32_t msg = htonl(UDP_CONNECT_MSG);
                         memcpy(pb->payload, &msg, sizeof(msg));
-                        err_t serr = udp_sendto(udp_stream->pcb, pb, &udp_stream->server_addr, udp_stream->server_port);
+                        err_t serr = udp_sendto(udp_stream->pcb, pb, &udp_stream->peer_addr, udp_stream->peer_port);
                         sddf_printf("udp cookie send stream=%d err=%d\n", s, serr);
                         pbuf_free(pb);
                     }
@@ -802,6 +1060,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                             stream->ctrl = ctrl;
                             stream->is_sender = true;
                             stream->bytes_this_tick = 0;
+
                             /* Bytes per 100ms tick to hit the rate target. 0 = unlimited. */
                             stream->tick_byte_limit = ctrl->target_bw_mbps
                                 ? (uint32_t)(((uint64_t)ctrl->target_bw_mbps * 1000000UL) / (8UL * 10UL))
@@ -813,119 +1072,13 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
 
                 } else if (st == TEST_RUNNING) {
                     /* nothing data flows via the stream callbacks */
-
+                    // negligible
                 } else if (st == EXCHANGE_RESULTS) {
                     ctrl->rx_phase = CTRL_WAIT_JSON_LEN;
-                  if (ctrl->is_udp) {
-                    char *buf = ctrl->json_send_buf;
-                    size_t cap = sizeof(ctrl->json_send_buf);
-                    int off = 0;
-                    off += sddf_snprintf(buf + off, cap - off,
-                        "{\"cpu_util_total\":%.2f,\"cpu_util_user\":%.2f,"
-                        "\"cpu_util_system\":0.00,\"sender_has_retransmits\":0,"
-                        "\"congestion_used\":\"cubic\",\"streams\":[",
-                        ctrl->cpu_util_percent, ctrl->cpu_util_percent);
-                    /* (id 1, then 3,4,5..)
-                     * UDP senders report the
-                     * datagrams/bytes they pumped; receivers report what arrived plus
-                     * loss (from the sender-seq span) and RFC1889 jitter. */
-                    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
-                    for (uint32_t s = 0; s < total; s++) {
-                        iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
-                        int id = (s == 0) ? 1 : (int)(2 + s);
-                        uint64_t bytes, packets;
-                        int lost = 0;
-                        double jitter = 0.0;
-                        if (us->is_sender) {
-                            bytes = us->bytes_sent;
-                            packets = us->packets_sent;
-                        } else {
-                            bytes = us->rx_bytes;
-                            packets = us->rx_packets;
-                            jitter = us->rx_jitter;
-                            if (us->rx_have_first) {
-                                int expected = (int)(us->rx_last_seq - us->rx_first_seq) + 1;
-                                lost = expected - (int)us->rx_packets;
-                                if (lost < 0) lost = 0;
-                            }
-                        }
-                        off += sddf_snprintf(buf + off, cap - off,
-                            "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
-                            "\"jitter\":%.6f,\"errors\":%d,\"omitted_errors\":0,"
-                            "\"packets\":%llu,\"omitted_packets\":0,"
-                            "\"start_time\":0.0,\"end_time\":%u.0}",
-                            s == 0 ? "" : ",", id,
-                            (unsigned long long)bytes, jitter, lost,
-                            (unsigned long long)packets, ctrl->duration_s);
-                    }
-                    off += sddf_snprintf(buf + off, cap - off,
-                        "],\"server_output_text\":\"\"}");
-                    sddf_printf("[results-tx] %s\n", ctrl->json_send_buf);
-                    uint32_t json_length = strlen(ctrl->json_send_buf);
-                    uint32_t be = htonl(json_length);
-                    memcpy(ctrl->json_len_buf, &be, 4);
-                    ctrl->tx_buf = (const int8_t *)ctrl->json_len_buf;
-                    ctrl->tx_len = 4;
-                    ctrl->tx_off = 0;
-                    iperf3_ctrl_maybe_tx(ctrl);
-                    ctrl->tx_buf = (const int8_t *)ctrl->json_send_buf;
-                    ctrl->tx_len = json_length;
-                    ctrl->tx_off = 0;
-                    iperf3_ctrl_maybe_tx(ctrl);
-                  } else {
-                    char *buf = ctrl->json_send_buf;
-                    size_t cap = sizeof(ctrl->json_send_buf);
-                    int off = 0;
-
-                    off += sddf_snprintf(buf + off, cap - off,
-                        "{\"cpu_util_total\":%.2f,\"cpu_util_user\":%.2f,"
-                        "\"cpu_util_system\":0.00,\"sender_has_retransmits\":0,"
-                        "\"congestion_used\":\"cubic\",\"streams\":[",
-                        ctrl->cpu_util_percent, ctrl->cpu_util_percent);
-
-                    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
-                    for (uint32_t s = 0; s < total; s++) {
-                        iperf3_stream_t *st = &ctrl->streams[s];
-                        int id = (s == 0) ? 1 : (int)(2 + s);
-                        uint64_t sbytes = st->is_sender ? st->bytes : st->rx_bytes;
-                        if (st->is_sender) {
-                            uint32_t rmean = st->rtt_count ? (uint32_t)(st->rtt_sum_us / st->rtt_count) : 0;
-                            off += sddf_snprintf(buf + off, cap - off,
-                                "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
-                                "\"min_rtt\":%u,\"max_rtt\":%u,\"mean_rtt\":%u,"
-                                "\"jitter\":0.0,\"errors\":0,\"omitted_errors\":0,"
-                                "\"packets\":0,\"omitted_packets\":0,"
-                                "\"start_time\":0.0,\"end_time\":%u.0}",
-                                s == 0 ? "" : ",", id,
-                                (unsigned long long)sbytes,
-                                st->rtt_count ? st->rtt_min_us : 0, st->rtt_max_us, rmean,
-                                ctrl->duration_s);
-                        } else {
-                            off += sddf_snprintf(buf + off, cap - off,
-                                "%s{\"id\":%d,\"bytes\":%llu,\"retransmits\":0,"
-                                "\"jitter\":0.0,\"errors\":0,\"omitted_errors\":0,"
-                                "\"packets\":0,\"omitted_packets\":0,"
-                                "\"start_time\":0.0,\"end_time\":%u.0}",
-                                s == 0 ? "" : ",", id,
-                                (unsigned long long)sbytes,
-                                ctrl->duration_s);
-                        }
-                    }
-                    off += sddf_snprintf(buf + off, cap - off,
-                        "],\"server_output_text\":\"\"}");
-                    sddf_printf("[results-tx] %s\n", ctrl->json_send_buf);
-                    uint32_t json_length = strlen(ctrl->json_send_buf);
-                    uint32_t be = htonl(json_length);
-                    memcpy(ctrl->json_len_buf, &be, 4);
-                    ctrl->tx_buf = (const int8_t *)ctrl->json_len_buf;
-                    ctrl->tx_len = 4;
-                    ctrl->tx_off = 0;
-                    iperf3_ctrl_maybe_tx(ctrl);
-                    ctrl->tx_buf = (const int8_t *)ctrl->json_send_buf;
-                    ctrl->tx_len = json_length;
-                    ctrl->tx_off = 0;
-                    iperf3_ctrl_maybe_tx(ctrl);
-                  }
+                    uint32_t body = ctrl->is_udp ? iperf3_build_udp_results(ctrl)
+                                                 : iperf3_build_tcp_results(ctrl);
+                    sddf_printf("[results-tx] %s\n", ctrl->json_send_buf + 4);
+                    iperf3_ctrl_send_json(ctrl, body);
                 } else if (st == DISPLAY_RESULTS) {
                     sddf_printf("[iperf3] BENCHMARK_COMPLETE\n");
                     iperf_set_send_state(ctrl, IPERF_DONE);
@@ -964,6 +1117,7 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     return ERR_OK;
 }
 
+// sent
 err_t iperf_ctrl_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     (void)tpcb;
@@ -972,25 +1126,76 @@ err_t iperf_ctrl_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     return ERR_OK;
 }
 
+/**
+ * Counts number of blocks sent/received
+ * 
+ * @param arg ctrl
+ * @param err error (no error msging atm)
+ */
 void iperf3_ctrl_err(void *arg, err_t err) {
     iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
     (void)err;
     ctrl->pcb = NULL;
 }
 
+/**
+ * Counts number of blocks sent/received
+ * 
+ * @param ctrl
+ */
+static uint64_t iperf3_blocks_done(iperf_ctrl_t *ctrl) {
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+    uint32_t blk = ctrl->payload_len ? ctrl->payload_len : 1;
+    uint64_t blocks = 0;
+
+    for (uint32_t s = 0; s < total; s++) {
+        if (ctrl->is_udp) {
+            iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+            blocks += us->is_sender ? us->packets_sent : (us->rx_bytes / blk);
+        } else {
+            iperf3_stream_t *st = &ctrl->streams[s];
+            blocks += (st->is_sender ? st->bytes : st->rx_bytes) / blk;
+        }
+    }
+    return blocks;
+}
+
+/**
+ * Checks if we have past the test deadline and can send test end state/ 
+ * Checks if the omit period is over
+ * 
+ * @param ctrl the control handle for the test
+ * @param now_ms the current timestamp
+ */
 static void iperf_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
-    if (ctrl->test_active && !ctrl->test_done && now_ms >= ctrl->end_time_ms)
-        ctrl->test_done = true;
+    if (ctrl->role == 'c' && ctrl->test_active && !ctrl->test_done) {
+        /* -k replaces the time limit rather than capping it, as in iperf3. */
+        bool finished = ctrl->target_blocks
+            ? (iperf3_blocks_done(ctrl) >= ctrl->target_blocks)
+            : (now_ms >= ctrl->end_time_ms);
+        if (finished) ctrl->test_done = true;
+    }
+    
     if (ctrl->test_active && ctrl->omitting && now_ms >= ctrl->omit_end_ms)
         ctrl->omitting = false;
 }
 
-/* UDP data path */
+/**
+ * Checks for deadlines then pumps data across udp streams
+ * 
+ * @param ctrl the control handle for the test
+ * @param now_ms the current timestamp
+ */
 void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
     iperf_timer_tick(ctrl, now_ms);
 
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+
+    // if the test is still active keep sending payload
     if (ctrl->test_active && !ctrl->test_done) {
-        for (int s = 0; s < ctrl->num_streams; s++) {
+        for (uint32_t s = 0; s < total; s++) {
             iperf3_udp_stream_t *stream = &ctrl->udp_streams[s];
             if (stream->pcb != NULL && stream->phase == SEND_PAYLOAD) {
                 stream->tx_buf = ctrl->payload;
@@ -1001,8 +1206,10 @@ void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
         }
     }
 
-    if (ctrl->test_active && ctrl->test_done && !ctrl->sent_test_end) {
-        for (int s = 0; s < ctrl->num_streams; s++) {
+    // if we are are the client and the test is over (past duration or block count)
+    // then we send the test end state and disarm all the streams
+    if (ctrl->role == 'c' && ctrl->test_active && ctrl->test_done && !ctrl->sent_test_end) {
+        for (uint32_t s = 0; s < total; s++) {
             if (ctrl->udp_streams[s].pcb) {
                 udp_remove(ctrl->udp_streams[s].pcb);
                 ctrl->udp_streams[s].pcb = NULL;
@@ -1013,9 +1220,18 @@ void iperf3_on_timer_tick(iperf_ctrl_t *ctrl, uint32_t now_ms) {
     }
 }
 
-/* TCP data path */
+/**
+ * Accumulate the byte counters across all TCP streams and checks deadline
+ * to send state and stop streams sending data if test ended.
+ * 
+ * @param ctrl ctrl block
+ * @param now_ms current time
+ */
 void iperf3_tcp_check_deadline(iperf_ctrl_t *ctrl, uint32_t now_ms) {
+    // client or udp check for quick return
     if (ctrl->is_udp || ctrl->role != 'c') return;
+
+    // sets deadline flags
     iperf_timer_tick(ctrl, now_ms);
     if (ctrl->test_done && !ctrl->sent_test_end) {
         for (int i = 0; i < MAX_STREAMS; i++) {
@@ -1027,14 +1243,16 @@ void iperf3_tcp_check_deadline(iperf_ctrl_t *ctrl, uint32_t now_ms) {
     }
 }
 
-static err_t iperf_poll(void *arg, struct tcp_pcb *tpcb) {
-    iperf_ctrl_t *ctrl = (iperf_ctrl_t *)arg;
-    (void)tpcb;
-    uint32_t now = sddf_timer_time_now(timer_config.driver_id) / 1000000;
-    iperf3_tcp_check_deadline(ctrl, now);
-    return ERR_OK;
-}
 
+/**
+ * registering callbacks for when this pcb establishes a connection with the server
+ * when running the client
+ * 
+ * @param arg contains the ctrl struct
+ * @param pcb the tcp_pcb for the underlying control connection
+ * @param err error
+ * 
+ */
 err_t iperf_ctrl_connect(void *arg, struct tcp_pcb *pcb, err_t err) {
     iperf_ctrl_t *ctrl = arg;
     if (err != ERR_OK) return err;
@@ -1045,7 +1263,6 @@ err_t iperf_ctrl_connect(void *arg, struct tcp_pcb *pcb, err_t err) {
     tcp_recv(pcb, iperf_ctrl_recv);
     tcp_sent(pcb, iperf_ctrl_sent);
     tcp_err(pcb, iperf3_ctrl_err);
-    tcp_poll(pcb, iperf_poll, 1);
 
     ctrl->tx_buf = (const int8_t *)ctrl->cookie;
     ctrl->tx_len = IPERF3_COOKIE_LEN;
@@ -1055,6 +1272,15 @@ err_t iperf_ctrl_connect(void *arg, struct tcp_pcb *pcb, err_t err) {
     return ERR_OK;
 }
 
+/**
+ * registering callbacks for when this pcb establishes a connection with the client
+ * when running the server
+ * 
+ * @param arg contains the ctrl struct
+ * @param pcb the tcp_pcb for the underlying control connection
+ * @param err error
+ * 
+ */
 err_t iperf_start_server(void *arg, struct tcp_pcb *pcb, err_t err) {
     iperf_ctrl_t *ctrl = arg;
     if (err != ERR_OK) return err;
@@ -1066,7 +1292,6 @@ err_t iperf_start_server(void *arg, struct tcp_pcb *pcb, err_t err) {
     tcp_sent(pcb, iperf_ctrl_sent);
     tcp_err(pcb, iperf3_ctrl_err);
 
-    tcp_poll(pcb, iperf_poll, 1);
 
     ctrl->tx_buf = (const int8_t *)ctrl->cookie;
     ctrl->tx_len = IPERF3_COOKIE_LEN;

@@ -34,13 +34,15 @@ typedef struct {
     stream_phase_t phase;
 
     uint32_t bytes_this_tick;
-    uint32_t tick_byte_limit;   /* 0 = unlimited */
+    uint32_t tick_byte_limit; /* 0 = unlimited */
 
-    uint64_t rtt_sent;      /* cumulative bytes handed to tcp_write */
-    uint64_t rtt_acked;     /* cumulative bytes ACKed */
-    uint64_t rtt_target;    /* byte offset of the sample being timed */
-    uint64_t rtt_t0_ns;     /* send time of that byte */
-    bool     rtt_pending;   /* a sample is in flight */
+
+    // rtt stats
+    uint64_t rtt_sent; /* cumulative bytes handed to tcp_write */
+    uint64_t rtt_acked; /* cumulative bytes ACKed */
+    uint64_t rtt_target; /* byte offset of the sample being timed */
+    uint64_t rtt_t0_ns; /* send time of that byte */
+    bool rtt_pending; /* a sample is in flight */
     uint32_t rtt_min_us, rtt_max_us, rtt_count;
     uint64_t rtt_sum_us, rtt_sumsq_us;
 
@@ -50,8 +52,8 @@ typedef struct {
 /* UDP stream */
 typedef struct {
     struct udp_pcb *pcb;
-    ip_addr_t server_addr;
-    uint16_t server_port;
+    ip_addr_t peer_addr;
+    uint16_t peer_port;
     uint64_t packets_sent;
     uint64_t bytes_sent;
     uint32_t seq_num;
@@ -90,7 +92,14 @@ void udp_pump(iperf3_udp_stream_t *stream);
 void udp_stream_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
                      const ip_addr_t *addr, u16_t port);
 
-/* Server data-stream recv (TCP forward) */
+/* Server bind a fresh listener on data port (Uses SO_REUSE) */
+struct udp_pcb *udp_new_listener(iperf_ctrl_t *ctrl);
+
+/* Server recv callback for the listener pcb and promotes to a stream pcb. */
+void udp_listener_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
+                       const ip_addr_t *addr, u16_t port);
+
+/* Server data-stream recv */
 err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
 
 #endif // IPERF3_STREAM_H

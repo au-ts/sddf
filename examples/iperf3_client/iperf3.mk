@@ -97,7 +97,7 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
-		-netdev user,id=netdev0 \
+		-netdev user,id=netdev0,hostfwd=tcp::5202-10.0.2.15:5202,hostfwd=udp::5202-10.0.2.15:5202 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors -smp 4
 

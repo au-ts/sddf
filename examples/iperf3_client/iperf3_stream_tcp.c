@@ -12,7 +12,13 @@
 
 extern timer_client_config_t timer_config;
 
-// initialise all stream state members
+/**
+ * Initialise all stream members
+ * 
+ * @param stream the stream
+ * @param cookie cookie
+ * @param ctrl ctrl
+ */
 void iperf3_stream_init(iperf3_stream_t *stream, uint8_t *cookie, iperf_ctrl_t *ctrl) {
     stream->pcb = NULL;
     stream->cookie = cookie;
@@ -36,9 +42,22 @@ void iperf3_stream_init(iperf3_stream_t *stream, uint8_t *cookie, iperf_ctrl_t *
 
     stream->rx_bytes = 0;
     stream->is_sender = true;
+
+    /* Server-side receive and pacing state*/
+    stream->cookie_rx_len = 0;
+    stream->bytes_this_tick = 0;
+    stream->tick_byte_limit = 0;
 }
 
-// maybe transmit data on this stream loops to fill the send buffer in one call
+/**
+ * Maybe transmit data on this stream. Loops and tcp_writes until pcb is full
+ * If write was successful then we increment relevant counters and start an
+ * RTT sample and was for an acknowledgement for that batch if a sample is not
+ * already active
+ * 
+ * @param stream stream to transmit on
+ * 
+ */
 void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   if (stream->pcb == NULL) return;
   if (stream->phase == STOPPED) return;
@@ -89,6 +108,15 @@ void iperf3_stream_maybe_tx(iperf3_stream_t *stream) {
   }
 }
 
+/**
+ * Try to connect TCP data stream to the server. Initialise callbacks then queue
+ * and send the cookie
+ * 
+ * @param arg stream
+ * @param tpcb tcp_pcb for the underlying stream connection
+ * @param err 
+ * 
+ */
 err_t iperf3_stream_connect(void *arg, struct tcp_pcb *tpcb, err_t err) {
     iperf3_stream_t *s = (iperf3_stream_t *)arg;
     if (err != ERR_OK) return err;
@@ -108,6 +136,16 @@ err_t iperf3_stream_connect(void *arg, struct tcp_pcb *tpcb, err_t err) {
     s->phase = COOKIE_SEND;
     return ERR_OK;
 }
+
+/**
+ * Callback for tcp_sent. When acks arrive calculate rtt stats. TCP segs are freed
+ * from lwips pbufs and we try send mroe data via maybe_tx
+ * 
+ * @param arg stream 
+ * @param tpcb tcp_pcb for the underlying stream connection
+ * @param len number of payload bytes that the peer acknowledged
+ * 
+ */
 err_t iperf3_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     iperf3_stream_t *stream = (iperf3_stream_t *)arg;
     (void)tpcb;
@@ -132,6 +170,18 @@ err_t iperf3_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     return ERR_OK;
 }
 
+
+/**
+ * Receive callback for server data stream which checks omitting and validates 
+ * cookie. Then sends cookie reply back via iperf3_server_stream_ready and
+ * frees pbufs
+ * 
+ * @param arg stream handle
+ * @param tpcb tcp_pcb
+ * @param p pbuf for received data
+ * @param err error
+ * 
+ */
 err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf3_stream_t *stream = (iperf3_stream_t *)arg;
     iperf_ctrl_t *ctrl = stream->ctrl;
@@ -144,9 +194,7 @@ err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
         return ERR_OK;
     }
 
-    /* Warm-up over: drop what we counted so far so our byte count covers the
-     * same window the client is reporting. Only costs a timer read while
-     * omitting, which is over within the first few seconds. */
+    /* if warming up keep resetting */
     if (ctrl->omitting) {
         uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
         if (now_ms >= ctrl->omit_end_ms) {
@@ -176,8 +224,8 @@ err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
             }
         }
 
-        // Everything after the cookie is measured
-        stream->bytes += (uint64_t)(n - i);
+        /* Everything after the cookie is measured */
+        stream->rx_bytes += (uint64_t)(n - i);
         q = q->next;
     }
 
@@ -186,6 +234,17 @@ err_t iperf3_server_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
     return ERR_OK;
 }
 
+
+/**
+ * Receive callback for client data stream which just accumulates totals and 
+ * frees pbufs after
+ * 
+ * @param arg stream handle
+ * @param tpcb tcp_pcb
+ * @param p pbuf for received data
+ * @param err error
+ * 
+ */
 err_t iperf3_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     iperf3_stream_t *stream = (iperf3_stream_t *)arg;
     (void)tpcb;
@@ -204,7 +263,7 @@ err_t iperf3_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t 
       stream->rx_bytes += p->tot_len;
     }
 
-    /* Tell lwIP we've consumed the data */
+    /* Tell lwIP we consumed the data */
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
     return ERR_OK;
