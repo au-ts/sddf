@@ -269,8 +269,8 @@ def generate(
     # for i in range(1, 18):
     #     acpi_tables_config.add_acpi_table("ssdt" + str(i))
 
-    acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
-    acpi_driver.add_boot_info(BootInfo("rsdp"))
+    # acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
+    # acpi_driver.add_boot_info(BootInfo("rsdp"))
 
     cnode_remaining_untypeds = CNode("remaining_untypeds", True, 9)
     sdf.add_cnode(cnode_remaining_untypeds)
@@ -403,7 +403,7 @@ def generate(
         ethernet_driver.add_ioport(pci_config_data_port)
 
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, ethernet_driver, None, 2))
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, ethernet_driver, None, 3))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, ethernet_driver, None, 3))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
     if board.name == "vb_105" or board.name == 'viscous':
