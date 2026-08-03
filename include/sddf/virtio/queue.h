@@ -83,11 +83,13 @@ struct virtq_used {
 };
 
 struct virtq {
-    unsigned int num;
+    uint32_t num;
 
     struct virtq_desc *desc;
     struct virtq_avail *avail;
     struct virtq_used *used;
+    /* Last index of the used ring processed */
+    uint16_t used_head;
 };
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
