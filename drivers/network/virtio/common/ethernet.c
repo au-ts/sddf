@@ -43,11 +43,6 @@ __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
-
 #define RX_COUNT 512
 #define TX_COUNT 512
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
@@ -56,8 +51,6 @@ net_queue_t *tx_active;
 
 struct virtq rx_virtq;
 struct virtq tx_virtq;
-uint16_t rx_last_seen_used = 0;
-uint16_t tx_last_seen_used = 0;
 
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
@@ -80,17 +73,9 @@ uint32_t rx_descriptors[RX_COUNT];
 ialloc_t tx_ialloc_desc;
 uint32_t tx_descriptors[TX_COUNT];
 
-int rx_last_desc_idx = 0;
-int tx_last_desc_idx = 0;
-
-static inline bool virtio_avail_full_rx(struct virtq *virtq)
+static inline bool virtio_avail_full(struct virtq *virtq, ialloc_t *ialloc)
 {
-    return rx_last_desc_idx >= rx_virtq.num;
-}
-
-static inline bool virtio_avail_full_tx(struct virtq *virtq)
-{
-    return tx_last_desc_idx >= tx_virtq.num;
+    return ialloc->size >= virtq->num;
 }
 
 static void rx_provide(void)
@@ -99,46 +84,44 @@ static void rx_provide(void)
     bool transferred = false;
     bool reprocess = true;
     while (reprocess) {
-        while (!virtio_avail_full_rx(&rx_virtq) && !net_queue_empty_free(&rx_queue)) {
+        while (!virtio_avail_full(&rx_virtq, &rx_ialloc_desc) && !net_queue_empty_free(&rx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
 
-            // Allocate a desc entry for the header, and one for the packet
-            uint32_t hdr_desc_idx = -1;
-            err = ialloc_alloc(&rx_ialloc_desc, &hdr_desc_idx);
-            assert(!err && hdr_desc_idx != -1);
-            uint32_t pkt_desc_idx = -1;
-            err = ialloc_alloc(&rx_ialloc_desc, &pkt_desc_idx);
-            assert(!err && pkt_desc_idx != -1);
+            /* Allocate descriptors for the header and buffer */
+            uint32_t hdr_idx, buffer_idx;
+            err = ialloc_alloc(&rx_ialloc_desc, &hdr_idx);
+            assert(!err);
+            err = ialloc_alloc(&rx_ialloc_desc, &buffer_idx);
+            assert(!err);
 
-            assert(hdr_desc_idx < rx_virtq.num);
-            assert(pkt_desc_idx < rx_virtq.num);
+            /* The header is located in the virtIO net header region */
+            rx_virtq.desc[hdr_idx].addr = virtio_net_rx_headers_paddr + (hdr_idx * sizeof(virtio_net_hdr_t));
+            rx_virtq.desc[hdr_idx].len = sizeof(virtio_net_hdr_t);
+            /* Point the header descriptor to the buffer descriptor */
+            rx_virtq.desc[hdr_idx].next = buffer_idx;
+            rx_virtq.desc[hdr_idx].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
 
-            // Get the header address, which is an index into the virtio net headers memory region
-            rx_virtq.desc[hdr_desc_idx].addr = virtio_net_rx_headers_paddr + (hdr_desc_idx * sizeof(virtio_net_hdr_t));
-            rx_virtq.desc[hdr_desc_idx].len = sizeof(virtio_net_hdr_t);
-            // Set the next of the header to the packet
-            rx_virtq.desc[hdr_desc_idx].next = pkt_desc_idx;
-            rx_virtq.desc[hdr_desc_idx].flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
-            // The packet address will be the actual buffer that we have dequeued from the client
-            rx_virtq.desc[pkt_desc_idx].addr = buffer.io_or_offset;
-            rx_virtq.desc[pkt_desc_idx].len = NET_BUFFER_SIZE;
-            rx_virtq.desc[pkt_desc_idx].flags = VIRTQ_DESC_F_WRITE;
-            // Set the entry in the available ring to point to the desc entry for the header
-            rx_virtq.avail->ring[rx_virtq.avail->idx % rx_virtq.num] = hdr_desc_idx;
-            // We only want to increment the avail ring by 1, as we are only increasing by one in
-            // this list, but we are adding two desc entries.
+            rx_virtq.desc[buffer_idx].addr = buffer.io_or_offset;
+            rx_virtq.desc[buffer_idx].len = NET_BUFFER_SIZE;
+            rx_virtq.desc[buffer_idx].flags = VIRTQ_DESC_F_WRITE;
+
+            /* Insert the header into the available ring */
+            rx_virtq.avail->ring[rx_virtq.avail->idx % rx_virtq.num] = hdr_idx;
+
+            /* Ensure all writes to the descriptor are ordered before we set the flags
+            * that makes hardware aware of this slot.
+            */
+            wwmb();
             rx_virtq.avail->idx++;
-            rx_last_desc_idx += 2;
-
             transferred = true;
         }
 
         net_request_signal_free(&rx_queue);
         reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !virtio_avail_full_rx(&rx_virtq)) {
+        if (!net_queue_empty_free(&rx_queue) && !virtio_avail_full(&rx_virtq, &rx_ialloc_desc)) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
@@ -154,39 +137,36 @@ static void rx_return(void)
 {
     /* Extract RX buffers from the 'used' and pass them up to the client by putting them
      * in our sDDF 'active' queues. */
-    uint16_t packets_transferred = 0;
-    uint16_t i = rx_last_seen_used;
-    uint16_t curr_idx = rx_virtq.used->idx;
-    while (i != curr_idx) {
-        struct virtq_used_elem hdr_used = rx_virtq.used->ring[i % rx_virtq.num];
-        assert(rx_virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
+    bool transferred = false;
+    while (rx_virtq.used_head != rx_virtq.used->idx) {
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read to the 'idx' field of the virt queue.
+         */
+        rrmb();
+        uint32_t hdr_idx = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].id;
+        uint32_t len = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].len;
 
-        struct virtq_desc virtio_hdr = rx_virtq.desc[hdr_used.id];
-        struct virtq_desc pkt = rx_virtq.desc[virtio_hdr.next % rx_virtq.num];
-        uint64_t addr = pkt.addr;
-        assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
+        /* Extract the buffer index from the header */
+        assert(rx_virtq.desc[hdr_idx].flags & VIRTQ_DESC_F_NEXT);
+        uint32_t buffer_idx = rx_virtq.desc[hdr_idx].next;
 
-        /* Received packet length is obtained from used header. This includes
-        the virtIO header length as well, so this must be subtracted before
-        passing to the virtualiser. */
-        uint32_t len = hdr_used.len - virtio_hdr.len;
-        net_buff_desc_t buffer = { addr, len };
+        /* Length in header include virtIO header length as well */
+        len -= sizeof(virtio_net_hdr_t);
+        net_buff_desc_t buffer = { rx_virtq.desc[buffer_idx].addr, len };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
-        err = ialloc_free(&rx_ialloc_desc, hdr_used.id);
+        err = ialloc_free(&rx_ialloc_desc, hdr_idx);
         assert(!err);
-        err = ialloc_free(&rx_ialloc_desc, rx_virtq.desc[hdr_used.id].next);
+        err = ialloc_free(&rx_ialloc_desc, buffer_idx);
         assert(!err);
 
-        rx_last_desc_idx -= 2;
-        assert(rx_last_desc_idx >= 0);
-        i++;
-        packets_transferred++;
+        rx_virtq.used_head++;
+        transferred = true;
     }
-    rx_last_seen_used += packets_transferred;
 
-    if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
+    if (transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         sddf_notify(config.virt_rx.id);
     }
@@ -195,56 +175,57 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
-    bool packets_transferred = false;
+    bool transferred = false;
     while (reprocess) {
-        while (!virtio_avail_full_tx(&tx_virtq) && !net_queue_empty_active(&tx_queue)) {
+        while (!virtio_avail_full(&tx_virtq, &tx_ialloc_desc) && !net_queue_empty_active(&tx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
-            /* Now we need to put our buffer into the virtIO ring */
-            uint32_t hdr_desc_idx = -1;
-            err = ialloc_alloc(&tx_ialloc_desc, &hdr_desc_idx);
-            assert(!err && hdr_desc_idx != -1);
-            uint32_t pkt_desc_idx = -1;
-            err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
-            assert(!err && pkt_desc_idx != -1);
-            /* We should not run out of descriptors assuming that the avail ring is not full. */
-            assert(hdr_desc_idx < tx_virtq.num);
-            assert(pkt_desc_idx < tx_virtq.num);
-            tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = hdr_desc_idx;
+            /* Allocate descriptors for the header and buffer */
+            uint32_t hdr_idx, buffer_idx;
+            err = ialloc_alloc(&tx_ialloc_desc, &hdr_idx);
+            assert(!err);
+            err = ialloc_alloc(&tx_ialloc_desc, &buffer_idx);
+            assert(!err);
 
-            virtio_net_hdr_t *hdr = &virtio_net_tx_headers[hdr_desc_idx];
+            virtio_net_hdr_t *hdr = &virtio_net_tx_headers[hdr_idx];
             hdr->flags = 0;
             hdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
             hdr->hdr_len = 0;  /* not used unless we have segmentation offload */
             hdr->gso_size = 0; /* same */
             hdr->csum_start = 0;
             hdr->csum_offset = 0;
-            tx_virtq.desc[hdr_desc_idx].addr = virtio_net_tx_headers_paddr + (hdr_desc_idx * sizeof(virtio_net_hdr_t));
-            tx_virtq.desc[hdr_desc_idx].len = sizeof(virtio_net_hdr_t);
-            tx_virtq.desc[hdr_desc_idx].next = pkt_desc_idx;
-            tx_virtq.desc[hdr_desc_idx].flags = VIRTQ_DESC_F_NEXT;
-            tx_virtq.desc[pkt_desc_idx].addr = buffer.io_or_offset;
-            tx_virtq.desc[pkt_desc_idx].len = buffer.len;
-            tx_virtq.desc[pkt_desc_idx].flags = 0;
+            tx_virtq.desc[hdr_idx].addr = virtio_net_tx_headers_paddr + (hdr_idx * sizeof(virtio_net_hdr_t));
+            tx_virtq.desc[hdr_idx].len = sizeof(virtio_net_hdr_t);
+            tx_virtq.desc[hdr_idx].next = buffer_idx;
+            tx_virtq.desc[hdr_idx].flags = VIRTQ_DESC_F_NEXT;
 
+            tx_virtq.desc[buffer_idx].addr = buffer.io_or_offset;
+            tx_virtq.desc[buffer_idx].len = buffer.len;
+            tx_virtq.desc[buffer_idx].flags = 0;
+
+            /* Insert the header into the available ring */
+            tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = hdr_idx;
+
+            /* Ensure all writes to the descriptor are ordered before we set the flags
+            * that makes hardware aware of this slot.
+            */
+            wwmb();
             tx_virtq.avail->idx++;
-            tx_last_desc_idx += 2;
-
-            packets_transferred = true;
+            transferred = true;
         }
 
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
-        if (!virtio_avail_full_tx(&tx_virtq) && !net_queue_empty_active(&tx_queue)) {
+        if (!virtio_avail_full(&tx_virtq, &tx_ialloc_desc) && !net_queue_empty_active(&tx_queue)) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
         }
     }
 
-    if (packets_transferred) {
+    if (transferred) {
         /* Finally, need to notify the queue if we have transferred data */
         /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
         virtio_transport_queue_notify(&dev, VIRTIO_NET_TX_QUEUE);
@@ -253,40 +234,33 @@ static void tx_provide(void)
 
 static void tx_return(void)
 {
-    /* We must look through the 'used' ring of the TX virtqueue and place them in our
-     * sDDF TX free queue. */
-    uint16_t enqueued = 0;
-    uint16_t i = tx_last_seen_used;
-    uint16_t curr_idx = tx_virtq.used->idx;
-    while (i != curr_idx && !net_queue_full_free(&tx_queue)) {
-        /* For each TX free entry in the sDDF queue, there are *two* virtq used entries.
-         * One for the virtIO header, and one for the packet. */
-        struct virtq_used_elem hdr_used = tx_virtq.used->ring[i % tx_virtq.num];
+    bool transferred = false;
+    while (tx_virtq.used_head != tx_virtq.used->idx) {
+        /*
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read to the 'idx' field of the virt queue.
+         */
+        rrmb();
+        uint32_t hdr_idx = tx_virtq.used->ring[tx_virtq.used_head % tx_virtq.num].id;
 
-        assert(tx_virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
+        /* Extract the buffer index from the header */
+        assert(tx_virtq.desc[hdr_idx].flags & VIRTQ_DESC_F_NEXT);
+        uint32_t buffer_idx = tx_virtq.desc[hdr_idx].next;
 
-        struct virtq_desc pkt = tx_virtq.desc[tx_virtq.desc[hdr_used.id].next % tx_virtq.num];
-        uint64_t addr = pkt.addr;
-        assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
-
-        net_buff_desc_t buffer = { addr, 0 };
+        net_buff_desc_t buffer = { tx_virtq.desc[buffer_idx].addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
 
-        err = ialloc_free(&tx_ialloc_desc, hdr_used.id);
+        err = ialloc_free(&tx_ialloc_desc, hdr_idx);
         assert(!err);
-        err = ialloc_free(&tx_ialloc_desc, tx_virtq.desc[hdr_used.id].next);
+        err = ialloc_free(&tx_ialloc_desc, buffer_idx);
         assert(!err);
-        tx_last_desc_idx -= 2;
-        assert(tx_last_desc_idx >= 0);
-        i++;
 
-        enqueued++;
+        tx_virtq.used_head++;
+        transferred = true;
     }
 
-    tx_last_seen_used += enqueued;
-
-    if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
+    if (transferred && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
         sddf_notify(config.virt_tx.id);
     }
