@@ -406,7 +406,7 @@ def generate(
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, ethernet_driver, None, 3))
     sdf.add_channel(Channel(pci_driver, ethernet_driver, a_id=1, b_id=10))
 
-    if board.name == "vb_105":
+    if board.name == "vb_105" or board.name == 'viscous':
         # ecam_mr = MemoryRegion(sdf, name="ecam", size=0x1000, paddr=0xE0100000)
         # sdf.add_mr(ecam_mr)
         # ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
