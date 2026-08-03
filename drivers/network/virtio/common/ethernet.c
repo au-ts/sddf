@@ -110,8 +110,10 @@ static void rx_provide(void)
             /* Insert the header into the available ring */
             rx_virtq.avail->ring[rx_virtq.avail->idx % rx_virtq.num] = hdr_idx;
 
-            /* Ensure all writes to the descriptor are ordered before we set the flags
-            * that makes hardware aware of this slot.
+            /* Ensure all writes to the descriptor are ordered before we set the
+            * flags that makes hardware aware of this slot. See section
+            * 2.7.13.3.1 Driver Requirements: Updating idx of Virtual I/O Device
+            * (VIRTIO) Version 1.4.
             */
             wwmb();
             rx_virtq.avail->idx++;
@@ -140,8 +142,10 @@ static void rx_return(void)
     bool transferred = false;
     while (rx_virtq.used_head != rx_virtq.used->idx) {
         /*
-         * The following barrier orders the following reads from the descriptor to be after
-         * the read to the 'idx' field of the virt queue.
+         * The following barrier orders the following reads from the descriptor
+         * to be after the read to the 'idx' field of the virt queue. See
+         * section 2.7.13.4.1 Driver Requirements: Notifying The Device of
+         * Virtual I/O Device (VIRTIO) Version 1.4.
          */
         rrmb();
         uint32_t hdr_idx = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].id;
@@ -208,8 +212,10 @@ static void tx_provide(void)
             /* Insert the header into the available ring */
             tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = hdr_idx;
 
-            /* Ensure all writes to the descriptor are ordered before we set the flags
-            * that makes hardware aware of this slot.
+            /* Ensure all writes to the descriptor are ordered before we set the
+            * flags that makes hardware aware of this slot. See section
+            * 2.7.13.3.1 Driver Requirements: Updating idx of Virtual I/O Device
+            * (VIRTIO) Version 1.4.
             */
             wwmb();
             tx_virtq.avail->idx++;
@@ -237,8 +243,10 @@ static void tx_return(void)
     bool transferred = false;
     while (tx_virtq.used_head != tx_virtq.used->idx) {
         /*
-         * The following barrier orders the following reads from the descriptor to be after
-         * the read to the 'idx' field of the virt queue.
+         * The following barrier orders the following reads from the descriptor
+         * to be after the read to the 'idx' field of the virt queue. See
+         * section 2.7.13.4.1 Driver Requirements: Notifying The Device of
+         * Virtual I/O Device (VIRTIO) Version 1.4.
          */
         rrmb();
         uint32_t hdr_idx = tx_virtq.used->ring[tx_virtq.used_head % tx_virtq.num].id;
