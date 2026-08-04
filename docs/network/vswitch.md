@@ -5,138 +5,301 @@
 
 # VSwitch component
 
-## Purpose
+The vswitch is an optional component of the sDDF networking stack. It models a
+physical Ethernet switch with the ability to send and receive packets to all
+network clients connected to it.
 
-The VSwitch component is an optional component of the sDDF networking stack. It models a physical Ethernet switch with the ability to send and receive packets to all PDs connected to the vswitch. A PD is connected as a pair of transmit and receive components (a Client and a Copier, or a Tx and Rx virtualiser). This pair is called a *port*. It supports a simple Access Control Lists scheme in a form of allow lists stating which PDs can communicate with each other. The communication, therefore, can be uni or bi-directional.
+The vswitch supports a simple, static Access Control List (ACL) scheme in the
+form of allow lists stating which clients can communicate with each other. The
+communication can be uni or bi-directional.
 
-A typical system comprising of a vswitch and a few clients is visible in the figure below:
+With a vswitch one can create multiple isolated networks in a system,
+maintaining the principle of confidentiality. Clients never receive buffers that
+were not addressed to them, and if a client performs a broadcast transmission,
+the ACL will filter out the destinations that the client is not permitted to
+transmit to.
+
+The vswitch also provides an API for clients to publish their IP addresses and
+query the IP address of other reachable clients, allowing clients to discover
+the IP addresses of their neighbours. More details on this vswitch PPC interface
+can be found in the [Protected Procedure call](#protected-procedure-call-api)
+section.
+
+## System Architecture
+
+Vswitch clients must be connected to the vswitch for both transmission and
+reception. The transmit queues of vswitch clients are connected to the vswitch
+component, as are the receive queues of the vswitch client's Copy component.
+Thus all packets sent and received by vswitch client pass through the vswitch
+component.
+
+An example system with two vswitch clients and one non-vswitch client is shown
+in the following figure:
 ![VSwitch in the system](/docs/network/imgs/vswitch.svg)
 
-With a VSwitch one can create multiple isolated networks in a system, maintaining the principle of Confidentiality from the CIA triade. Clients never receive buffers that were not addressed to them, and even if some client performs a broadcast transmission, the ACL will filter out the destinations that are not permitted from this port.
+The abstraction the vswitch uses for a client (a pair of Rx and Tx queues) is a
+*port*. See the following definition from the [network config
+file](/include/sddf/network/config.h):
+
+```c
+typedef struct net_vswitch_port_config {
+    net_connection_resource_t rx; // Rx queue of the port
+    net_connection_resource_t tx; // Tx queue of the port
+    region_resource_t tx_data; // Tx data region of the port
+    mac_addr_t mac_addr; // MAC address of the port (ignored if virtualiser port)
+    uint64_t acl; // Access control list of the port
+} net_vswitch_port_config_t;
+```
+
+The final port in the vswitch's port list (port at index `config.num_ports`) is
+the virtualiser port - the port which holds the connections with the Rx and Tx
+virtualisers. In the virtualiser port, the Rx and Tx connections are reversed.
+The Rx virtualiser is connected to the `tx` queue, and the Tx virtualiser is
+connected to the `rx` queue. This allows the vswitch component to handle the
+system receiving packets as the virtualiser port *transmitting* packets, and the
+system transmitting packets as the virtualiser port *receiving* packets.
+
+## Buffer Descriptor Region ID
+
+The addition of a vswitch component requires that the system keep track of some
+additional net buffer descriptor state in some circumstances. Namely the `oid`
+or ownership identifier of a buffer.
+
+Prior to the addition of the vswitch, the data region a buffer belonged to could
+generally be inferred from the queue it was dequeued from. For example, a buffer
+descriptor dequeued from a client's Tx active queue must refer to the client's
+Tx data region. However, with the addition of the vswitch component, this can
+not always be inferred.
+
+For example, when the vswitch transmits a client's buffer to another client, the
+copier of the destination client no longer knows which data region the buffer
+belongs to. For queues where the buffer data region can no longer be inferred,
+we now utilise the buffer descriptor `oid` field. The 6 bit integer held in this
+field associates a region identifier with the buffer pointer to by the
+descriptor.
+
+If the data region of a buffer can still be inferred from the queue it was
+dequeued from, the `oid` field should be set to 0 and safely ignored.
 
 ## Operation
 
-The VSwitch supports up to 62 clients when a virtualiser is connected and 63 when it's not. Connection of a pair of virtualisers allows for interacting with the external world and if that's not needed the vswitch works akin to intranet. When packets arrive at an ingress port, they are inspected against an internal mapping of MAC addresses behind each other port. If a port matching the requested MAC is not found, the packet is assumed to be dedicated towards external world and is routed via the virtualiser. In case there is no virtualiser connected and no MAC is matched the packet is dropped.
+### Unicast
 
-In case the packet is a broadcast packet, it will be delivered to all ports that can accept it according to the ACLs and their respective occupancy. Broadcasting is internally done by keeping a reference count of the number of ports a packet has been handed over to. It is decremented every time the buffer stamped as originating from that port is returned. This is achieved by keeping a special bit field in `net_buffer_desc_t` struct - `oid` - owner's id.
+The vswitch supports up to 31 ports (including the virtualiser port). When
+packets arrive at a port (via the port's Tx queue), they are inspected against
+an internal mapping of MAC addresses behind the other ports. If a port matching
+the destination MAC address is not found, the packet is directed to the external
+world via the virtualiser port.
 
-Internally, vswitch performs very simple bookkeeping of the number of packets it has already transmitted to a given destination port as to not flood it with packets if a client cannot keep up. The count is incremented every time a packet is transmitted to a destination port and decremented when the destination port successfully returns the buffer.
+Before the packet is transferred to the destination port, the ACL list for the
+transmitting client is checked to ensure the client has permission to
+communicate with the receiver. If the permission check fails, the packet is
+immediately dropped and returned to the sender.
 
-A diagram describing a simple scenario where client0 is broadcasting a packet is attached below to illustrate that better:
+Once it has been determined that the transmission is permitted, the capacity of
+the destination port is checked (see [here](#queue-capacity-checks)). If the
+destination port is not at capacity the packet is placed in its Rx queue.
+Otherwise, the packet will be dropped and returned to the sender.
+
+### Broadcast
+
+When a broadcast packet is transmitted it will be delivered to all ports the
+sender has permission to transmit to, so long as those ports have capacity to
+receive packets at the time the packet is processed.
+
+The vswitch uses a buffer reference count system internally to determine when a
+buffer can be returned to the transmitting client. Each buffer has it's own
+ count, which is incremented each time the buffer is forwarded to a port, and
+decremented whenever a port returns the buffer. When the count hits zero, the
+buffer is returned to the sending port.
+
+Broadcast packets are forwarded to each destination port at the same time with
+the exception of the virtualiser port (on systems supporting checksum offload).
+This is because the vswitch needs to zero out the packet's checksum fields prior
+to it being processed by the NIC, see the section on
+[checksumming](#checksumming).
+
+### Queue capacity checks
+
+Internally, the vswitch performs very simple bookkeeping of the outstanding
+number of packets which have been forwarded to each port without being returned.
+This is to ensure that copy components are not forwarded more packets than they
+are designed to handle simultaneously (the capacity of their queues).
+
+The count is incremented every time a packet is transmitted to a destination
+port and decremented when the destination port successfully returns the buffer.
+The vswitch will not forward more packets than the port's capacity. If the
+capacity is reached, packets will be dropped.
+
+### Example operation
+
+The following diagrams demonstrate how the vswitch handles a client broadcast
+packet when hardware checksum offload is not enabled. We show what happens when
+client0 (or port 0) transmits a broadcast packet:
 
 ![Broadcast example, part 1](/docs/network/imgs/vswitch_tx1.svg)
 
-After the buffer is transmitted directly from client0, the reference count indexed by this port index and buffer's offset is bumped up to match how many times it was transmitted:
+After the buffer is transmitted by client0, the vswitch finds the buffer's
+reference count location using the client number and buffer offset. Since this
+is client0 transmitting buffer 0, the first slot is used. The reference count is
+then incremented twice as the packet is transmitted to the other ports:
 
 ![Broadcast example, part 2](/docs/network/imgs/vswitch_tx2.svg)
 
-Client1's Copier dequeues the buffer first and enqueues it into it's Client's active queue, the buffer is enqueued back into the free queue back to the vswitch and notifies it. vswitch gets the notification and matches the buffer's `oid` against the refcount table and decrements the count corresponding to this buffer's offset:
+Client1's Copier dequeues the buffer first, copies it into a local buffer and
+enqueues it into the free queue shared with the vswitch. When the vswitch is
+eventually notified by client1's copier, it extracts the buffer's owner using
+the `oid` field. It can then decremented the buffer's refcount:
 
 ![Broadcast example, part 3](/docs/network/imgs/vswitch_tx3.svg)
 
-Then, the virtualiser gets the notification and dequeues the buffer. It then enqueues the buffer into the driver. The refcount does not get decremented yet:
+When the virtualiser processes the vswitch's notification, it will dequeue the
+buffer and pass it to the driver:
 
 ![Broadcast example, part 4](/docs/network/imgs/vswitch_tx4.svg)
 
-After the driver transmits the buffer it kicks the Tx virtualiser and it in turn returns the buffer back to the vswitch, effectively decrementing the reference count:
+After the driver transmits the buffer it kicks the Tx virtualiser and it in turn
+returns the buffer back to the vswitch, effectively decrementing the reference
+count:
 
 ![Broadcast example, part 5](/docs/network/imgs/vswitch_tx5.svg)
 
-When the reference count drops to 0, the buffer is finally returned back to the client0 where it can be reused. After this operation no other component of the system can access the memory behind the descriptor:
+When the reference count drops to 0, the buffer is finally returned back to the
+client0 where it can be reused. After this operation no other component of the
+system can access the memory behind the descriptor:
 
 ![Broadcast example, part 6](/docs/network/imgs/vswitch_tx6.svg)
 
-There is a rare case in which the vswitch is connected to a NIC with hardware offloaded cheksumming and the clients already perform this checksumming (e.g. Linux VMs hosted on `libvmm`). In such case the checksum will be applied twice when transmitted through the Ethernet driver. Although the easiest solution would be to turn off the checksumming for the clients whatsoever, sometimes it's impossible (e.g. Virtio spec allows for [*partial checksumming option*](https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1970003) but not for disabling it wholly). In such cases vswitch is responsible for clearing the checksum before passing it to virtualisers.
+### Checksumming
 
-To do this, it needs to modify the packet only when passing it to the virtualiser and since the packet is only a descriptor, it cannot modify the memory until it's **sure** that no other client is referencing it. This requires knowing that all other clients have already returned the buffer containing the packet.
+All vswitch clients must generate the checksums of outgoing packets if they wish
+for them to be correct when received by other vswitch clients. This is in
+contrast to when hardware checksum offload is enabled, and the client can safely
+leave all checksums empty to be filled by hardware.
 
-Since vswitch needs to inspect the packets, Tx data regions of its clients have to be mapped into the vswitch PD. Also, the packets are not copied unless they are received by a client's Copier component which is present because the clients are inherently untrusted.
+In the case where the vswitch is connected to a NIC supporting hardware checksum
+offloading vswitch clients must still generate their checksums in software. The
+vswitch will then ensure that the checksums are cleared before passing the
+packet to the virtualiser port.
+
+Since other vswitch clients must receive packets *with* software generated
+checksums, packets are passed to all non-virtualiser destination ports first.
+Once the packet has been copied and returned by each port, it's checksums are
+zeroed out and it is forwarded to the virtualiser port.
+
+Since the vswitch needs to inspect the checksums of outgoing packets, the Tx
+data regions of vswitch clients need to be mapped into the vswitch PD.
 
 ## Usage
 
 ### sdfgen
 
-To use vswitch component in your system, a few modifications are required to the `meta.py` and `.mk` files. The `microkit_sdf_gen` tool contains all necessary machinery to augment the `.system` file for you. First you need to create a vswitch PD same as you do with other PDs:
+To use vswitch component in your system, a few modifications are required to the
+`meta.py` and `.mk` files. The `microkit_sdf_gen` tool contains all necessary
+machinery to augment the `.system` file for you. First you need to create a
+vswitch PD same as you do with other PDs:
+
 ```py
 vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
 ```
-Important caveat is that it's priority has to be higher than clients that are connected to it if you want to call the IP - related PPCs on it.
 
-The `vswitch` example makes usage of the two Protected Procedure calls, one to report the IP address obtained via DHCP from the server, and other to query IPs of ports connected to the vswitch. This, of course can be extended to the developer's liking as, for example, MAC addresses could be queried, or the ACLs themselves.
+Important caveat is that it's priority has to be higher than clients that are
+connected to it to support the PPC functionality.
 
-Then, connect it to your clients:
+When you declare your Network subsystem, you must pass in this vswitch PD to the "vswitch" argument:
+
 ```py
-net_system.add_client_with_copier(client0, client0_net_copier, vswitch=vswitch)
+net_system = Sddf.Net(
+	sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch
+)
 ```
-And add it as your child PD:
+
+Then, to connect a client to the vswitch, set the vswitch argument to true:
+
 ```py
-child_pds = [
-  … other pds
-  vswitch
-]
+net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
 ```
-Next, **after** you call `net_system.connect()` and **before** you call `net_system.serialise_config(output_dir)` you need to specify the ACLs that define which PDs can talk to which:
+
+Then proceed creating your net subsystem as usual, until `net_system.connect()`
+is called. You then need to specify your static vswitch ACL rules, which define
+which clients can communicate with which (note by default there are *no*
+permissions):
+
 ```py
 # Assume we have clients 0, 1, 2, 3 and a virtualiser V
-# We add ACLs as follows:
-# 0 <-> 1, 3, V
-# 1 <-> 0, V
-# 2 <-> V
-# 3 <-> 0, 1, V
-net_system.add_acl_rule(client0, client3, vswitch)
-net_system.add_acl_rule(client0, net_virt_tx, vswitch)
-net_system.add_acl_rule(client1, client0, vswitch)
-net_system.add_acl_rule(client1, net_virt_tx, vswitch)
-net_system.add_acl_rule(client2, net_virt_tx, vswitch)
-net_system.add_acl_rule(client3, client0, vswitch)
-net_system.add_acl_rule(client3, client1, vswitch)
-net_system.add_acl_rule(client3, net_virt_tx, vswitch)
+# ACLs: x -> y : x can talk to y
+# 0 -> 1, 2, 3, V
+# 1 -> 0, 2, V
+# 2 -> 0, 1, V
+# 3 -> 0, V
+net_system.add_acl_rule(client0, client1, True, True)
+net_system.add_acl_rule(client0, client2, True, True)
+net_system.add_acl_rule(client0, client3, True, True)
+net_system.add_acl_rule(client0, net_virt_tx, True, True)
+net_system.add_acl_rule(client1, client2, True, True)
+net_system.add_acl_rule(client1, net_virt_tx, True, True)
+net_system.add_acl_rule(client2, net_virt_tx, True, True)
+net_system.add_acl_rule(client3, net_virt_tx, True, True)
 ```
 
-The API `add_acl_rule` also allows unidirectional ACL specification. Such case is presented below:
-```py
-# Assume we have clients 0, 1 and a virtualiser V
-# We add ACLs as follows:
-# 0 <-> 1, V
-# 1 <-> V
-net_system.add_acl_rule(client0, client1, vswitch, True, False)
-net_system.add_acl_rule(client0, net_virt_tx, vswitch)
-net_system.add_acl_rule(client1, net_virt_tx, vswitch)
-```
-In such a system `client0` can talk to `client1` and the outside world but `client0` is limited only to communication with the outside world via the virtualiser and cannot talk to `client1`.
+Finally, the system can be serialised with
+`net_system.serialise_config(output_dir)`.
 
 ### Makefiles
 
-Similarly to other components, the makefiles for any system including vswitch will also have to be modified.
+Including a vswitch in your subsystem requires the following additional changes
+to your makefile (beyond including the network subsystem). Firstly, you must
+include the `network_vswitch.elf` elf file as a target of your makefile, and
+include it as an argument to the final system image.
 
-First modification is that since each copier now contains unique mapping of data regions that is patched by the `sdfgen` tool and then copied into the elf sections by `objcopy`, the network_copy elf file itself has to be copied:
+Next, you must copy the system configuration data into the vswitch elf file
+after the metaprogram has run:
 ```sh
-	cp network_copy.elf network_copy0.elf
-	cp network_copy.elf network_copy1.elf
-```
-Patching is done as follows:
-```sh
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
+$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
 ```
 
-Next, the vswitch elf file has to be included in the final system image:
-```sh
-	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
+### Protected Procedure Call API
+
+The PPC API (call IDs, arguments, return values) can be found in
+[vswitch.h](/include/sddf/network/vswitch.h):
+
+```c
+/**
+ * Register a client's IP address with the vswitch.
+ */
+#define VSWITCH_SET_IP_ADDR 0
+
+/**
+ * Request a client's vswitch ID and reachable neighbours.
+ */
+#define VSWITCH_QUERY_STATE 1
+
+/**
+ * Request another client's IP address.
+ */
+#define VSWITCH_REQ_CLIENT 2
 ```
 
-Lastly, remember to add the `network_vswitch.elf` to your list of `IMAGES` so that it will be included in the build.
+The three available PPC calls are:
+1. Set IP Address: Publish an IP address associated with this port, for other
+   clients  to query.
+2. Query vswitch state: Return a bitmap of reachable neighbours. Bit(n) is set
+   if client n is reachable.
+3. Request a vswitch client's IP address: Return the IP address registered by
+   client n.
+
+See the vswitch example client [client.c](/examples/vswitch/client.c) for an
+example of how to use each of these APIs.
 
 ## Limitations
 
-Right now, the vswitch is limited by the number of PDs that can be connected to it. There is a possibility of extending that in the future but that is at the discretion of Microkit maintainers.
+Due to each vswitch client requiring 2 channels with the vswitch, there is a
+limitation of 31 vswitch clients per system. This limitation however could
+easily be overcome in the future with additional support from Microkit.
 
-Next limitation is that you can currently have just one vswitch in the system. There is not much sense in having more than one vswitch as you can realize subsequent subnets via ACLs inside a single vswitch. The only foreseeable case for multiple vswitches would be in a system where you have multiple NICs that should serve different clients on different vswitches.
+Currently we only support one vswitch per net subsystem, as we did not see the
+need for chaining multiple vswitches. Isolated subnets are achievable using a
+single vswitch with appropriate ACLs.
 
-Currently, when the vswitch is overloaded with packets to a destination that cannot accept any more packets, it will simply drop them. It potentially could have an internal "in-flight" queue that it would periodically try re-transmitting instead of dropping.
-
-Due to how some protocols, e.g. ICMP require the destination to be able to reply to the sender, hence uni-directional ACL settings will prevent one side replying and in turn the ICMP echos will never be replied to. Ideally, a switch would allow for such uni-directional communication but it would require more packet inspection and corner cases which would impact the performance.
-
-In a rare case user would like to modify the ACLs during system's runtime, e.g. if a PD is misbehaving and somehow it was caught red-handed, there should be a notion of a *supervisor* PD that would then instruct the vswitch to restrict the offending PD's access to say virtualisers. This is not implemented as such, but would require just minor adjustments to the `protected` entrypoint.
-
-Right now there is an unhandled corner case where the vswitch would be responsible for **adding** a checksum. If 2 clients are communicating via vswitch with the expectation of a checksum being filled in by the HW, it will never be filled because the packet never reaches the Ethernet driver. The vswitch should detect this case and add the checksum.
+In the future, support will be added for the modification of ACL rules at
+run-time. This will require clients having a notion of a capability over ACLs.
