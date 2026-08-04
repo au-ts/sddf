@@ -35,12 +35,18 @@ the diagram:
   the Rx DMA region into [client-specific Rx data regions](#data-regions). In
   contrast to the other network components, each client [has its own copy
   component](#copy-components-and-availability).
+* The [virtual switch](/docs/network/vswitch.md) or vswitch can optionally be
+  included, and allows network clients to communicate virtually over the
+  network. If included, the vswitch is responsible for multiplexing packets
+  between network clients and the virtualisers.
 
 Networking clients can both receive (Rx) and transmit (Tx) data unless the
 system configures them to be Rx or Tx only. Rx clients interface only with their
 respective copiers to receive packets (or in the rare case where they are
-*trusted*, the Rx virtualiser). Tx clients interface only with the Tx
-virtualiser to transmit packets.
+*trusted*, the Rx virtualiser). Tx clients interface either with the Tx
+virtualiser or the vswitch to transmit packets, depending on whether they are
+connected to the vswitch. From the clients perspective, both connections are the
+same.
 
 Network components communicate using shared memory (queues and data) and
 asynchronous notifications (Microkit channels). The diagram below gives an
@@ -60,9 +66,13 @@ regions used to contain raw buffers which the NIC interacts with via DMA
 particular client (referred to as client data regions).
 
 There are separate Rx and Tx DMA regions. In the case of Tx, each client is
-allocated its own Tx DMA region which it has exclusive access to. The only other
-component that has permissions to a client's Tx DMA region is the Tx
-virtualiser, which it requires for performing cache cleaning operations.
+allocated its own Tx DMA region which it has exclusive access to. For systems
+without a vswitch, the only other component that can access a client's Tx DMA
+region is the Tx virtualiser, which is required for performing cache cleaning
+operations. If a client is connected to a vswitch, the vswitch requires access
+to the region as well for packet inspection and checksum updates. Additionally,
+the copy components of all vswitch clients also require read-only access. More
+on this can be found in the [vswitch](/docs/network/vswitch.md) section.
 
 In contrast, as our multiplexing is performed by the virtualiser, all clients
 share a single Rx DMA region. Since giving clients direct access to this global
@@ -91,6 +101,46 @@ of the underlying region. This allows the driver to pass IO addresses directly
 to the hardware without having knowledge of the underlying data regions. When
 buffers are returned to clients, the Tx virtualiser can determine their owner by
 comparing their IO address to the bounds of each client's DMA region.
+
+With the addition of the vswitch component, another set of queues are used to
+hold buffers from multiple data regions - the queues shared between the vswitch
+and the copy components of the vswitch clients, see [here](#queue-assumptions).
+This necessitated the use of a data region identifier `oid` for each buffer
+descriptor, to distinguish which data region each buffer belongs to:
+
+```c
+typedef struct net_buff_desc {
+    /* offset of buffer within buffer memory region or io address of buffer */
+    uint64_t io_or_offset;
+    /* length of data inside buffer */
+    uint16_t len;
+    /**
+     * Ownership identifier of the buffer, which is used to identify which
+     * memory region a buffer belongs to.
+     *
+     * For systems without a vswitch, the region a buffer belongs to can either
+     * be deduced from the queue it was dequeued from or its io address.
+     *
+     *  However, when a vswitch is introduced buffers belonging to more than one
+     *  region can now be enqueued in the same queue. For example, the Rx active
+     *  queue of the copy component only contains Rx DMA buffers in systems
+     *  without a vswitch, but when a vswitch is present the copier's queue may
+     *  also contain Tx buffers belonging to another client's data region.
+     *
+     * In these ambiguous cases, the oid field is used to resolve the source
+     * region of each buffer. oids are not globally unique for each memory
+     * region, they are just required to be consistent between neighbouring
+     * pairs of components like the vswitch and the copy components.
+     *
+     * oid is ignored by components which do not use it, like the Rx virtualiser
+     * and Ethernet drivers, and should always be set to 0 by net clients.
+     */
+    uint8_t oid : 6;
+} net_buff_desc_t;
+```
+
+Note that the `oid` field is only used in systems containing a vswitch
+component, and should be set to 0 otherwise.
 
 ### Network queues
 
@@ -262,12 +312,24 @@ system by writing to shared memory regions:
 
 Currently each network queue is designed to have the capacity needed to hold all
 the buffers that can possibly be enqueued simultaneously, i.e. it is impossible
-for a queue to be filled past capacity. Since queue entries themselves are only
-pointers to buffers, this does not incur significant memory overhead. Thus,
-while processing network queues, components do not need to check whether a queue
-is *full* - they only need to check whether queues are *empty*. Since checking
-for fullness requires the use of memory barriers, this is a significant
+for a queue to be filled past capacity so long as only the available system
+buffers are enqueued. Since queue entries themselves are only pointers to
+buffers, this does not incur significant memory overhead. Therefore while
+processing network queues, components do not need to check whether a queue is
+*full* - they only need to check whether queues are *empty*. Since checking for
+fullness requires the use of memory barriers, this is a significant
 optimisation.
+
+With the addition of the vswitch component, this assumption unfortunately no
+longer holds for all queues. Since the vswitch was implemented to enable client
+communication with only a single copy, this necessitates that the queues shared
+between the vswitch and the copy components of its clients may now hold buffers
+from multiple different data regions (the system Rx DMA region, as well as the
+Tx DMA region of each vswitch client). Since the memory required to adjust the
+capacity of these queues increases in the order of the number of vswitch clients
+squared, we instead require that the vswitch component ensures that no more than
+the queue's capacity is ever enqueued. More on this can be found in the
+[vswitch](/docs/network/vswitch.md) section.
 
 Unfortunately there is currently a vulnerability where untrusted clients are
 able to insert *duplicate buffers* into their queues, which could cause a
@@ -663,3 +725,6 @@ Components using lwIP will also require the lwIP include directories
 An example echo server system utilising the network subsystem can be found
 [here](/examples/echo_server/). The [README](/examples/echo_server/README.md)
 describes how to build, run, test and benchmark the system.
+
+An example demonstrating how the network subsystem can be used with a vswitch
+component can be found [here](/examples/vswitch/).
