@@ -150,6 +150,7 @@ static void rx_return(void)
         rrmb();
         uint32_t hdr_idx = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].id;
         uint32_t len = rx_virtq.used->ring[rx_virtq.used_head % rx_virtq.num].len;
+        assert(len > sizeof(virtio_net_hdr_t));
 
         /* Extract the buffer index from the header */
         assert(rx_virtq.desc[hdr_idx].flags & VIRTQ_DESC_F_NEXT);
