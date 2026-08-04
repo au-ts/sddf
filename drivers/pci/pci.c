@@ -12,13 +12,13 @@
 #include <sel4/sel4_arch/mapping.h>
 
 uintptr_t pci_resources_vaddr = 0x60000000;
-seL4_CPtr cnode_cptr_pci_resources;
-seL4_CPtr vspace_cptr_ethernet_driver;
 pci_resources_t *pci_resources;
 cnode_specs_t *cnode_specs;
 uint32_t kernel_objects_ut_idx = 2;
 
-seL4_CPtr cnode_cptr_ethernet_driver;
+#define CPTR_CNODE_PCI_RESOURCES        (microkit_cspace_root_slot_to_cptr(1))
+#define CPTR_VSPACE_ETHERNET_DRIVER     (microkit_cspace_root_slot_to_cptr(2))
+#define CPTR_CSPACE_ETHERNET_DRIVER     (microkit_cspace_root_slot_to_cptr(3))
 
 bool acpi_ready = false;
 
@@ -89,7 +89,7 @@ void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t 
     uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
     uintptr_t cur_vaddr = target_vaddr;
     while (cur_paddr < end_paddr) {
-        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, vspace_cptr_ethernet_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
+        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, CPTR_VSPACE_ETHERNET_DRIVER, seL4_X86_LargePageObject, seL4_ReadWrite);
         if (error != seL4_NoError) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return;
@@ -255,7 +255,7 @@ void bind_irq(pci_bridge_t *pci_bridge, struct pci_header_type0 *pci_header, uin
     }
 
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(cnode_cptr_pci_resources + 1, cnode_cptr_ethernet_driver, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 0, 1);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(CPTR_CNODE_PCI_RESOURCES + 1, CPTR_CSPACE_ETHERNET_DRIVER, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 0, 1);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
@@ -263,15 +263,15 @@ void bind_irq(pci_bridge_t *pci_bridge, struct pci_header_type0 *pci_header, uin
     }
 
     sddf_dprintf("Try minting a notification capability: ");
-    error = seL4_CNode_Mint(cnode_cptr_pci_resources, 250, 58, cnode_cptr_ethernet_driver, 1, 58, seL4_ReadWrite, 1 << irq_num);
+    error = seL4_CNode_Mint(CPTR_CNODE_PCI_RESOURCES, 250, 58, CPTR_CSPACE_ETHERNET_DRIVER, 1, 58, seL4_ReadWrite, 1 << irq_num);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to mint a notification - %d\n", error);
     } else {
         sddf_dprintf("Success!\n");
     }
 
-    seL4_CPtr handler_cap = cnode_cptr_ethernet_driver + base_irq_cap + irq_num;
-    seL4_CPtr ntf_cap = cnode_cptr_pci_resources + 250;
+    seL4_CPtr handler_cap = CPTR_CSPACE_ETHERNET_DRIVER + base_irq_cap + irq_num;
+    seL4_CPtr ntf_cap = CPTR_CNODE_PCI_RESOURCES + 250;
 
     seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
     sddf_dprintf("ret: %lu\n", ret);
@@ -389,9 +389,9 @@ void init(void)
 
     pci_resources = (pci_resources_t *)pci_resources_vaddr;
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
-    sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)cnode_cptr_pci_resources);
-    sddf_dprintf("cptr_ethernet_driver: 0x%lx\n", (uintptr_t)cnode_cptr_ethernet_driver);
-    cnode_specs->cptr = cnode_cptr_pci_resources;
+    sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);
+    sddf_dprintf("cptr_ethernet_driver: 0x%lx\n", (uintptr_t)CPTR_CSPACE_ETHERNET_DRIVER);
+    cnode_specs->cptr = CPTR_CNODE_PCI_RESOURCES;
 
     sddf_dprintf("=========PCI driver is running==========\n");
 
