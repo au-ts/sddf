@@ -42,10 +42,11 @@ uintptr_t aml_object_pool_size = 0x100000;
 pci_resources_t *pci_resources = (pci_resources_t *)0x60000000;
 uintptr_t ecam_base_vaddr = 0x20000000;
 
-seL4_CPtr vspace_cptr_pci_driver;
-seL4_CPtr cnode_cptr_remaining_untypeds;
-seL4_CPtr cnode_cptr_pci_resources;
-uintptr_t bootinfo_remaining_untypeds;
+#define CPTR_POST_CAPDL_UNTYPEDS  (microkit_cspace_root_slot_to_cptr(1))
+#define CPTR_VSPACE_PCI_DRIVER    (microkit_cspace_root_slot_to_cptr(2))
+#define CPTR_PCI_RESOURCES        (microkit_cspace_root_slot_to_cptr(3))
+
+capDLBootInfo_t *bootinfo_post_capdl_untypeds;
 uintptr_t bootinfo_rsdp;
 
 uintptr_t acpi_vaddr = 0x4000000;
@@ -312,8 +313,9 @@ void load_acpi_tables()
 void init(void)
 {
     // Init the CNode specs that record all the untypeds passed from the capDL initialiser
-    capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds;
-    post_boot_cnode.cptr = cnode_cptr_remaining_untypeds;
+    /* capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds; */
+    capDLBootInfo = bootinfo_post_capdl_untypeds;
+    post_boot_cnode.cptr = CPTR_POST_CAPDL_UNTYPEDS;
     post_boot_cnode.start = capDLBootInfo->untypeds.start;
     // TODO: is end empty?
     for (uint64_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
@@ -326,10 +328,11 @@ void init(void)
     }
     update_active_ut_idx(&post_boot_cnode);
     sddf_dprintf("cnode start: %d\n", post_boot_cnode.start);
+    sddf_dprintf("cptr: 0x%x\n", post_boot_cnode.start);
 
     // Init the CNodes that is shared between ACPI and PCIe driver
     pci_resources_cnode = &pci_resources->cnode_specs;
-    pci_resources_cnode->cptr = cnode_cptr_pci_resources;
+    pci_resources_cnode->cptr = CPTR_PCI_RESOURCES;
     // TODO: this should be passed by capDL loader
     seL4_Error error = seL4_CNode_Move(pci_resources_cnode->cptr, 1, 58, post_boot_cnode.cptr, 1, 58);
     if (error != seL4_NoError) {
@@ -469,7 +472,7 @@ void init(void)
         uintptr_t cur_paddr = pci_resources->pci_seg_groups[i].base_addr;
         uintptr_t cur_vaddr = ecam_base_vaddr;
         while (cur_paddr < end_paddr) {
-            error = retype_and_map_frame(&post_boot_cnode, cur_paddr, cur_vaddr, vspace_cptr_pci_driver, seL4_X86_LargePageObject, seL4_ReadWrite);
+            error = retype_and_map_frame(&post_boot_cnode, cur_paddr, cur_vaddr, CPTR_VSPACE_PCI_DRIVER, seL4_X86_LargePageObject, seL4_ReadWrite);
             if (error != seL4_NoError) {
                 sddf_dprintf("Error: failed to retype or map a frame.\n");
                 return;
