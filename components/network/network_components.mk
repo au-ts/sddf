@@ -13,10 +13,10 @@
 
 NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
 NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf network_arp.elf network_copy.elf network_vswitch.elf
-network/components/%.o: ${SDDF}/network/components/%.c
+components/network/%.o: ${SDDF}/components/network/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-NETWORK_COMPONENT_OBJ := $(addprefix network/components/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o network_vswitch.o)
+NETWORK_COMPONENT_OBJ := $(addprefix components/network/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o network_vswitch.o)
 
 CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
@@ -24,28 +24,28 @@ ${CHECK_NETWORK_FLAGS_MD5}:
 	-rm -f .network_cflags-*
 	touch $@
 
-#vpath %.c ${SDDF}/network/components
+#vpath %.c ${SDDF}/components/network
 
 
 ${NETWORK_IMAGES}: LIBS := libsddf_util_debug.a ${LIBS}
 
-${NETWORK_COMPONENT_OBJ}: |network/components $(SDDF_LIBC_INCLUDE)
+${NETWORK_COMPONENT_OBJ}: |components/network $(SDDF_LIBC_INCLUDE)
 ${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
 ${NETWORK_COMPONENT_OBJ}: CFLAGS+=${CFLAGS_network}
 
-network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c
+components/network/network_virt_%.o: ${SDDF}/components/network/virt_%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-network/components/network_copy.o: ${SDDF}/network/components/copy.c
+components/network/network_copy.o: ${SDDF}/components/network/copy.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-network/components/network_arp.o: ${SDDF}/network/components/arp.c
+components/network/network_arp.o: ${SDDF}/components/network/arp.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-network/components/network_vswitch.o: ${SDDF}/network/components/vswitch.c
+components/network/network_vswitch.o: ${SDDF}/components/network/vswitch.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-%.elf: network/components/%.o
+%.elf: components/network/%.o
 	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
 
 clean::
@@ -53,9 +53,9 @@ clean::
 
 clobber::
 	${RM} -f ${NETWORK_IMAGES}
-	rmdir network/components
+	rmdir components/network
 
-network/components:
+components/network:
 	mkdir -p $@
 
 -include ${NETWORK_COMPONENTS_OBJS:.o=.d}

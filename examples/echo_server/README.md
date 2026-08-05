@@ -549,12 +549,12 @@ example header](/examples/echo_server/include/lwip/lwipopts.h). This header is
 provided by the lwIP user and allows lwIP features to be turned on or off, thus
 does not include a full list of available debug options. For this, you should
 check the [options header in the lwIP
-library](/network/ipstacks/lwip/src/include/lwip/opt.h). Any options you wish to
+library](/components/network/ipstacks/lwip/src/include/lwip/opt.h). Any options you wish to
 use can then be added the [lwIP options example
 header](/examples/echo_server/include/lwip/lwipopts.h).
 
 Each debug printing option you wish to use can be configured to the desired
-level, see [here](/network/ipstacks/lwip/src/include/lwip/debug.h):
+level, see [here](/components/network/ipstacks/lwip/src/include/lwip/debug.h):
 
 ```c
 /** Debug level: ALL messages*/

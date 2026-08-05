@@ -84,8 +84,8 @@ export BLK_NEED_TIMER
 endif
 
 include ${SDDF}/util/util.mk
-include ${SDDF}/blk/components/blk_components.mk
-include ${SDDF}/serial/components/serial_components.mk
+include ${SDDF}/components/blk/blk_components.mk
+include ${SDDF}/components/serial/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
