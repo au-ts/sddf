@@ -7,3 +7,4 @@ from .i2c import sDDFI2C
 from .sddf import sDDFDriverClass
 from .serial import sDDFSerial
 from .timer import sDDFTimer
+from .blk import sDDFBlk
