@@ -48,9 +48,6 @@ class sDDFSerial(sDDFDriverClass):
         virt_tx_elf: str = "serial_virt_tx.elf",
         driver_elf: str = "serial_driver.elf",
     ):
-        super().__init__(
-            sdf, "serial", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
-        )
         assert driver_prio > virt_tx_prio > 0
         if allow_rx:
             # Default RX prio == TX prio
@@ -59,6 +56,16 @@ class sDDFSerial(sDDFDriverClass):
             assert driver_prio > virt_rx_prio > 0
 
         self.cpu = cpu
+        driver = ProtectionDomain(
+            sdf,
+            "serial_driver",
+            driver_elf,
+            scheduling=SchedulingProperties(driver_prio),
+            cpu=self.cpu,
+        )
+        super().__init__(
+            sdf, driver, "serial", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
+        )
         self.allow_rx = allow_rx
         self.data_size = data_size
         self.queue_size = queue_size
@@ -69,21 +76,10 @@ class sDDFSerial(sDDFDriverClass):
                 f"begin_str length {len(begin_str)} exceeds max {SERIAL_MAX_BEGIN_STR_LEN}"
             )
         self.begin_str = begin_str
-
         self.virt_tx = None
         self.virt_rx = None
         self.virt_rx_elf = virt_rx_elf
         self.virt_tx_elf = virt_tx_elf
-        self.driver = ProtectionDomain(
-            self.sdf,
-            "serial_driver",
-            driver_elf,
-            scheduling=SchedulingProperties(driver_prio),
-            cpu=self.cpu,
-        )
-
-        # We must make the driver BEFORE we get here
-        self.driver_dev_resources = self.create_dtb_resources(self.driver)
 
         # Stubs of config structs that we need to collect in construct_infrastructure and connect_clients
         self.virt_tx_config = None
@@ -331,13 +327,18 @@ class sDDFSerial(sDDFDriverClass):
 
     def generate_config_structs(self):
         # We've already made our structs, just return them as a list for the serialiser
-        driver_resources = [self.driver_dev_resources, self.driver_config]
+        driver_resources = [self.driver_config]
         virt_resources = []
         if self.virt_tx_config:
             virt_resources.append(self.virt_tx_config)
         if self.virt_rx_config:
             virt_resources.append(self.virt_rx_config)
-        return driver_resources + virt_resources + self.client_configs
+        return (
+            super().generate_config_structs()
+            + [self.driver_config]
+            + virt_resources
+            + self.client_configs
+        )
 
     # ### connection config struct factory functions ###
 

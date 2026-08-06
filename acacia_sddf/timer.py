@@ -32,19 +32,17 @@ class sDDFTimer(sDDFDriverClass):
         cpu: Optional[int] = None,
         driver_elf: str = "timer_driver.elf",
     ):
-        super().__init__(
-            sdf, "timer", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
-        )
-        self.driver = ProtectionDomain(
-            self.sdf,
+        driver = ProtectionDomain(
+            sdf,
             "timer_driver",
             driver_elf,
             scheduling=SchedulingProperties(driver_prio, passive=True),
         )
         self.cpu = cpu
+        super().__init__(
+            sdf, driver, "timer", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
+        )
 
-        # Create driver resources before doing anything else
-        self.driver_dev_resources = self.create_dtb_resources(self.driver)
         self.client_configs = []
 
     def connect_clients(self):
@@ -70,7 +68,7 @@ class sDDFTimer(sDDFDriverClass):
 
     def generate_config_structs(self):
         # We've already made our structs
-        return [self.driver_dev_resources] + self.client_configs
+        return super().generate_config_structs() + self.client_configs
 
     def timer_client_config_factory(
         self, client_pd: ProtectionDomain, driver_id: int
@@ -88,8 +86,6 @@ class sDDFTimer(sDDFDriverClass):
         )
 
     # x86 utility
-    # NOTE: is this safe to call automatically? I currently am assuming we want manual
-    # control over this since we didn't bake it into sdfgen before.
     def add_x86_hpet(self):
         # Timer IRQ must be the highest priority (highest vector) to ensure they are delivered
         # as close as possible to the timer expiry. The highest vector is defined by (irq_user_max - irq_user_min) in seL4 source

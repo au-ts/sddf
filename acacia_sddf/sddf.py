@@ -31,13 +31,14 @@ class sDDFDriverClass(Subsystem):
     def __init__(
         self,
         system: System,
+        driver_pd: ProtectionDomain,
         class_name: str,
         dev_compatible: str,
         dev_dt_path: str,
         magic: str,
     ):
         super().__init__(system, class_name)
-
+        self.driver = driver_pd
         self.sdf = system
         self.dtb = system.dtb
         self.driver_magic = magic
@@ -45,6 +46,7 @@ class sDDFDriverClass(Subsystem):
             print(
                 f"Initialising {class_name} driver with no DTB. Assuming this is x86 and no DTB is needed"
             )
+            self.create_dtb_resources()
             return
 
         # Find real DTB node
@@ -81,41 +83,26 @@ class sDDFDriverClass(Subsystem):
                 f"Multiple sDDF drivers satisfy {dev_compatible}! "
                 f"There whould be only one.\n{matching_configs}"
             )
-        self.driver_config = matching_configs[0]
+        self.sddf_driver_config = matching_configs[0]
+        self.create_dtb_resources()
 
-    def create_dtb_resources(self, driver_pd: ProtectionDomain) -> ConfigStruct:
+    def create_dtb_resources(self) -> ConfigStruct:
         """
         Given the driver PD and the DTB+driver_config we were initialised with,
         create all regions, maps, and IRQs required. Creates a DeviceResources ConfigStruct
         for the subsystem to use upon calling `create_config_structs`.
-
-        This method will not run twice; it will return the existing ConfigStruct. I.e.
-        there is no risk of creating duplicate MRs, maps or IRQs from this method.
-
-        Args:
-            driver_pd: ProtectionDomain
-        Returns:
-            ConfigStruct -> DeviceResources.
         """
-        # Cache DTB regions. Don't want to accidentally make these multiple times.
-        if hasattr(self, "__device_resources"):
-            return self.__device_resources
-
+        # track fields to store in DeviceResources. tuples of vaddr, offset
+        self.__region_maps = []
+        self.__irq_ids = []
         if self.dtb is None:
             print(f"sddf.py: no DTB! Creating dummy device resources.")
             # x86 or otherwise no DTB!
             print("sddf.py: no DTB! Assuming x86")
             self.x86_resources()
-            # We generate an empty deviceresources despite it being useless, as our build system expects it.
-            self.__device_resources = DeviceResourcesFactory(
-                self.driver_magic, [], [], target_file=driver_pd.prog_image
-            )
-            return self.__device_resources
+            return
 
-        region_maps = (
-            []
-        )  # track fields to store in DeviceResources. tuples of vaddr, offset
-        for region in self.driver_config.regions:
+        for region in self.sddf_driver_config.regions:
             mr = None
             # We name regions as [region_name]_[node_path] to avoid collisions with
             # duplicate driver classes on different nodes
@@ -158,35 +145,44 @@ class sDDFDriverClass(Subsystem):
                         self.sdf, region_name, mr_sz, paddr=d_paddr, cached=False
                     )
             else:
-                # This is a MR that doesn't correspond to physical memory
-                # mr = MemoryRegion(region_name, region.size)
-                # d_reg_offset = 0
-
-                # If you've run into this, open an issue. Old sdfgen supports this but it seems like a bug.
-                raise NotImplementedError("Config region doesn't correspond to DTB!")
+                # This is a physical region that needs an arbitrary paddr. We make it now
+                # and acacia assigns a paddr upon calling `System.assemble`. We make the
+                # config structs in `generate_config_structs` - Acacia only calls it AFTER
+                # assembling, ensuring that our MRs have a paddr in the config struct.
+                mr = MemoryRegion(self.sdf, region_name, region.size, physical=True)
+                d_reg_offset = 0
 
             # Second: set up map
-            # Assumes permission string is correctly formatted. Non r/w/x chars are ignored
-            d_map = driver_pd.create_automap(mr, region.perms if region.perms else "rw")
-            region_maps.append((d_map, d_reg_offset))
+            d_map = self.driver.create_automap(
+                mr, region.perms if region.perms else "rw"
+            )
+            self.__region_maps.append((d_map, d_reg_offset))
 
         # Next: set up IRQs
         irqs_from_prop = self.dtb.get_parsed_irqs(self.dtb_node, self.sdf.arch)
-        if len(irqs_from_prop) == 0 and (t := len(self.driver_config.irqs)) != 0:
+        if len(irqs_from_prop) == 0 and (t := len(self.sddf_driver_config.irqs)) != 0:
             raise RuntimeError(
                 f"Driver config expects {t} irqs but none found in node!"
             )
 
-        irq_ids = []
-        for irq in self.driver_config.irqs:
+        for irq in self.sddf_driver_config.irqs:
             dt_irq = irqs_from_prop[irq.dt_index]
-            irq_ids.append(driver_pd.add_irq(dt_irq))
+            self.__irq_ids.append(self.driver.add_irq(dt_irq))
 
-        # Finally: make config struct
-        self.__device_resources = DeviceResourcesFactory(
-            self.driver_magic, region_maps, irq_ids, target_file=driver_pd.prog_image
-        )
-        return self.__device_resources
+    def generate_config_structs(self):
+        """
+        Returns config structs as specified by DTB and driver config. We need to make
+        MRs before Acacia calls `generate_config_structs` on each subsystem to ensure
+        physical MRs without an explicit paddr get assigned an address in time.
+        """
+        return [
+            DeviceResourcesFactory(
+                self.driver_magic,
+                self.__region_maps,
+                self.__irq_ids,
+                target_file=self.driver.prog_image,
+            )
+        ]
 
     def x86_resources(self):
         """
@@ -205,6 +201,7 @@ def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0
 
 
 def DeviceRegionResourceFactory(region: ConfigStruct, io_addr: int):
+    assert io_addr is not None
     fields = {"region": region, "io_addr": io_addr}
     return ConfigStruct(fields, type_name="device_region_resource_t")
 
