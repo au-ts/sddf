@@ -188,6 +188,7 @@ enum device_resource_type {
 
 typedef struct {
     enum device_resource_type type;
+    uint8_t flags;
     uintptr_t min_addr;
     uintptr_t max_addr;
 } device_resource_t;

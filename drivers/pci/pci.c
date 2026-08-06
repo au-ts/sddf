@@ -11,8 +11,7 @@
 #include <sddf/resources/device.h>
 #include <sel4/sel4_arch/mapping.h>
 
-uintptr_t pci_resources_vaddr = 0x60000000;
-pci_resources_t *pci_resources;
+pci_resources_t *pci_resources = (pci_resources_t *)0x60000000;
 cnode_specs_t *cnode_specs;
 uint32_t kernel_objects_ut_idx = 2;
 
@@ -43,59 +42,96 @@ static struct shared_pci_cap *find_pci_cap_by_id(struct pci_header_type0 *config
     return NULL;
 }
 
-void configure_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, pci_bar_t pci_bar_cfg)
+uint64_t alloc_bar_from_resource_windows(uint32_t bar_request)
 {
-    sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, pci_bar_cfg.base_addr);
-    if (pci_bar_cfg.base_addr) {
-            volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
-            // TODO: check if the BAR type is matched
-            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-            *mem_bar = 0xFFFFFFFF;
-            // TODO: read the size of BAR and allocate from the resource window
-            //   and map it to the device driver's PD
-            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-            // TODO: write the allocated physical address to the BAR register
-            *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
-            // TODO: check if it has been updated
-            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    uint8_t space_indicator = bar_request & 0x1;
+    uint8_t bar_width = bar_request & 0x3;
+    uint8_t prefetchable = bar_request & 0x1;
+
+    sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
+    sddf_dprintf("    Width: ");
+
+    enum device_resource_type expected_resource_type;
+
+    switch (bar_width) {
+        case 0: {
+            sddf_dprintf("32-bit BAR\n");
+            expected_resource_type = DWORD_MEMORY;
+            break;
+        }
+        case 2: {
+            sddf_dprintf("64-bit BAR\n");
+            expected_resource_type = QWORD_MEMORY;
+            break;
+        }
+        default: {
+            sddf_dprintf("Reserved\n");
+        }
     }
+    sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
+
+    uint32_t bar_size = (~(bar_request) | 0xF) + 1;
+    sddf_dprintf("    Size: 0x%x\n", bar_size);
+
+    for (int i = 0; i < pci_resources->num_bridges; i++) {
+        uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
+        sddf_dprintf("num_res: %u\n", num_res);
+        for (int j = 0; j < num_res; j++) {
+            device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
+            sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx, type_flags: 0x%x\n", dev_res->type, dev_res->min_addr, dev_res->max_addr, dev_res->flags);
+
+            if (dev_res->type == expected_resource_type && dev_res->max_addr - dev_res->min_addr >= bar_size) {
+                uint64_t allocated_paddr = dev_res->min_addr;
+                sddf_dprintf("allocated paddr: 0x%x\n", allocated_paddr);
+                dev_res->min_addr += bar_size;
+                return allocated_paddr;
+            }
+        }
+    }
+
+    return 0;
 }
 
 void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
 {
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+
+    // Read pre-allocated physical address
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id + 1, mem_bar[1]);
     bool memory_64bit = (*mem_bar) & 0x4;
-    uintptr_t dev_regs_paddr = *mem_bar;
+    uint64_t prealloc_paddr = *mem_bar;
     if (memory_64bit) {
-        dev_regs_paddr = mem_bar[0] + ((uint64_t)mem_bar[1] << 32);
+        prealloc_paddr += ((uint64_t)mem_bar[1] << 32);
     }
-    *mem_bar = 0xFFFFFFFF;
-    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id + 1, mem_bar[1]);
-    uint32_t dev_regs_size = (~(*mem_bar) | 0xF) + 1;
-    sddf_dprintf("size: 0x%x\n", dev_regs_size);
-    // TODO: allocate memory region from the windows
-    *mem_bar = dev_regs_paddr & 0xFFFFFFFF;
-    if (memory_64bit) {
-        *(mem_bar + 1) = dev_regs_paddr >> 32;
-    }
-    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+    sddf_dprintf("BAR %u - pre-allocated addr: 0x%lx\n", bar_id, prealloc_paddr);
 
+    // Write 1s to read BAR request from device and allocate from resource windows
+    *mem_bar = 0xFFFFFFFF;
+    uint64_t realloc_paddr = alloc_bar_from_resource_windows(*mem_bar);
+    if (realloc_paddr == 0) {
+        sddf_dprintf("[Error] failed to allocate requested BAR from resource windows\n");
+        return;
+    }
+
+    *mem_bar = realloc_paddr & 0xFFFFFFFF;
+    if (memory_64bit) {
+        *(mem_bar + 1) = realloc_paddr >> 32;
+    }
+    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
 
     seL4_Error error;
-    uintptr_t cur_paddr = dev_regs_paddr;
-    uintptr_t end_paddr = dev_regs_paddr + dev_regs_size;
+    uintptr_t cur_paddr = realloc_paddr;
+    uintptr_t end_paddr = realloc_paddr + 0x4000;
     uintptr_t cur_vaddr = target_vaddr;
     while (cur_paddr < end_paddr) {
-        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, CPTR_VSPACE_ETHERNET_DRIVER, seL4_X86_LargePageObject, seL4_ReadWrite);
+        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, CPTR_VSPACE_ETHERNET_DRIVER, seL4_X86_4K, seL4_ReadWrite);
         if (error != seL4_NoError) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return;
         }
-        cur_paddr += (1 << seL4_LargePageBits);
-        cur_vaddr += (1 << seL4_LargePageBits);
+        cur_paddr += (1 << seL4_PageBits);
+        cur_vaddr += (1 << seL4_PageBits);
     }
 }
 
@@ -206,7 +242,7 @@ pci_bridge_t *find_pci_bridge(uintptr_t header_addr, uintptr_t ecam_base)
     uintptr_t header_offset = header_addr - ecam_base;
     uint32_t dev_slot = header_offset >> 15;
     uint32_t func_slot = header_offset & 0xFFFF;
-    uintptr_t target_bridge_adr = dev_slot << 16 + func_slot;
+    uintptr_t target_bridge_adr = (dev_slot << 16) + func_slot;
 
     if (header_addr == 0x0) {
         target_bridge_adr = 0x0;
@@ -302,7 +338,7 @@ struct pci_header_type1 *find_parent_pci_bridge(uintptr_t bus_base, uint8_t bus_
 
                     if (parent_bridge == NULL) {
                         parent_bridge = bridge_header;
-                        sddf_dprintf("update, header: 0x%x, ecam_base: 0x%lx\n", (uintptr_t)bridge_header, bus_base);
+                        sddf_dprintf("update, header: 0x%lx, ecam_base: 0x%lx\n", (uintptr_t)bridge_header, bus_base);
                     } else {
                         if (bridge_header->secondary_bus_num >= parent_bridge->secondary_bus_num &&
                             bridge_header->subordinate_bus_num <= parent_bridge->subordinate_bus_num) {
@@ -335,24 +371,29 @@ void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
                                  pci_header->device_id,
                                  pci_header->header_type & 0x3F);
                 }
-
+                for (uint8_t k = 0; k < 6; k++) {
+                    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (k * 0x04));
+                    if (*mem_bar != 0xffffffff) {
+                        sddf_dprintf("  BAR %d: 0x%x\n", k, *mem_bar);
+                    }
+                }
 
                 // TODO: convert it to general solution
-                /* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { */
-                /*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
-                /*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
-                /*     pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
-                /*     map_pci_bar(pci_header, 4, 0x60000000); */
-                /*     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
-                /* } */
-
-                if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) {
+                if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
                     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus);
                     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header);
                     pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base);
-                    map_pci_bar(pci_header, 0, 0x2000000);
-                    /* bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
+                    map_pci_bar(pci_header, 4, 0x60000000);
+                    bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16);
                 }
+
+                /* if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) { */
+                /*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
+                /*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
+                /*     pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
+                /*     map_pci_bar(pci_header, 0, 0x2000000); */
+                /*     /\* bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); *\/ */
+                /* } */
 
             }
         }
@@ -387,7 +428,6 @@ void init(void)
         return;
     }
 
-    pci_resources = (pci_resources_t *)pci_resources_vaddr;
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
     sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);
     sddf_dprintf("cptr_ethernet_driver: 0x%lx\n", (uintptr_t)CPTR_CSPACE_ETHERNET_DRIVER);
@@ -409,28 +449,7 @@ void init(void)
                      pci_seg_group->bus_end);
     }
 
-    /* sddf_dprintf("=========Descriptions of PCI resources==========\n"); */
-    /* for (int i = 0; i < pci_resources->num_bridges; i++) { */
-    /*     uint8_t num_res = pci_resources->bridges[i].num_dev_resources; */
-    /*     sddf_dprintf("num_res: %u\n", num_res); */
-    /*     for (int j = 0; j < num_res; j++) { */
-    /*         device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j]; */
-    /*         sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr); */
-
-    /*         if (dev_res->type == DWORD_MEMORY || dev_res->type == WORD_MEMORY || dev_res->type == QWORD_MEMORY) { */
-    /*             get_ut_by_paddr(dev_res->min_addr); */
-    /*         } */
-    /*     } */
-
-    /*     uint8_t num_prt_entries = pci_resources->bridges[i].num_prt_entries; */
-    /*     sddf_dprintf("num_prt_entries: %u\n", num_prt_entries); */
-    /*     for (int j = 0; j < num_prt_entries; j++) { */
-    /*         pci_prt_t *pci_prt = (pci_prt_t *)&pci_resources->bridges[i].prt_entries[j]; */
-    /*         sddf_dprintf("addr: 0x%X, pin: %u, gsi: %u\n", pci_prt->address, pci_prt->pin, pci_prt->gsi); */
-    /*     } */
-    /* } */
-
-
+    sddf_deferred_notify(1);
 }
 
 void notified(microkit_channel ch)

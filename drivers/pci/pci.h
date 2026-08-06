@@ -305,6 +305,7 @@ enum device_resource_type {
 
 typedef struct {
     enum device_resource_type type;
+    uint8_t flags;
     uintptr_t min_addr;
     uintptr_t max_addr;
 } device_resource_t;
@@ -316,8 +317,6 @@ typedef struct {
 } pci_prt_t;
 
 typedef struct {
-    /* char path_name[AML_MAX_PATH_STR]; */
-    /* uint32_t path_len; */
     uint32_t bus_start;
     uint32_t bus_end;
     uintptr_t adr;
