@@ -22,7 +22,6 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
-
 """
 Below are classes to serialise into custom configuration for the benchmarking component.
 All serialised definitions are little endian and pointers are 64-bit integers.
@@ -195,7 +194,7 @@ def generate(
         assert timer_node is not None
 
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=150, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=254, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -361,6 +360,9 @@ def generate(
 
     # Allocate benchmarking resources
     core_objs = [{} for _ in range(num_cores)]
+
+    pmu_irq = SystemDescription.IrqConventional(23, id=21)
+
     for i in range(num_cores):
         core = sorted(pds_per_core)[i]
         core_objs[i]["core"] = core
@@ -374,7 +376,7 @@ def generate(
 
         core_objs[i]["bench_elf"] = copy_elf("benchmark", "benchmark", core)
         core_objs[i]["bench_pd"] = ProtectionDomain(
-            f"bench{core}", core_objs[i]["bench_elf"], priority=149, cpu=core
+            f"bench{core}", core_objs[i]["bench_elf"], priority=253, cpu=core
         )
         sdf.add_pd(core_objs[i]["bench_pd"])
 
@@ -398,7 +400,6 @@ def generate(
             # First active core is notified by benchmarking client
             core_objs[i]["start_ch"] = Channel(client0, core_objs[i]["bench_pd"])
             core_objs[i]["stop_ch"] = Channel(client0, core_objs[i]["bench_pd"])
-
         else:
             # Other cores are notified by benchmark PD on previous core
             core_objs[i]["start_ch"] = Channel(
@@ -408,8 +409,9 @@ def generate(
                 core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"]
             )
 
-
         timer_system.add_client(core_objs[i]["bench_pd"])
+        core_objs[i]["bench_pd"].add_irq(pmu_irq)
+
         sdf.add_channel(core_objs[i]["start_ch"])
         sdf.add_channel(core_objs[i]["stop_ch"])
 

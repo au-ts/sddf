@@ -27,6 +27,17 @@ The definitions are specific to ARMv8 - different definitions will need to used 
 
 #define SEL4BENCH_EVENT_CACHE_L1I_ACCESS            0x14
 #define SEL4BENCH_EVENT_CACHE_L1D_WB                0x15
+#define SEL4BENCH_EVENT_TLB_L1D_ACCESS              0x25
+#define SEL4BENCH_EVENT_TLB_L1I_ACCESS              0x26
+#define SEL4BENCH_EVENT_CACHE_LL_ACCESS             0x32
+#define SEL4BENCH_EVENT_CACHE_LL_MISS               0x33
+
+#define SEL4BENCH_EVENT_MEM_ACCESS                  0x13
+#define SEL4BENCH_EVENT_EXC_TAKEN                   0x09
+#define SEL4BENCH_EVENT_INST_SPEC                   0x1B
+#define SEL4BENCH_EVENT_BR_RETIRED                  0x21
+#define SEL4BENCH_EVENT_BR_MIS_PRED_RETIRED         0x022
+#define SEL4BENCH_EVENT_EXC_RETURN                  0x0A
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31
@@ -63,6 +74,8 @@ typedef uint64_t ccnt_t;
 #define PMSELR      "PMSELR_EL0"
 #define PMXEVTYPER  "PMXEVTYPER_EL0"
 #define PMCCNTR     "PMCCNTR_EL0"
+#define PMOVSCLR    "PMOVSCLR_EL0"
+#define PMINTENSET  "PMINTENSET_EL1"
 
 #define PMU_WRITE(reg, v)                      \
     do {                                       \
@@ -90,42 +103,93 @@ static FASTFN uint32_t sel4bench_private_read_pmcr(void)
 
 typedef struct event_value {
     bool multiplexed;
-    bool new;
+    bool started;
+
     double last_rate;
-    ccnt_t prev_cycle_count;
-    ccnt_t total;
+    ccnt_t cyc_prev;
+    ccnt_t cyc_prev_int; //num cycles previous interval
+    uint64_t total;
 } event_value_t;
 
 typedef struct counter_data {
     uint8_t len;
     uint8_t curr_event_idx;
-    event_id_t events[2];
+    event_id_t events[5];
 } counter_data_t;
 
 counter_data_t counters[6];
-event_value_t event_values[8];
+event_value_t event_values[19] = {0};
 
 char *counter_names[] = {
+    "Instructions",
+    "Branch mispredictions",
     "L1 i-cache misses",
     "L1 d-cache misses",
     "L1 i-tlb misses",
     "L1 d-tlb misses",
-    "Instructions",
-    "Branch mispredictions",
-    "L1 i-cache accesses",
-    "L1 d-cache write backs"
 };
 
 event_id_t benchmarking_events[] = {
+    SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
+    SEL4BENCH_EVENT_BRANCH_MISPREDICT,
     SEL4BENCH_EVENT_CACHE_L1I_MISS,
     SEL4BENCH_EVENT_CACHE_L1D_MISS,
     SEL4BENCH_EVENT_TLB_L1I_MISS,
     SEL4BENCH_EVENT_TLB_L1D_MISS,
-    SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
-    SEL4BENCH_EVENT_BRANCH_MISPREDICT,
-    SEL4BENCH_EVENT_CACHE_L1I_ACCESS,
-    SEL4BENCH_EVENT_CACHE_L1D_WB
+   
 };
+
+// char *counter_names[] = {
+//     "Instructions",
+//     "Branch mispredictions",
+//     "L1 i-cache misses",
+//     "L1 d-cache misses",
+//     "L1 i-tlb misses",
+//     "L1 d-tlb misses",
+
+//     "Memory access",
+//     "Exceptions returned",
+//     "L1 i-cache misses",
+//     "L1 d-cache misses",
+//     "L1 i-tlb misses",
+//     "L1 d-tlb misses",
+
+//     "L1 i-cache access",
+//     "L1 d-cache write backs",
+//     "Memory access",
+//     "Instructions",
+//     "Branch mispredictions",
+//     "Exceptions returned",
+
+//     "LL cache access"
+// };
+
+// event_id_t benchmarking_events[] = {
+//     SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
+//     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
+//     SEL4BENCH_EVENT_CACHE_L1I_MISS,
+//     SEL4BENCH_EVENT_CACHE_L1D_MISS,
+//     SEL4BENCH_EVENT_TLB_L1I_MISS,
+//     SEL4BENCH_EVENT_TLB_L1D_MISS,
+
+//     SEL4BENCH_EVENT_MEM_ACCESS,
+//     SEL4BENCH_EVENT_EXC_RETURN,
+//     SEL4BENCH_EVENT_CACHE_L1I_MISS,
+//     SEL4BENCH_EVENT_CACHE_L1D_MISS,
+//     SEL4BENCH_EVENT_TLB_L1I_MISS,
+//     SEL4BENCH_EVENT_TLB_L1D_MISS,
+
+//     SEL4BENCH_EVENT_CACHE_L1I_ACCESS,
+//     SEL4BENCH_EVENT_CACHE_L1D_WB,
+//     SEL4BENCH_EVENT_MEM_ACCESS,
+//     SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
+//     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
+//     SEL4BENCH_EVENT_EXC_RETURN,
+
+//     SEL4BENCH_EVENT_CACHE_LL_ACCESS 
+// };
+
+uint32_t counter_overflows[7] = {0,0,0,0,0,0,0};
 
 // Write to set of enabled counters
 static FASTFN void sel4bench_private_write_cntens(uint32_t mask)
@@ -173,6 +237,33 @@ static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
     PMU_WRITE(PMXEVTYPER, val);
 }
 
+static FASTFN uint64_t sel4bench_private_read_pmintenset(void) 
+{
+    uint64_t val;
+    PMU_READ(PMINTENSET, val);
+    return val;
+}
+
+static FASTFN void sel4bench_private_write_pmintenset(uint64_t val) 
+{
+    PMU_WRITE(PMINTENSET, val);
+}
+
+/**
+ * Query how many performance counters are supported on this CPU, excluding the
+ * cycle counter.
+ *
+ * Note that the return value is of type `seL4_Word`; consequently, this library
+ * supports a number of counters less than or equal to the machine word size in
+ * bits.
+
+ * @return quantity of counters on this CPU
+ */
+static FASTFN seL4_Word sel4bench_get_num_counters()
+{
+    return SEL4BENCH_ARMV8A_PMCR_N(sel4bench_private_read_pmcr());
+}
+
 /**
  * Initialise the sel4bench library.  Nothing else is guaranteed to work, and
  * may produce strange failures, if you don't do this first.
@@ -204,21 +295,6 @@ static FASTFN void sel4bench_init()
 }
 
 /**
- * Query how many performance counters are supported on this CPU, excluding the
- * cycle counter.
- *
- * Note that the return value is of type `seL4_Word`; consequently, this library
- * supports a number of counters less than or equal to the machine word size in
- * bits.
-
- * @return quantity of counters on this CPU
- */
-static FASTFN seL4_Word sel4bench_get_num_counters()
-{
-    return SEL4BENCH_ARMV8A_PMCR_N(sel4bench_private_read_pmcr());
-}
-
-/**
  * Query the value of a set of counters. Temporarily disables counters then re-enables them once reading is finished
  *
  * `values` must point to an array of a length at least equal to the highest
@@ -239,48 +315,44 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, event_
     // stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
     sel4bench_private_write_cntenc(enable_word);
 
-    unsigned int counter = 0;
-    for (; mask != 0; mask >>= 1, counter++) {
-        if (mask & 1) {
-            sel4bench_private_write_pmnxsel(counter);
-
-            uint8_t event_idx = counters[counter].events[counters[counter].curr_event_idx];
-
-            if (!values[event_idx].multiplexed) {
-                values[event_idx].total = sel4bench_private_read_pmcnt();
-            } else {
-                uint64_t value = sel4bench_private_read_pmcnt();
-                ccnt_t ccnt;
-                SEL4BENCH_READ_CCNT(ccnt);
-
-                // only start TAM once events start to occur
-                if (values[event_idx].new && value == 0) continue;
-
-                if (values[event_idx].new) {
-                    values[event_idx].new = 0;    
-                    values[event_idx].prev_cycle_count = ccnt;
-                    values[event_idx].last_rate = (double)value / (double)ccnt;
-                } else {
-                    uint64_t tmp = values[event_idx].prev_cycle_count;
-
-                    double delta_ccnt = (ccnt - values[event_idx].prev_cycle_count);
-                    double new_rate = (double)value / delta_ccnt;
-
-                    double count_interval = ((new_rate + values[event_idx].last_rate) * delta_ccnt) / 2;
-                    values[event_idx].total += (uint64_t)count_interval;
-
-                    values[event_idx].last_rate = new_rate;
-                    values[event_idx].prev_cycle_count = ccnt;
-
-                    // sddf_printf("counter %d event 0x%x value %lld ccnt %lld prev ccnt %lld newrate %lf this interval %lld\n", 
-                    //     counter, benchmarking_events[event_idx], value, ccnt, tmp, new_rate, count_interval);
-                }
-            }
-        }
-    }
-
     ccnt_t ccnt;
     SEL4BENCH_READ_CCNT(ccnt);
+
+    unsigned int counter = 0;
+    for (; mask != 0; mask >>= 1, counter++) {
+        if (!(mask & 1)) continue;
+
+        sel4bench_private_write_pmnxsel(counter);
+        uint32_t value = sel4bench_private_read_pmcnt();
+        uint64_t true_value = (uint64_t)value + ((uint64_t)UINT32_MAX * (uint64_t)counter_overflows[counter]);
+        uint8_t event_idx = counters[counter].events[counters[counter].curr_event_idx];
+
+        // We are switching away from this event
+        if (!values[event_idx].multiplexed) {
+            values[event_idx].total = true_value;
+            continue;
+        } 
+    
+        if (!values[event_idx].started) {
+            values[event_idx].last_rate = (double)true_value / (ccnt - values[event_idx].cyc_prev);
+            values[event_idx].cyc_prev_int = ccnt;
+            values[event_idx].started = true;
+        } else {
+            if (true_value == 0) continue;
+
+            ccnt_t delta_ccnt = (ccnt - values[event_idx].cyc_prev_int);
+            double new_rate = (double)true_value / (ccnt - values[event_idx].cyc_prev);
+
+            double count_interval = (new_rate + values[event_idx].last_rate) * delta_ccnt;
+            values[event_idx].total += ((uint64_t)count_interval >> 1);
+
+            values[event_idx].last_rate = new_rate;
+            values[event_idx].cyc_prev_int = ccnt;
+
+            // sddf_printf("counter %d event %d value %lld count_interval %lld ccnt %lld new_rate %.2lf last_rate %.2lf delta ccnt %lld, prev ccnt %lld, prev int ccnt %lld\n", 
+            //     counter, event_idx, value, (uint64_t)count_interval >> 1, ccnt, new_rate, values[event_idx].last_rate, delta_ccnt, values[event_idx].cyc_prev, values[event_idx].cyc_prev_int);
+        }
+    }
 
     sel4bench_private_write_cntens(enable_word);
 
@@ -336,6 +408,18 @@ static FASTFN void sel4bench_reset_counters(void)
     MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 }
 
+static FASTFN uint32_t sel4bench_read_pmovsclr(void)
+{
+    uint64_t val;
+    PMU_READ(PMOVSCLR, val);
+    return (uint32_t)val;
+}
+
+static FASTFN void sel4bench_write_pmovsclr(uint32_t val)
+{
+    PMU_WRITE(PMOVSCLR, val);
+}
+
 /**
  * Changes the event being monitored in a counter for multiplexing.
  * Does nothing if counter only has one event assigned to it.
@@ -348,21 +432,31 @@ static FASTFN void sel4bench_rotate_events(void) {
         multiplex_bf |= BIT(counter);
     }
 
+    sel4bench_private_write_pmnxsel(0);
+    uint32_t value = sel4bench_private_read_pmcnt();
+    uint64_t true_value = (uint64_t)value + ((uint64_t)UINT32_MAX * (uint64_t)counter_overflows[0]);
+
     if (multiplex_bf == 0) return;
 
     sel4bench_get_counters(multiplex_bf, event_values);
 
     for (seL4_Word i = 0; multiplex_bf != 0; multiplex_bf >>= 1, i++) {
-        if (multiplex_bf & 1) {
-            if (counters[i].curr_event_idx == counters[i].len - 1) {
-                counters[i].curr_event_idx = 0;
-            } else {
-                counters[i].curr_event_idx++;
-            }
+        if (!(multiplex_bf & 1)) continue;
 
-            event_id_t event = benchmarking_events[counters[i].events[counters[i].curr_event_idx]];
-            sel4bench_set_count_event(i, event);
-            // sddf_printf("Change event on countr %d to 0x%x\n", i, benchmarking_events[counters[i].events[counters[i].curr_event_idx]]);
-        }   
+        if (counters[i].curr_event_idx == counters[i].len - 1) {
+            counters[i].curr_event_idx = 0;
+        } else {
+            counters[i].curr_event_idx++;
+        }
+
+        event_id_t event_idx = counters[i].events[counters[i].curr_event_idx];
+        event_id_t event = benchmarking_events[event_idx];
+        sel4bench_set_count_event(i, event);
+
+        counter_overflows[i] = 0;
+
+        ccnt_t ccnt;
+        SEL4BENCH_READ_CCNT(ccnt);
+        event_values[event_idx].cyc_prev = ccnt;
     }
 }

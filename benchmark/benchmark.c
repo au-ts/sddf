@@ -19,7 +19,7 @@
 #include <sddf/timer/client.h>
 
 #define LOG_BUFFER_CAP 7
-#define MULTIPLEX_INTERVAL NS_IN_S
+#define MULTIPLEX_INTERVAL NS_IN_S / 2
 
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
 
@@ -30,20 +30,6 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 counter_bitfield_t benchmark_bf;
 
 serial_queue_handle_t serial_tx_queue_handle;
-
-
-
-// typedef struct event_node {
-    // event_id_t id;
-    // struct event_node *next;
-// } event_node_t;
-// 
-// typedef struct counter_data {
-    // uint8_t len;
-    // event_node_t *events;
-// } counter_data_t;
-
-// counter_data_t *counters;
 
 static char *child_name(uint8_t child_id)
 {
@@ -135,50 +121,34 @@ static void benchmark_init(void)
 #if ENABLE_PMU_EVENTS
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
-    // counters = calloc(sizeof(counter_data_t), n_counters);
-    // for (seL4_Word counter = 0; counter < ARRAY_SIZE(benchmarking_events); counter++) {
-    //     counter %= n_counters;
-        
-    //     event_node_t *event = malloc(sizeof(event_node_t));
-    //     if (counters[counter].events == NULL) {
-    //         event->next = NULL;
-    //         counters[counter].events = event;
 
-    //         sel4bench_set_count_event(counter, benchmarking_events[counter]);
-    //         benchmark_bf |= BIT(counter);
-    //     } else {
-    //         event->next = counters[counter].events;
-    //         counters[counter].events = event;
-    //     }
-
-    //     counters[counter].len++;
-    // }
-
-    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
+    for (int event = 0, counter = 0; event < ARRAY_SIZE(benchmarking_events); event++, counter = (counter + 1) % n_counters) {
         sel4bench_set_count_event(counter, benchmarking_events[counter]);
         benchmark_bf |= BIT(counter);
-        counters[counter].len = 1;
-        counters[counter].events[0] = counter;        
-        counters[counter].curr_event_idx = 0;
+        counters[counter].curr_event_idx = 0;   
 
-        event_values[counter].new = true;
-        event_values[counter].total = 0;
-        event_values[counter].multiplexed = false;
+        counters[counter].events[counters[counter].len] = event;    
+        counters[counter].len++;
     }
 
-    counters[4].len = 2;
-    counters[4].events[1] = 6;
+    for (int counter = 0; counter < n_counters; counter++) {
+        if (counters[counter].len > 1) {
+            for (int event = 0; event < counters[counter].len; event++) {
+                event_values[counters[counter].events[event]].multiplexed = true;
+            }
+        }
+    }
 
-    counters[5].len = 2;
-    counters[5].events[1] = 7;
-
-    event_values[4].multiplexed = true;
-    event_values[5].multiplexed = true;
-    event_values[6].multiplexed = true;
-    event_values[7].multiplexed = true;
+    for (int counter = 0; counter < n_counters; counter++) {
+        sddf_printf("[%d]: ", counter);
+        for (int event = 0; event < counters[counter].len; event++) {
+            sddf_printf("%d ", counters[counter].events[event]);
+        }
+        sddf_printf("\n");
+    }
  
     sel4bench_reset_counters();
-    sel4bench_start_counters(benchmark_bf);
+    // sel4bench_start_counters(benchmark_bf);
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -201,7 +171,17 @@ static void benchmark_start(void)
 #if ENABLE_PMU_EVENTS
     sel4bench_reset_counters();
     THREAD_MEMORY_RELEASE();
+    for (int i = 0 ; i < 7; i++) {
+        counter_overflows[i] = 0;
+    }
     sel4bench_start_counters(benchmark_bf);
+
+    ccnt_t ccnt;
+    SEL4BENCH_READ_CCNT(ccnt);
+
+    for (seL4_Word event; event < ARRAY_SIZE(benchmarking_events); event++) {
+        event_values[event].cyc_prev = ccnt;
+    }
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
@@ -274,6 +254,23 @@ void notified(microkit_channel ch)
     } else if (ch == timer_config.driver_id) {
         sel4bench_rotate_events();
         sddf_timer_set_timeout(timer_config.driver_id, MULTIPLEX_INTERVAL);
+    } else if (ch == 21) {
+        uint32_t irq_flag = sel4bench_read_pmovsclr();
+
+        for (int i = 0; i < 6; i++) {
+            if (irq_flag & (1 << i)) {
+                // sddf_printf("%d overflow\n", i);
+                counter_overflows[i] += 1;
+            }
+        }
+
+        if (irq_flag & (1 << 31)) {
+            counter_overflows[6] += 1;
+        }
+
+        // When 1 is written to the above bits the interrupt is cleared
+        sel4bench_write_pmovsclr(irq_flag);
+        microkit_irq_ack(ch);
     } else {
         sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);
     }
