@@ -4,5 +4,6 @@
 from .i2c import sDDFI2C
 from .timer import sDDFTimer
 from .serial import sDDFSerial
+from .blk import sDDFBlk
 from .sddf import sDDFDriverClass, sDDFDriverConfig, sDDFDriverManifest
 from .board import BOARDS, Board
