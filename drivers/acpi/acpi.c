@@ -102,10 +102,11 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)buf_cur;
                 dev_res->min_addr = word_as->min_address;
                 dev_res->max_addr = word_as->min_address + word_as->address_length;
-                dev_res->type = word_as->resource_type;
+                dev_res->type = WORD_MEMORY + word_as->resource_type;
+                dev_res->flags = word_as->type_flags;
 
                 sddf_dprintf("Word ");
-                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
+                pass_resource_with_range(word_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
@@ -114,10 +115,11 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)buf_cur;
                 dev_res->min_addr = dword_as->min_address;
                 dev_res->max_addr = dword_as->min_address + dword_as->address_length;
-                dev_res->type = dword_as->resource_type;
+                dev_res->type = DWORD_MEMORY + dword_as->resource_type;
+                dev_res->flags = dword_as->type_flags;
 
                 sddf_dprintf("DWord ");
-                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
+                pass_resource_with_range(dword_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
@@ -126,10 +128,11 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)buf_cur;
                 dev_res->min_addr = qword_as->min_address;
                 dev_res->max_addr = qword_as->min_address + qword_as->address_length;
-                dev_res->type = qword_as->resource_type;
+                dev_res->type = QWORD_MEMORY + qword_as->resource_type;
+                dev_res->flags = qword_as->type_flags;
 
                 sddf_dprintf("QWord ");
-                pass_resource_with_range(dev_res->type, dev_res->min_addr, dev_res->max_addr);
+                pass_resource_with_range(qword_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
                 break;
@@ -138,6 +141,8 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_io_port_t *io_port = (acpi_io_port_t *)buf_cur;
                 dev_res->min_addr = io_port->min_address;
                 dev_res->max_addr = io_port->min_address + io_port->address_length;
+                dev_res->type = IO_PORT;
+                dev_res->flags = io_port->info;
 
                 sddf_dprintf("I/O Port ");
                 pass_resource_with_range(1, dev_res->min_addr, dev_res->max_addr);
@@ -339,6 +344,7 @@ void init(void)
         sddf_dprintf("Error: failed to copy a the IRQControl Capability\n");
         return;
     }
+    sddf_dprintf("IRQ control cptr: 0x%lx\n", (uintptr_t)(CPTR_PCI_RESOURCES + 1));
     pci_resources_cnode->start = 2;
     pci_resources_cnode->end = 3;
 
@@ -426,7 +432,6 @@ void init(void)
             aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
             sddf_dprintf("value: 0x%lx, type: %u, length: %u\n", prt_data.value, prt_data.type, prt_data.length);
             parse_prt_package(prt_node, prt_data, pci_resources->num_bridges);
-            pci_resources->num_bridges++;
             sddf_dprintf("======Finish _PRT parsing\n");
 
             aml_namespace_node_t *child_node = node->parent->child;
@@ -436,7 +441,7 @@ void init(void)
 
                 if (child_node->op_code == DEVICE_OP && child_adr_node && child_prt_node) {
                     aml_data_t child_prt_data = eval_namespace_node(child_prt_node, 0, NULL);
-                    sddf_dprintf("name: %s, adr_node: 0x%lx, prt_node: 0x%lx, num_bridge: 0x%x\n", child_node->name, child_adr_node, child_prt_node, pci_resources->num_bridges);
+                    sddf_dprintf("name: %s, adr_node: 0x%lx, prt_node: 0x%lx, num_bridge: 0x%x\n", child_node->name, (uintptr_t)child_adr_node, (uintptr_t)child_prt_node, pci_resources->num_bridges);
                     parse_prt_package(child_prt_node, child_prt_data, pci_resources->num_bridges);
 
                     aml_data_t child_adr_data = eval_namespace_node(child_adr_node, 0, NULL);
@@ -454,7 +459,7 @@ void init(void)
             // TODO: fix register reading during PRT parsing by reusing paging structures
             pass_crs_and_caps(crs_data, pci_resources->num_bridges);
             sddf_dprintf("======Finish _CRS parsing\n");
-
+            pci_resources->num_bridges++;
         }
     }
     // TODO: Num of PCIe bridges should be matched in MCFG and DSDT

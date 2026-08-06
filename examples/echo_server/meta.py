@@ -399,10 +399,11 @@ def generate(
         # )
         # ethernet_driver.add_map(virtio_net_regs_map)
 
-        virtio_net_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=16
-        )
-        ethernet_driver.add_irq(virtio_net_irq)
+        # virtio_net_irq = SystemDescription.IrqIoapic(
+        #     ioapic_id=0, pin=11, vector=1, id=16
+        # )
+        # ethernet_driver.add_irq(virtio_net_irq)
+        ethernet_driver.add_irq_placeholder(16)
 
         pci_config_address_port = SystemDescription.IoPort(0xCF8, 4, 1)
         ethernet_driver.add_ioport(pci_config_address_port)
