@@ -365,7 +365,7 @@ class sDDFSerial(sDDFDriverClass):
             "default_baud": baud_rate,
             "rx_enabled": rx_enabled,
             "tx": tx_connection,
-            "rx": rx_connection if rx_connection else 0,
+            "rx": rx_connection if rx_connection else ConfigStruct({}, empty=True),
         }
         return ConfigStruct(
             fields,
@@ -443,7 +443,7 @@ class sDDFSerial(sDDFDriverClass):
         fields = {
             "magic": magic,
             "tx": tx_connection,
-            "rx": rx_connection if rx_connection else 0,
+            "rx": rx_connection if rx_connection else ConfigStruct({}, empty=True),
         }
         return ConfigStruct(
             fields,
