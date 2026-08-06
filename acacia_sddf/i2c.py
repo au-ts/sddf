@@ -51,22 +51,9 @@ class sDDFI2C(sDDFDriverClass):
         virt_elf: str = "i2c_virt.elf",
         driver_elf: str = "i2c_driver.elf",
     ):
-        super().__init__(
-            sdf, "i2c", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
-        )
         self.sdf = sdf
         self.cpu = cpu
-
-        # Internal bookkeeping
-        self.driver = None
-        self.virt = None
-
-        # ELF names. This is required because acacia is tragically detached
-        # from the build system itself and cannot guarantee the names of sDDF
-        # compiled objects itself. This will not be required once we start using
-        # the sDDF with an SDK model, but that is for the future.
-        self.virt_elf = virt_elf
-        self.driver = ProtectionDomain(
+        driver = ProtectionDomain(
             self.sdf,
             "i2c_driver",
             driver_elf,
@@ -74,8 +61,13 @@ class sDDFI2C(sDDFDriverClass):
             cpu=self.cpu,
         )
 
-        # We must make the driver BEFORE we get here
-        self.driver_dev_resources = self.create_dtb_resources(self.driver)
+        super().__init__(
+            sdf, driver, "i2c", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
+        )
+
+        # Internal bookkeeping
+        self.virt = None
+        self.virt_elf = virt_elf
 
         # Stubs of config structs that we need to collect in construct_infrastructure and connect_clients
         self.virt_config = None
@@ -98,10 +90,6 @@ class sDDFI2C(sDDFDriverClass):
             self.driver.add_map(Map(clk_mr, 0x30_000_000, "rw"))
             self.driver.add_map(Map(gpio_mr, 0x30_100_000, "rw"))
 
-        # We create queues etc. AFTER setting up the device resources to ensure that IRQ channels
-        # have a lower value than any other channels. This is necessary because Microkit will
-        # deliver notifications in ascending channel_id order, which can end up mattering in certain
-        # cases.
         self.construct_infrastructure(virt_prio)
 
     def construct_infrastructure(self, virt_prio):
@@ -229,9 +217,14 @@ class sDDFI2C(sDDFDriverClass):
 
     def generate_config_structs(self):
         # We've already made our structs, just return them as a list for the serialiser
-        driver_resources = [self.driver_dev_resources, self.driver_config]
+        driver_resources = [self.driver_config]
         virt_resources = [self.virt_config]
-        return driver_resources + virt_resources + self.client_configs
+        return (
+            super().generate_config_structs()
+            + driver_resources
+            + virt_resources
+            + self.client_configs
+        )
 
     # ### dtb utility functions for drivers that depend on i2c ###
     def get_i2c_addresses_from_dtb(self, device_node: DTBNode) -> List[I2CAddress]:
