@@ -201,17 +201,17 @@ class sDDFDriverClass(Subsystem):
 
 def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
     fields = {"vaddr": map.vaddr + offset, "size": map.mr.size}
-    return ConfigStruct("region_resource_t", section_name=section_name, fields=fields)
+    return ConfigStruct(fields, type_name="region_resource_t", section_name=section_name)
 
 
 def DeviceRegionResourceFactory(region: ConfigStruct, io_addr: int):
     fields = {"region": region, "io_addr": io_addr}
-    return ConfigStruct("device_region_resource_t", fields=fields)
+    return ConfigStruct(fields, type_name="device_region_resource_t")
 
 
 def DeviceIRQResourceFactory(id: int):
     fields = {"id": id}
-    return ConfigStruct("device_irq_resource_t", fields=fields)
+    return ConfigStruct(fields, type_name="device_irq_resource_t")
 
 
 def DeviceResourcesFactory(
@@ -222,7 +222,7 @@ def DeviceResourcesFactory(
     section_name="device_resources",
 ):
     region_structs = [
-        DeviceRegionResourceFactory(RegionResourceFactory(m, offset=o), m.mr.paddr)
+        DeviceRegionResourceFactory(RegionResourceFactory(m, section_name=o), m.mr.paddr)
         for m, o in maps_offsets
     ]
     irq_structs = [DeviceIRQResourceFactory(i) for i in irq_ids]
@@ -234,8 +234,8 @@ def DeviceResourcesFactory(
         "irqs": irq_structs,
     }
     return ConfigStruct(
-        "device_resources_t",
+        fields,
+        type_name="device_resources_t",
         section_name=section_name,
-        fields=fields,
         target_file=target_file,
     )

@@ -265,7 +265,7 @@ class sDDFI2C(sDDFDriverClass):
             "num_buffers": num_bufs,
             "id": id,
         }
-        return ConfigStruct("i2c_connection_resource_t", fields=fields)
+        return ConfigStruct(fields, type_name="i2c_connection_resource_t")
 
     def i2c_client_config_factory(
         self,
@@ -285,10 +285,10 @@ class sDDFI2C(sDDFDriverClass):
             "data": data_region,
         }
         return ConfigStruct(
-            "i2c_client_config_t",
+            fields,
+            type_name="i2c_client_config_t",
             target_file=client_pd.prog_image,
             section_name="i2c_client_config",
-            fields=fields,
         )
 
     def i2c_virt_client_config_factory(
@@ -307,7 +307,7 @@ class sDDFI2C(sDDFDriverClass):
             "driver_data_vaddr": driver_d_vaddr,
             "client_data_vaddr": client_d_vaddr,
         }
-        return ConfigStruct("i2c_virt_client_config_t", fields=fields)
+        return ConfigStruct(fields, type_name="i2c_virt_client_config_t")
 
     def i2c_virt_config_factory(
         self,
@@ -324,10 +324,10 @@ class sDDFI2C(sDDFDriverClass):
             "clients": client_connections,
         }
         return ConfigStruct(
-            "i2c_virt_config_t",
+            fields,
+            type_name="i2c_virt_config_t",
             target_file=virt_pd.prog_image,
             section_name="i2c_virt_config",
-            fields=fields,
         )
 
     def i2c_driver_config_factory(
@@ -338,10 +338,10 @@ class sDDFI2C(sDDFDriverClass):
             "virt": virt_connection,
         }
         return ConfigStruct(
-            "i2c_driver_config_t",
+            fields,
+            type_name="i2c_driver_config_t",
             target_file=driver_pd.prog_image,
             section_name="i2c_driver_config",
-            fields=fields,
         )
 
 
