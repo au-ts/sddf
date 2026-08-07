@@ -27,7 +27,7 @@ typedef struct blk_connection_resource {
 } blk_connection_resource_t;
 
 typedef struct blk_driver_config {
-    char magic[SDDF_BLK_MAGIC_LEN];
+    char magic[SDDF_BLK_MAGIC_LEN + 1];
     blk_connection_resource_t virt;
 } blk_driver_config_t;
 
@@ -43,14 +43,14 @@ typedef struct blk_virt_config_driver {
 } blk_virt_config_driver_t;
 
 typedef struct blk_virt_config {
-    char magic[SDDF_BLK_MAGIC_LEN];
+    char magic[SDDF_BLK_MAGIC_LEN + 1];
     uint64_t num_clients;
     blk_virt_config_driver_t driver;
     blk_virt_config_client_t clients[SDDF_BLK_MAX_CLIENTS];
 } blk_virt_config_t;
 
 typedef struct blk_client_config {
-    char magic[SDDF_BLK_MAGIC_LEN];
+    char magic[SDDF_BLK_MAGIC_LEN + 1];
     blk_connection_resource_t virt;
     region_resource_t data;
 } blk_client_config_t;
