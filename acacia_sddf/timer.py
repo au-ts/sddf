@@ -81,10 +81,10 @@ class sDDFTimer(sDDFDriverClass):
         # invariant: this PD only is a client to timer one time.
         fields = {"magic": "sDDF" + chr(6), "driver_id": driver_id}
         return ConfigStruct(
-            "timer_client_config_t",
+            fields,
+            type_name="timer_client_config_t",
             target_file=client_pd.prog_image,
             section_name="timer_client_config",
-            fields=fields,
         )
 
     # x86 utility
