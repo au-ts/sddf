@@ -11,5 +11,6 @@
 
 #define SDDF_TIMER_GET_TIME 0
 #define SDDF_TIMER_SET_TIMEOUT 1
+#define SDDF_TIMER_GET_COUNTER_FREQ 2
 
 typedef uint64_t sddf_timer_freq_hz_t;

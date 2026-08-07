@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/util/arch_timestamp_counter.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
@@ -92,6 +91,14 @@ volatile hpet_timer_t *timer_0;
 uint64_t hpet_freq = 0;
 uint64_t tsc_freq = 0;
 
+typedef struct {
+    seL4_BootInfoHeader header;
+    uint32_t mhz;
+} x86_tsc_freq_bootinfo_t;
+
+/* Set by the x86 TSC-frequency bootinfo map in the system description. */
+const x86_tsc_freq_bootinfo_t *x86_tsc_freq_bootinfo;
+
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 uint64_t timeouts[MAX_TIMEOUTS];
@@ -137,6 +144,20 @@ static void process_timeouts(uint64_t curr_ticks)
 static uint64_t tsc_ticks_to_ns(uint64_t tsc)
 {
     return ticks_to_ns(tsc, tsc_freq);
+}
+
+static uint64_t get_tsc_frequency_from_bootinfo(void)
+{
+    if (x86_tsc_freq_bootinfo == NULL || x86_tsc_freq_bootinfo->header.id != SEL4_BOOTINFO_HEADER_X86_TSC_FREQ
+        || x86_tsc_freq_bootinfo->header.len != sizeof(seL4_BootInfoHeader) + sizeof(uint32_t)
+        || x86_tsc_freq_bootinfo->mhz == 0) {
+
+        return 0;
+    }
+
+    LOG_TIMER_DRIVER("The tsc_freq=%llu\n", (uint64_t)x86_tsc_freq_bootinfo->mhz * MEGA);
+    /* The kernel's TSC bootinfo payload is expressed in MHz. */
+    return (uint64_t)x86_tsc_freq_bootinfo->mhz * MEGA;
 }
 
 void init(void)
@@ -188,10 +209,9 @@ void init(void)
 
     microkit_deferred_irq_ack(IRQ_CH);
 
-    /* Detect TSC */
-    tsc_freq = sddf_read_freq();
+    tsc_freq = get_tsc_frequency_from_bootinfo();
     if (!tsc_freq) {
-        LOG_TIMER_DRIVER_ERR("Cannot detect or use TSC frequency, expect performance degradation.\n");
+        LOG_TIMER_DRIVER_ERR("Cannot retrieve TSC frequency from bootinfo, expect performance degradation.\n");
         /* Because SDDF_TIMER_GET_TIME calls will go to the HPET rather than from the TSC.
          * Which is very slow to read. See:
          * https://docs.redhat.com/en/documentation/red_hat_enterprise_linux_for_real_time/7/html/reference_guide/chap-timestamping
@@ -209,14 +229,14 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (microkit_msginfo_get_label(msginfo)) {
 
-    case SDDF_TIMER_GET_TIME: {
-        if (tsc_freq) {
-            microkit_mr_set(0, tsc_ticks_to_ns(sddf_read_counter()));
-        } else {
-            microkit_mr_set(0, hpet_ticks_to_ns(get_hpet_ticks()));
-        }
+    case SDDF_TIMER_GET_TIME:
+        // If TSC can be used the client will not PPC into this driver.
+        microkit_mr_set(0, hpet_ticks_to_ns(get_hpet_ticks()));
         return microkit_msginfo_new(0, 1);
-    }
+
+    case SDDF_TIMER_GET_COUNTER_FREQ:
+        microkit_mr_set(0, tsc_freq);
+        return microkit_msginfo_new(0, 1);
 
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t ticks_now = get_hpet_ticks();
