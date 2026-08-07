@@ -32,7 +32,7 @@ typedef enum {
 #define SDDF_LIB_SDDF_LWIP_MAGIC_LEN 5
 
 typedef struct lib_sddf_lwip_config {
-    char magic[SDDF_LIB_SDDF_LWIP_MAGIC_LEN];
+    char magic[SDDF_LIB_SDDF_LWIP_MAGIC_LEN + 1];
     region_resource_t pbuf_pool;
     uint64_t num_pbufs;
 } lib_sddf_lwip_config_t;
