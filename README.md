@@ -35,7 +35,7 @@ website [here](https://trustworthy.systems/projects/drivers/).
 * GNU Make
 * Clang and LLVM bintools
 * Device Tree Compiler
-* Python (3.9 or higher)
+* Python (3.10 or higher)
 
 See the instructions below for installing the rest of the dependencies based on
 your machine:
