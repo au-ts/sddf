@@ -222,7 +222,7 @@ def DeviceResourcesFactory(
     section_name="device_resources",
 ):
     region_structs = [
-        DeviceRegionResourceFactory(RegionResourceFactory(m, section_name=o), m.mr.paddr)
+        DeviceRegionResourceFactory(RegionResourceFactory(m, offset=o), m.mr.paddr)
         for m, o in maps_offsets
     ]
     irq_structs = [DeviceIRQResourceFactory(i) for i in irq_ids]
