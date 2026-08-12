@@ -1,5 +1,236 @@
 # Revision history for sDDF
 
+## Release 0.7.0
+
+### Features
+
+* Update to Microkit 2.3.0, including seL4 16.0.0
+* Baseline x86_64 support has been added
+* SMP support has been added
+* New 'VSwitch' feature for the networking component
+* Model checking of the serial queues under the weak memory model using [GenMC](
+  https://plv.mpi-sws.org/genmc).
+
+New board support:
+
+* AArch64
+
+  * Raspberry Pi 4 (serial/timer/network)
+  * ZynqMP (ZCU102, ZCU106, Kria K26) (serial/timer/network)
+  * Rock3b support (serial/timer/network)
+
+* RISC-V
+
+  * Star64 (serial/timer/network)
+  * Cheshire support (serial)
+  * [Serengeti] support (serial/timer/i2c)
+  * Hifive P550 (serial)
+
+* x86_64
+
+  * Microkit `x86_64_generic` and `x86_64_generic_vtx` platforms (serial/timer/network/blk)
+
+
+Breaking changes:
+
+* The Zig build system has been removed as it duplicated the effort we spent
+  on the Make build system.
+* The minimum version of Python is now 3.10.
+* Required 'sdfgen' version has been updated to v35
+* Makefile toolchain details have been abstracted to `tools/make` to reduce
+  duplication.
+* I²C protocol has been rewritten
+
+[Serengeti]: https://github.com/au-ts/serengeti
+
+#### Block
+
+* Support GPT partition schemes, not just MSDOS (MBR) partitions
+* IMX MMC driver supports 25MHz "Default Speed" operation
+* Add `blk_storage_set_ready` helper for driver internals
+* Example now depends on the Serial subsystem so it works in release mode
+* Support for the 'x86_64_generic' Microkit platform in QEMU (via VirtIO)
+* Experimental support for NVMe on AArch64/Riscv64/x86_64 platforms
+  * Note: x86_64 NVMe does not work with Microkit 2.3.0 as sDDF does not
+    declare the appropriate IOMMU regions in the Microkit system. It does work
+    on Microkit 2.2.0, which disables the IOMMU completely.
+* Our `mkvirtdisk` script for QEMU systems supports creating `ext4` partitions
+  as well. It is run when simulating examples on QEMU.
+
+#### I²C
+
+* Protocol has been completed refactored in [PR 509](https://github.com/au-ts/sddf/pull/509)
+  and the [Design RFC](https://github.com/au-ts/sddf/issues/486).
+* Example now depends on the Serial subsystem so it works in release mode
+* There are now blocking and non-blocking 'libi2c' APIs.
+* Support for Serengeti with `eth,i2c` (based on OpenTitan I²C)
+* New example: "I²C bus scan" which lists I²C addresses present on the bus
+* New example: "INA219" that reads current/voltage/power from an INA219 peripheral,
+  currently targeted at the bus addresses on the Digilent Genesys 2 FPGA dev
+  board that runs Serengeti or Cheshire.
+
+#### Network
+
+* Support for the Pine64 Star64 board using the `dwmac-5.10a` driver.
+* Update copy component to drop active Rx DMA buffers if client buffer queue is empty
+* (TODO): LWIP changes to echo socket and tick timer and a bunch of other code
+   FIXME: courtney summary?
+    + a variety of extra features (see commits in aug 2025)
+* Support multiple ethernet drivers for the same board by producing alternate
+  ELF files for the driver
+* Support for the [COMPULAB IOT-GATE-iMX8](
+  https://www.compulab.com/products/iot-gateways/iot-gate-imx8-industrial-arm-iot-gateway/)
+  boards.
+* Address Conflict Detection (DHCP ACD) is disabled on QEMU platforms
+  as this significantly reduces DHCP time.
+* Various driver improvements to increase performance;
+    * Use more appropriate AHB PBL (programmable burst length) value on various platforms
+    * Use store-and-forward for Meson
+    * Use hardware checksum offload on OdroidC4
+* Support for an SMP configuration of the 'echo server' example
+* `lib_sddf_lwip` helper functions now use common `sddf_lwip` prefix.
+* Support for the VirtIO driver on PCI has been added
+* Support for the 'x86_64_generic' Microkit platform in QEMU (via VirtIO)
+* Support for Rock3b with `snps-dwmac-4.20a`.
+* Support for Raspberry Pi4 with `brcm,bcm2711-genet-v5`
+* New VSwitch components, [documented here](https://github.com/au-ts/sddf/blob/main/docs/network/vswitch.md).
+* Support for the ZynqMP (ZCU102/Kria k26) platforms with `zynqmp-gem`
+* Spin PROMELA models for signalling protocol verification now have documentation
+  and the models are checked in CI.
+
+#### Serial
+
+* New `ns16550a` serial driver.
+* QEMU RISC-V now defaults to using an `ns16550a` driver instead of the VirtIO
+  console driver. Change the `UART_DRIV_DIR` in `tools/make/board/qemu_virt_riscv64.mk`
+  if you wish to use VirtIO console instead.
+* Star64 platform support via ns16550a.
+* Cheshire/Serengeti platform support via ns16550a.
+* ZynqMP (ZCU102/ZCU106/KRIA26) platform support for `xlnx,zynqmp-uart`
+* Raspberry Pi 4B support via ns16550a.
+* Hifive P550 (ESWIN 7700X) support via ns16550a.
+* x86_64 support via the pc99 driver (ns16550 but over IO port)
+* Rock3b support via ns16550a.
+
+#### Timer
+
+* Support more than 6 clients using the timer subsystem at one time.
+* Add universal time conversion API which has a formal (Z3 SMT) proof of
+  correctness, for conversion between time and ticks without overflow.
+
+* Support for x86_64 platforms using the HPET timer.
+  * Then a new TSC 'fastpath' timer read when supported via hardware.
+* Support for the ZynqMP `cdns,ttc` driver.
+* Support for the BCM2835 (Raspberry Pi 4B) `brcm-bcm2835-system-timer`.
+* Support the Serengeti APB timer `pulp,apb_timer`
+* Support for the Rock3b using `rockchip,rk3568-timer`.
+
+#### Miscellaneous
+
+* Vendored 'libco' implemented now supports RISC-V (64-bit) as well
+* Remove support for `cache_invalidate` as it is always faster to use
+  userland `cache_clean_and_invalidate` instead (invalidate goes via kernel)
+* We include a custom libc in sDDF that can be externally overridden with a
+  'true' libc, which has from-source builds of optimised `memcpy` and other
+  features expecting by a freestanding compiler.
+* 'Echo server' example works in SMP mode and can be benchmarked on other
+  architectures, although cycle counts are not emitted for x86.
+* Examples are run weekly on hardware and on every PR in QEMU using a new
+  [testing framework](https://github.com/au-ts/sddf/tree/main/ci).
+* The sDDF design document is now built and included as part of the repo.
+* There is new developer documentation in the `docs/` folder.
+* VirtIO drivers can now work on both PCIe and MMIO transport layers
+* Add missing `memmove()` function for AArch64 to our minimal libc
+* Add `ROUND_DOWN` macro to `util.h`.
+* 'Agnostic' support added; so drivers can be used on top of non-Microkit systems
+  such as [Djawula](https://trustworthy.systems/projects/Djawula)
+* Most QEMU/simulated boards specified fixed VirtIO MMIO buses or PCI addresses
+  as QEMU will often change the values between different versions.
+* Implemented a ['memory barrier API'](https://github.com/au-ts/sddf/issues/642)
+* Echo Server benchmarks are run weekly in CI and their results are logged.
+* Benchmark: Add support for build time choice of PMU events, more defined events & different defaults
+* Toolchain: export a `CXX` variable in makefiles
+* VirtIO: add option to skip PCI bus probing
+
+### Bugfixes
+
+* network/virtio: add appropriate memory barriers
+* network/virtio: map hardware rings as cached, which fixes coherency issues
+  when running on *real* AArch64 KVM.
+* Bug fixes for 'bitarray', 'fsmalloc' and 'ialloc' libraries
+* use /usr/bin/env instead of hardcoded shell paths
+* echo_server: fix process script for benchmarking events
+* echo_server: fixup duplicate uart_driver and virt_tx pds
+* benchmark: synchronises pmu interactions
+* drivers/tsc_hpet: serialise rdtsc
+* Makefile dependency fix
+* benchmark: Check for overflows during benchmarking
+* ci: increase echo server DHCP timeout for RPi4B
+* examples/timer: only print after setting a timeout
+  Redues time drift when printing to the console is slow.
+* timer/hpet: change IRQ and many bug fixes
+* i2c/opentitan: Don't enqueue more reads than we have space for
+  in the RX fifo
+* i2c/opentitan: Don't use target-mode-only interrupts
+* i2c/opentitan: fix issues from #680
+* i2c/opentitan: removed fmt thresh IRQ to prevent hanging on simple reads.
+* make: remove CHECK_FLAGS_BOARD_MD5 as common.mk appends already
+* i2c/opentitan: fix log printing + misc fixes
+* libco/rv64: addi -> addiw for unsigned XLEN add
+* lib_sddf_lwip: add create modifier to ar invocations
+* nvme: clamp queue depth to controller CAP.MQES
+* nvme: add memory barriers to queue operations
+* examples/i2c: only add GPIO/clock regions for Odroid-C4 I2C
+* network/dwmac: dwmac: Don't use raw tail index - #656
+* timer/hpet: add retain, used to section
+* timer/arm: add retain, used to section
+* serial/pc99: avoid device_resources section being optimised out
+* Echo server: Explicitly use the latency-check ipbench client test
+* Fix missing libc build dependencies
+* blk: fix virt init for unexpected notifies
+* virtio: specify blk,eth devices for qemu by hand
+  This will make it more reliable when QEMU versions change.
+* examples/blk: typo fix for VirtIO regs
+* virtio/pci: cleanup/fixes for PCI metadata checking
+* examples/timer: remove duplicate variable from meta.py
+* lib_sddf_lwip: assert that the number of pbufs is >= the number of Rx buffers
+* examples/echo_server: remove the pending tx pbufs from the echo server - drop packets instead
+* lib_sddf_lwip: Notify the Tx virtualiser if there are no Tx free buffers available
+* toolchain: use -O2. This fixes performance on RISC-V.
+* examples/echo_server: Remove duplicate protection domain declarations
+* serial: fix signalling protocol under smp
+* examples/serial: Fix libsddf_util_debug dependency
+* Function definitions in header files should be inline
+* i2c/queues: fix memory barriers
+* timer/bcm2835: fix spurious interrupts
+* network/virtio: fix rx packet length read
+* util/assert: prevent infinite recursion & a stack overflow when asserts are
+  called during a previous assert.
+* serial/ns16550a: do not set baud while busy
+* network/dwmac: fix UB in `1 << 31` shifts by using `BIT(n)` macro.
+* serial/virt: correctly implement the signalling protocol
+* serial: enable TX FIFO available interrupts when waiting to send data
+* timer/jh7110: fix large timeouts
+* timer/meson: bugfix by acking IRQs on init
+  * This was later migrated to be done for all drivers as part of Microkit
+* network/dwmac: use the same MAC address as U-Boot does
+* serial/ns16550a: read/write to registers appropriately, as many are read-to-clear
+  but were used as if they were read-write registers
+* serial/ns16550a: fix initial driver reset deleting previous serial output
+* flake.nix: add various missing dependencies
+* various drivers: use sddf_dprintf for log printing, which works in debug mode
+* block/virtio: fix compile warning
+* virtio: ack interrupts *before* handling responses
+* block/virtio: fix debug print compile error
+* timer/jh7110: prevent potential race in time reads
+* network/dwmac: fix ethernet dwmac bug introduced by removing descriptor array
+* network: prioritise handling tx IRQs over rx IRQs; this is more performant,
+  see [issue #419](https://github.com/au-ts/sddf/issues/419).
+* examples/echo_server: fix multi-threaded compilation by tracking deps correctly
+* serial: don't service RX queues when RX is disabled
+* block: Bugfixes for error conditions in the IMX MMC driver
+* Fix `libco` `-Wnull-dereference` warnings on newer compilers
+
 ## Release 0.6.0
 
 ### General
