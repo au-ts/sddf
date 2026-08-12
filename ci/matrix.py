@@ -100,6 +100,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "imx8mp_evk",
             "imx8mp_iotgate",
             "maaxboard",
+            "kria_k26",
             "odroidc2",
             "odroidc4",
             "qemu_virt_aarch64",
@@ -114,6 +115,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # not in machine queue
             {"board": "imx8mp_evk"},
             {"board": "rock3b"},
+            {"board": "kria_k26"},
         ],
     },
     "serial": {
@@ -125,6 +127,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
+            "imx8mp_iotgate",
             "kria_k26",
             "maaxboard",
             "odroidc2",
@@ -150,8 +153,10 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release"],
         "build_systems": ["make"],
         "boards": [
+            "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
+            "imx8mp_iotgate",
             "kria_k26",
             "maaxboard",
             "odroidc2",
