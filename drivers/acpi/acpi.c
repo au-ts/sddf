@@ -102,7 +102,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_word_address_space_t *word_as = (acpi_word_address_space_t *)buf_cur;
                 dev_res->min_addr = word_as->min_address;
                 dev_res->max_addr = word_as->min_address + word_as->address_length;
-                dev_res->type = WORD_MEMORY + word_as->resource_type;
+                dev_res->type = word_as->resource_type;
                 dev_res->flags = word_as->type_flags;
 
                 sddf_dprintf("Word ");
@@ -115,7 +115,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_dword_address_space_t *dword_as = (acpi_dword_address_space_t *)buf_cur;
                 dev_res->min_addr = dword_as->min_address;
                 dev_res->max_addr = dword_as->min_address + dword_as->address_length;
-                dev_res->type = DWORD_MEMORY + dword_as->resource_type;
+                dev_res->type = dword_as->resource_type;
                 dev_res->flags = dword_as->type_flags;
 
                 sddf_dprintf("DWord ");
@@ -128,7 +128,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_qword_address_space_t *qword_as = (acpi_qword_address_space_t *)buf_cur;
                 dev_res->min_addr = qword_as->min_address;
                 dev_res->max_addr = qword_as->min_address + qword_as->address_length;
-                dev_res->type = QWORD_MEMORY + qword_as->resource_type;
+                dev_res->type = qword_as->resource_type;
                 dev_res->flags = qword_as->type_flags;
 
                 sddf_dprintf("QWord ");
@@ -141,7 +141,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 acpi_io_port_t *io_port = (acpi_io_port_t *)buf_cur;
                 dev_res->min_addr = io_port->min_address;
                 dev_res->max_addr = io_port->min_address + io_port->address_length;
-                dev_res->type = IO_PORT;
+                dev_res->type = ACPI_RES_TYPE_IO;
                 dev_res->flags = io_port->info;
 
                 sddf_dprintf("I/O Port ");

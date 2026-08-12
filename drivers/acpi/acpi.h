@@ -170,20 +170,13 @@ enum aml_data_resource_type {
     QWORD_AS_DESCRIPTOR = 0x8A,
 };
 
-#define MAX_NUM_AS_RESOURCES 10
+#define MAX_NUM_AS_RESOURCES 30
 #define MAX_NUM_PRT_ENTRIES 256
 
 enum device_resource_type {
-    IO_PORT = 0,
-    DWORD_MEMORY,
-    DWORD_IO,
-    DWORD_BUS,
-    WORD_MEMORY,
-    WORD_IO,
-    WORD_BUS,
-    QWORD_MEMORY,
-    QWORD_IO,
-    QWORD_BUS,
+    ACPI_RES_TYPE_MEMORY,
+    ACPI_RES_TYPE_IO,
+    ACPI_RES_TYPE_BUS,
 };
 
 typedef struct {

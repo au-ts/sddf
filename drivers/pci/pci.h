@@ -279,7 +279,7 @@ typedef struct pci_ecam_config {
 
 // ===================sort out this=============
 #define MAX_NUM_PCI_SEG_GROUP 16
-#define MAX_NUM_AS_RESOURCES 10
+#define MAX_NUM_AS_RESOURCES 30
 #define MAX_NUM_PRT_ENTRIES 256
 
 typedef struct pci_seg_group {
@@ -291,16 +291,9 @@ typedef struct pci_seg_group {
 } __attribute__((packed)) pci_seg_group_t;
 
 enum device_resource_type {
-    IO_PORT = 0,
-    DWORD_MEMORY,
-    DWORD_IO,
-    DWORD_BUS,
-    WORD_MEMORY,
-    WORD_IO,
-    WORD_BUS,
-    QWORD_MEMORY,
-    QWORD_IO,
-    QWORD_BUS,
+    ACPI_RES_TYPE_MEMORY,
+    ACPI_RES_TYPE_IO,
+    ACPI_RES_TYPE_BUS,
 };
 
 typedef struct {
@@ -334,3 +327,33 @@ typedef struct {
     uint32_t num_bridges;
     cnode_specs_t cnode_specs;
 } pci_resources_t;
+
+typedef struct {
+    uint16_t io_16bit;     // 16-bit I/O ports
+    uint32_t io_32bit;     // 32-bit I/O ports
+    uint32_t mem_32bit_np; // 32-bit non-prefetchable
+    uint32_t mem_32bit; // 32-bit prefetchable
+    uint64_t mem_64bit; // 64-bit prefetchable
+} pci_bar_request_t;
+
+typedef struct pci_bridge_windows {
+    uint32_t io_base;
+    uint32_t io_limit;
+
+    uint32_t mem_np_base;
+    uint32_t mem_np_limit;
+
+    uint64_t mem_p_base;
+    uint64_t mem_p_limit;
+    bool mem_p_is_64bit;
+} pci_bridge_windows_t;
+
+typedef struct pci_bridge_node {
+    bool is_host_bridge;
+    struct pci_header_type1 *bridge_header;
+    struct pci_bridge_node *parent;
+    struct pci_bridge_node *child;
+    struct pci_bridge_node *next;
+    pci_bar_request_t total_req;
+    pci_bridge_windows_t windows;
+} pci_bridge_node_t;
