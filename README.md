@@ -31,7 +31,7 @@ website [here](https://trustworthy.systems/projects/drivers/).
 
 ## Dependencies
 
-* [Microkit SDK 2.2.0](https://github.com/seL4/microkit/releases/tag/2.2.0)
+* [Microkit SDK 2.3.0](https://github.com/seL4/microkit/releases/tag/2.3.0)
 * GNU Make
 * Clang and LLVM bintools
 * Device Tree Compiler
@@ -60,8 +60,8 @@ pip3 install --break-system-packages sdfgen==0.33.0
 #### Microkit SDK
 
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.2.0/microkit-sdk-2.2.0-linux-x86-64.tar.gz
-tar xf microkit-sdk-2.2.0-linux-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.3.0/microkit-sdk-2.3.0-linux-x86-64.tar.gz
+tar xf microkit-sdk-2.3.0-linux-x86-64.tar.gz
 ```
 
 ### Homebrew
@@ -84,14 +84,14 @@ pip3 install --break-system-packages sdfgen==0.33.0
 
 For Apple Silicon:
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.2.0/microkit-sdk-2.2.0-macos-aarch64.tar.gz
-tar xf microkit-sdk-2.2.0-macos-aarch64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.3.0/microkit-sdk-2.3.0-macos-aarch64.tar.gz
+tar xf microkit-sdk-2.3.0-macos-aarch64.tar.gz
 ```
 
 For Intel:
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.2.0/microkit-sdk-2.2.0-macos-x86-64.tar.gz
-tar xf microkit-sdk-2.2.0-macos-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.3.0/microkit-sdk-2.3.0-macos-x86-64.tar.gz
+tar xf microkit-sdk-2.3.0-macos-x86-64.tar.gz
 ```
 
 ### Nix
