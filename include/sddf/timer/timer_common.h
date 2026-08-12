@@ -40,7 +40,7 @@ static inline sddf_timer_freq_hz_t find_true_freq(sddf_timer_freq_hz_t f, uint64
  *
  *  This function will return a transformed number of ticks for any input values that possibly
  *  correspond to 64-bit output for any clock frequency we expect from timers.
- *  See `timer_common.z3` for a proof of correctness.
+ *  See `examples/timer/models/timer_common.z3` for a proof of correctness.
  *  TODO: return an error if overflow.
  */
 static inline uint64_t period_transform(uint64_t period, uint64_t target_freq, uint64_t input_freq)
