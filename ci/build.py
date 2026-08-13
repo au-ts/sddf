@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import argparse
+from itertools import chain
 import os
 from pathlib import Path
 import shutil
@@ -111,38 +112,62 @@ def build(args: argparse.Namespace, test_config: common.TestConfig):
 
 
 if __name__ == "__main__":
+    tests = set(chain.from_iterable(
+        matrix_product(
+            common.TestConfig,
+            example=[example_name],
+            board=options["boards"],
+            config=options["configs"],
+            build_system=options["build_systems"],
+            test_fn=[None],
+            backend_fn=[None],
+            no_output_timeout_s=[None],
+        )
+        for example_name, options in matrix.EXAMPLES.items()
+    ))
+
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("microkit_sdk")
     parser.add_argument("num_jobs", nargs="?", type=int, default=os.cpu_count())
-    parser.add_argument(
-        "--examples",
-        default=set(matrix.EXAMPLES.keys()),
-        action=ArgparseActionList,
-    )
     parser.add_argument(
         "--no-clean",
         action="store_true",
         help="Do not remove any pre-existing CI build directory before building",
     )
 
+    filters = parser.add_argument_group(title="filters")
+    filters.add_argument(
+        "--examples",
+        default=set(matrix.EXAMPLES.keys()),
+        action=ArgparseActionList,
+    )
+    filters.add_argument(
+        "--boards",
+        default={test.board for test in tests},
+        action=ArgparseActionList,
+    )
+    filters.add_argument(
+        "--configs",
+        default={test.config for test in tests},
+        action=ArgparseActionList,
+    )
+    filters.add_argument(
+        "--build-systems",
+        default={test.build_system for test in tests},
+        action=ArgparseActionList,
+    )
+    filters.add_argument(
+        "--only-qemu",
+        action=argparse.BooleanOptionalAction,
+        help="select only QEMU tests",
+    )
+
     args = parser.parse_args()
 
-    for example_name, options in matrix.EXAMPLES.items():
-        if example_name not in args.examples:
-            continue
+    filter_args = argparse.Namespace(
+        **{a.dest: getattr(args, a.dest) for a in filters._group_actions}
+    )
 
-        matrix = set(
-            matrix_product(
-                common.TestConfig,
-                example=[example_name],
-                board=options["boards"],
-                config=options["configs"],
-                build_system=options["build_systems"],
-                test_fn=[None],
-                backend_fn=[None],
-                no_output_timeout_s=[None],
-            )
-        )
-        for test_config in matrix:
-            build(args, test_config)
+    for test_config in common.subset_test_cases(tests, filter_args):
+        build(args, test_config)

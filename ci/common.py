@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
 from datetime import datetime
 import sys
@@ -161,7 +162,7 @@ def test_case_summary(tests: list[TestConfig]):
 
 
 def subset_test_cases(
-    tests: list[TestConfig], filters: argparse.Namespace
+    tests: Iterable[TestConfig], filters: argparse.Namespace
 ) -> list[TestConfig]:
     # This works under the assumption that all elements of tests are the same
     # subset of TestConfig.
