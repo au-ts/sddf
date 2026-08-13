@@ -80,7 +80,7 @@ else
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
 endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+	$(OBJCOPY) --update-section .timer_client_config=client_timer_client_config.data client.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)

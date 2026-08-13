@@ -87,3 +87,8 @@ Device Tree compatible strings/platforms it is known to work with.
     * `brcm,bcm2835-system-timer`
 * x86-64 TSC & HPET:
     * `tsc_hpet`
+
+## TMU (Thermal Monitoring Unit)
+
+* imx
+    * `fsl,imx8mq-tmu`
