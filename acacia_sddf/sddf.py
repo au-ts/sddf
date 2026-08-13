@@ -166,6 +166,10 @@ class sDDFDriverClass(Subsystem):
             )
 
         for irq in self.sddf_driver_config.irqs:
+            if irq.dt_index >= len(irqs_from_prop):
+                raise IndexError(
+                    f"Config {self.sddf_driver_config} refers to more IRQs than present in DTB (n={len(irqs_from_prop)})!"
+                )
             dt_irq = irqs_from_prop[irq.dt_index]
             self.__irq_ids.append(self.driver.add_irq(dt_irq))
 
@@ -197,7 +201,9 @@ class sDDFDriverClass(Subsystem):
 
 def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
     fields = {"vaddr": map.vaddr + offset, "size": map.mr.size}
-    return ConfigStruct(fields, type_name="region_resource_t", section_name=section_name)
+    return ConfigStruct(
+        fields, type_name="region_resource_t", section_name=section_name
+    )
 
 
 def DeviceRegionResourceFactory(region: ConfigStruct, io_addr: int):
