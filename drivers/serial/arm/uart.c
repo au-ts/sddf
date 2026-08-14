@@ -117,7 +117,7 @@ static void uart_setup(void)
     uart_regs->lcr_h &= ~(PL011_LCR_2_STP_BITS);
 
     /* Set data length to 8 */
-    uart_regs->lcr_h |= (0b11 < PL011_LCR_WLEN_SHFT);
+    uart_regs->lcr_h |= (0b11 << PL011_LCR_WLEN_SHFT);
 
     /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
     set_baud(config.default_baud);
