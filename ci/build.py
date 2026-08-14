@@ -112,19 +112,21 @@ def build(args: argparse.Namespace, test_config: common.TestConfig):
 
 
 if __name__ == "__main__":
-    tests = set(chain.from_iterable(
-        matrix_product(
-            common.TestConfig,
-            example=[example_name],
-            board=options["boards"],
-            config=options["configs"],
-            build_system=options["build_systems"],
-            test_fn=[None],
-            backend_fn=[None],
-            no_output_timeout_s=[None],
+    tests = set(
+        chain.from_iterable(
+            matrix_product(
+                common.TestConfig,
+                example=[example_name],
+                board=options["boards"],
+                config=options["configs"],
+                build_system=options["build_systems"],
+                test_fn=[None],
+                backend_fn=[None],
+                no_output_timeout_s=[None],
+            )
+            for example_name, options in matrix.EXAMPLES.items()
         )
-        for example_name, options in matrix.EXAMPLES.items()
-    ))
+    )
 
     parser = argparse.ArgumentParser(description=__doc__)
 
