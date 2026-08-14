@@ -1,0 +1,164 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Pancake Serial Queue Library
+ * 
+ * Shared queue functions for serial drivers and components.
+ * Provides common operations for managing serial queues in Pancake.
+ */
+
+fun serial_queue_get_head(1 queue_ptr)
+{
+  var head = 0;
+  !ld32 head, queue_ptr + 4;
+  return head;
+}
+
+fun serial_queue_get_tail(1 queue_ptr)
+{
+  var tail = 0;
+  !ld32 tail, queue_ptr;
+  return tail;
+}
+
+fun serial_queue_set_head(1 queue_ptr, 1 new_head)
+{
+  !st32 queue_ptr + 4, new_head;
+  return 0;
+}
+
+fun serial_queue_set_tail(1 queue_ptr, 1 new_tail)
+{
+  !st32 queue_ptr, new_tail;
+  return 0;
+}
+
+fun serial_queue_is_empty(1 queue_ptr)
+{
+  var 1 head = serial_queue_get_head(queue_ptr);
+  var 1 tail = serial_queue_get_tail(queue_ptr);
+  return (head == tail);
+}
+
+fun serial_queue_is_full(1 queue_ptr, 1 capacity)
+{
+  var 1 head = serial_queue_get_head(queue_ptr);
+  var 1 tail = serial_queue_get_tail(queue_ptr);
+  var used = tail - head;
+  return (used == capacity);
+}
+
+fun serial_queue_get_used(1 queue_ptr)
+{
+  var 1 head = serial_queue_get_head(queue_ptr);
+  var 1 tail = serial_queue_get_tail(queue_ptr);
+  return (tail - head);
+}
+
+fun serial_queue_get_free(1 queue_ptr, 1 capacity)
+{
+  var 1 used = serial_queue_get_used(queue_ptr);
+  return (capacity - used);
+}
+
+fun serial_queue_enqueue_char(1 queue_ptr, 1 capacity, 1 data_ptr, 1 c)
+{
+  var 1 tail = serial_queue_get_tail(queue_ptr);
+  var pos = tail & (capacity - 1);
+  var char_addr = data_ptr + pos;
+  !st8 char_addr, c;
+  
+  var new_tail = tail + 1;
+  serial_queue_set_tail(queue_ptr, new_tail);
+  return 0;
+}
+
+fun serial_queue_dequeue_char(1 queue_ptr, 1 capacity, 1 data_ptr)
+{
+  var 1 head = serial_queue_get_head(queue_ptr);
+  var pos = head & (capacity - 1);
+  var char_addr = data_ptr + pos;
+  var c = 0;
+  !ld8 c, char_addr;
+  
+  var new_head = head + 1;
+  serial_queue_set_head(queue_ptr, new_head);
+  return c;
+}
+
+fun serial_queue_get_signal_state(1 queue_ptr)
+{
+  var signal_state = 0;
+  !ld32 signal_state, queue_ptr + 8;
+  return signal_state;
+}
+
+fun serial_queue_set_signal_state(1 queue_ptr, 1 state)
+{
+  !st32 queue_ptr + 8, state;
+  return 0;
+}
+
+fun serial_queue_request_signal(1 queue_ptr)
+{
+  return serial_queue_set_signal_state(queue_ptr, 0);
+}
+
+fun serial_queue_cancel_signal(1 queue_ptr)
+{
+  return serial_queue_set_signal_state(queue_ptr, 1);
+}
+
+fun serial_queue_require_signal(1 queue_ptr)
+{
+  var 1 signal_state = serial_queue_get_signal_state(queue_ptr);
+  return (!signal_state);
+}
+
+fun serial_require_consumer_signal_client(1 client, 1 cli_queue_base) {
+  var cli_offset = cli_queue_base + client * 3;
+  var cli_queue_ptr = pnk_mem(cli_offset);
+  
+  var producer_signalled = 0;
+  !ld32 producer_signalled, cli_queue_ptr + 8;
+  
+  return !producer_signalled;
+}
+
+fun serial_cancel_consumer_signal_client(1 client, 1 cli_queue_base) {
+  var cli_offset = cli_queue_base + client * 3;
+  var cli_queue_ptr = pnk_mem(cli_offset);
+  
+  !st32 cli_queue_ptr + 8, 1;
+  return 0;
+}
+
+fun serial_request_consumer_signal_client(1 client, 1 cli_queue_base) {
+    var cli_offset = cli_queue_base + client * 3;
+    var cli_queue_ptr = pnk_mem(cli_offset);
+    
+    !st32 cli_queue_ptr + 8, 0;
+    return 0;
+}
+
+fun serial_queue_get_length(1 queue_ptr)
+{
+  var 1 head = serial_queue_get_head(queue_ptr);
+  var 1 tail = serial_queue_get_tail(queue_ptr);
+  return (tail - head);
+}
+
+fun serial_queue_transfer_byte(1 src_queue_ptr, 1 src_capacity, 1 src_data_ptr, 1 dst_queue_ptr, 1 dst_capacity, 1 dst_data_ptr)
+{
+  var 1 src_empty = serial_queue_is_empty(src_queue_ptr);
+  if (src_empty) { return 0; }
+  
+  var 1 dst_full = serial_queue_is_full(dst_queue_ptr, dst_capacity);
+  if (dst_full) { return 0; }
+  
+  var 1 byte_val = serial_queue_dequeue_char(src_queue_ptr, src_capacity, src_data_ptr);
+  serial_queue_enqueue_char(dst_queue_ptr, dst_capacity, dst_data_ptr, byte_val);
+  return 1;
+}
+
