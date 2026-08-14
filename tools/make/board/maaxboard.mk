@@ -13,5 +13,6 @@ NET_DRIV_DIR := ${PLATFORM}
 ETH_DRIV := eth_driver_${PLATFORM}.elf
 TIMER_DRIV_DIR := ${PLATFORM}
 UART_DRIV_DIR := ${PLATFORM}
+PMIC_DRIV_DIR := bd71837amwv
 
 CPU := cortex-a53

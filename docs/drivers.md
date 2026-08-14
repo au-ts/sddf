@@ -87,3 +87,8 @@ Device Tree compatible strings/platforms it is known to work with.
     * `brcm,bcm2835-system-timer`
 * x86-64 TSC & HPET:
     * `tsc_hpet`
+
+## PMIC
+
+* Rohm BD71837 (iMX boards)
+    * `rohm,bd71837`
