@@ -1,0 +1,42 @@
+#include <os/sddf.h>
+#include <sddf/util/cache.h>
+#include <sddf/util/fence.h>
+#include <sddf/util/printf.h>
+#include <sddf/util/util.h>
+
+void ffisddf_irq_ack(unsigned char *c, long clen, unsigned char *a, long alen) {
+    sddf_irq_ack(clen);
+}
+
+void ffisddf_notify(unsigned char *c, long clen, unsigned char *a, long alen) {
+    sddf_notify(clen);
+}
+
+void ffisddf_deferred_irq_ack(unsigned char *c, long clen, unsigned char *a, long alen) {
+    sddf_deferred_irq_ack(clen);
+}
+
+void ffisddf_deferred_notify(unsigned char *c, long clen, unsigned char *a, long alen) {
+    sddf_deferred_notify(clen);
+}
+
+void fficache_clean(unsigned char *c, long clen, unsigned char *a, long alen) {
+    cache_clean((unsigned long) c, (unsigned long) a);
+}
+
+void fficache_clean_and_invalidate(unsigned char *c, long clen, unsigned char *a, long alen) {
+    cache_clean_and_invalidate((unsigned long) c, (unsigned long) a);
+}
+
+void ffiTHREAD_MEMORY_RELEASE(unsigned char *c, long clen, unsigned char *a, long alen) {
+    THREAD_MEMORY_RELEASE();
+}
+
+void ffiTHREAD_MEMORY_ACQUIRE(unsigned char *c, long clen, unsigned char *a, long alen) {
+    THREAD_MEMORY_ACQUIRE();
+}
+
+void ffidebug_print(unsigned char *c, long clen, unsigned char *a, long alen) {
+    /* clen = debug value to print, alen = context/location id */
+    sddf_dprintf("[DEBUG] Location %ld: Value = %ld (0x%lx)\n", alen, clen, clen);
+}
