@@ -1,0 +1,254 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define UART_REG_BASE       pnk_mem(0)
+
+#define IRQ_CH  pnk_mem(1)
+#define RX_CH   pnk_mem(2)  
+#define TX_CH   pnk_mem(3)
+
+#define SERIAL_RX_QUEUE     pnk_mem(4)
+#define SERIAL_RX_CAPACITY  pnk_mem(5)
+#define SERIAL_RX_DATA      pnk_mem(6)
+
+#define SERIAL_TX_QUEUE     pnk_mem(7)
+#define SERIAL_TX_CAPACITY  pnk_mem(8)
+#define SERIAL_TX_DATA      pnk_mem(9)
+
+#define RX_ENABLED          pnk_mem(1024)
+
+#define RXD_OFFSET          0
+#define TXD_OFFSET          64
+#define CR1_OFFSET          128
+#define CR2_OFFSET          132
+#define CR3_OFFSET          136
+#define CR4_OFFSET          140
+#define FCR_OFFSET          144
+#define SR1_OFFSET          148
+#define SR2_OFFSET          152
+#define ESC_OFFSET          156
+#define TIM_OFFSET          160
+#define BIR_OFFSET          164
+#define BMR_OFFSET          168
+#define BRC_OFFSET          172
+#define ONEMS_OFFSET        176
+#define TS_OFFSET           180
+
+#define UART_CR1_UART_EN            1
+#define UART_CR1_RX_READY_INT       512
+#define UART_CR1_TX_READY_INT       8192
+
+#define UART_CR2_TX_EN              4
+#define UART_CR2_RX_EN              2
+
+#define UART_SR1_RX_RDY             512
+#define UART_SR1_TX_RDY             8192
+#define UART_SR1_FRM_ERR            1024
+#define UART_SR1_PARITY_ERR         32768
+#define UART_SR1_ABNORMAL           33792
+
+#define UART_TST_TX_FIFO_FULL       16
+#define UART_TST_RX_FIFO_EMPTY      32
+
+
+fun uart_read_rxd()
+{
+  var reg_addr = UART_REG_BASE + RXD_OFFSET;
+  var rxd = 0;
+  !ld32 rxd, reg_addr;
+  return rxd;
+}
+
+fun uart_write_txd(1 data)
+{
+  var reg_addr = UART_REG_BASE + TXD_OFFSET;
+  !st32 reg_addr, data;
+  return 0;
+}
+
+fun uart_read_cr1()
+{
+  var reg_addr = UART_REG_BASE + CR1_OFFSET;
+  var cr1 = 0;
+  !ld32 cr1, reg_addr;
+  return cr1;
+}
+
+fun uart_write_cr1(1 cr1)
+{
+  var reg_addr = UART_REG_BASE + CR1_OFFSET;
+  !st32 reg_addr, cr1;
+  return 0;
+}
+
+fun uart_read_sr1()
+{
+  var reg_addr = UART_REG_BASE + SR1_OFFSET;
+  var sr1 = 0;
+  !ld32 sr1, reg_addr;
+  return sr1;
+}
+
+fun uart_write_sr1(1 sr1)
+{
+  var reg_addr = UART_REG_BASE + SR1_OFFSET;
+  !st32 reg_addr, sr1;
+  return 0;
+}
+
+fun uart_read_ts()
+{
+  var reg_addr = UART_REG_BASE + TS_OFFSET;
+  var ts = 0;
+  !ld32 ts, reg_addr;
+  return ts;
+}
+
+
+export fun tx_provide()
+{
+  var transferred = false;
+  var tx_queue = SERIAL_TX_QUEUE;
+  var tx_capacity = SERIAL_TX_CAPACITY;
+  var tx_data = SERIAL_TX_DATA;
+
+  while (true)
+  {
+    var 1 ts = uart_read_ts();
+    if (ts & UART_TST_TX_FIFO_FULL) { break; }
+
+    var 1 is_empty = serial_queue_is_empty(tx_queue);
+    if (is_empty) { break; }
+
+    var 1 c = serial_queue_dequeue_char(tx_queue, tx_capacity, tx_data);
+    uart_write_txd(c);
+    transferred = true;
+  }
+
+  var 1 ts = uart_read_ts();
+  var 1 cr1 = uart_read_cr1();
+  var 1 is_empty = serial_queue_is_empty(tx_queue);
+  
+  if ((ts & UART_TST_TX_FIFO_FULL) && (!is_empty)) {
+    cr1 = cr1 | UART_CR1_TX_READY_INT;
+    uart_write_cr1(cr1);
+  } else {
+    cr1 = cr1 & 4294959103;
+    uart_write_cr1(cr1);
+  }
+
+  var 1 requires_signal = serial_queue_require_signal(tx_queue);
+  if (transferred && requires_signal) {
+    serial_queue_cancel_signal(tx_queue);
+    sddf_notify(TX_CH);
+  }
+
+  return 0;
+}
+
+fun rx_return()
+{
+  var reprocess = true;
+  var enqueued = false;
+  var rx_queue = SERIAL_RX_QUEUE;
+  var rx_capacity = SERIAL_RX_CAPACITY;
+  var rx_data = SERIAL_RX_DATA;
+
+  while (reprocess)
+  {
+    while (true)
+    {
+      var 1 ts = uart_read_ts();
+      if (ts & UART_TST_RX_FIFO_EMPTY) { break; }
+
+      var 1 is_full = serial_queue_is_full(rx_queue, rx_capacity);
+      if (is_full) { break; }
+
+      var 1 rxd = uart_read_rxd();
+      var c = rxd & 255;
+      serial_queue_enqueue_char(rx_queue, rx_capacity, rx_data, c);
+      enqueued = true;
+    }
+
+    var 1 ts = uart_read_ts();
+    var 1 is_full = serial_queue_is_full(rx_queue, rx_capacity);
+    
+    if ((!(ts & UART_TST_RX_FIFO_EMPTY)) && is_full) {
+      var 1 cr1 = uart_read_cr1();
+      cr1 = cr1 & 4294966783;
+      uart_write_cr1(cr1);
+      serial_queue_request_signal(rx_queue);
+    }
+    
+    reprocess = false;
+
+    if ((!(ts & UART_TST_RX_FIFO_EMPTY)) && (!is_full)) {
+      serial_queue_cancel_signal(rx_queue);
+      var 1 cr1 = uart_read_cr1();
+      cr1 = cr1 | UART_CR1_RX_READY_INT;
+      uart_write_cr1(cr1);
+      reprocess = true;
+    }
+  }
+
+  if (enqueued) {
+    sddf_notify(RX_CH);
+  }
+
+  return 0;
+}
+
+fun handle_irq()
+{
+  var 1 uart_sr1 = uart_read_sr1();
+  var 1 uart_cr1 = uart_read_cr1();
+
+  while ((uart_sr1 & UART_SR1_ABNORMAL) || (uart_sr1 & UART_SR1_RX_RDY) ||
+         ((uart_cr1 & UART_CR1_TX_READY_INT) && (uart_sr1 & UART_SR1_TX_RDY)))
+  {
+    if (RX_ENABLED && (uart_sr1 & UART_SR1_RX_RDY)) {
+      rx_return();
+    }
+
+    if ((uart_cr1 & UART_CR1_TX_READY_INT) && (uart_sr1 & UART_SR1_TX_RDY)) {
+      tx_provide();
+    }
+
+    if (uart_sr1 & UART_SR1_ABNORMAL) {
+      uart_write_sr1(UART_SR1_ABNORMAL);
+    }
+
+    uart_sr1 = uart_read_sr1();
+    uart_cr1 = uart_read_cr1();
+  }
+
+  return 0;
+}
+
+
+export fun notified(1 ch)
+{
+  if (ch == IRQ_CH) {
+    handle_irq();
+    sddf_deferred_irq_ack(ch);
+    return 0;
+  }
+
+  if (ch == TX_CH) {
+    tx_provide();
+    return 0;
+  }
+
+  if (ch == RX_CH) {
+    var 1 cr1 = uart_read_cr1();
+    cr1 = cr1 | UART_CR1_RX_READY_INT;
+    uart_write_cr1(cr1);
+
+    rx_return();
+    return 0;
+  }
+
+  return 0;
+}
