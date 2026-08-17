@@ -29,6 +29,9 @@ uint8_t avail_region_idx = 1;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".ecam_configs"))) pci_ecam_config_t pci_ecam_config;
 
+pci_bridge_node_t *host_bridge;
+pci_devices_config_t devices_config;
+
 /**
  * Look for the capability of a device by ID
  * */
@@ -44,80 +47,168 @@ static struct shared_pci_cap *find_pci_cap_by_id(struct pci_header_type0 *config
     return NULL;
 }
 
-uint64_t alloc_bar_from_resource_windows(uint32_t bar_request)
-{
-    /* uint8_t space_indicator = bar_request & 0x1; */
-    /* uint8_t bar_width = bar_request & 0x3; */
-    /* uint8_t prefetchable = bar_request & 0x1; */
-    /* uint32_t bar_size = (~(bar_request) | 0xF) + 1; */
-
-    /* sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory"); */
-    /* sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false"); */
-    /* sddf_dprintf("    Size: 0x%x\n", bar_size); */
-    /* sddf_dprintf("    Width: "); */
-
-    /* enum device_resource_type expected_resource_type; */
-
-    /* switch (bar_width) { */
-    /*     case 0: { */
-    /*         sddf_dprintf("32-bit BAR\n"); */
-    /*         expected_resource_type = DWORD_MEMORY; */
-    /*         break; */
-    /*     } */
-    /*     case 2: { */
-    /*         sddf_dprintf("64-bit BAR\n"); */
-    /*         expected_resource_type = QWORD_MEMORY; */
-    /*         break; */
-    /*     } */
-    /*     default: { */
-    /*         sddf_dprintf("Reserved\n"); */
-    /*     } */
-    /* } */
-
-    /* for (int i = 0; i < pci_resources->num_bridges; i++) { */
-    /*     uint8_t num_res = pci_resources->bridges[i].num_dev_resources; */
-    /*     for (int j = 0; j < num_res; j++) { */
-    /*         device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j]; */
-    /*         sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx, type_flags: 0x%x\n", dev_res->type, dev_res->min_addr, dev_res->max_addr, dev_res->flags); */
-
-    /*         if (dev_res->type == expected_resource_type && dev_res->max_addr - dev_res->min_addr >= bar_size) { */
-    /*             uint64_t allocated_paddr = dev_res->min_addr; */
-    /*             sddf_dprintf("allocated paddr: 0x%lx\n", allocated_paddr); */
-    /*             dev_res->min_addr += bar_size; */
-    /*             return allocated_paddr; */
-    /*         } */
-    /*     } */
-    /* } */
-
-    return 0;
-}
-
-void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
+pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar_id)
 {
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
-
-    // Read pre-allocated physical address
-    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-    sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id + 1, mem_bar[1]);
-    bool memory_64bit = (*mem_bar) & 0x4;
-    uint64_t prealloc_paddr = *mem_bar;
-    if (memory_64bit) {
-        prealloc_paddr += ((uint64_t)mem_bar[1] << 32);
-    }
-    sddf_dprintf("BAR %u - pre-allocated addr: 0x%lx\n", bar_id, prealloc_paddr);
-
-    // Write 1s to read BAR request from device and allocate from resource windows
+    *mem_bar = 0;
     *mem_bar = 0xFFFFFFFF;
-    uint64_t realloc_paddr = alloc_bar_from_resource_windows(*mem_bar);
-    if (realloc_paddr == 0) {
-        sddf_dprintf("[Error] failed to allocate requested BAR from resource windows\n");
-        return;
+    uint64_t readback = (uint64_t)*mem_bar;
+
+    uint8_t space_indicator = readback & 0x1;
+    uint8_t bar_width = readback & 0x3;
+    uint8_t prefetchable = readback & 0x1;
+    uint64_t bar_size = (~(readback | 0xFFFFFFFF00000000) | 0xF) + 1;
+
+    if (space_indicator == 0 && bar_width == 2) {
+        volatile uint64_t *mem_bar_64b = (volatile uint64_t *)mem_bar;
+        readback = *mem_bar_64b;
+        bar_size = (~((uint64_t)readback) | 0xF) + 1;
+    }
+
+    pci_bar_request_t bar_request = {0, 0, 0, 0, 0};
+    if (readback == 0) return bar_request;
+
+    sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
+    sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
+    sddf_dprintf("    Width: %s\n", bar_width == 2 ? "64-bit BAR" : "32-bit BAR");
+
+    if (space_indicator == 1) {
+        if ((readback & 0xFFFF0000) == 0) {
+            bar_size = (~(readback | 0xFFFFFFFFFFFF0000) | 0xF) + 1;
+            bar_request.io_16bit = bar_size;
+        } else {
+            bar_request.io_32bit = bar_size;
+        }
+    } else {
+        if (prefetchable == 1 && bar_width == 2) {
+            bar_request.mem_64bit = bar_size;
+        } else if (prefetchable == 1 && bar_width == 0) {
+            bar_request.mem_32bit = bar_size;
+        } else if (prefetchable == 0) {
+            bar_request.mem_32bit_np = bar_size;
+        }
+    }
+    sddf_dprintf("    Size: 0x%lx\n", bar_size);
+
+    return bar_request;
+}
+
+bool alloc_from_resource_windows(acpi_dev_t *acpi_pci_bridge,
+                                      enum device_resource_type resource_type,
+                                      uintptr_t lower_boundary,
+                                      uintptr_t upper_boundary,
+                                      bool prefetchable,
+                                      uint64_t size,
+                                      uintptr_t *base)
+{
+    sddf_dprintf("Requested resource type 0x%x located within [0x%lx-0x%lx], prefetchable: %d, size: 0x%lx\n",
+                 resource_type,
+                 lower_boundary,
+                 upper_boundary,
+                 prefetchable,
+                 size);
+    sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)acpi_pci_bridge);
+    uint8_t num_res = acpi_pci_bridge->num_dev_resources;
+    for (int j = 0; j < num_res; j++) {
+        device_resource_t *dev_res = (device_resource_t *)&acpi_pci_bridge->dev_resources[j];
+        /* sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx, type_flags: 0x%x\n", dev_res->type, dev_res->min_addr, dev_res->max_addr, dev_res->flags); */
+
+        if (dev_res->type != resource_type) continue;
+        if (lower_boundary > 0 && dev_res->max_addr < lower_boundary) continue;
+        if (upper_boundary > 0 && dev_res->min_addr > upper_boundary) continue;
+
+        // ACPI Release 6.5 Section 6.4.3.5.5 Resource Type Specific Flags
+        //   Any value set in Bits[2:1] can be treated as `prefetchable`
+        if (prefetchable && (dev_res->flags & 0x6) == 0) continue;
+        if (!prefetchable && (dev_res->flags & 0x6)) continue;
+
+        if (dev_res->max_addr - dev_res->min_addr < size) continue;
+
+        *base = (uintptr_t)dev_res->min_addr + size;
+        dev_res->min_addr = *base;
+        return true;
+    }
+
+    return false;
+}
+
+pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
+{
+    uint32_t io_upper = 0x0; // Upper boundary of requested I/O end
+    if (req->io_16bit > 0) {
+        io_upper = 0x10000;
+    }
+    uint32_t io_size = (uint32_t)req->io_16bit + req->io_32bit;
+    uintptr_t io_base = 0;
+    sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)host_bridge->acpi_dev);
+    if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_IO, 0x0, io_upper, false, io_size, &io_base)) {
+        sddf_dprintf("[Error] failed to allocate 0x%x-byte I/O from resource windows\n", io_size);
+    }
+
+    uint32_t mem_32bit_np_size = req->mem_32bit_np; // 32-bit non-prefetchable memory
+    uint64_t mem_p_size = req->mem_64bit; // Prefetchable memory
+    bool mem_p_is_64bit = false;
+    uintptr_t mem_p_base = 0;
+    uintptr_t mem_np_base = 0;
+    if (req->mem_64bit > 0 && alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x100000000, 0x0, true, req->mem_64bit, &mem_p_base)) {
+        // 32-bit memory is constrainted resource so prioritise merging 32bit prefetchable and non-prefetchable requests
+        mem_32bit_np_size += req->mem_32bit;
+        mem_p_is_64bit = true;
+    } else if ((req->mem_32bit > 0 || req->mem_64bit > 0) && alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, true, req->mem_64bit + req->mem_32bit, &mem_p_base)) {
+        mem_p_size += req->mem_32bit;
+    } else {
+        mem_p_size = 0;
+        mem_32bit_np_size += req->mem_32bit + req->mem_64bit;
+    }
+
+    if (!alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_64bit + req->mem_32bit, &mem_np_base)) {
+        sddf_dprintf("[Error] failed to allocate 0x%x-byte memory from non-prefetchable windows\n", mem_32bit_np_size);
+    }
+
+    pci_resource_windows_t allocated_windows;
+    allocated_windows.io_base = io_base;
+    allocated_windows.io_limit = io_base + io_size;
+    allocated_windows.mem_np_base = mem_np_base;
+    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size;
+    allocated_windows.mem_p_base = mem_p_base;
+    allocated_windows.mem_p_limit = mem_p_base + mem_p_size;
+    allocated_windows.mem_p_is_64bit = mem_p_is_64bit;
+
+    return allocated_windows;
+}
+
+void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
+{
+    pci_bar_request_t bar_request = read_bar_size(pci_header, bar_id);
+    pci_resource_windows_t allocated_windows;
+
+    if (parent_bridge == host_bridge) {
+        allocated_windows = alloc_resource_from_host_bridge(&bar_request);
+    } else {
+        // TODO: allcoate from the parent PCI-to-PCI bridge
+    }
+
+    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+    bool memory_64bit = bar_request.mem_64bit > 0;
+
+    uint64_t realloc_paddr = 0;
+    if (bar_request.mem_32bit_np + bar_request.mem_32bit + bar_request.mem_64bit) {
+        if (allocated_windows.mem_p_base > 0) {
+            realloc_paddr = allocated_windows.mem_p_base;
+        } else if (allocated_windows.mem_np_base > 0) {
+            realloc_paddr = allocated_windows.mem_np_base;
+        } else {
+            sddf_dprintf("[Error] failed to allocate resource from windows\n");
+        }
+    } else {
+        sddf_dprintf("[Error] I/O BAR is not supported yet\n");
     }
 
     *mem_bar = realloc_paddr & 0xFFFFFFFF;
     if (memory_64bit) {
         *(mem_bar + 1) = realloc_paddr >> 32;
     }
+
     sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
 
     seL4_Error error;
@@ -135,56 +226,13 @@ void map_pci_bar(struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t 
     }
 }
 
-void configure_irqs(struct pci_header_type0 *pci_header, config_request_t config_request)
-{
-    bool ioapic_enabled = true;
-    for (int i = 0; i < config_request.num_irqs; i++) {
-        if (config_request.irqs[i].kind != irq_ioapic) {
-            ioapic_enabled = false;
-        }
-
-        if (!ioapic_enabled && config_request.irqs[i].kind == irq_ioapic) {
-            sddf_dprintf("error: I/O APIC can not be enabled with MSI/MSI-X\n");
-            return;
-        }
-    }
-
-    // Enable/Disable I/O APIC interrupts
-    if (ioapic_enabled) {
-        pci_header->command &= (~BIT(10));
-        return;
-    } else {
-        pci_header->command |= BIT(10);
-    }
-
-    for (int i = 0; i < config_request.num_irqs; i++) {
-        switch (config_request.irqs[i].kind) {
-            case irq_ioapic: {
-                // TODO: figure out how to reconfigure interrupt vectors
-                break;
-            };
-            case irq_msi: {
-                // TODO: configure MSI interrupts
-                break;
-            };
-            case irq_msix: {
-                break;
-            };
-            default: {
-                sddf_dprintf("error: device does not support MSI-X\n");
-            };
-        }
-
-    }
-}
-
 uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
 {
-    for (int i = 0; i < pci_resources->num_bridges; i++) {
-        uint8_t num_res = pci_resources->bridges[i].num_dev_resources;
+    for (int i = 0; i < pci_resources->num_devices; i++) {
+        uint8_t num_res = pci_resources->devices[i].num_dev_resources;
         sddf_dprintf("num_res: %u\n", num_res);
         for (int j = 0; j < num_res; j++) {
-            device_resource_t *dev_res = (device_resource_t *)&pci_resources->bridges[i].dev_resources[j];
+            device_resource_t *dev_res = (device_resource_t *)&pci_resources->devices[i].dev_resources[j];
             /* sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx\n", dev_res->type, dev_res->min_addr, dev_res->max_addr); */
 
             if (dev_res->type == ACPI_RES_TYPE_BUS) {
@@ -201,56 +249,52 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
     return 0;
 }
 
-void configure_msi(struct pci_header_type0 *pci_header, uint8_t vector)
+/* void configure_msi(struct pci_header_type0 *pci_header, uint8_t vector) */
+/* { */
+/*     struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX); */
+
+/*     if (msix_cap) { */
+/*         // Bits 2-0 refer to BAR ID */
+/*         uint8_t bar_id = msix_cap->table_offset_bir & 0x5; */
+/*         pci_bar_t msix_bar; */
+/*         msix_bar.bar_id = bar_id; */
+/*         /\* msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr; *\/ */
+/*         msix_bar.ioport = false; */
+
+/*         map_pci_bar(pci_header, bar_id, 0x4000000); */
+
+/*         // Enable MSI-X */
+/*         struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl; */
+/*         msg_ctrl->msix_enable = 1; */
+/*         sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1); */
+/*         sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask); */
+/*         sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable); */
+
+/*         struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr; */
+/*         msix_table->msg_addr_low = 0xFEEu << 20; */
+/*         msix_table->msg_data = 0x4030 + vector; */
+/*         msix_table->vec_ctrl = 0x0; */
+/*         sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low); */
+/*         sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi); */
+/*         sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data); */
+/*         sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl); */
+
+/*         uint32_t *msix_pba = (uint32_t *)( + 0x800); */
+/*         sddf_dprintf("PBA: 0x%x\n", msix_pba[0]); */
+
+/*     } */
+/* } */
+
+acpi_dev_t *find_acpi_dev_by_header_offset(uintptr_t header_offset)
 {
-    struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
-
-    if (msix_cap) {
-        // Bits 2-0 refer to BAR ID
-        uint8_t bar_id = msix_cap->table_offset_bir & 0x5;
-        pci_bar_t msix_bar;
-        msix_bar.bar_id = bar_id;
-        /* msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr; */
-        msix_bar.ioport = false;
-
-        map_pci_bar(pci_header, bar_id, 0x4000000);
-
-        // Enable MSI-X
-        struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
-        msg_ctrl->msix_enable = 1;
-        sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
-        sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
-        sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
-
-        struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr;
-        msix_table->msg_addr_low = 0xFEEu << 20;
-        msix_table->msg_data = 0x4030 + vector;
-        msix_table->vec_ctrl = 0x0;
-        sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
-        sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
-        sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
-        sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
-
-        uint32_t *msix_pba = (uint32_t *)( + 0x800);
-        sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
-
-    }
-}
-
-pci_bridge_t *find_pci_bridge(uintptr_t header_addr, uintptr_t ecam_base)
-{
-    uintptr_t header_offset = header_addr - ecam_base;
     uint32_t dev_slot = header_offset >> 15;
     uint32_t func_slot = header_offset & 0xFFFF;
     uintptr_t target_bridge_adr = (dev_slot << 16) + func_slot;
 
-    if (header_addr == 0x0) {
-        target_bridge_adr = 0x0;
-    }
     sddf_dprintf("Target PCI bridge addr: 0x%lx\n", header_offset);
-    uint32_t num_bridges = pci_resources->num_bridges;
-    for (int i = 0; i < num_bridges; i++) {
-        pci_bridge_t *pci_bridge = &pci_resources->bridges[i];
+    uint32_t num_devices = pci_resources->num_devices;
+    for (int i = 0; i < num_devices; i++) {
+        acpi_dev_t *pci_bridge = &pci_resources->devices[i];
         if (target_bridge_adr == pci_bridge->adr) {
             sddf_dprintf("pci_bridge addr: 0x%lx\n", pci_bridge->adr);
             return pci_bridge;
@@ -260,7 +304,7 @@ pci_bridge_t *find_pci_bridge(uintptr_t header_addr, uintptr_t ecam_base)
     return NULL;
 }
 
-void bind_irq(pci_bridge_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
+void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
 {
     uint8_t base_irq_cap = 138;
 
@@ -322,32 +366,13 @@ void bind_irq(pci_bridge_t *pci_bridge, struct pci_header_type0 *pci_header, uin
     sddf_deferred_notify(1);
 }
 
-struct pci_header_type1 *find_parent_pci_bridge(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end, uint8_t child_bus)
+pci_bridge_node_t *find_parent_pci_bridge(pci_bridge_node_t *bridge_node, uint8_t bus)
 {
-    struct pci_header_type1 *parent_bridge = NULL;
-
-    for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
-        for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
-            for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
-                struct pci_header_type1 *bridge_header = (struct pci_header_type1 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
-                // Bits[6:0] - Header Layout specifying header type
-                if ((bridge_header->header_type & 0x3F) == 1) {
-                    sddf_dprintf("  - primary bus num: 0x%x\n", bridge_header->primary_bus_num);
-                    sddf_dprintf("  - secondary bus num: 0x%x\n", bridge_header->secondary_bus_num);
-                    sddf_dprintf("  - subordinate bus num: 0x%x\n", bridge_header->subordinate_bus_num);
-
-                    if (parent_bridge == NULL) {
-                        parent_bridge = bridge_header;
-                        sddf_dprintf("update, header: 0x%lx, ecam_base: 0x%lx\n", (uintptr_t)bridge_header, bus_base);
-                    } else {
-                        if (bridge_header->secondary_bus_num >= parent_bridge->secondary_bus_num &&
-                            bridge_header->subordinate_bus_num <= parent_bridge->subordinate_bus_num) {
-                            sddf_dprintf("update\n");
-                            parent_bridge = bridge_header;
-                        }
-                    }
-                }
-            }
+    pci_bridge_node_t *parent_bridge = bridge_node;
+    pci_bridge_node_t *child = bridge_node->child;
+    while (child) {
+        if (child->bridge_header->secondary_bus_num <= bus && child->bridge_header->subordinate_bus_num >= bus) {
+            parent_bridge = find_parent_pci_bridge(child, bus);
         }
     }
 
@@ -355,95 +380,64 @@ struct pci_header_type1 *find_parent_pci_bridge(uintptr_t bus_base, uint8_t bus_
 }
 
 
-// TODO: pass bus start and end as arguments
-void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
+/* // TODO: pass bus start and end as arguments */
+/* void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end) */
+/* { */
+/*     for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) { */
+/*         for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) { */
+/*             for (uint8_t pci_func = 0; pci_func < 8; pci_func++) { */
+/*                 struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12)); */
+/*                 if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) { */
+/*                     sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n", */
+/*                                  (((uintptr_t)pci_header >> 20) & 0xff), */
+/*                                  (((uintptr_t)pci_header >> 15) & 0x1f), */
+/*                                  (((uintptr_t)pci_header >> 12) & 0x7), */
+/*                                  pci_header->vendor_id, */
+/*                                  pci_header->device_id, */
+/*                                  pci_header->header_type & 0x3F); */
+/*                 } */
+/*                 for (uint8_t k = 0; k < 6; k++) { */
+/*                     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (k * 0x04)); */
+/*                     if (*mem_bar != 0xffffffff) { */
+/*                         sddf_dprintf("  BAR %d: 0x%x\n", k, *mem_bar); */
+/*                     } */
+/*                 } */
+
+/*                 // TODO: convert it to general solution */
+/*                 /\* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { *\/ */
+/*                 /\*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); *\/ */
+/*                 /\*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); *\/ */
+/*                 /\*     acpi_dev_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); *\/ */
+/*                 /\*     map_pci_bar(pci_header, 4, 0x60000000); *\/ */
+/*                 /\*     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); *\/ */
+/*                 /\* } *\/ */
+
+/*                 if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) { */
+/*                     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
+/*                     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
+/*                     acpi_dev_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
+/*                     map_pci_bar(pci_bridge, pci_header, 0, 0x2000000); */
+/*                     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
+/*                 } */
+
+/*             } */
+/*         } */
+/*     } */
+/* } */
+
+void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 {
-    for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) {
-        for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
-            for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
-                struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12));
-                if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) {
-                    sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n",
-                                 (((uintptr_t)pci_header >> 20) & 0xff),
-                                 (((uintptr_t)pci_header >> 15) & 0x1f),
-                                 (((uintptr_t)pci_header >> 12) & 0x7),
-                                 pci_header->vendor_id,
-                                 pci_header->device_id,
-                                 pci_header->header_type & 0x3F);
-                }
-                for (uint8_t k = 0; k < 6; k++) {
-                    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (k * 0x04));
-                    if (*mem_bar != 0xffffffff) {
-                        sddf_dprintf("  BAR %d: 0x%x\n", k, *mem_bar);
-                    }
-                }
+    struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (device_config->bus << 20) + (device_config->dev << 15) + (device_config->func << 12));
+    pci_bridge_node_t *parent_bridge = find_parent_pci_bridge(host_bridge, device_config->bus);
 
-                // TODO: convert it to general solution
-                if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) {
-                    struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus);
-                    sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header);
-                    pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base);
-                    map_pci_bar(pci_header, 4, 0x60000000);
-                    bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16);
-                }
-
-                /* if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) { */
-                /*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
-                /*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
-                /*     pci_bridge_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
-                /*     map_pci_bar(pci_header, 0, 0x2000000); */
-                /*     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
-                /* } */
-
-            }
-        }
-    }
-}
-
-pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar_id)
-{
-    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
-    *mem_bar = 0;
-    *mem_bar = 0xFFFFFFFF;
-    uint64_t readback = (uint64_t)*mem_bar;
-
-    uint8_t space_indicator = readback & 0x1;
-    uint8_t bar_width = readback & 0x3;
-    uint8_t prefetchable = readback & 0x1;
-    uint64_t bar_size = (~(readback | 0xFFFFFFFF00000000) | 0xF) + 1;
-
-    if (space_indicator == 0 && bar_width == 2) {
-        volatile uint64_t *mem_bar_64b = (volatile uint64_t *)mem_bar;
-        readback = *mem_bar_64b;
-        bar_size = (~((uint64_t)readback) | 0xF) + 1;
+    for (int i = 0; i < device_config->num_bars; i++) {
+        map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->bars[i].vaddr);
     }
 
-    pci_bar_request_t bar_request = {0, 0, 0, 0, 0};
-    if (readback == 0) return bar_request;
-
-    sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
-    sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
-    sddf_dprintf("    Width: %s\n", bar_width == 2 ? "64-bit BAR" : "32-bit BAR");
-
-    if (space_indicator == 1) {
-        if ((readback & 0xFFFF0000) == 0) {
-            bar_size = (~(readback | 0xFFFFFFFFFFFF0000) | 0xF) + 1;
-            bar_request.io_16bit = bar_size;
-        } else {
-            bar_request.io_32bit = bar_size;
-        }
-    } else {
-        if (prefetchable == 1 && bar_width == 2) {
-            bar_request.mem_64bit = bar_size;
-        } else if (prefetchable == 1 && bar_width == 0) {
-            bar_request.mem_32bit = bar_size;
-        } else if (prefetchable == 0) {
-            bar_request.mem_32bit_np = bar_size;
-        }
+    for (int i = 0; i < device_config->num_irqs; i++) {
+        // FIXME: support only legacy I/O APIC for now
+        bind_irq(parent_bridge, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->irqs[i].ch);
     }
-    sddf_dprintf("    Size: 0x%lx\n", bar_size);
-
-    return bar_request;
 }
 
 pci_bar_request_t merge_bar_requests(pci_bar_request_t bar_request_a, pci_bar_request_t bar_request_b)
@@ -466,7 +460,6 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
     for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
         for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
             struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(host_bridge_base + (bus << 20) + (pci_dev << 15) + (pci_func << 12));
-            if (pci_header->vendor_id == 0xffff && pci_header->device_id == 0xffff) continue;
 
             sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n",
                          (((uintptr_t)pci_header >> 20) & 0xff),
@@ -475,6 +468,7 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
                          pci_header->vendor_id,
                          pci_header->device_id,
                          pci_header->header_type & 0x3F);
+            if (pci_header->vendor_id == 0xffff && pci_header->device_id == 0xffff) continue;
 
             if (pci_header->header_type & 0x3F) {
                 struct pci_header_type1 *bridge_header = (struct pci_header_type1 *)pci_header;
@@ -523,98 +517,27 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
     return bar_request_summary;
 }
 
-bool alloc_from_resource_windows(pci_bridge_t *acpi_pci_bridge,
-                                      enum device_resource_type resource_type,
-                                      uintptr_t lower_boundary,
-                                      uintptr_t upper_boundary,
-                                      bool prefetchable,
-                                      uint64_t size,
-                                      uintptr_t *base)
-{
-    sddf_dprintf("Requested resource type 0x%x located within [0x%lx-0x%lx], prefetchable: %d, size: 0x%lx\n",
-                 resource_type,
-                 lower_boundary,
-                 upper_boundary,
-                 prefetchable,
-                 size);
-    sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)acpi_pci_bridge);
-    uint8_t num_res = acpi_pci_bridge->num_dev_resources;
-    for (int j = 0; j < num_res; j++) {
-        device_resource_t *dev_res = (device_resource_t *)&acpi_pci_bridge->dev_resources[j];
-        /* sddf_dprintf("resource type: %u, min_addr: 0x%lx, max_addr: 0x%lx, type_flags: 0x%x\n", dev_res->type, dev_res->min_addr, dev_res->max_addr, dev_res->flags); */
-
-        if (dev_res->type != resource_type) continue;
-        if (lower_boundary > 0 && dev_res->max_addr < lower_boundary) continue;
-        if (upper_boundary > 0 && dev_res->min_addr > upper_boundary) continue;
-
-        // ACPI Release 6.5 Section 6.4.3.5.5 Resource Type Specific Flags
-        //   Any value set in Bits[2:1] can be treated as `prefetchable`
-        if (prefetchable && (dev_res->flags & 0x6) == 0) continue;
-        if (!prefetchable && (dev_res->flags & 0x6)) continue;
-
-        if (dev_res->max_addr - dev_res->min_addr < size) continue;
-
-        *base = (uintptr_t)dev_res->min_addr + size;
-        dev_res->min_addr = *base;
-        return true;
-    }
-
-    return false;
-}
-
-bool alloc_resource_for_bridge(pci_bridge_node_t *pci_bridge, pci_bridge_t *acpi_pci_bridge)
+bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
 {
 
     if (pci_bridge->parent && pci_bridge->parent->is_host_bridge == true) {
         pci_bar_request_t *req = &pci_bridge->total_req;
-        uint32_t io_upper = 0x0; // Upper boundary of requested I/O end
-        if (req->io_16bit > 0) {
-            io_upper = 0x10000;
-        }
-        uint32_t io_size = (uint32_t)req->io_16bit + req->io_32bit;
-        uintptr_t io_base = 0;
-        sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)acpi_pci_bridge);
-        if (alloc_from_resource_windows(acpi_pci_bridge, ACPI_RES_TYPE_IO, 0x0, io_upper, false, io_size, &io_base)) {
-            sddf_dprintf("[Error] failed to allocate 0x%x-byte I/O from resource windows\n", io_size);
+        pci_resource_windows_t allocated_windows = alloc_resource_from_host_bridge(&pci_bridge->total_req);
+        pci_bridge->windows = allocated_windows;
+
+        acpi_dev_t *acpi_dev = find_acpi_dev_by_header_offset((uint64_t)pci_bridge->bridge_header & ((1 << 28) - 1));
+        if (acpi_dev == NULL) {
+            sddf_dprintf("[Error] ACPI device for bridge is not found\n");
             return false;
         }
-
-        uint32_t mem_32bit_np_size = req->mem_32bit_np; // 32-bit non-prefetchable memory
-        uint64_t mem_p_size = req->mem_64bit; // Prefetchable memory
-        bool mem_p_is_64bit = false;
-        uint64_t mem_p_upper = 0x0;
-        uintptr_t mem_p_base = 0;
-        uintptr_t mem_np_base = 0;
-        if (req->mem_64bit > 0 && alloc_from_resource_windows(acpi_pci_bridge, ACPI_RES_TYPE_MEMORY, 0x100000000, 0x0, true, req->mem_64bit, &mem_p_base)) {
-            // 32-bit memory is constrainted resource so prioritise merging 32bit prefetchable and non-prefetchable requests
-            mem_32bit_np_size += req->mem_32bit;
-            mem_p_is_64bit = true;
-        } else if ((req->mem_32bit > 0 || req->mem_64bit > 0) && alloc_from_resource_windows(acpi_pci_bridge, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, true, req->mem_64bit + req->mem_32bit, &mem_p_base)) {
-            mem_p_size += req->mem_32bit;
-        } else {
-            mem_p_size = 0;
-            mem_32bit_np_size += req->mem_32bit + req->mem_64bit;
-        }
-
-        if (!alloc_from_resource_windows(acpi_pci_bridge, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_64bit + req->mem_32bit, &mem_np_base)) {
-            sddf_dprintf("[Error] failed to allocate 0x%x-byte memory from non-prefetchable windows\n", mem_32bit_np_size);
-            return false;
-        }
-
-        pci_bridge->windows.io_base = io_base;
-        pci_bridge->windows.io_limit = io_base + io_size;
-        pci_bridge->windows.mem_np_base = mem_np_base;
-        pci_bridge->windows.mem_np_limit = mem_np_base + mem_32bit_np_size;
-        pci_bridge->windows.mem_p_base = mem_p_base;
-        pci_bridge->windows.mem_p_limit = mem_p_base + mem_p_size;
-        pci_bridge->windows.mem_p_is_64bit = mem_p_is_64bit;
+        pci_bridge->acpi_dev = acpi_dev;
         sddf_dprintf("==Allocate resource windows:\n");
         sddf_dprintf("  - io_base: 0x%x\n", pci_bridge->windows.io_base);
         sddf_dprintf("  - io_limit: 0x%x\n", pci_bridge->windows.io_limit);
         sddf_dprintf("  - mem_np_base: 0x%x\n", pci_bridge->windows.mem_np_base);
         sddf_dprintf("  - mem_np_limit: 0x%x\n", pci_bridge->windows.mem_np_limit);
-        sddf_dprintf("  - mem_p_base: 0x%x\n", pci_bridge->windows.mem_p_base);
-        sddf_dprintf("  - mem_p_limit: 0x%x\n", pci_bridge->windows.mem_p_limit);
+        sddf_dprintf("  - mem_p_base: 0x%lx\n", pci_bridge->windows.mem_p_base);
+        sddf_dprintf("  - mem_p_limit: 0x%lx\n", pci_bridge->windows.mem_p_limit);
         sddf_dprintf("  - mem_p_is_64bit: %u\n", pci_bridge->windows.mem_p_is_64bit);
     } else if (pci_bridge->is_host_bridge == true) {
         // Do nothing for host bridge
@@ -624,7 +547,7 @@ bool alloc_resource_for_bridge(pci_bridge_node_t *pci_bridge, pci_bridge_t *acpi
 
     pci_bridge_node_t *child_bridge = pci_bridge->child;
     while (child_bridge) {
-        alloc_resource_for_bridge(child_bridge, acpi_pci_bridge);
+        alloc_resource_for_bridges(child_bridge);
         child_bridge = child_bridge->next;
     }
 }
@@ -657,6 +580,30 @@ void init(void)
         return;
     }
 
+    // QEMU
+    devices_config.devs[0].bus = 1;
+    devices_config.devs[0].dev = 0;
+    devices_config.devs[0].func = 0;
+    devices_config.devs[0].bars[0].id = 0;
+    devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
+    devices_config.devs[0].irqs[0].ch = 16;
+    devices_config.devs[0].num_bars++;
+    devices_config.devs[0].num_irqs++;
+    devices_config.num_dev++;
+
+    // Hardware
+    devices_config.devs[0].bus = 1;
+    devices_config.devs[0].dev = 0;
+    devices_config.devs[0].func = 0;
+    devices_config.devs[0].bars[0].id = 0;
+    devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
+    devices_config.devs[0].irqs[0].ch = 16;
+    devices_config.devs[0].num_bars++;
+    devices_config.devs[0].num_irqs++;
+    devices_config.num_dev++;
+
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
     sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);
     sddf_dprintf("cptr_ethernet_driver: 0x%lx\n", (uintptr_t)CPTR_CSPACE_ETHERNET_DRIVER);
@@ -673,16 +620,19 @@ void init(void)
                      pci_resources->pci_seg_groups[i].bus_start,
                      pci_resources->pci_seg_groups[i].bus_end);
         pci_seg_group_t *pci_seg_group = &pci_resources->pci_seg_groups[i];
-        /* pci_ecam_scan(pci_seg_group->base_addr, */
-        /*              pci_seg_group->bus_start, */
-        /*              pci_seg_group->bus_end); */
         uint32_t host_bridge_idx = num_pci_bridge_nodes;
         pci_bridge_nodes[host_bridge_idx].is_host_bridge = true;
+        host_bridge = &pci_bridge_nodes[host_bridge_idx];
         num_pci_bridge_nodes++;
-        scan_and_calc_bar_size(pci_seg_group->base_addr, &pci_bridge_nodes[host_bridge_idx], pci_seg_group->bus_start);
-        pci_bridge_t *host_bridge = find_pci_bridge(pci_seg_group->base_addr, pci_seg_group->base_addr);
-        sddf_dprintf("host_bridge: 0x%lx\n", (uintptr_t)host_bridge);
-        alloc_resource_for_bridge(&pci_bridge_nodes[0], host_bridge);
+        scan_and_calc_bar_size(pci_seg_group->base_addr, host_bridge, pci_seg_group->bus_start);
+        acpi_dev_t *host_bridge_dev = find_acpi_dev_by_header_offset(0);
+
+        sddf_dprintf("host_bridge: 0x%lx\n", (uintptr_t)host_bridge_dev);
+        alloc_resource_for_bridges(host_bridge);
+
+        for (int j = 0; j < devices_config.num_dev; j++) {
+            config_pci_device(&devices_config.devs[j], pci_seg_group->base_addr, pci_seg_group->bus_start, pci_seg_group->bus_end);
+        }
     }
 
     sddf_deferred_notify(1);
