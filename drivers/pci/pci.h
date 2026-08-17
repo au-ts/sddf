@@ -244,7 +244,7 @@ typedef enum bar_locatable {
 } bar_locatable_t;
 
 typedef enum irq_kind : uint8_t {
-    irq_ioapic, irq_msi, irq_msix
+    IRQ_IOAPIC, IRQ_MSI, IRQ_MSIX
 } irq_kind_t;
 
 typedef struct pci_irq {
@@ -318,13 +318,13 @@ typedef struct {
     pci_prt_t prt_entries[MAX_NUM_PRT_ENTRIES];
     uint8_t num_prt_entries;
     uint8_t segment_id;
-} pci_bridge_t;
+} acpi_dev_t;
 
 typedef struct {
     pci_seg_group_t pci_seg_groups[MAX_NUM_PCI_SEG_GROUP];
     uint32_t num_pci_groups;
-    pci_bridge_t bridges[30];
-    uint32_t num_bridges;
+    acpi_dev_t devices[30];
+    uint32_t num_devices;
     cnode_specs_t cnode_specs;
 } pci_resources_t;
 
@@ -332,8 +332,8 @@ typedef struct {
     uint16_t io_16bit;     // 16-bit I/O ports
     uint32_t io_32bit;     // 32-bit I/O ports
     uint32_t mem_32bit_np; // 32-bit non-prefetchable
-    uint32_t mem_32bit; // 32-bit prefetchable
-    uint64_t mem_64bit; // 64-bit prefetchable
+    uint32_t mem_32bit;    // 32-bit prefetchable
+    uint64_t mem_64bit;    // 64-bit prefetchable
 } pci_bar_request_t;
 
 typedef struct pci_bridge_windows {
@@ -346,14 +346,40 @@ typedef struct pci_bridge_windows {
     uint64_t mem_p_base;
     uint64_t mem_p_limit;
     bool mem_p_is_64bit;
-} pci_bridge_windows_t;
+} pci_resource_windows_t;
 
 typedef struct pci_bridge_node {
     bool is_host_bridge;
+    acpi_dev_t *acpi_dev;
     struct pci_header_type1 *bridge_header;
     struct pci_bridge_node *parent;
     struct pci_bridge_node *child;
     struct pci_bridge_node *next;
     pci_bar_request_t total_req;
-    pci_bridge_windows_t windows;
+    pci_resource_windows_t windows;
 } pci_bridge_node_t;
+
+typedef struct pci_device_bar {
+    uint8_t id;
+    uintptr_t vaddr;
+} pci_device_bar_t;
+
+typedef struct pci_device_irq {
+    irq_kind_t type;
+    uint8_t ch;
+} pci_device_irq_t;
+
+typedef struct pci_device_config {
+    uint8_t bus;
+    uint8_t dev;
+    uint8_t func;
+    pci_device_bar_t bars[6];
+    pci_device_irq_t irqs[10];
+    uint8_t num_bars;
+    uint8_t num_irqs;
+} pci_device_config_t;
+
+typedef struct pci_devices_config {
+    uint8_t num_dev;
+    pci_device_config_t devs[10];
+} pci_devices_config_t;
