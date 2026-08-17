@@ -31,8 +31,7 @@
 
 virtio_device_handle_t dev;
 
-#define QUEUE_SIZE 1024
-#define VIRTQ_NUM_REQUESTS QUEUE_SIZE
+#define QUEUE_SIZE_MAX 1024
 
 uintptr_t requests_paddr;
 uintptr_t requests_vaddr;
@@ -47,14 +46,14 @@ static struct virtio_blk_req *virtio_headers;
  * A mapping from virtIO header index in the descriptor virtq ring, to the sDDF ID given
  * in the request. We need this mapping due to out of order operations.
  */
-uint32_t virtio_header_to_id[QUEUE_SIZE];
+uint32_t virtio_header_to_id[QUEUE_SIZE_MAX];
 
 /*
  * Due to the out-of-order nature of virtIO, we need a way of allocating indexes in a
  * non-linear way.
  */
 ialloc_t ialloc_desc;
-uint32_t descriptors[QUEUE_SIZE];
+uint32_t descriptors[QUEUE_SIZE_MAX];
 
 uint16_t last_seen_used = 0;
 
@@ -271,7 +270,6 @@ void handle_irq(void)
 void virtio_blk_init(void)
 {
     assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
-    ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
     /* First reset the device */
     virtio_transport_set_status(&dev, 0);
@@ -302,9 +300,6 @@ void virtio_blk_init(void)
     storage_info->block_size = 1;
     storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
-    /* Finished populating configuration */
-    blk_storage_set_ready(storage_info, true);
-
 #ifdef DEBUG_DRIVER
     uint32_t features_low = virtio_transport_get_driver_features(&dev, 0);
     uint32_t features_high = virtio_transport_get_driver_features(&dev, 1);
@@ -321,11 +316,15 @@ void virtio_blk_init(void)
         return;
     }
 
+    uint16_t host_q_capacity = virtio_transport_queue_get_capacity(&dev, 0);
+    uint16_t driver_q_capacity = MIN(host_q_capacity, QUEUE_SIZE_MAX);
+    ialloc_init(&ialloc_desc, descriptors, driver_q_capacity);
+
     /* Add virtqueues */
     size_t desc_off = 0;
-    size_t avail_off = ALIGN(desc_off + (16 * VIRTQ_NUM_REQUESTS), 2);
-    size_t used_off = ALIGN(avail_off + (6 + 2 * VIRTQ_NUM_REQUESTS), 4);
-    size_t size = used_off + (6 + 8 * VIRTQ_NUM_REQUESTS);
+    size_t avail_off = ALIGN(desc_off + (16 * driver_q_capacity), 2);
+    size_t used_off = ALIGN(avail_off + (6 + 2 * driver_q_capacity), 4);
+    size_t size = used_off + (6 + 8 * driver_q_capacity);
 
     // Make sure that the metadata region is able to fit all the virtIO specific
     // extra data.
@@ -337,12 +336,12 @@ void virtio_blk_init(void)
     assert(size <= device_resources.regions[2].region.size);
 #endif
 
-    virtq.num = VIRTQ_NUM_REQUESTS;
+    virtq.num = driver_q_capacity;
     virtq.desc = (struct virtq_desc *)(requests_vaddr + desc_off);
     virtq.avail = (struct virtq_avail *)(requests_vaddr + avail_off);
     virtq.used = (struct virtq_used *)(requests_vaddr + used_off);
 
-    virtio_transport_queue_setup(&dev, 0, VIRTQ_NUM_REQUESTS, requests_paddr + desc_off, requests_paddr + avail_off,
+    virtio_transport_queue_setup(&dev, 0, driver_q_capacity, requests_paddr + desc_off, requests_paddr + avail_off,
                                  requests_paddr + used_off);
 
     /* Finish initialisation */
@@ -390,6 +389,10 @@ void init(void)
     virtio_blk_init();
 
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
+
+    /* Driver ready */
+    blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
+    blk_storage_set_ready(storage_info, true);
 }
 
 void notified(sddf_channel ch)

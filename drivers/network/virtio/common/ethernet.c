@@ -43,9 +43,8 @@ __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-#define RX_COUNT 512
-#define TX_COUNT 512
-#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
+#define RX_COUNT_MAX 512
+#define TX_COUNT_MAX 512
 
 #define HW_RING_SIZE (0x10000)
 
@@ -69,9 +68,9 @@ virtio_net_hdr_t *virtio_net_tx_headers;
 virtio_device_handle_t dev;
 
 ialloc_t rx_ialloc_desc;
-uint32_t rx_descriptors[RX_COUNT];
+uint32_t rx_descriptors[RX_COUNT_MAX];
 ialloc_t tx_ialloc_desc;
-uint32_t tx_descriptors[TX_COUNT];
+uint32_t tx_descriptors[TX_COUNT_MAX];
 
 static inline bool virtio_avail_full(struct virtq *virtq, ialloc_t *ialloc)
 {
@@ -330,16 +329,21 @@ static void eth_setup(void)
 #endif
 
     // Setup the virtqueues
+    uint16_t rx_q_host_capacity = virtio_transport_queue_get_capacity(&dev, VIRTIO_NET_RX_QUEUE);
+    uint16_t tx_q_host_capacity = virtio_transport_queue_get_capacity(&dev, VIRTIO_NET_TX_QUEUE);
+
+    uint16_t rx_q_driver_capacity = MIN(rx_q_host_capacity, RX_COUNT_MAX);
+    uint16_t tx_q_driver_capacity = MIN(tx_q_host_capacity, TX_COUNT_MAX);
 
     size_t rx_desc_off = 0;
-    size_t rx_avail_off = ALIGN(rx_desc_off + (16 * RX_COUNT), 2);
-    size_t rx_used_off = ALIGN(rx_avail_off + (6 + 2 * RX_COUNT), 4);
-    size_t tx_desc_off = ALIGN(rx_used_off + (6 + 8 * RX_COUNT), 16);
-    size_t tx_avail_off = ALIGN(tx_desc_off + (16 * TX_COUNT), 2);
-    size_t tx_used_off = ALIGN(tx_avail_off + (6 + 2 * TX_COUNT), 4);
-    size_t virtq_size = tx_used_off + (6 + 8 * TX_COUNT);
+    size_t rx_avail_off = ALIGN(rx_desc_off + (16 * rx_q_driver_capacity), 2);
+    size_t rx_used_off = ALIGN(rx_avail_off + (6 + 2 * rx_q_driver_capacity), 4);
+    size_t tx_desc_off = ALIGN(rx_used_off + (6 + 8 * rx_q_driver_capacity), 16);
+    size_t tx_avail_off = ALIGN(tx_desc_off + (16 * tx_q_driver_capacity), 2);
+    size_t tx_used_off = ALIGN(tx_avail_off + (6 + 2 * tx_q_driver_capacity), 4);
+    size_t virtq_size = tx_used_off + (6 + 8 * tx_q_driver_capacity);
 
-    rx_virtq.num = RX_COUNT;
+    rx_virtq.num = rx_q_driver_capacity;
     rx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + rx_desc_off);
     rx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + rx_avail_off);
     rx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + rx_used_off);
@@ -348,7 +352,7 @@ static void eth_setup(void)
     assert((uintptr_t)rx_virtq.avail % 2 == 0);
     assert((uintptr_t)rx_virtq.used % 4 == 0);
 
-    tx_virtq.num = TX_COUNT;
+    tx_virtq.num = tx_q_driver_capacity;
     tx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + tx_desc_off);
     tx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + tx_avail_off);
     tx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + tx_used_off);
@@ -361,22 +365,27 @@ static void eth_setup(void)
     virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + virtq_size;
     virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + virtq_size;
     virtio_net_tx_headers = (virtio_net_hdr_t *)virtio_net_tx_headers_vaddr;
-    size_t tx_headers_size = ((TX_COUNT / 2) * sizeof(virtio_net_hdr_t));
+    size_t tx_headers_size = ((tx_q_driver_capacity / 2) * sizeof(virtio_net_hdr_t));
     virtio_net_rx_headers_paddr = virtio_net_tx_headers_paddr + tx_headers_size;
-    size_t rx_headers_size = ((RX_COUNT / 2) * sizeof(virtio_net_hdr_t));
+    size_t rx_headers_size = ((rx_q_driver_capacity / 2) * sizeof(virtio_net_hdr_t));
 
     assert(virtq_size + tx_headers_size + rx_headers_size <= HW_RING_SIZE);
+
+    ialloc_init(&rx_ialloc_desc, rx_descriptors, rx_q_driver_capacity);
+    ialloc_init(&tx_ialloc_desc, tx_descriptors, tx_q_driver_capacity);
 
     rx_provide();
     tx_provide();
 
     // Setup RX queue first
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_RX_QUEUE, RX_COUNT, hw_ring_buffer_paddr + rx_desc_off,
-                                        hw_ring_buffer_paddr + rx_avail_off, hw_ring_buffer_paddr + rx_used_off));
+    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_RX_QUEUE, rx_q_driver_capacity,
+                                        hw_ring_buffer_paddr + rx_desc_off, hw_ring_buffer_paddr + rx_avail_off,
+                                        hw_ring_buffer_paddr + rx_used_off));
 
     // Setup TX queue
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_TX_QUEUE, TX_COUNT, hw_ring_buffer_paddr + tx_desc_off,
-                                        hw_ring_buffer_paddr + tx_avail_off, hw_ring_buffer_paddr + tx_used_off));
+    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_TX_QUEUE, tx_q_driver_capacity,
+                                        hw_ring_buffer_paddr + tx_desc_off, hw_ring_buffer_paddr + tx_avail_off,
+                                        hw_ring_buffer_paddr + tx_used_off));
 
     // Set the MAC address
     config->mac[0] = 0x52;
@@ -410,9 +419,6 @@ void init(void)
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
 #endif
-
-    ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
-    ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
