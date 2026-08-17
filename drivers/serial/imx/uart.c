@@ -17,7 +17,7 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 #ifdef PANCAKE_SERIAL_DRIVER
-static char cml_memory[1024*20];
+static char cml_memory[1024 * 20];
 extern void *cml_heap;
 extern void *cml_stack;
 extern void *cml_stackend;
@@ -40,18 +40,16 @@ void cml_clear() {
 }
 
 void init_pancake_mem() {
-    unsigned long cml_heap_sz = 1024*10;
-    unsigned long cml_stack_sz = 1024*10;
+    unsigned long cml_heap_sz = 1024 * 10;
+    unsigned long cml_stack_sz = 1024 * 10;
     cml_heap = cml_memory;
     cml_stack = cml_heap + cml_heap_sz;
     cml_stackend = cml_stack + cml_stack_sz;
 }
 #endif /* PANCAKE_SERIAL_DRIVER */
 
-#ifndef PANCAKE_SERIAL_DRIVER
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
-#endif /* PANCAKE_SERIAL_DRIVER */
 
 volatile imx_uart_regs_t *uart_regs;
 
@@ -202,6 +200,11 @@ void init(void)
 
     uart_setup();
 
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
 #ifdef PANCAKE_SERIAL_DRIVER
     init_pancake_mem();
 
@@ -211,22 +214,11 @@ void init(void)
     pnk_mem[1] = device_resources.irqs[0].id;
     pnk_mem[2] = config.rx.id;
     pnk_mem[3] = config.tx.id;
-    serial_queue_handle_t *rx_queue_handlep = (serial_queue_handle_t *) &pnk_mem[4];
-    serial_queue_handle_t *tx_queue_handlep = (serial_queue_handle_t *) &pnk_mem[7];
+    pnk_mem[4] = (uintptr_t) &rx_queue_handle;
+    pnk_mem[5] = (uintptr_t) &tx_queue_handle;
     pnk_mem[1024] = config.rx_enabled;
 
-    // Initialize queue handles
-    if (config.rx_enabled) {
-        serial_queue_init(rx_queue_handlep, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
-    }
-    serial_queue_init(tx_queue_handlep, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
-
     cml_main();
-#else /* PANCAKE_SERIAL_DRIVER */
-    if (config.rx_enabled) {
-        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
-    }
-    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 #endif /* PANCAKE_SERIAL_DRIVER */
 }
 

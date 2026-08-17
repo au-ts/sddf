@@ -6,159 +6,342 @@
  * 
  * Shared queue functions for serial drivers and components.
  * Provides common operations for managing serial queues in Pancake.
+ *
+ * The serial queue, like all sDDF queues, is an implementation of a single-producer,
+ * single-consumer FIFO queue. The key assumption being that only the producer is permitted to
+ * modify the tail, and only the consumer is permitted to modify the head. Both components are
+ * permitted to read both indices. The library's atomic operations are written to ensure correctness
+ * under these assumptions, thus each function's description contains an explicit notes on its
+ * assumed caller.
  */
 
-fun serial_queue_get_head(1 queue_ptr)
+// helper functions
+inline fun serial_queue_get_tail(1 queue_handle)
 {
-  var head = 0;
-  !ld32 head, queue_ptr + 4;
-  return head;
+    var queue = 0;
+    !ldw queue, queue_handle;
+    var tail = 0;
+    !ld32 tail, queue;
+    return tail;
 }
 
-fun serial_queue_get_tail(1 queue_ptr)
+inline fun serial_queue_get_head(1 queue_handle)
 {
-  var tail = 0;
-  !ld32 tail, queue_ptr;
-  return tail;
+    var queue = 0;
+    !ldw queue, queue_handle;
+    var head = 0;
+    !ld32 head, queue + 4;
+    return head;
 }
 
-fun serial_queue_set_head(1 queue_ptr, 1 new_head)
+inline fun serial_queue_get_producer_signalled(1 queue_handle)
 {
-  !st32 queue_ptr + 4, new_head;
-  return 0;
+    var queue = 0;
+    !ldw queue, queue_handle;
+    var producer_signalled = 0;
+    !ld32 producer_signalled, queue + 8;
+    return producer_signalled;
 }
 
-fun serial_queue_set_tail(1 queue_ptr, 1 new_tail)
+inline fun serial_queue_set_tail(1 queue_handle, 1 new_tail)
 {
-  !st32 queue_ptr, new_tail;
-  return 0;
-}
-
-fun serial_queue_is_empty(1 queue_ptr)
-{
-  var 1 head = serial_queue_get_head(queue_ptr);
-  var 1 tail = serial_queue_get_tail(queue_ptr);
-  return (head == tail);
-}
-
-fun serial_queue_is_full(1 queue_ptr, 1 capacity)
-{
-  var 1 head = serial_queue_get_head(queue_ptr);
-  var 1 tail = serial_queue_get_tail(queue_ptr);
-  var used = tail - head;
-  return (used == capacity);
-}
-
-fun serial_queue_get_used(1 queue_ptr)
-{
-  var 1 head = serial_queue_get_head(queue_ptr);
-  var 1 tail = serial_queue_get_tail(queue_ptr);
-  return (tail - head);
-}
-
-fun serial_queue_get_free(1 queue_ptr, 1 capacity)
-{
-  var 1 used = serial_queue_get_used(queue_ptr);
-  return (capacity - used);
-}
-
-fun serial_queue_enqueue_char(1 queue_ptr, 1 capacity, 1 data_ptr, 1 c)
-{
-  var 1 tail = serial_queue_get_tail(queue_ptr);
-  var pos = tail & (capacity - 1);
-  var char_addr = data_ptr + pos;
-  !st8 char_addr, c;
-  
-  var new_tail = tail + 1;
-  serial_queue_set_tail(queue_ptr, new_tail);
-  return 0;
-}
-
-fun serial_queue_dequeue_char(1 queue_ptr, 1 capacity, 1 data_ptr)
-{
-  var 1 head = serial_queue_get_head(queue_ptr);
-  var pos = head & (capacity - 1);
-  var char_addr = data_ptr + pos;
-  var c = 0;
-  !ld8 c, char_addr;
-  
-  var new_head = head + 1;
-  serial_queue_set_head(queue_ptr, new_head);
-  return c;
-}
-
-fun serial_queue_get_signal_state(1 queue_ptr)
-{
-  var signal_state = 0;
-  !ld32 signal_state, queue_ptr + 8;
-  return signal_state;
-}
-
-fun serial_queue_set_signal_state(1 queue_ptr, 1 state)
-{
-  !st32 queue_ptr + 8, state;
-  return 0;
-}
-
-fun serial_queue_request_signal(1 queue_ptr)
-{
-  return serial_queue_set_signal_state(queue_ptr, 0);
-}
-
-fun serial_queue_cancel_signal(1 queue_ptr)
-{
-  return serial_queue_set_signal_state(queue_ptr, 1);
-}
-
-fun serial_queue_require_signal(1 queue_ptr)
-{
-  var 1 signal_state = serial_queue_get_signal_state(queue_ptr);
-  return (!signal_state);
-}
-
-fun serial_require_consumer_signal_client(1 client, 1 cli_queue_base) {
-  var cli_offset = cli_queue_base + client * 3;
-  var cli_queue_ptr = pnk_mem(cli_offset);
-  
-  var producer_signalled = 0;
-  !ld32 producer_signalled, cli_queue_ptr + 8;
-  
-  return !producer_signalled;
-}
-
-fun serial_cancel_consumer_signal_client(1 client, 1 cli_queue_base) {
-  var cli_offset = cli_queue_base + client * 3;
-  var cli_queue_ptr = pnk_mem(cli_offset);
-  
-  !st32 cli_queue_ptr + 8, 1;
-  return 0;
-}
-
-fun serial_request_consumer_signal_client(1 client, 1 cli_queue_base) {
-    var cli_offset = cli_queue_base + client * 3;
-    var cli_queue_ptr = pnk_mem(cli_offset);
-    
-    !st32 cli_queue_ptr + 8, 0;
+    var queue = 0;
+    !ldw queue, queue_handle;
+    !st32 queue, new_tail;
     return 0;
 }
 
-fun serial_queue_get_length(1 queue_ptr)
+inline fun serial_queue_set_head(1 queue_handle, 1 new_head)
 {
-  var 1 head = serial_queue_get_head(queue_ptr);
-  var 1 tail = serial_queue_get_tail(queue_ptr);
-  return (tail - head);
+    var queue = 0;
+    !ldw queue, queue_handle;
+    !st32 queue + 4, new_head;
+    return 0;
 }
 
-fun serial_queue_transfer_byte(1 src_queue_ptr, 1 src_capacity, 1 src_data_ptr, 1 dst_queue_ptr, 1 dst_capacity, 1 dst_data_ptr)
+inline fun serial_queue_set_producer_signalled(1 queue_handle, 1 new_producer_signalled)
 {
-  var 1 src_empty = serial_queue_is_empty(src_queue_ptr);
-  if (src_empty) { return 0; }
-  
-  var 1 dst_full = serial_queue_is_full(dst_queue_ptr, dst_capacity);
-  if (dst_full) { return 0; }
-  
-  var 1 byte_val = serial_queue_dequeue_char(src_queue_ptr, src_capacity, src_data_ptr);
-  serial_queue_enqueue_char(dst_queue_ptr, dst_capacity, dst_data_ptr, byte_val);
-  return 1;
+    var queue = 0;
+    !ldw queue, queue_handle;
+    !st32 queue + 8, new_producer_signalled;
+    return 0;
 }
 
+inline fun serial_queue_get_capacity(1 queue_handle)
+{
+    var capacity = 0;
+    !ld32 capacity, queue_handle + 8;
+    return capacity;
+}
+
+inline fun serial_queue_get_data_region(1 queue_handle)
+{
+    var data_region = 0;
+    !ldw data_region, queue_handle + 16;
+    return data_region;
+}
+
+// library functions
+
+/**
+ * Return the number of bytes of data stored in the queue. This is calculated by
+ * using the head and tail values currently stored in the shared queue handle
+ * data structure. This function should only be called by the CONSUMER of the
+ * queue.
+ *
+ * @param queue_handle queue containing the data.
+ *
+ * @return The number bytes of data stored in the queue.
+ */
+inline fun serial_queue_length_consumer(1 queue_handle)
+{
+    /* The load-acquire of tail will be paired with the store-release
+     * in serial_enqueue() or serial_update_shared_tail().
+     */
+    var tail = serial_queue_get_tail(queue_handle);
+    THREAD_MEMORY_ACQUIRE();
+    var head = serial_queue_get_head(queue_handle);
+    return tail - head;
+}
+
+/**
+ * Return the number of bytes of data stored in the queue. This is calculated by
+ * using the head and tail values currently stored in the shared queue handle
+ * data structure. This function should only be called by the PRODUCER of the
+ * queue.
+ *
+ * @param queue_handle queue containing the data.
+ *
+ * @return The number bytes of data stored in the queue.
+ */
+inline fun serial_queue_length_producer(1 queue_handle)
+{
+    var tail = serial_queue_get_tail(queue_handle);
+    /* The load-acquire of head will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head().
+     */
+    var head = serial_queue_get_head(queue_handle);
+    THREAD_MEMORY_ACQUIRE();
+    return tail - head;
+}
+
+/**
+ * Check if the queue is empty. This function should only be called by the
+ * CONSUMER of the queue.
+ *
+ * @param queue_handle queue to check.
+ * @param local_head head which points to the next character to be dequeued.
+ * Should be set to the value of the shared head in the queue if a local copy is
+ * not in use.
+ *
+ * @return true indicates the queue is empty, false otherwise.
+ */
+inline fun serial_queue_empty(1 queue_handle, 1 local_head)
+{
+    /* The load-acquire will be paired with the store-release
+     * in serial_enqueue() or serial_update_shared_tail().
+     */
+    var tail = serial_queue_get_tail(queue_handle);
+    THREAD_MEMORY_ACQUIRE();
+    return local_head == tail;
+}
+
+/**
+ * Check if the queue is full. This function should only be called by the
+ * PRODUCER of the queue.
+ *
+ * @param queue_handle queue to check.
+ * @param local_tail tail which points to the next enqueue slot. Should be set
+ * to the value of the shared tail in the queue if a local copy is not in use.
+ *
+ * @return true indicates the queue is full, false otherwise.
+ */
+inline fun serial_queue_full(1 queue_handle, 1 local_tail)
+{
+    /* The load-acquire will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head().
+     */
+    var head = serial_queue_get_tail(queue_handle);
+    THREAD_MEMORY_ACQUIRE();
+    var capacity = serial_queue_get_capacity(queue_handle);
+    return local_tail - head == capacity;
+}
+
+/**
+ * Enqueue a character into a queue. Update the shared tail so the character is
+ * visible to the consumer. This function should only be called by the PRODUCER
+ * of the queue.
+ *
+ * @param queue_handle queue to enqueue into.
+ * @param character character to be enqueued.
+ *
+ * @return -1 when queue is full, 0 on success.
+ */
+inline fun serial_enqueue(1 queue_handle, 1 character)
+{
+    var tail = serial_queue_get_tail(queue_handle);
+
+    var is_full = serial_queue_full(queue_handle, tail);
+    if (is_full) {
+        return -1;
+    }
+
+    // optimisation: cache tail value
+    // tail = serial_queue_get_tail(queue_handle);
+
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var pos = tail & (capacity - 1);
+    var data_region = serial_queue_get_data_region(queue_handle);
+    !st8 data_region + pos, character;
+
+    // optimisation: cache tail value
+    // tail = serial_queue_get_tail(queue_handle);
+
+    /* The store-release will synchronise with load-acquires by the CONSUMER of the queue. */
+    THREAD_MEMORY_RELEASE();
+    serial_queue_set_tail(queue_handle, tail + 1);
+
+    return 0;
+}
+
+// TODO
+// inline fun serial_enqueue_local(1 queue_handle, 1 local_tail, 1 character)
+
+/**
+ * Dequeue a character from a queue. Update the shared head so the removal of
+ * the character is visible to the producer. This function should only be called
+ * by the CONSUMER of the queue.
+ *
+ * @param queue_handle queue to dequeue from.
+ * @param character address of character to copy into.
+ *
+ * @return {-1, _} when queue is empty, {0, character} on success.
+ */
+inline fun {1, 1} serial_dequeue(1 queue_handle)
+{
+    var head = serial_queue_get_head(queue_handle);
+
+    var is_empty = serial_queue_empty(queue_handle, head);
+
+    if (is_empty) {
+        return <-1, 0>;
+    }
+
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var pos = head & (capacity - 1);
+    var data_region = serial_queue_get_data_region(queue_handle);
+    var character = 0;
+    !ld8 character, data_region + pos;
+
+    /* The store-release will synchronise with load-acquires by the PRODUCER of the queue. */
+    THREAD_MEMORY_RELEASE();
+    serial_queue_set_head(queue_handle, head + 1);
+
+    return <0, character>;
+}
+
+// TODO
+// inline fun {1, 1} serial_dequeue_locals(1 queue_handle, 1 local_head)
+// inline fun serial_update_shared_tail(1 queue_handle, 1 local_tail)
+// inline fun serial_update_shared_head(1 queue_handle, 1 local_tail)
+// inline fun serial_queue_contiguous_length(1 queue_handle)
+// inline fun serial_queue_free(1 queue_handle)
+// inline fun serial_queue_contiguous_free(1 queue_handle)
+// inline fun serial_queue_batch(1 queue_handle, 1 num, 1 src)
+// inline fun serial_transfer_all(1 free_queue_handle, 1 active_queue_handle)
+// inline fun serial_transfer_all_colour(1 free_queue_handle,
+//                                       1 active_queue_handle, 1 col_start,
+//                                       1 col_start_len, 1 col_end, 1 col_end_len)
+
+/**
+ * Indicate to consumer of the queue that producer requires signalling.
+ *
+ * @param queue queue handle of queue that requires signalling upon enqueuing.
+ */
+inline fun serial_request_consumer_signal(1 queue_handle)
+{
+    serial_queue_set_producer_signalled(queue_handle, 0);
+    /* The sc fence will synchronise with the sc fence in the consumer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     *
+     * More information on the sDDF signalling protocol can be found in the corresponding section
+     * in the developer docs (docs/developing.md).
+     * How the serial subsystem uses the protocol can be found in the serial docs
+     * (docs/serial/serial.md).
+     *
+     * The sc fence ensures that:
+     * 1. The producer is observed to set the `producer_signalled` flag before performing its
+     *    "re-check" of the space in the queue.
+     * 2. The consumer is observed to check the producer_signalled flag after it terminates updating
+     *    the queue.
+     * Enforcing the ordering of these events ensures that the producer will not become deadlocked
+     * awaiting free space in the queue (assuming this space does become available).
+     *
+     * Once the producer breaks out of its queue processing loop, if the consumer subsequently
+     * makes space available there are two possible timelines:
+     * 1. The producer's update to the flag is observed by the consumer, causing the consumer to
+     *    notify.
+     * 2. The producer's update to the flag is not observed, thus must not have occurred at the time
+     *    of the consumer's decision to notify. If this is the case then the producer's "re-check"
+     *    also hasn't occurred (thanks to the fences). Thus, when this "re-check" is performed the
+     *    free space in the queue will be observable (thanks again to the fences), triggering the
+     *    producer to "re-process" the queue.
+     *
+     * From a memory model perspective, the following shape of cppmem program
+     * (http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/) represents the undesired behaviour that is
+     * prevented by the pair of sc fences.
+     *
+     * int main() {
+     *   atomic_int flag = 0;
+     *   atomic_int queue = 0;
+     *   {{{
+     *     // producer
+     *     {
+     *       flag.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       queue.load(relaxed).readsvalue(0);
+     *     }
+     *   |||
+     *     // consumer
+     *     {
+     *       queue.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       flag.load(relaxed).readsvalue(0);
+     *     }
+     *   }}};
+     * }
+     */
+    fence_seq_cst();
+    return 0;
+}
+
+/**
+ * Indicate that producer has been signalled.
+ *
+ * @param queue queue handle of the queue that has been signalled.
+ */
+inline fun serial_cancel_consumer_signal(1 queue_handle)
+{
+    serial_queue_set_producer_signalled(queue_handle, 1);
+    /* It is not necessary to insert a sc fence here, unlike in serial_request_consumer_signal(),
+     * as the signalling protocol requires that a cancellation is always followed by a request.
+     */
+    return 0;
+}
+
+/**
+ * Producer of the queue requires signalling.
+ *
+ * @param queue queue handle of the queue to check.
+ */
+inline fun serial_require_consumer_signal(1 queue_handle)
+{
+    /* The sc fence will synchronise with the sc fence in the producer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     */
+    fence_seq_cst();
+    var producer_signalled = serial_queue_get_producer_signalled(queue_handle);
+    return !producer_signalled;
+}

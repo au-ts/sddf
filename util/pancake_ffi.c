@@ -40,3 +40,7 @@ void ffidebug_print(unsigned char *c, long clen, unsigned char *a, long alen) {
     /* clen = debug value to print, alen = context/location id */
     sddf_dprintf("[DEBUG] Location %ld: Value = %ld (0x%lx)\n", alen, clen, clen);
 }
+
+void ffifence_seq_cst(unsigned char *c, long clen, unsigned char *a, long alen) {
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
