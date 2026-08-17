@@ -246,11 +246,23 @@ void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle,
     cfg->driver_feature = driver_features;
 }
 
+uint16_t virtio_transport_queue_get_capacity(virtio_device_handle_t *device_handle, uint32_t select)
+{
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    cfg->queue_select = select;
+    return cfg->queue_size;
+}
+
 bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_t select, uint16_t size, uint64_t desc,
                                   uint64_t driver, uint64_t device)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    uint16_t hw_max_capacity = virtio_transport_queue_get_capacity(device_handle, select);
+    if (size > hw_max_capacity) {
+        LOG_VIRTIO_ERR("Requested queue size %u is larger than host's max %u!\n", size, hw_max_capacity);
+        return false;
+    }
 
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
     cfg->queue_select = select;
     cfg->queue_size = size;
     cfg->queue_desc = desc;
