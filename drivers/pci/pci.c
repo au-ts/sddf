@@ -59,11 +59,13 @@ pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar
     uint8_t prefetchable = (readback & 0x8) >> 3;
     uint64_t bar_size = (~(readback | 0xFFFFFFFF00000000) | 0xF) + 1;
 
-    if (space_indicator == 0 && bar_width == 2) {
-        volatile uint64_t *mem_bar_64b = (volatile uint64_t *)mem_bar;
-        readback = *mem_bar_64b;
-        bar_size = (~((uint64_t)readback) | 0xF) + 1;
-    }
+    /* if (space_indicator == 0 && bar_width == 2) { */
+    /*     volatile uint64_t *mem_bar_64b = (volatile uint64_t *)mem_bar; */
+    /*     *mem_bar_64b = 0xffffffffffffffff; */
+    /*     readback = *mem_bar_64b; */
+    /*     sddf_dprintf("64bit readback: 0x%lx\n", readback); */
+    /*     bar_size = (~((uint64_t)readback) | 0xF) + 1; */
+    /* } */
 
     pci_bar_request_t bar_request = {0, 0, 0, 0, 0};
     if (readback == 0) return bar_request;
@@ -177,7 +179,63 @@ pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
     return allocated_windows;
 }
 
-void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr)
+pci_resource_windows_t alloc_resource_from_bridge(pci_bridge_node_t *parent_bridge, pci_bar_request_t *req)
+{
+    pci_resource_windows_t *windows = &parent_bridge->windows;
+
+    uint32_t io_size = (uint32_t)req->io_16bit + req->io_32bit;
+    uintptr_t io_base = 0;
+    sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)host_bridge->acpi_dev);
+    if (io_size > 0) {
+        if (windows->io_limit - windows->io_base >= io_size) {
+            io_base = windows->io_base;
+            windows->io_base = io_base + io_size;
+        } else {
+            sddf_dprintf("[Error] failed to allocate 0x%x bytes I/O from resource windows\n", io_size);
+        }
+    }
+
+    uintptr_t mem_p_base = 0;
+    uintptr_t mem_np_base = 0;
+    uint32_t mem_32bit_np_size = 0;
+    uint64_t mem_p_size = 0;
+    bool mem_p_is_64bit = false;
+    if (req->mem_64bit > 0 && windows->mem_p_limit - windows->mem_p_base >= req->mem_64bit) {
+        mem_p_base = windows->mem_p_base;
+        mem_p_size = req->mem_64bit;
+        windows->mem_p_base = mem_p_base + mem_p_size;
+        mem_p_is_64bit = true;
+    } else if (req->mem_32bit > 0 && windows->mem_p_limit - windows->mem_p_base >= req->mem_32bit) {
+        mem_p_base = windows->mem_p_base;
+        mem_p_size = req->mem_32bit;
+        windows->mem_p_base = mem_p_base + mem_p_size;
+    } else {
+        mem_p_size = 0;
+        mem_32bit_np_size = req->mem_32bit + req->mem_64bit + req->mem_32bit_np;
+    }
+
+    if (mem_32bit_np_size > 0) {
+        if (windows->mem_np_limit - windows->mem_np_base >= mem_32bit_np_size) {
+            mem_np_base = windows->mem_np_base;
+            windows->mem_np_base = mem_np_base + mem_32bit_np_size;
+        } else {
+            sddf_dprintf("[Error] failed to allocate 0x%x bytes memory from resource windows\n", io_size);
+        }
+    }
+
+    pci_resource_windows_t allocated_windows;
+    allocated_windows.io_base = io_base;
+    allocated_windows.io_limit = io_base + io_size;
+    allocated_windows.mem_np_base = mem_np_base;
+    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size;
+    allocated_windows.mem_p_base = mem_p_base;
+    allocated_windows.mem_p_limit = mem_p_base + mem_p_size;
+    allocated_windows.mem_p_is_64bit = mem_p_is_64bit;
+
+    return allocated_windows;
+}
+
+void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr, uint32_t bar_size)
 {
     pci_bar_request_t bar_request = read_bar_size(pci_header, bar_id);
     pci_resource_windows_t allocated_windows;
@@ -192,6 +250,7 @@ void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_
         allocated_windows = alloc_resource_from_host_bridge(&bar_request);
     } else {
         // TODO: allcoate from the parent PCI-to-PCI bridge
+        allocated_windows = alloc_resource_from_bridge(parent_bridge, &bar_request);
     }
 
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
@@ -221,7 +280,7 @@ void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_
 
     seL4_Error error;
     uintptr_t cur_paddr = realloc_paddr;
-    uintptr_t end_paddr = realloc_paddr + 0x4000;
+    uintptr_t end_paddr = realloc_paddr + bar_size;
     uintptr_t cur_vaddr = target_vaddr;
     while (cur_paddr < end_paddr) {
         error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, CPTR_VSPACE_ETHERNET_DRIVER, seL4_X86_4K, seL4_ReadWrite);
@@ -348,7 +407,7 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
     }
 
     sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(CPTR_CNODE_PCI_RESOURCES + 1, CPTR_CSPACE_ETHERNET_DRIVER, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 0, 1);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(CPTR_CNODE_PCI_RESOURCES + 1, CPTR_CSPACE_ETHERNET_DRIVER, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 1, 1);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
@@ -356,7 +415,7 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
     }
 
     sddf_dprintf("Try minting a notification capability: ");
-    error = seL4_CNode_Mint(CPTR_CNODE_PCI_RESOURCES, 250, 58, CPTR_CSPACE_ETHERNET_DRIVER, 1, 58, seL4_ReadWrite, 1 << irq_num);
+    error = seL4_CNode_Mint(CPTR_CNODE_PCI_RESOURCES, 511, 58, CPTR_CSPACE_ETHERNET_DRIVER, 1, 58, seL4_ReadWrite, 1 << irq_num);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to mint a notification - %d\n", error);
     } else {
@@ -364,7 +423,7 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
     }
 
     seL4_CPtr handler_cap = CPTR_CSPACE_ETHERNET_DRIVER + base_irq_cap + irq_num;
-    seL4_CPtr ntf_cap = CPTR_CNODE_PCI_RESOURCES + 250;
+    seL4_CPtr ntf_cap = CPTR_CNODE_PCI_RESOURCES + 511;
 
     seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
     sddf_dprintf("ret: %lu\n", ret);
@@ -404,7 +463,7 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
 
     sddf_dprintf("parent_bridge: 0x%lx, header: 0x%lx\n", (uintptr_t)parent_bridge->acpi_dev, (uintptr_t)parent_bridge->bridge_header);
     for (int i = 0; i < device_config->num_bars; i++) {
-        map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->bars[i].vaddr);
+        map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->bars[i].vaddr, device_config->bars[i].size);
     }
     sddf_dprintf("Finished BAR mapping\n");
 
@@ -477,7 +536,7 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
                 }
             } else {
                 for (uint8_t bar_id = 0; bar_id < 6; bar_id++) {
-                    pci_bar_request_t bar_request = read_bar_size(pci_header, bar_id);
+                    pci_bar_request_t bar_request = read_bar_size((struct pci_header_type0 *)pci_header, bar_id);
                     if (bar_request.mem_64bit > 0) {
                         bar_id++;
                     }
@@ -502,7 +561,6 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
 {
 
     if (pci_bridge->parent && pci_bridge->parent->is_host_bridge == true) {
-        pci_bar_request_t *req = &pci_bridge->total_req;
         pci_resource_windows_t allocated_windows = alloc_resource_from_host_bridge(&pci_bridge->total_req);
         pci_bridge->windows = allocated_windows;
 
@@ -586,6 +644,7 @@ void init(void)
     /* devices_config.devs[0].func = 0; */
     /* devices_config.devs[0].bars[0].id = 4; */
     /* devices_config.devs[0].bars[0].vaddr = 0x60000000; */
+    /* devices_config.devs[0].bars[0].size = 0x4000; */
     /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
     /* devices_config.devs[0].irqs[0].ch = 16; */
     /* devices_config.devs[0].num_bars++; */
@@ -598,6 +657,7 @@ void init(void)
     devices_config.devs[0].func = 0;
     devices_config.devs[0].bars[0].id = 0;
     devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].bars[0].size = 0x100000;
     devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
     devices_config.devs[0].irqs[0].ch = 16;
     devices_config.devs[0].num_bars++;

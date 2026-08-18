@@ -285,7 +285,7 @@ def generate(
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
 
-    cnode_pci_resources = CNode("pci_resources", False, 8)
+    cnode_pci_resources = CNode("pci_resources", False, 9)
     sdf.add_cnode(cnode_pci_resources)
     acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
     pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
@@ -302,7 +302,7 @@ def generate(
     sdf.add_mr(mr_acpi_tables_copy)
     acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
 
-    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x20000)
+    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x40000)
     sdf.add_mr(mr_pci_resources)
     acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
     pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
@@ -465,6 +465,7 @@ def generate(
         #                     polarity=IrqIoapic.Polarity.ACTIVELOW,
         #                     id=16)
         # ethernet_driver.add_irq(eth_irq)
+        ethernet_driver.add_irq_placeholder(16)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",

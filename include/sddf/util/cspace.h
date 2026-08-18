@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <microkit.h>
 
-#define MAX_NUM_CAP_SLOTS 512
+#define MAX_NUM_CAP_SLOTS 1024
 
 /* #define IDX_TO_CPTR(idx) (seL4_CPtr)(cnode_cptr_remaining_untypeds + idx) */
 #define IDX_TO_CPTR(cnode_specs, idx) (seL4_CPtr)(cnode_specs->cptr + idx)
