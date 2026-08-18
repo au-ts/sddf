@@ -431,8 +431,6 @@ void init(void)
 
             aml_data_t prt_data = eval_namespace_node(prt_node, 0, NULL);
             sddf_dprintf("value: 0x%lx, type: %u, length: %u\n", prt_data.value, prt_data.type, prt_data.length);
-            parse_prt_package(prt_node, prt_data, pci_resources->num_bridges);
-            sddf_dprintf("======Finish _PRT parsing\n");
 
             aml_namespace_node_t *child_node = node->parent->child;
             while(child_node) {
@@ -453,6 +451,10 @@ void init(void)
                 child_node = child_node->next;
             }
 
+            parse_prt_package(prt_node, prt_data, pci_resources->num_bridges);
+            sddf_dprintf("======Finish _PRT parsing\n");
+            sddf_dprintf("num_prt_entries: %u, bridge_idx: %u\n", pci_resources->bridges[pci_resources->num_bridges].num_prt_entries, pci_resources->num_bridges);
+            sddf_dprintf("bridge address: 0x%lx\n", (uintptr_t)&pci_resources->bridges[pci_resources->num_bridges]);
             // TODO: fix ret_type
             aml_data_t crs_data = eval_namespace_node(crs_node, 0, NULL);
             sddf_dprintf("CRS: 0x%lx, len: 0x%x\n", crs_data.value, crs_data.length);

@@ -55,8 +55,8 @@ pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar
     uint64_t readback = (uint64_t)*mem_bar;
 
     uint8_t space_indicator = readback & 0x1;
-    uint8_t bar_width = readback & 0x3;
-    uint8_t prefetchable = readback & 0x1;
+    uint8_t bar_width = (readback & 0x6) >> 1;
+    uint8_t prefetchable = (readback & 0x8) >> 3;
     uint64_t bar_size = (~(readback | 0xFFFFFFFF00000000) | 0xF) + 1;
 
     if (space_indicator == 0 && bar_width == 2) {
@@ -124,8 +124,8 @@ bool alloc_from_resource_windows(acpi_dev_t *acpi_pci_bridge,
 
         if (dev_res->max_addr - dev_res->min_addr < size) continue;
 
-        *base = (uintptr_t)dev_res->min_addr + size;
-        dev_res->min_addr = *base;
+        *base = (uintptr_t)dev_res->min_addr;
+        dev_res->min_addr = *base + size;
         return true;
     }
 
@@ -141,7 +141,7 @@ pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
     uint32_t io_size = (uint32_t)req->io_16bit + req->io_32bit;
     uintptr_t io_base = 0;
     sddf_dprintf("bridge: 0x%lx\n", (uintptr_t)host_bridge->acpi_dev);
-    if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_IO, 0x0, io_upper, false, io_size, &io_base)) {
+    if (io_size > 0 && alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_IO, 0x0, io_upper, false, io_size, &io_base)) {
         sddf_dprintf("[Error] failed to allocate 0x%x-byte I/O from resource windows\n", io_size);
     }
 
@@ -161,7 +161,7 @@ pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
         mem_32bit_np_size += req->mem_32bit + req->mem_64bit;
     }
 
-    if (!alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_64bit + req->mem_32bit, &mem_np_base)) {
+    if (mem_32bit_np_size > 0 && !alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, mem_32bit_np_size, &mem_np_base)) {
         sddf_dprintf("[Error] failed to allocate 0x%x-byte memory from non-prefetchable windows\n", mem_32bit_np_size);
     }
 
@@ -181,6 +181,12 @@ void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_
 {
     pci_bar_request_t bar_request = read_bar_size(pci_header, bar_id);
     pci_resource_windows_t allocated_windows;
+
+    sddf_dprintf("  - io_16bit: 0x%x\n", bar_request.io_16bit);
+    sddf_dprintf("  - io_32bit: 0x%x\n", bar_request.io_32bit);
+    sddf_dprintf("  - mem_32bit: 0x%x\n", bar_request.mem_32bit);
+    sddf_dprintf("  - mem_64bit: 0x%lx\n", bar_request.mem_64bit);
+    sddf_dprintf("  - mem_32bit_np: 0x%x\n", bar_request.mem_32bit_np);
 
     if (parent_bridge == host_bridge) {
         allocated_windows = alloc_resource_from_host_bridge(&bar_request);
@@ -202,8 +208,10 @@ void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_
         }
     } else {
         sddf_dprintf("[Error] I/O BAR is not supported yet\n");
+        return;
     }
 
+    sddf_dprintf("realloc_paddr: 0x%lx\n", realloc_paddr);
     *mem_bar = realloc_paddr & 0xFFFFFFFF;
     if (memory_64bit) {
         *(mem_bar + 1) = realloc_paddr >> 32;
@@ -288,10 +296,10 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
 acpi_dev_t *find_acpi_dev_by_header_offset(uintptr_t header_offset)
 {
     uint32_t dev_slot = header_offset >> 15;
-    uint32_t func_slot = header_offset & 0xFFFF;
+    uint32_t func_slot = header_offset & 0x7FFF;
     uintptr_t target_bridge_adr = (dev_slot << 16) + func_slot;
 
-    sddf_dprintf("Target PCI bridge addr: 0x%lx\n", header_offset);
+    sddf_dprintf("Target PCI bridge addr: 0x%lx, adr: 0x%lx\n", header_offset, target_bridge_adr);
     uint32_t num_devices = pci_resources->num_devices;
     for (int i = 0; i < num_devices; i++) {
         acpi_dev_t *pci_bridge = &pci_resources->devices[i];
@@ -310,6 +318,7 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
 
     uint8_t num_prt_entries = pci_bridge->num_prt_entries;
     sddf_dprintf("num_prt_entries: %u\n", num_prt_entries);
+    sddf_dprintf("address: 0x%lx\n", (uintptr_t)pci_bridge);
     uint8_t gsi_number = 0;
     for (int j = 0; j < num_prt_entries; j++) {
         pci_prt_t *pci_prt = (pci_prt_t *)&pci_bridge->prt_entries[j];
@@ -368,62 +377,21 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
 
 pci_bridge_node_t *find_parent_pci_bridge(pci_bridge_node_t *bridge_node, uint8_t bus)
 {
-    pci_bridge_node_t *parent_bridge = bridge_node;
+    pci_bridge_node_t *direct_parent_bridge = bridge_node;
     pci_bridge_node_t *child = bridge_node->child;
     while (child) {
         if (child->bridge_header->secondary_bus_num <= bus && child->bridge_header->subordinate_bus_num >= bus) {
-            parent_bridge = find_parent_pci_bridge(child, bus);
+            pci_bridge_node_t *closer_parent_bridge = find_parent_pci_bridge(child, bus);
+            if (child != closer_parent_bridge) {
+                direct_parent_bridge = closer_parent_bridge;
+                break;
+            }
         }
+        child = child->next;
     }
 
-    return parent_bridge;
+    return direct_parent_bridge;
 }
-
-
-/* // TODO: pass bus start and end as arguments */
-/* void pci_ecam_scan(uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end) */
-/* { */
-/*     for (uint8_t pci_bus = bus_start; pci_bus < bus_end; pci_bus++) { */
-/*         for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) { */
-/*             for (uint8_t pci_func = 0; pci_func < 8; pci_func++) { */
-/*                 struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (pci_bus << 20) + (pci_dev << 15) + (pci_func << 12)); */
-/*                 if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) { */
-/*                     sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n", */
-/*                                  (((uintptr_t)pci_header >> 20) & 0xff), */
-/*                                  (((uintptr_t)pci_header >> 15) & 0x1f), */
-/*                                  (((uintptr_t)pci_header >> 12) & 0x7), */
-/*                                  pci_header->vendor_id, */
-/*                                  pci_header->device_id, */
-/*                                  pci_header->header_type & 0x3F); */
-/*                 } */
-/*                 for (uint8_t k = 0; k < 6; k++) { */
-/*                     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (k * 0x04)); */
-/*                     if (*mem_bar != 0xffffffff) { */
-/*                         sddf_dprintf("  BAR %d: 0x%x\n", k, *mem_bar); */
-/*                     } */
-/*                 } */
-
-/*                 // TODO: convert it to general solution */
-/*                 /\* if (pci_bus == 0 && pci_dev == 2 && pci_func == 0) { *\/ */
-/*                 /\*     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); *\/ */
-/*                 /\*     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); *\/ */
-/*                 /\*     acpi_dev_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); *\/ */
-/*                 /\*     map_pci_bar(pci_header, 4, 0x60000000); *\/ */
-/*                 /\*     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); *\/ */
-/*                 /\* } *\/ */
-
-/*                 if (pci_bus == 1 && pci_dev == 0 && pci_func == 0) { */
-/*                     struct pci_header_type1 *parent_bridge_header = find_parent_pci_bridge(bus_base, bus_start, bus_end, pci_bus); */
-/*                     sddf_dprintf("parent bridge: 0x%lx\n", (uintptr_t)parent_bridge_header); */
-/*                     acpi_dev_t *pci_bridge = find_pci_bridge((uintptr_t)parent_bridge_header, bus_base); */
-/*                     map_pci_bar(pci_bridge, pci_header, 0, 0x2000000); */
-/*                     bind_irq(pci_bridge, pci_header, pci_bus, pci_dev, pci_func, 16); */
-/*                 } */
-
-/*             } */
-/*         } */
-/*     } */
-/* } */
 
 void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, uint8_t bus_start, uint8_t bus_end)
 {
@@ -436,8 +404,10 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
 
     for (int i = 0; i < device_config->num_irqs; i++) {
         // FIXME: support only legacy I/O APIC for now
-        bind_irq(parent_bridge, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->irqs[i].ch);
+        bind_irq(parent_bridge->acpi_dev, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->irqs[i].ch);
     }
+
+    pci_header->command = pci_header->command | BIT(2);
 }
 
 pci_bar_request_t merge_bar_requests(pci_bar_request_t bar_request_a, pci_bar_request_t bar_request_b)
@@ -459,8 +429,9 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
     pci_bridge_node_t *child = parent_bridge->child;
     for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
         for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
-            struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(host_bridge_base + (bus << 20) + (pci_dev << 15) + (pci_func << 12));
+            volatile struct pci_header_type0 *pci_header = (volatile struct pci_header_type0 *)(host_bridge_base + (bus << 20) + (pci_dev << 15) + (pci_func << 12));
 
+            if (pci_header->vendor_id == 0xffff && pci_header->device_id == 0xffff) continue;
             sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vendor_id: 0x%x, device_id: 0x%x, type: %u\n",
                          (((uintptr_t)pci_header >> 20) & 0xff),
                          (((uintptr_t)pci_header >> 15) & 0x1f),
@@ -468,7 +439,9 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
                          pci_header->vendor_id,
                          pci_header->device_id,
                          pci_header->header_type & 0x3F);
-            if (pci_header->vendor_id == 0xffff && pci_header->device_id == 0xffff) continue;
+
+            // Clear bit `Bus Master Enable` to disable I/O Requests before re-configuration
+            pci_header->command = pci_header->command & (~(1U << 2));
 
             if (pci_header->header_type & 0x3F) {
                 struct pci_header_type1 *bridge_header = (struct pci_header_type1 *)pci_header;
@@ -482,6 +455,8 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
                 uint32_t bridge_idx = num_pci_bridge_nodes;
                 num_pci_bridge_nodes++;
                 pci_bridge_nodes[bridge_idx].parent = parent_bridge;
+                pci_bridge_nodes[bridge_idx].bridge_header = bridge_header;
+
                 if (child) {
                     child->next = &pci_bridge_nodes[bridge_idx];
                     child = child->next;
@@ -539,6 +514,30 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
         sddf_dprintf("  - mem_p_base: 0x%lx\n", pci_bridge->windows.mem_p_base);
         sddf_dprintf("  - mem_p_limit: 0x%lx\n", pci_bridge->windows.mem_p_limit);
         sddf_dprintf("  - mem_p_is_64bit: %u\n", pci_bridge->windows.mem_p_is_64bit);
+
+        volatile struct pci_header_type1 *bridge_header = (volatile struct pci_header_type1 *)pci_bridge->bridge_header;
+        sddf_dprintf("ello\n");
+        // TODO: check if bridge supports 16bit
+        /* bridge_header->io_base = (uint8_t)pci_bridge->windows.io_base; */
+        sddf_dprintf("ello\n");
+        /* bridge_header->io_limit = (uint8_t)pci_bridge->windows.io_limit; */
+
+        bridge_header->mem_base = (uint16_t)(pci_bridge->windows.mem_np_base >> 16);
+        bridge_header->mem_limit = (uint16_t)(pci_bridge->windows.mem_np_limit >> 16);
+
+        // TODO: check if bridge supports 64bit
+        sddf_dprintf("ello\n");
+        if (pci_bridge->windows.mem_p_base) {
+            bridge_header->pre_mem_base = (uint16_t)(pci_bridge->windows.mem_p_base >> 16);
+            bridge_header->pre_mem_limit = (uint16_t)(pci_bridge->windows.mem_p_limit >> 16);
+        } else if (pci_bridge->windows.mem_p_is_64bit) {
+            bridge_header->pre_mem_base_upper = (uint32_t)(pci_bridge->windows.mem_p_base >> 32);
+            bridge_header->pre_mem_limit_upper = (uint32_t)(pci_bridge->windows.mem_p_limit >> 32);
+        }
+        sddf_dprintf("ello\n");
+        bridge_header->command = bridge_header->command | BIT(2);
+        sddf_dprintf("ello\n");
+
     } else if (pci_bridge->is_host_bridge == true) {
         // Do nothing for host bridge
     } else {
@@ -581,11 +580,11 @@ void init(void)
     }
 
     // QEMU
-    devices_config.devs[0].bus = 1;
-    devices_config.devs[0].dev = 0;
+    devices_config.devs[0].bus = 0;
+    devices_config.devs[0].dev = 2;
     devices_config.devs[0].func = 0;
-    devices_config.devs[0].bars[0].id = 0;
-    devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].bars[0].id = 4;
+    devices_config.devs[0].bars[0].vaddr = 0x60000000;
     devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
     devices_config.devs[0].irqs[0].ch = 16;
     devices_config.devs[0].num_bars++;
@@ -593,16 +592,16 @@ void init(void)
     devices_config.num_dev++;
 
     // Hardware
-    devices_config.devs[0].bus = 1;
-    devices_config.devs[0].dev = 0;
-    devices_config.devs[0].func = 0;
-    devices_config.devs[0].bars[0].id = 0;
-    devices_config.devs[0].bars[0].vaddr = 0x2000000;
-    devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
-    devices_config.devs[0].irqs[0].ch = 16;
-    devices_config.devs[0].num_bars++;
-    devices_config.devs[0].num_irqs++;
-    devices_config.num_dev++;
+    /* devices_config.devs[0].bus = 1; */
+    /* devices_config.devs[0].dev = 0; */
+    /* devices_config.devs[0].func = 0; */
+    /* devices_config.devs[0].bars[0].id = 0; */
+    /* devices_config.devs[0].bars[0].vaddr = 0x2000000; */
+    /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
+    /* devices_config.devs[0].irqs[0].ch = 16; */
+    /* devices_config.devs[0].num_bars++; */
+    /* devices_config.devs[0].num_irqs++; */
+    /* devices_config.num_dev++; */
 
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
     sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);
@@ -628,6 +627,7 @@ void init(void)
         acpi_dev_t *host_bridge_dev = find_acpi_dev_by_header_offset(0);
 
         sddf_dprintf("host_bridge: 0x%lx\n", (uintptr_t)host_bridge_dev);
+        host_bridge->acpi_dev = host_bridge_dev;
         alloc_resource_for_bridges(host_bridge);
 
         for (int j = 0; j < devices_config.num_dev; j++) {
