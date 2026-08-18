@@ -17,7 +17,7 @@
 #include "nvme.h"
 #include "nvme_queue.h"
 
-//#define DEBUG_DRIVER
+#define DEBUG_DRIVER
 #ifdef DEBUG_DRIVER
 #include "nvme_debug.h"
 #define UNUSED
@@ -906,10 +906,12 @@ void init(void)
 
     /* NVMe Controller Init */
     nvme_controller_init();
+    sddf_dprintf("finished\n");
 }
 
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("notified ch: %u\n", ch);
     if (ch == NVME_IRQ) {
         /* Guard against early IRQ delivery before admin queues are initialised. */
         if (state_ctx.state > NVME_STATE_WAIT_READY) {

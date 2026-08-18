@@ -9,10 +9,10 @@ from sdfgen import SystemDescription, Sddf, DeviceTree
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
-from board import BOARDS
+from board import BOARDS, add_x86_hpet
 
 ProtectionDomain = SystemDescription.ProtectionDomain
-
+IrqIoapic = SystemDescription.IrqIoapic
 
 def generate(
     sdf_file: str,
@@ -60,20 +60,9 @@ def generate(
         )
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
-        if board.arch == SystemDescription.Arch.X86_64:
-            hpet_irq = SystemDescription.IrqMsi(
-                pci_bus=0, pci_device=0, pci_func=0, vector=0, handle=0, id=0
-            )
-            timer_driver.add_irq(hpet_irq)
 
-            hpet_regs = SystemDescription.MemoryRegion(
-                sdf, "hpet_regs", 0x1000, paddr=0xFED00000
-            )
-            hpet_regs_map = SystemDescription.Map(
-                hpet_regs, 0x5000_0000, "rw", cached=False
-            )
-            timer_driver.add_map(hpet_regs_map)
-            sdf.add_mr(hpet_regs)
+        if board.arch == SystemDescription.Arch.X86_64:
+            add_x86_hpet(sdf, timer_driver)
 
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     partition = int(args.partition) if args.partition else board.partition
@@ -104,14 +93,33 @@ def generate(
             sdf.add_mr(mr)
             blk_driver.add_map(SystemDescription.Map(mr, vaddr, "rw", cached=False))
 
-        if board.arch == SystemDescription.Arch.X86_64:
+        if board.name == "qemu_virt_x86":
             # BAR0: MMIO (always uncached)
             nvme_bar0_mr = SystemDescription.MemoryRegion(
                 sdf, "nvme_bar0", 0x4000, paddr=0xFEBD4000
             )
 
             # IRQ
-            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=10, vector=1, id=17)
+            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0,
+                                                   pin=10,
+                                                   vector=1,
+                                                   trigger=IrqIoapic.Trigger.LEVEL,
+                                                   polarity=IrqIoapic.Polarity.ACTIVELOW,
+                                                   id=17)
+
+        elif board.name == "vb_105" or board.name == 'viscous':
+            # BAR0: MMIO (always uncached)
+            nvme_bar0_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_bar0", 0x4000, paddr=0x6000400000
+            )
+            # IRQ
+            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0,
+                                                   pin=17,
+                                                   vector=1,
+                                                   trigger=IrqIoapic.Trigger.LEVEL,
+                                                   polarity=IrqIoapic.Polarity.ACTIVELOW,
+                                                   id=17)
+
 
         elif board.arch == SystemDescription.Arch.AARCH64:
             # BAR0: MMIO (always uncached)

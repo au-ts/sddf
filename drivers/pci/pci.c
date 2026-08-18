@@ -50,6 +50,12 @@ static struct shared_pci_cap *find_pci_cap_by_id(struct pci_header_type0 *config
 pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar_id)
 {
     volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+    uint32_t original_paddr_1 = (uint32_t)*mem_bar;
+    uint32_t original_paddr_2 = 0;
+    if (!(original_paddr_1 & 0x1) && (original_paddr_1 & 0x4)) {
+        original_paddr_2 = mem_bar[1];
+    }
+
     *mem_bar = 0;
     *mem_bar = 0xFFFFFFFF;
     uint64_t readback = (uint64_t)*mem_bar;
@@ -70,6 +76,8 @@ pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar
     pci_bar_request_t bar_request = {0, 0, 0, 0, 0};
     if (readback == 0) return bar_request;
 
+    sddf_dprintf("BAR %u\n", bar_id);
+    sddf_dprintf("    Original Paddr: 0x%lx %lx\n", original_paddr_2, original_paddr_1);
     sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
     sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
     sddf_dprintf("    Width: %s\n", bar_width == 2 ? "64-bit BAR" : "32-bit BAR");
