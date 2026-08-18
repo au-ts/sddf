@@ -132,6 +132,60 @@ field rx_handled: Set[Seq[Int]]
 field tx_handled: Set[Seq[Int]]
 /////////////////////////////
 
+///////////////////////////// wm ghost state
+define WM_NONE                                0
+define WM_STORE_RX_QM_AND_BUF                 1
+define WM_STORE_TX_QM_AND_BUF                 2
+define WM_STORE_RX_STAT                       3
+define WM_STORE_TX_STAT                       4
+define WM_STORE_RX_STAT_PRE_RDAR              5
+define WM_STORE_TX_STAT_PRE_TDAR              6
+define WM_LOAD_RX_STAT                        7
+define WM_LOAD_TX_STAT                        8
+define WM_LOAD_RX_BUF                         9
+define WM_LOAD_TX_BUF                         10
+define WM_STORE_RX_QM_AND_ADDR                11
+define WM_STORE_TX_QM_AND_ADDR                12
+define WM_LOAD_QM_TX_FREE                     13
+define WM_LOAD_QM_TX_ACTIVE                   14
+define WM_LOAD_QM_RX_FREE                     15
+define WM_LOAD_QM_RX_ACTIVE                   16
+define WM_STORE_QM_TX_FREE                    17
+define WM_STORE_QM_TX_ACTIVE                  18
+define WM_STORE_QM_RX_FREE                    19
+define WM_STORE_QM_RX_ACTIVE                  20
+define WM_STORE_QM_TX_ACTIVE_2                21
+define WM_STORE_QM_RX_FREE_2                  22
+define WM_STORE_DATA_RX_ACTIVE                23
+define WM_STORE_DATA_TX_FREE                  24
+define WM_STORE_ADDR_RX_ACTIVE                25
+define WM_STORE_ADDR_TX_FREE                  26
+define WM_STORE_QM_W_DATA_RX_ACTIVE           27
+define WM_STORE_QM_W_DATA_TX_FREE             28
+define WM_STORE_RX_FREE_CONSUMER_SIGNALLED    29
+define WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED  30
+define WM_STORE_TX_FREE_CONSUMER_SIGNALLED    31
+define WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED  32
+define WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED   33
+define WM_LOAD_TX_FREE_CONSUMER_SIGNALLED     34
+define WM_STORE_RDAR                          35
+define WM_STORE_TDAR                          36
+
+field wm_state: Int
+field wm_state_old: Int
+field wm_buf_addr: Int
+field wm_buf_len: Int
+field wm_hw_slot: Int
+field wm_stat: Int
+field wm_qref: Ref
+field wm_qtail: Int
+field wm_qhead: Int
+field wm_qaddr: Int
+field wm_qlen: Int
+field wm_store_tail_count: Int
+field wm_consumer_signalled: Bool
+field wm_stat_old_was_empty: Bool
+
 /* Hardware ring stat WRAP:
  * According to the imx8mm manual that:
  * > Wrap. Written by user.
@@ -341,7 +395,7 @@ predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
     acc(gv.hardware_ring_tx, 3/4) &&
     forall i: Int ::
         (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
+            acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
             bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
             (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
@@ -475,14 +529,13 @@ method store_hw_ring_rx_addr(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_valid_data_addr(value)
     requires acc(slot(gv.hardware_ring_rx, (address - 4 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_rx, (address - 4 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_RX_FREE_2
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 4 - hw_ring_rx_addr) / hw_descriptor_size).hw_addr)
     ensures acc(slot(gv.hardware_ring_rx, (address - 4 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    ensures slot(gv.hardware_ring_rx, (address - 4 - hw_ring_rx_addr) / hw_descriptor_size).hw_addr == value
-{
-    var index: Int := (address - 4 - hw_ring_rx_addr) / hw_descriptor_size
-    slot(gv.hardware_ring_rx, index).hw_addr := value
-    refute false
-}
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_QM_AND_ADDR
+    ensures acc(gv.wm_buf_addr) && acc(gv.wm_hw_slot)
+    ensures gv.wm_buf_addr == value
+    ensures gv.wm_hw_slot == (address - 4 - hw_ring_rx_addr) / hw_descriptor_size
 
 method store_hw_ring_tx_addr(heap: IArray, gv: Ref, address: Int, value: Int)
     requires (address - 4) >= hw_ring_tx_addr && (address - 4) < (hw_ring_tx_addr + hw_ring_tx_size)
@@ -491,15 +544,15 @@ method store_hw_ring_tx_addr(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_valid_data_addr(value)
     requires acc(slot(gv.hardware_ring_tx, (address - 4 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_tx, (address - 4 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_TX_ACTIVE_2
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - 4 - hw_ring_tx_addr) / hw_descriptor_size).hw_addr)
     ensures acc(slot(gv.hardware_ring_tx, (address - 4 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    ensures slot(gv.hardware_ring_tx, (address - 4 - hw_ring_tx_addr) / hw_descriptor_size).hw_addr == value
-{
-    var index: Int := (address - 4 - hw_ring_tx_addr) / hw_descriptor_size
-    slot(gv.hardware_ring_tx, index).hw_addr := value
-    refute false
-}
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_QM_AND_ADDR
+    ensures acc(gv.wm_buf_addr) && acc(gv.wm_hw_slot)
+    ensures gv.wm_buf_addr == value
+    ensures gv.wm_hw_slot == (address - 4 - hw_ring_tx_addr) / hw_descriptor_size
 
+// WM: No considerations need to be made for addr, since we assume if we have access to it, it is not changing.
 method load_hw_ring_rx_addr(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
     requires (address - 4) % 8 == 0
@@ -538,30 +591,32 @@ method store_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_RXD_EMPTY(value)
     requires acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed
-    requires acc(gv.rx_await_ack)
     // make sure the given value is wrapped properly
     requires (((address - 2 - hw_ring_rx_addr) / hw_descriptor_size) == (hw_capacity - 1)) <==> is_WRAP(value)
-    requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+    requires acc(gv.rx_await_ack) &&
+        forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
         gv.rx_await_ack[i] != gv.rx_await_ack[j]
+    requires acc(gv.wm_state) && gv.wm_state == WM_NONE
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    // check that the specified slot in the hardware ring is updated
-    ensures slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat == value
-    ensures acc(gv.rx_await_ack)
-    ensures (address - 2 - hw_ring_rx_addr) / hw_descriptor_size in gv.rx_await_ack
-    ensures (address - 2 - hw_ring_rx_addr) / hw_descriptor_size in old(gv.rx_await_ack) ==> gv.rx_await_ack == old(gv.rx_await_ack)
-    ensures !((address - 2 - hw_ring_rx_addr) / hw_descriptor_size in old(gv.rx_await_ack)) ==> gv.rx_await_ack == old(gv.rx_await_ack) ++ Seq((address - 2 - hw_ring_rx_addr) / hw_descriptor_size) 
-    ensures forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
-        gv.rx_await_ack[i] != gv.rx_await_ack[j]
-    ensures |old(gv.rx_await_ack)| == 0 ==> |gv.rx_await_ack| == 1
-{
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_STAT
+    ensures acc(gv.wm_hw_slot) && acc(gv.wm_stat)
+    ensures gv.wm_hw_slot == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size &&
+      gv.wm_stat == value
+    ensures acc(gv.rx_await_ack) && gv.wm_hw_slot in gv.rx_await_ack &&
+        (gv.wm_hw_slot in old(gv.rx_await_ack) ==> gv.rx_await_ack == old(gv.rx_await_ack)) &&
+        (!(gv.wm_hw_slot in old(gv.rx_await_ack)) ==> gv.rx_await_ack == old(gv.rx_await_ack) ++ Seq(gv.wm_hw_slot)) &&
+        (forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+            gv.rx_await_ack[i] != gv.rx_await_ack[j]) &&
+        (|old(gv.rx_await_ack)| == 0 ==> |gv.rx_await_ack| == 1)
+/*{
     var index: Int := (address - 2 - hw_ring_rx_addr) / hw_descriptor_size
     slot(gv.hardware_ring_rx, index).hw_stat := value
     if (!(index in gv.rx_await_ack)) {
         gv.rx_await_ack := gv.rx_await_ack ++ Seq(index)
     }
     refute false
-}
+}*/
 
 method load_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
@@ -570,54 +625,18 @@ method load_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int)
     requires acc(gv.hardware_ring_rx, 1/2) &&
         acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
     requires bounded16(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
-    requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4)
-    requires forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_rx_addr) / hw_descriptor_size ==>
-            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
-            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
-    requires forall s: Seq[Int] :: s in gv.rx_active.net_added ==> |s| == 2
     requires !is_RXD_EMPTY(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) ==>
         is_valid_rx_stat(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
+    requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_RX_ACTIVE)
+    ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_RX_STAT &&
+        acc(gv.wm_state_old) && gv.wm_state_old == old(gv.wm_state) && acc(gv.wm_stat)
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
-    ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4) &&
-        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_rx_addr) / hw_descriptor_size ==>
-            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
-            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
-    ensures retval == slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat
-    ensures bounded16(retval)
+    ensures retval == gv.wm_stat
+    ensures is_valid_rx_stat(gv.wm_stat)
     ensures !is_RXD_EMPTY(old(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)) ==>
-        !is_RXD_EMPTY(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
-    ensures let stat == (slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) in
-        !is_RXD_EMPTY(stat) ==> is_valid_rx_stat(stat)
-    ensures let r == (slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size)) in
-        is_RXD_EMPTY(old(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)) &&
-            !is_RXD_EMPTY(r.hw_stat) ==>
-                valid_rx_read_slot(r) &&
-                (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) &&
-                    slot(gv.hardware_ring_rx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size) &&
-                (forall s: Seq[Int] :: s in gv.rx_active.net_added ==> |s| == 2 && s[0] != r.hw_addr) &&
-                r.ghost_unprocessed
-{
-    var r: Ref := slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size)
-    if (is_RXD_EMPTY(r.hw_stat)) {
-        // must not be in the device-owned part of the ring
-        // i.e. between hw_rx_head and hw_rx_tail
-        exhale acc(r.hw_stat, 1/2)
-        inhale acc(r.hw_stat, 1/2)
-        inhale bounded16(r.hw_stat)
-        if (!is_RXD_EMPTY(r.hw_stat)) {
-            inhale valid_rx_read_slot(r)
-            inhale r.ghost_unprocessed == true
-            // injectivity property of ring
-            inhale forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) &&
-                slot(gv.hardware_ring_rx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size
-            // ghost state property
-            inhale forall s: Seq[Int] :: s in gv.rx_active.net_added ==> s[0] != r.hw_addr
-        }
-    }
-    retval := r.hw_stat
-    refute false
-}
-
+        !is_RXD_EMPTY(gv.wm_stat)
+    ensures acc(gv.wm_stat_old_was_empty) && gv.wm_stat_old_was_empty == is_RXD_EMPTY(old(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)) &&
+        acc(gv.wm_hw_slot) && gv.wm_hw_slot == (address - 2 - hw_ring_rx_addr) / hw_descriptor_size
 
 method store_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     requires (address - 2) >= hw_ring_tx_addr && (address - 2) < (hw_ring_tx_addr + hw_ring_tx_size)
@@ -627,30 +646,24 @@ method store_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_TXD_READY(value)
     requires acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed
-    requires acc(gv.tx_await_ack)
+    requires acc(gv.tx_await_ack) &&
+        forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
+        gv.tx_await_ack[i] != gv.tx_await_ack[j]
     // make sure the given value is wrapped properly
     requires (((address - 2 - hw_ring_tx_addr) / hw_descriptor_size) == (hw_capacity - 1)) <==> is_WRAP(value)
-    requires forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
-        gv.tx_await_ack[i] != gv.tx_await_ack[j]
+    requires acc(gv.wm_state) && gv.wm_state == WM_NONE
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    // check that the specified slot in the hardware ring is updated
-    ensures slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat == value
-    ensures acc(gv.tx_await_ack)
-    ensures (address - 2 - hw_ring_tx_addr) / hw_descriptor_size in gv.tx_await_ack
-    ensures (address - 2 - hw_ring_tx_addr) / hw_descriptor_size in old(gv.tx_await_ack) ==> gv.tx_await_ack == old(gv.tx_await_ack)
-    ensures !((address - 2 - hw_ring_tx_addr) / hw_descriptor_size in old(gv.tx_await_ack)) ==> gv.tx_await_ack == old(gv.tx_await_ack) ++ Seq((address - 2 - hw_ring_tx_addr) / hw_descriptor_size) 
-    ensures forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
-        gv.tx_await_ack[i] != gv.tx_await_ack[j]
-    ensures |old(gv.tx_await_ack)| == 0 ==> |gv.tx_await_ack| == 1
-{
-    var index: Int := (address - 2 - hw_ring_tx_addr) / hw_descriptor_size
-    slot(gv.hardware_ring_tx, index).hw_stat := value
-    if (!(index in gv.tx_await_ack)) {
-        gv.tx_await_ack := gv.tx_await_ack ++ Seq(index)
-    }
-    refute false
-}
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_STAT
+    ensures acc(gv.wm_hw_slot) && acc(gv.wm_stat)
+    ensures gv.wm_hw_slot == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size &&
+      gv.wm_stat == value
+    ensures acc(gv.tx_await_ack) && gv.wm_hw_slot in gv.tx_await_ack &&
+        (gv.wm_hw_slot in old(gv.tx_await_ack) ==> gv.tx_await_ack == old(gv.tx_await_ack)) &&
+        (!(gv.wm_hw_slot in old(gv.tx_await_ack)) ==> gv.tx_await_ack == old(gv.tx_await_ack) ++ Seq(gv.wm_hw_slot)) &&
+        (forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
+            gv.tx_await_ack[i] != gv.tx_await_ack[j]) &&
+        (|old(gv.tx_await_ack)| == 0 ==> |gv.tx_await_ack| == 1)
 
 method load_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
@@ -659,54 +672,20 @@ method load_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int)
     requires acc(gv.hardware_ring_tx, 1/2) &&
         acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
     requires bounded16(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
-    requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4)
-    requires forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_tx_addr) / hw_descriptor_size ==>
-            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
-            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
-    requires forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2
     requires !is_TXD_READY(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) ==>
         is_valid_tx_stat(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
+    requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_TX_FREE)
+    ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_TX_STAT &&
+        acc(gv.wm_state_old) && gv.wm_state_old == old(gv.wm_state) && acc(gv.wm_stat)
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
-    ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4) &&
-        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != (address - 2 - hw_ring_tx_addr) / hw_descriptor_size ==>
-            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
-            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
-    ensures retval == slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat
-    ensures bounded16(retval)
+    ensures retval == gv.wm_stat
+    ensures is_valid_tx_stat(gv.wm_stat)
     ensures !is_TXD_READY(old(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)) ==>
-        !is_TXD_READY(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
-    ensures let stat == (slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) in
-        !is_TXD_READY(stat) ==> is_valid_tx_stat(stat)
-    ensures let r == (slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size)) in
-        is_TXD_READY(old(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)) &&
-            !is_TXD_READY(r.hw_stat) ==>
-                valid_tx_read_slot(r) &&
-                (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
-                    slot(gv.hardware_ring_tx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size) &&
-                (forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2 && s[0] != r.hw_addr) &&
-                r.ghost_unprocessed
-{
-    var r: Ref := slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size)
-    if (is_TXD_READY(r.hw_stat)) {
-        // must not be in the device-owned part of the ring
-        // i.e. between hw_tx_head and hw_tx_tail
-        exhale acc(r.hw_stat, 1/2)
-        inhale acc(r.hw_stat, 1/2)
-        inhale bounded16(r.hw_stat)
-        if (!is_TXD_READY(r.hw_stat)) {
-            inhale valid_tx_read_slot(r)
-            inhale r.ghost_unprocessed == true
-            // injectivity property of ring
-            inhale forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
-                slot(gv.hardware_ring_tx, j).hw_addr == r.hw_addr ==> j == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size
-            // ghost state property
-            inhale forall s: Seq[Int] :: s in gv.tx_free.net_added ==> s[0] != r.hw_addr
-        }
-    }
-    retval := r.hw_stat
-    refute false
-}
+        !is_TXD_READY(gv.wm_stat)
+    ensures acc(gv.wm_stat_old_was_empty) && gv.wm_stat_old_was_empty == is_TXD_READY(old(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)) &&
+        acc(gv.wm_hw_slot) && gv.wm_hw_slot == (address - 2 - hw_ring_tx_addr) / hw_descriptor_size
 
+// WM: No considerations need to be made for len, since we assume nothing about the contents of the len.
 method load_hw_ring_rx_len(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
     requires address >= hw_ring_rx_addr && address < (hw_ring_rx_addr + hw_ring_rx_size)
@@ -729,14 +708,14 @@ method store_hw_ring_rx_len(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_valid_data_len(value)
     requires acc(slot(gv.hardware_ring_rx, (address - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_rx, (address - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed
+    requires acc(gv.wm_state) && acc(gv.wm_hw_slot, 1/2)
+    requires gv.wm_state == WM_STORE_RX_QM_AND_ADDR
+    requires gv.wm_hw_slot == (address - hw_ring_rx_addr) / hw_descriptor_size
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - hw_ring_rx_addr) / hw_descriptor_size).hw_len)
     ensures acc(slot(gv.hardware_ring_rx, (address - hw_ring_rx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    ensures slot(gv.hardware_ring_rx, (address - hw_ring_rx_addr) / hw_descriptor_size).hw_len == value
-{
-    var index: Int := (address - hw_ring_rx_addr) / hw_descriptor_size
-    slot(gv.hardware_ring_rx, index).hw_len := value
-    refute false
-}
+    ensures acc(gv.wm_state) && acc(gv.wm_buf_len) && acc(gv.wm_hw_slot, 1/2)
+    ensures gv.wm_buf_len == value
+    ensures gv.wm_state == WM_STORE_RX_QM_AND_BUF
 
 method load_hw_ring_tx_len(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
@@ -760,14 +739,14 @@ method store_hw_ring_tx_len(heap: IArray, gv: Ref, address: Int, value: Int)
     requires is_valid_data_len(value)
     requires acc(slot(gv.hardware_ring_tx, (address - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2) &&
         !slot(gv.hardware_ring_tx, (address - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed
+    requires acc(gv.wm_state) && acc(gv.wm_hw_slot, 1/2)
+    requires gv.wm_state == WM_STORE_TX_QM_AND_ADDR
+    requires gv.wm_hw_slot == (address - hw_ring_tx_addr) / hw_descriptor_size
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - hw_ring_tx_addr) / hw_descriptor_size).hw_len)
     ensures acc(slot(gv.hardware_ring_tx, (address - hw_ring_tx_addr) / hw_descriptor_size).ghost_unprocessed, 1/2)
-    ensures slot(gv.hardware_ring_tx, (address - hw_ring_tx_addr) / hw_descriptor_size).hw_len == value
-{
-    var index: Int := (address - hw_ring_tx_addr) / hw_descriptor_size
-    slot(gv.hardware_ring_tx, index).hw_len := value
-    refute false
-}
+    ensures acc(gv.wm_state) && acc(gv.wm_buf_len) && acc(gv.wm_hw_slot, 1/2)
+    ensures gv.wm_buf_len == value
+    ensures gv.wm_state == WM_STORE_TX_QM_AND_BUF
 
 method store_hw_ring_reserve(heap: IArray, gv: Ref, address: Int, value: Int)
     requires ((address - 2) >= hw_ring_rx_addr && (address - 2) < (hw_ring_tx_addr + hw_ring_tx_size))
@@ -781,123 +760,41 @@ method store_hw_ring_reserve(heap: IArray, gv: Ref, address: Int, value: Int)
 define RDAR_RDAR        16777216    // 1 << 24
 define TDAR_TDAR        16777216    // 1 << 24
 
+field wm_await_ack_data: Seq[Ref]
+
+// WM: No permissions or information gained, so no need for move-later WM handling.
 method store_RDAR(heap: IArray, gv: Ref, address: Int, value: Int)
     requires address == (REG_BASE + RDAR_offset)
     requires value == RDAR_RDAR
-    requires acc(gv.rx_await_ack) && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
-    requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
-        gv.rx_await_ack[i] != gv.rx_await_ack[j]
-    requires forall i: Int :: i in gv.rx_await_ack ==>
-                acc(slot(gv.hardware_ring_rx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed) &&
-                is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) &&
-                !slot(gv.hardware_ring_rx, i).ghost_unprocessed
-    requires forall i: Int :: i in gv.rx_await_ack ==> forall x: Seq[Int] :: x in gv.rx_handled ==>
-               |x| == 2 && x[0] != slot(gv.hardware_ring_rx, i).hw_addr
-    ensures acc(gv.rx_await_ack) && gv.rx_await_ack == Seq[Int]() && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
-    ensures forall i: Int :: i in old(gv.rx_await_ack) ==> acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2)
+    requires acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_RDAR && acc(gv.wm_await_ack_data)
+    requires forall r: Ref :: r in gv.wm_await_ack_data ==> acc(r.hw_addr) && acc(r.hw_len)
+    requires forall r: Ref :: r in gv.wm_await_ack_data ==> forall x: Seq[Int] :: x in gv.rx_handled ==>
+               |x| == 2 && x[0] != r.hw_addr
+    ensures acc(gv.wm_state) && gv.wm_state == WM_NONE
+    ensures acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
     ensures forall x: Seq[Int] :: x in old(gv.rx_handled) ==> x in gv.rx_handled
-    ensures forall i: Int :: 0 <= i && i < old(|gv.rx_await_ack|) ==> old(Seq(
-              slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr, slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len)) in gv.rx_handled
+    ensures forall i: Int :: forall r: Ref :: r in old(gv.wm_await_ack_data) ==> old(Seq(r.hw_addr, r.hw_len)) in gv.rx_handled
     ensures forall x: Seq[Int] :: x in gv.rx_handled ==> x in old(gv.rx_handled) ||
-                (|x| == 2 && exists i: Int :: (0 <= i && i < old(|gv.rx_await_ack|) && x == Seq(
-                    old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr), old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len))))
-    ensures |gv.rx_handled| == |old(gv.rx_handled)| + |old(gv.rx_await_ack)|
-// todo reintroduce a body
-/*{
-    var ix: Int := 0
-    while (ix < |gv.rx_await_ack|)
-        invariant acc(gv.rx_await_ack, 1/2) && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
-        invariant forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
-            gv.rx_await_ack[i] != gv.rx_await_ack[j]
-        invariant forall j: Int :: 0 <= j && j < |gv.rx_await_ack| ==>
-            gv.rx_await_ack[j] in gv.rx_await_ack
-        invariant forall i: Int :: i in gv.rx_await_ack ==>
-            acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/2) &&
-            acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
-            acc(slot(gv.hardware_ring_rx, i).hw_len, 1/2) &&
-            is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat)
-        invariant |gv.rx_await_ack| == old(|gv.rx_await_ack|)
-        invariant forall i: Int :: 0 <= i && i < old(|gv.rx_await_ack|) ==>
-            old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr) == slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr &&
-            old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len) == slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len
-        invariant forall x: Seq[Int] :: x in old(gv.rx_handled) ==> x in gv.rx_handled
-        invariant 0 <= ix
-        invariant forall i: Int :: 0 <= i && i < ix && i < |gv.rx_await_ack| ==> Seq(
-                    slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr, slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len) in gv.rx_handled
-        invariant forall x: Seq[Int] :: x in gv.rx_handled ==> x in old(gv.rx_handled) ||
-                    (|x| == 2 && exists i: Int :: 0 <= i && i < |gv.rx_await_ack| && x == Seq(
-                        slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr, slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len))
-        invariant forall i: Int :: ix <= i && i < |gv.rx_await_ack| ==> forall x: Seq[Int] :: x in gv.rx_handled ==>
-                    x != Seq(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr, slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_len)
-        invariant |gv.rx_handled| == |old(gv.rx_handled)| + ix
-    {
-        gv.rx_handled := gv.rx_handled union Set(Seq(slot(gv.hardware_ring_rx, gv.rx_await_ack[ix]).hw_addr, slot(gv.hardware_ring_rx, gv.rx_await_ack[ix]).hw_len))
-        ix := ix + 1
-    }
-    assert gv.rx_await_ack == old(gv.rx_await_ack)
-    gv.rx_await_ack := Seq[Int]()
-    refute false
-}*/
+                (|x| == 2 && exists r: Ref :: (r in old(gv.wm_await_ack_data) && x == old(Seq(r.hw_addr, r.hw_len))))
+    ensures |gv.rx_handled| == |old(gv.rx_handled)| + |old(gv.wm_await_ack_data)|
 
+// WM: No permissions or information gained, so no need for move-later WM handling.
 method store_TDAR(heap: IArray, gv: Ref, address: Int, value: Int)
     requires address == (REG_BASE + TDAR_offset)
     requires value == TDAR_TDAR
-    requires acc(gv.tx_await_ack) && acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
-    requires forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
-        gv.tx_await_ack[i] != gv.tx_await_ack[j]
-    requires forall i: Int :: i in gv.tx_await_ack ==>
-                acc(slot(gv.hardware_ring_tx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed) &&
-                is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
-                !slot(gv.hardware_ring_tx, i).ghost_unprocessed
-    requires forall i: Int :: i in gv.tx_await_ack ==> forall x: Seq[Int] :: x in gv.tx_handled ==>
-               |x| == 2 && x[0] != slot(gv.hardware_ring_tx, i).hw_addr
-    ensures acc(gv.tx_await_ack) && gv.tx_await_ack == Seq[Int]() && acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
-    ensures forall i: Int :: i in old(gv.tx_await_ack) ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2)
+    requires acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_TDAR && acc(gv.wm_await_ack_data)
+    requires forall r: Ref :: r in gv.wm_await_ack_data ==> acc(r.hw_addr) && acc(r.hw_len)
+    requires forall r: Ref :: r in gv.wm_await_ack_data ==> forall x: Seq[Int] :: x in gv.tx_handled ==>
+               |x| == 2 && x[0] != r.hw_addr
+    ensures acc(gv.wm_state) && gv.wm_state == WM_NONE
+    ensures acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
     ensures forall x: Seq[Int] :: x in old(gv.tx_handled) ==> x in gv.tx_handled
-    ensures forall i: Int :: 0 <= i && i < old(|gv.tx_await_ack|) ==> old(Seq(
-              slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr, slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len)) in gv.tx_handled
+    ensures forall i: Int :: forall r: Ref :: r in old(gv.wm_await_ack_data) ==> old(Seq(r.hw_addr, r.hw_len)) in gv.tx_handled
     ensures forall x: Seq[Int] :: x in gv.tx_handled ==> x in old(gv.tx_handled) ||
-                (|x| == 2 && exists i: Int :: (0 <= i && i < old(|gv.tx_await_ack|) && x == Seq(
-                    old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr), old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len))))
-    ensures |gv.tx_handled| == |old(gv.tx_handled)| + |old(gv.tx_await_ack)|
-/*{
-    var ix: Int := 0
-    while (ix < |gv.tx_await_ack|)
-        invariant acc(gv.tx_await_ack, 1/2) && acc(gv.tx_handled) && acc(gv.hardware_ring_tx, 1/2)
-        invariant forall i: Int, j: Int :: 0 <= i && i < |gv.tx_await_ack| && 0 <= j && j < |gv.tx_await_ack| && i != j ==>
-            gv.tx_await_ack[i] != gv.tx_await_ack[j]
-        invariant forall j: Int :: 0 <= j && j < |gv.tx_await_ack| ==>
-            gv.tx_await_ack[j] in gv.tx_await_ack
-        invariant forall i: Int :: i in gv.tx_await_ack ==>
-            acc(slot(gv.hardware_ring_tx, i).hw_addr, 1/2) &&
-            acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
-            acc(slot(gv.hardware_ring_tx, i).hw_len, 1/2) &&
-            is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat)
-        invariant |gv.tx_await_ack| == old(|gv.tx_await_ack|)
-        invariant forall i: Int :: 0 <= i && i < old(|gv.tx_await_ack|) ==>
-            old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr) == slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr &&
-            old(slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len) == slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len
-        invariant forall x: Seq[Int] :: x in old(gv.tx_handled) ==> x in gv.tx_handled
-        invariant 0 <= ix
-        invariant forall i: Int :: 0 <= i && i < ix && i < |gv.tx_await_ack| ==> Seq(
-                    slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr, slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len) in gv.tx_handled
-        invariant forall x: Seq[Int] :: x in gv.tx_handled ==> x in old(gv.tx_handled) ||
-                    (|x| == 2 && exists i: Int :: 0 <= i && i < |gv.tx_await_ack| && x == Seq(
-                        slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_addr, slot(gv.hardware_ring_tx, gv.tx_await_ack[i]).hw_len))
-    {
-        gv.tx_handled := gv.tx_handled union Set(Seq(slot(gv.hardware_ring_tx, gv.tx_await_ack[ix]).hw_addr, slot(gv.hardware_ring_tx, gv.tx_await_ack[ix]).hw_len))
-        ix := ix + 1
-    }
-    assert gv.tx_await_ack == old(gv.tx_await_ack)
-    gv.tx_await_ack := Seq[Int]()
-    refute false
-}*/
+                (|x| == 2 && exists r: Ref :: (r in old(gv.wm_await_ack_data) && x == old(Seq(r.hw_addr, r.hw_len))))
+    ensures |gv.tx_handled| == |old(gv.tx_handled)| + |old(gv.wm_await_ack_data)|
 
 /////////////////////////////
 
@@ -925,21 +822,18 @@ function is_EIR_RXF(eir: Int): Bool
 function is_EIR_TXF(eir: Int): Bool
     ensures result <==> bv64_to_int(bv64_and(bv64_from_int(eir), bv64_from_int(EIR_TXF_MASK))) != 0
 
+// WM: We do not reason about EIR in relation to anything else, and it makes no guarantees,
+//     so no WM handling required.
 method store_EIR(heap: IArray, gv: Ref, address: Int, value: Int)
     requires address == (REG_BASE + EIR_offset)
     requires bv64_to_int(bv64_and(bv64_from_int(value), bv64_from_int(IRQ_MASK))) == value
-{
-    refute false
-}
 
+// WM: We do not reason about EIR in relation to anything else, and it makes no guarantees,
+//     so no WM handling required.
 method load_EIR(heap: IArray, gv: Ref, address: Int)
     returns (retval: Int)
     requires address == (REG_BASE + EIR_offset)
     ensures bounded32(retval)
-{
-    retval := ND_bounded32()
-    refute false
-}
 /////////////////////////////
 
 method f_rx_set_descr_processed(heap: IArray, gv: Ref, i: Int)
@@ -1064,3 +958,278 @@ define f_garbage_c2(heap, gv) (
     (a - b) % (MAX_INT16 + 1) == QUEUE_CAPACITY && gv.hw_rx_tail == gv.hw_rx_head &&
     gv.hw_rx_head == b && gv.hw_rx_tail == a ==> false
 )
+
+method f_wm_pre_rdar(heap: IArray, gv: Ref)
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_STAT
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_STAT_PRE_RDAR
+
+method f_wm_pre_tdar(heap: IArray, gv: Ref)
+    requires acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_STAT
+    ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_STAT_PRE_TDAR
+
+method f_ffiTHREAD_MEMORY_RELEASE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int, d: Int)
+    requires a == 0 && b == 0 && c == 0 && d == 0
+    requires acc(gv.wm_state)
+    requires gv.wm_state == WM_STORE_RX_QM_AND_BUF ==> acc(gv.wm_buf_addr) && acc(gv.wm_buf_len) && acc(gv.wm_hw_slot)
+    requires gv.wm_state == WM_STORE_RX_QM_AND_BUF ==> acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_addr) && acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_len)
+    requires gv.wm_state == WM_STORE_RX_QM_AND_BUF ==> acc(gv.wm_qhead)
+    requires gv.wm_state == WM_STORE_RX_QM_AND_BUF ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head)
+    requires gv.wm_state == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.wm_hw_slot) && acc(gv.wm_stat)
+    requires gv.wm_state == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_stat)
+    requires gv.wm_state == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.rx_await_ack) && gv.rx_await_ack == Seq(gv.wm_hw_slot) && acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_addr) &&
+        acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_len) &&
+        acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).ghost_unprocessed) &&
+        is_RXD_EMPTY(gv.wm_stat) &&
+        !slot(gv.hardware_ring_rx, gv.wm_hw_slot).ghost_unprocessed
+    requires gv.wm_state == WM_STORE_TX_QM_AND_BUF ==> acc(gv.wm_buf_addr) && acc(gv.wm_buf_len) && acc(gv.wm_hw_slot)
+    requires gv.wm_state == WM_STORE_TX_QM_AND_BUF ==> acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_addr) && acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_len)
+    requires gv.wm_state == WM_STORE_TX_QM_AND_BUF ==> acc(gv.wm_qhead)
+    requires gv.wm_state == WM_STORE_TX_QM_AND_BUF ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head)
+    requires gv.wm_state == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.wm_hw_slot) && acc(gv.wm_stat)
+    requires gv.wm_state == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_stat)
+    requires gv.wm_state == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.tx_await_ack) && gv.tx_await_ack == Seq(gv.wm_hw_slot) && acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_addr) &&
+        acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_len) &&
+        acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).ghost_unprocessed) &&
+        is_TXD_READY(gv.wm_stat) &&
+        !slot(gv.hardware_ring_tx, gv.wm_hw_slot).ghost_unprocessed
+    requires gv.wm_state == WM_STORE_QM_TX_ACTIVE ==>
+        acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4) && acc(gv.tx_active.net_descr, 1/4) && acc(gv.tx_active.net_removed) &&
+        acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr) &&
+        acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len)
+    requires gv.wm_state == WM_STORE_QM_RX_FREE ==>
+        acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4) && acc(gv.rx_free.net_descr, 1/4) && acc(gv.rx_free.net_removed_addr) &&
+        acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr) &&
+        acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_len)
+    requires gv.wm_state == WM_STORE_QM_RX_ACTIVE || gv.wm_state == WM_STORE_QM_TX_FREE ==>
+        acc(gv.wm_qtail)
+    requires gv.wm_state == WM_STORE_QM_RX_ACTIVE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail)
+    requires gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail)
+    requires gv.wm_state == WM_STORE_QM_W_DATA_RX_ACTIVE || gv.wm_state == WM_STORE_QM_W_DATA_TX_FREE ==>
+        acc(gv.wm_qaddr) && acc(gv.wm_qlen) && acc(gv.wm_qref) && acc(gv.wm_qref.ndescr_addr) && acc(gv.wm_qref.ndescr_len) && acc(gv.wm_state_old)
+    requires gv.wm_state == WM_STORE_QM_W_DATA_RX_ACTIVE || gv.wm_state == WM_STORE_QM_W_DATA_TX_FREE ==> acc(gv.wm_store_tail_count, 1/2)
+    requires gv.wm_state == WM_STORE_QM_W_DATA_RX_ACTIVE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added) && acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4) &&
+        gv.wm_qref == slotq(gv.rx_active.net_descr, gv.rx_active.net_tail + gv.wm_store_tail_count - 1)
+    requires gv.wm_state == WM_STORE_QM_W_DATA_TX_FREE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added) && acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4) &&
+        gv.wm_qref == slotq(gv.tx_free.net_descr, gv.tx_free.net_tail + gv.wm_store_tail_count - 1)
+    requires gv.wm_state == WM_STORE_RX_FREE_CONSUMER_SIGNALLED ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_signal)
+    requires gv.wm_state == WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
+    requires gv.wm_state == WM_STORE_TX_FREE_CONSUMER_SIGNALLED ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
+    requires gv.wm_state == WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_signal)
+    requires gv.wm_state in Set(WM_STORE_RX_FREE_CONSUMER_SIGNALLED, WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED, WM_STORE_TX_FREE_CONSUMER_SIGNALLED, WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED) ==> 
+        acc(gv.wm_consumer_signalled)
+    ensures acc(gv.wm_state)
+    ensures gv.wm_state == (old(gv.wm_state) in Set(WM_STORE_QM_TX_ACTIVE, WM_STORE_QM_RX_FREE)
+            ? old(gv.wm_state)
+            : old(gv.wm_state) == WM_STORE_QM_W_DATA_RX_ACTIVE
+                ? WM_STORE_QM_RX_ACTIVE
+                : old(gv.wm_state) == WM_STORE_QM_W_DATA_TX_FREE
+                    ? WM_STORE_QM_TX_FREE
+                    : old(gv.wm_state) == WM_STORE_RX_STAT_PRE_RDAR
+                        ? WM_STORE_RDAR
+                        : old(gv.wm_state) == WM_STORE_TX_STAT_PRE_TDAR
+                            ? WM_STORE_TDAR
+                            : WM_NONE)
+    ensures old(gv.wm_state) == WM_STORE_RX_QM_AND_BUF ==> acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_addr) && acc(slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_len)
+    ensures old(gv.wm_state) == WM_STORE_RX_QM_AND_BUF ==>
+        slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_addr == old(gv.wm_buf_addr) &&
+        slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_len == old(gv.wm_buf_len)
+    ensures old(gv.wm_state) == WM_STORE_RX_QM_AND_BUF ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head)
+    ensures old(gv.wm_state) == WM_STORE_RX_QM_AND_BUF ==> gv.rx_free.net_head == old(gv.wm_qhead)
+    ensures old(gv.wm_state) == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_stat, 1/2)
+    ensures old(gv.wm_state) == WM_STORE_RX_STAT_PRE_RDAR ==> slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_stat == old(gv.wm_stat)
+    ensures old(gv.wm_state) == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.rx_await_ack) && gv.rx_await_ack == Seq[Int]()
+    ensures old(gv.wm_state) == WM_STORE_RX_STAT_PRE_RDAR ==> acc(gv.wm_await_ack_data) && |gv.wm_await_ack_data| == 1 &&
+              acc(gv.wm_await_ack_data[0].hw_addr) && acc(gv.wm_await_ack_data[0].hw_len) &&
+              gv.wm_await_ack_data[0].hw_addr == old(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_addr) &&
+              gv.wm_await_ack_data[0].hw_len == old(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_len)
+    ensures old(gv.wm_state) == WM_STORE_TX_QM_AND_BUF ==> acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_addr) && acc(slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_len)
+    ensures old(gv.wm_state) == WM_STORE_TX_QM_AND_BUF ==>
+        slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_addr == old(gv.wm_buf_addr) &&
+        slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_len == old(gv.wm_buf_len)
+    ensures old(gv.wm_state) == WM_STORE_TX_QM_AND_BUF ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head)
+    ensures old(gv.wm_state) == WM_STORE_TX_QM_AND_BUF ==> gv.tx_active.net_head == old(gv.wm_qhead)
+    ensures old(gv.wm_state) == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_stat, 1/2)
+    ensures old(gv.wm_state) == WM_STORE_TX_STAT_PRE_TDAR ==> slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_stat == old(gv.wm_stat)
+    ensures old(gv.wm_state) == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.tx_await_ack) && gv.tx_await_ack == Seq[Int]()
+    ensures old(gv.wm_state) == WM_STORE_TX_STAT_PRE_TDAR ==> acc(gv.wm_await_ack_data) && |gv.wm_await_ack_data| == 1 &&
+              acc(gv.wm_await_ack_data[0].hw_addr) && acc(gv.wm_await_ack_data[0].hw_len) &&
+              gv.wm_await_ack_data[0].hw_addr == old(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_addr) &&
+              gv.wm_await_ack_data[0].hw_len == old(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_len)
+    ensures old(gv.wm_state) == WM_STORE_QM_TX_ACTIVE ==> acc(gv.tx_active, 1/4) &&
+        acc(gv.tx_active.net_head, 1/4) && acc(gv.tx_active.net_descr, 1/4) && acc(gv.tx_active.net_removed) &&
+        gv.tx_active.net_removed == old(gv.tx_active.net_removed) union
+            Set(Seq(old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr), old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len)))
+    ensures old(gv.wm_state) == WM_STORE_QM_TX_ACTIVE ==> acc(gv.wm_qaddr) && acc(gv.wm_qlen) &&
+        gv.wm_qaddr == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr) &&
+        gv.wm_qlen == old(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len)
+    ensures old(gv.wm_state) == WM_STORE_QM_RX_FREE ==> acc(gv.rx_free, 1/4) &&
+        acc(gv.rx_free.net_head, 1/4) && acc(gv.rx_free.net_descr, 1/4) && acc(gv.rx_free.net_removed_addr) &&
+        gv.rx_free.net_removed_addr == old(gv.rx_free.net_removed_addr) union Set(old(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr))
+    ensures old(gv.wm_state) == WM_STORE_QM_RX_ACTIVE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail) &&
+        gv.rx_active.net_tail == old(gv.wm_qtail)
+    ensures old(gv.wm_state) == WM_STORE_QM_TX_FREE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail) &&
+        gv.tx_free.net_tail == old(gv.wm_qtail)
+    ensures old(gv.wm_state) == WM_STORE_QM_W_DATA_RX_ACTIVE ==> acc(gv.rx_active, 1/4) &&
+        acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4) && acc(gv.rx_active.net_added) &&
+        gv.rx_active.net_added == old(gv.rx_active.net_added) union Set(Seq(old(gv.wm_qaddr), old(gv.wm_qlen)))
+    ensures old(gv.wm_state) == WM_STORE_QM_W_DATA_TX_FREE ==> acc(gv.tx_free, 1/4) &&
+        acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4) && acc(gv.tx_free.net_added) &&
+        gv.tx_free.net_added == old(gv.tx_free.net_added) union Set(Seq(old(gv.wm_qaddr), old(gv.wm_qlen)))
+    ensures old(gv.wm_state) == WM_STORE_QM_W_DATA_RX_ACTIVE || old(gv.wm_state) == WM_STORE_QM_W_DATA_TX_FREE ==> acc(gv.wm_store_tail_count, 1/2)
+    ensures old(gv.wm_state) == WM_STORE_RX_FREE_CONSUMER_SIGNALLED ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_signal) &&
+        gv.rx_free.net_signal == old(gv.wm_consumer_signalled)
+    ensures old(gv.wm_state) == WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal) &&
+        gv.rx_active.net_signal == old(gv.wm_consumer_signalled)
+    ensures old(gv.wm_state) == WM_STORE_TX_FREE_CONSUMER_SIGNALLED ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal) &&
+        gv.tx_free.net_signal == old(gv.wm_consumer_signalled)
+    ensures old(gv.wm_state) == WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_signal) &&
+        gv.tx_active.net_signal == old(gv.wm_consumer_signalled)
+
+method f_ffiTHREAD_MEMORY_ACQUIRE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int, d: Int)
+    requires a == 0 && b == 0 && c == 0 && d == 0
+    requires acc(gv.wm_state)
+    requires gv.wm_state == WM_LOAD_QM_TX_FREE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head) && acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_TX_FREE ==> 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256 &&
+      forall i: Int :: gv.tx_free.net_tail <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
+        acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_TX_ACTIVE ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
+    requires gv.wm_state == WM_LOAD_QM_TX_ACTIVE ==> acc(gv.tx_active.net_removed, 1/4) && acc(gv.tx_handled, 1/4) &&
+        acc(gv.tx_active.net_descr, 1/4) && acc(gv.tx_active.net_head, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_TX_ACTIVE ==> 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
+      forall i: Int :: gv.tx_active.net_head <= i < gv.tx_active.net_tail ==>
+        acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_RX_ACTIVE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
+    requires gv.wm_state == WM_LOAD_QM_RX_ACTIVE ==> acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_RX_ACTIVE ==> 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256 &&
+      forall i: Int :: gv.rx_active.net_tail <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
+        acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_RX_FREE ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail)
+    requires gv.wm_state == WM_LOAD_QM_RX_FREE ==> acc(gv.rx_free.net_removed_addr, 1/4) && acc(gv.rx_handled, 1/4) &&
+      acc(gv.rx_free.net_descr, 1/4) && acc(gv.rx_free.net_head, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_RX_FREE ==> 0 <= gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
+      forall i: Int :: gv.rx_free.net_head <= i < gv.rx_free.net_tail ==>
+        acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
+    requires gv.wm_state == WM_LOAD_QM_TX_FREE ==> acc(gv.wm_qhead) && gv.wm_qhead >= gv.tx_free.net_head &&
+        0 <= gv.tx_free.net_tail - gv.wm_qhead <= 256
+    requires gv.wm_state == WM_LOAD_QM_RX_ACTIVE ==> acc(gv.wm_qhead) && gv.wm_qhead >= gv.rx_active.net_head &&
+        0 <= gv.rx_active.net_tail - gv.wm_qhead <= 256
+    requires gv.wm_state == WM_LOAD_QM_RX_FREE ==> acc(gv.wm_qtail) && gv.wm_qtail >= gv.rx_free.net_tail &&
+        0 <= gv.wm_qtail - gv.rx_free.net_tail <= 256
+    requires gv.wm_state == WM_LOAD_QM_TX_ACTIVE ==> acc(gv.wm_qtail) && gv.wm_qtail >= gv.tx_active.net_tail &&
+        0 <= gv.wm_qtail - gv.tx_active.net_tail <= 256
+    requires gv.wm_state == WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
+    requires gv.wm_state == WM_LOAD_TX_FREE_CONSUMER_SIGNALLED ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
+    requires gv.wm_state in Set(WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED, WM_LOAD_TX_FREE_CONSUMER_SIGNALLED) ==> 
+        acc(gv.wm_consumer_signalled)
+    requires gv.wm_state == WM_LOAD_RX_STAT || gv.wm_state == WM_LOAD_TX_STAT ==>
+        acc(gv.wm_stat) && acc(gv.wm_state_old) && acc(gv.wm_stat_old_was_empty) && acc(gv.wm_hw_slot)
+    requires gv.wm_state == WM_LOAD_RX_STAT ==> acc(gv.hardware_ring_rx, 1/4) && acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4) &&
+        acc(slot(gv.hardware_ring_rx, gv.wm_hw_slot).hw_stat, 3/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != gv.wm_hw_slot ==>
+            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
+    requires gv.wm_state == WM_LOAD_TX_STAT ==> acc(gv.hardware_ring_tx, 1/4) && acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4) &&
+        acc(slot(gv.hardware_ring_tx, gv.wm_hw_slot).hw_stat, 3/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != gv.wm_hw_slot ==>
+            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
+            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
+    ensures acc(gv.wm_state) && gv.wm_state ==
+        (old(gv.wm_state) in Set(WM_LOAD_RX_STAT, WM_LOAD_TX_STAT) ? old(gv.wm_state_old) : WM_NONE)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> gv.tx_free.net_head == old(gv.wm_qhead)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4) &&
+      0 <= gv.tx_free.net_tail - old(gv.tx_free.net_head) <= 256 &&
+      forall i: Int :: gv.tx_free.net_tail <= i < old(gv.tx_free.net_head) + QUEUE_CAPACITY ==>
+        acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 1/4)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> forall i: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
+      acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_free.net_descr, i).ndescr_len, 2/3) &&
+      is_valid_data_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_free.net_descr, i).ndescr_len)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> forall i: Int, j: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY &&
+      gv.tx_free.net_tail <= j < gv.tx_free.net_head + QUEUE_CAPACITY &&
+      slotq(gv.tx_free.net_descr, i).ndescr_addr == slotq(gv.tx_free.net_descr, j).ndescr_addr ==>
+        i == j
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> gv.tx_active.net_tail == old(gv.wm_qtail)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> acc(gv.tx_active.net_removed, 1/4) && acc(gv.tx_handled, 1/4) &&
+        acc(gv.tx_active.net_descr, 1/4) && acc(gv.tx_active.net_head, 1/4)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> 0 <= old(gv.tx_active.net_tail) - gv.tx_active.net_head <= 256 &&
+        forall i: Int :: gv.tx_active.net_head <= i < old(gv.tx_active.net_tail) ==>
+            acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+      is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
+      gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
+      slotq(gv.tx_active.net_descr, i).ndescr_addr == slotq(gv.tx_active.net_descr, j).ndescr_addr ==>
+        i == j
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall i: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail ==>
+      forall s: Seq[Int] :: s in gv.tx_active.net_removed ==> |s| == 2 &&
+        s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
+    ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall s: Seq[Int] :: s in gv.tx_handled ==>
+      |s| == 2 && forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
+        s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> gv.rx_active.net_head == old(gv.wm_qhead)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4) &&
+      0 <= gv.rx_active.net_tail - old(gv.rx_active.net_head) <= 256 &&
+      forall i: Int :: gv.rx_active.net_tail <= i < old(gv.rx_active.net_head) + QUEUE_CAPACITY ==>
+        acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 1/4)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> forall i: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
+      acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_active.net_descr, i).ndescr_len, 2/3) &&
+      is_valid_data_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_active.net_descr, i).ndescr_len)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> forall i: Int, j: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY &&
+      gv.rx_active.net_tail <= j < gv.rx_active.net_head + QUEUE_CAPACITY &&
+      slotq(gv.rx_active.net_descr, i).ndescr_addr == slotq(gv.rx_active.net_descr, j).ndescr_addr ==>
+        i == j
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> gv.rx_free.net_tail == old(gv.wm_qtail)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> acc(gv.rx_free.net_removed_addr, 1/4) && acc(gv.rx_handled, 1/4) && acc(gv.rx_free.net_descr, 1/4) &&
+      acc(gv.rx_free.net_head, 1/4) && 0 <= old(gv.rx_free.net_tail) - gv.rx_free.net_head <= 256 &&
+      forall i: Int :: gv.rx_free.net_head <= i < old(gv.rx_free.net_tail) ==>
+        acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> 0 <= old(gv.rx_free.net_tail) - gv.rx_free.net_head <= 256 &&
+      forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
+        acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+        is_valid_data_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_free.net_descr, i).ndescr_len)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> forall i: Int, j: Int :: old(gv.rx_free.net_tail) <= i && i < gv.rx_free.net_tail &&
+      gv.rx_free.net_head <= j && j < gv.rx_free.net_tail &&
+      slotq(gv.rx_free.net_descr, i).ndescr_addr == slotq(gv.rx_free.net_descr, j).ndescr_addr ==>
+        i == j
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
+      !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr)
+    ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> forall s: Seq[Int] :: s in gv.rx_handled ==>
+      |s| == 2 && forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
+        s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr
+    ensures old(gv.wm_state) == WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal) &&
+        gv.rx_active.net_signal == old(gv.wm_consumer_signalled)
+    ensures old(gv.wm_state) == WM_LOAD_TX_FREE_CONSUMER_SIGNALLED ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal) &&
+        gv.tx_free.net_signal == old(gv.wm_consumer_signalled)
+    ensures old(gv.wm_state) == WM_LOAD_RX_STAT ==> acc(gv.hardware_ring_rx, 1/4) && acc(slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_stat, 3/4) &&
+        slot(gv.hardware_ring_rx, old(gv.wm_hw_slot)).hw_stat == old(gv.wm_stat)
+    ensures old(gv.wm_state) == WM_LOAD_RX_STAT ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_added, 1/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != old(gv.wm_hw_slot) ==>
+            acc(slot(gv.hardware_ring_rx, j).hw_stat, 1/4) &&
+            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) ==> acc(slot(gv.hardware_ring_rx, j).hw_addr, 1/4))
+    ensures old(gv.wm_state) == WM_LOAD_RX_STAT ==> let r == (slot(gv.hardware_ring_rx, old(gv.wm_hw_slot))) in
+        old(gv.wm_stat_old_was_empty) && !is_RXD_EMPTY(r.hw_stat) ==>
+            valid_rx_read_slot(r) &&
+            (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, j).hw_stat) &&
+                slot(gv.hardware_ring_rx, j).hw_addr == r.hw_addr ==> j == old(gv.wm_hw_slot)) &&
+            (forall s: Seq[Int] :: s in gv.rx_active.net_added ==> |s| == 2 && s[0] != r.hw_addr) &&
+            r.ghost_unprocessed
+    ensures old(gv.wm_state) == WM_LOAD_TX_STAT ==> acc(gv.hardware_ring_tx, 1/4) && acc(slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_stat, 3/4) &&
+        slot(gv.hardware_ring_tx, old(gv.wm_hw_slot)).hw_stat == old(gv.wm_stat)
+    ensures old(gv.wm_state) == WM_LOAD_TX_STAT ==> acc(gv.hardware_ring_tx, 1/4) && acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_added, 1/4) &&
+        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && j != old(gv.wm_hw_slot) ==>
+            acc(slot(gv.hardware_ring_tx, j).hw_stat, 1/4) &&
+            (!is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) ==> acc(slot(gv.hardware_ring_tx, j).hw_addr, 1/4))
+    ensures old(gv.wm_state) == WM_LOAD_TX_STAT ==> let r == (slot(gv.hardware_ring_tx, old(gv.wm_hw_slot))) in
+        old(gv.wm_stat_old_was_empty) && !is_TXD_READY(r.hw_stat) ==>
+            valid_tx_read_slot(r) &&
+            (forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
+                slot(gv.hardware_ring_tx, j).hw_addr == r.hw_addr ==> j == old(gv.wm_hw_slot)) &&
+            (forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2 && s[0] != r.hw_addr) &&
+            r.ghost_unprocessed
+

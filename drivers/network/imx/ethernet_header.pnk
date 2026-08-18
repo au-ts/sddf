@@ -122,6 +122,15 @@ var 1 eth_reg = ETH_REG;
 /@ extern field hw_stat: Int @/
 /@ extern field hw_len: Int @/
 
+/@ extern field wm_state: Int @/
+/@ extern field wm_buf_addr: Int @/
+/@ extern field wm_qaddr: Int @/
+/@ extern field wm_qlen: Int @/
+/@ extern field wm_qhead: Int @/
+/@ extern field wm_qtail: Int @/
+/@ extern field wm_store_tail_count: Int @/
+/@ extern field wm_await_ack_data: Seq[Ref] @/
+
 /@ extern function union_elem(s: Set[Int], t: Set[Int], e: Int): Bool @/
 /@ extern function union_elem_seq(s: Set[Seq[Int]], t: Set[Seq[Int]], e: Seq[Int]): Bool @/
 /@ extern function empty_set(): Set[Int] @/
@@ -189,16 +198,16 @@ var 1 eth_reg = ETH_REG;
 /@ shared r u32 rx_free_addr[RX_FREE_BASE+BUFFERS_OFFSET+NDESC_ADDR_OFF..RX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
 /@ shared r u16 rx_free_len[RX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN_OFF..RX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
 /@ shared rw u16 rx_active_tail[RX_ACTIVE_BASE+TAIL_OFFSET..RX_ACTIVE_BASE+TAIL_OFFSET+2] @/
-/@ shared rw u16 rx_active_head[RX_ACTIVE_BASE+HEAD_OFFSET..RX_ACTIVE_BASE+HEAD_OFFSET+2] @/
+/@ shared r u16 rx_active_head[RX_ACTIVE_BASE+HEAD_OFFSET..RX_ACTIVE_BASE+HEAD_OFFSET+2] @/
 /@ shared rw u32 rx_active_consumer_signalled[RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared w u32 rx_active_addr[RX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_ADDR_OFF..RX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
 /@ shared w u16 rx_active_len[RX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_LEN_OFF..RX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
 /@ shared rw u16 tx_free_tail[TX_FREE_BASE+TAIL_OFFSET..TX_FREE_BASE+TAIL_OFFSET+2] @/
-/@ shared rw u16 tx_free_head[TX_FREE_BASE+HEAD_OFFSET..TX_FREE_BASE+HEAD_OFFSET+2] @/
+/@ shared r u16 tx_free_head[TX_FREE_BASE+HEAD_OFFSET..TX_FREE_BASE+HEAD_OFFSET+2] @/
 /@ shared rw u32 tx_free_consumer_signalled[TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared w u32 tx_free_addr[TX_FREE_BASE+BUFFERS_OFFSET+NDESC_ADDR_OFF..TX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
 /@ shared w u16 tx_free_len[TX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN_OFF..TX_FREE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
-/@ shared rw u16 tx_active_tail[TX_ACTIVE_BASE+TAIL_OFFSET..TX_ACTIVE_BASE+TAIL_OFFSET+2] @/
+/@ shared r u16 tx_active_tail[TX_ACTIVE_BASE+TAIL_OFFSET..TX_ACTIVE_BASE+TAIL_OFFSET+2] @/
 /@ shared rw u16 tx_active_head[TX_ACTIVE_BASE+HEAD_OFFSET..TX_ACTIVE_BASE+HEAD_OFFSET+2] @/
 /@ shared w u32 tx_active_consumer_signalled[TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared r u32 tx_active_addr[TX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_ADDR_OFF..TX_ACTIVE_BASE+BUFFERS_OFFSET+NDESC_LEN*QUEUE_CAPACITY:NDESC_LEN] @/
@@ -266,3 +275,41 @@ var 1 eth_reg = ETH_REG;
 		gv.rx_processed == empty_set_seqint() && \
 		gv.tx_processed == empty_set() \
 )
+
+#define WM_NONE                                0
+#define WM_STORE_RX_QM_AND_BUF                 1
+#define WM_STORE_TX_QM_AND_BUF                 2
+#define WM_STORE_RX_STAT                       3
+#define WM_STORE_TX_STAT                       4
+#define WM_STORE_RX_STAT_PRE_RDAR              5
+#define WM_STORE_RX_STAT_PRE_TDAR              6
+#define WM_LOAD_RX_STAT                        7
+#define WM_LOAD_TX_STAT                        8
+#define WM_LOAD_RX_BUF                         9
+#define WM_LOAD_TX_BUF                         10
+#define WM_STORE_RX_QM_AND_ADDR                11
+#define WM_STORE_TX_QM_AND_ADDR                12
+#define WM_LOAD_QM_TX_FREE                     13
+#define WM_LOAD_QM_TX_ACTIVE                   14
+#define WM_LOAD_QM_RX_FREE                     15
+#define WM_LOAD_QM_RX_ACTIVE                   16
+#define WM_STORE_QM_TX_FREE                    17
+#define WM_STORE_QM_TX_ACTIVE                  18
+#define WM_STORE_QM_RX_FREE                    19
+#define WM_STORE_QM_RX_ACTIVE                  20
+#define WM_STORE_QM_TX_ACTIVE_2                21
+#define WM_STORE_QM_RX_FREE_2                  22
+#define WM_STORE_DATA_RX_ACTIVE                23
+#define WM_STORE_DATA_TX_FREE                  24
+#define WM_STORE_ADDR_RX_ACTIVE                25
+#define WM_STORE_ADDR_TX_FREE                  26
+#define WM_STORE_QM_W_DATA_RX_ACTIVE           27
+#define WM_STORE_QM_W_DATA_TX_FREE             28
+#define WM_STORE_RX_FREE_CONSUMER_SIGNALLED    29
+#define WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED  30
+#define WM_STORE_TX_FREE_CONSUMER_SIGNALLED    31
+#define WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED  32
+#define WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED   33
+#define WM_LOAD_TX_FREE_CONSUMER_SIGNALLED     34
+#define WM_STORE_RDAR                          35
+#define WM_STORE_TDAR                          36
