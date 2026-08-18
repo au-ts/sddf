@@ -296,20 +296,24 @@ uint8_t get_pci_bridge_idx_by_bus(uint8_t pci_bus)
 acpi_dev_t *find_acpi_dev_by_header_offset(uintptr_t header_offset)
 {
     uint32_t dev_slot = header_offset >> 15;
-    uint32_t func_slot = header_offset & 0x7FFF;
-    uintptr_t target_bridge_adr = (dev_slot << 16) + func_slot;
+    uint32_t func_slot = (header_offset >> 12) & 0x7;
+    acpi_dev_t *ret_bridge = NULL;
 
-    sddf_dprintf("Target PCI bridge addr: 0x%lx, adr: 0x%lx\n", header_offset, target_bridge_adr);
+    sddf_dprintf("Target PCI bridge addr: 0x%lx, dev: 0x%x, func: 0x%x\n", header_offset, dev_slot, func_slot);
     uint32_t num_devices = pci_resources->num_devices;
     for (int i = 0; i < num_devices; i++) {
         acpi_dev_t *pci_bridge = &pci_resources->devices[i];
-        if (target_bridge_adr == pci_bridge->adr) {
-            sddf_dprintf("pci_bridge addr: 0x%lx\n", pci_bridge->adr);
-            return pci_bridge;
+        if (ret_bridge != NULL && dev_slot == (pci_bridge->adr >> 16) && func_slot == (pci_bridge->adr & 0xFFFF)) {
+            // Update returned device if the ADR matches both dev_slot and func_slot
+            ret_bridge = pci_bridge;
+        }
+        if (ret_bridge == NULL && dev_slot == (pci_bridge->adr >> 16)) {
+            ret_bridge = pci_bridge;
         }
     }
 
-    return NULL;
+    sddf_dprintf("pci_bridge addr: 0x%lx\n", ret_bridge->adr);
+    return ret_bridge;
 }
 
 void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
@@ -379,13 +383,13 @@ pci_bridge_node_t *find_parent_pci_bridge(pci_bridge_node_t *bridge_node, uint8_
 {
     pci_bridge_node_t *direct_parent_bridge = bridge_node;
     pci_bridge_node_t *child = bridge_node->child;
+    sddf_dprintf("Looking for bus %u\n", bus);
     while (child) {
-        if (child->bridge_header->secondary_bus_num <= bus && child->bridge_header->subordinate_bus_num >= bus) {
+        sddf_dprintf("secondary: %u, subordinate: %u\n", child->bridge_header->secondary_bus_num, child->bridge_header->subordinate_bus_num);
+        if (child->bridge_header->secondary_bus_num <= bus && bus <= child->bridge_header->subordinate_bus_num) {
             pci_bridge_node_t *closer_parent_bridge = find_parent_pci_bridge(child, bus);
-            if (child != closer_parent_bridge) {
-                direct_parent_bridge = closer_parent_bridge;
-                break;
-            }
+            direct_parent_bridge = closer_parent_bridge;
+            break;
         }
         child = child->next;
     }
@@ -398,9 +402,11 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
     struct pci_header_type0 *pci_header = (struct pci_header_type0 *)(bus_base + (device_config->bus << 20) + (device_config->dev << 15) + (device_config->func << 12));
     pci_bridge_node_t *parent_bridge = find_parent_pci_bridge(host_bridge, device_config->bus);
 
+    sddf_dprintf("parent_bridge: 0x%lx, header: 0x%lx\n", (uintptr_t)parent_bridge->acpi_dev, (uintptr_t)parent_bridge->bridge_header);
     for (int i = 0; i < device_config->num_bars; i++) {
         map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->bars[i].vaddr);
     }
+    sddf_dprintf("Finished BAR mapping\n");
 
     for (int i = 0; i < device_config->num_irqs; i++) {
         // FIXME: support only legacy I/O APIC for now
@@ -516,17 +522,14 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
         sddf_dprintf("  - mem_p_is_64bit: %u\n", pci_bridge->windows.mem_p_is_64bit);
 
         volatile struct pci_header_type1 *bridge_header = (volatile struct pci_header_type1 *)pci_bridge->bridge_header;
-        sddf_dprintf("ello\n");
         // TODO: check if bridge supports 16bit
         /* bridge_header->io_base = (uint8_t)pci_bridge->windows.io_base; */
-        sddf_dprintf("ello\n");
         /* bridge_header->io_limit = (uint8_t)pci_bridge->windows.io_limit; */
 
         bridge_header->mem_base = (uint16_t)(pci_bridge->windows.mem_np_base >> 16);
         bridge_header->mem_limit = (uint16_t)(pci_bridge->windows.mem_np_limit >> 16);
 
         // TODO: check if bridge supports 64bit
-        sddf_dprintf("ello\n");
         if (pci_bridge->windows.mem_p_base) {
             bridge_header->pre_mem_base = (uint16_t)(pci_bridge->windows.mem_p_base >> 16);
             bridge_header->pre_mem_limit = (uint16_t)(pci_bridge->windows.mem_p_limit >> 16);
@@ -534,9 +537,7 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
             bridge_header->pre_mem_base_upper = (uint32_t)(pci_bridge->windows.mem_p_base >> 32);
             bridge_header->pre_mem_limit_upper = (uint32_t)(pci_bridge->windows.mem_p_limit >> 32);
         }
-        sddf_dprintf("ello\n");
         bridge_header->command = bridge_header->command | BIT(2);
-        sddf_dprintf("ello\n");
 
     } else if (pci_bridge->is_host_bridge == true) {
         // Do nothing for host bridge
@@ -580,28 +581,28 @@ void init(void)
     }
 
     // QEMU
-    devices_config.devs[0].bus = 0;
-    devices_config.devs[0].dev = 2;
-    devices_config.devs[0].func = 0;
-    devices_config.devs[0].bars[0].id = 4;
-    devices_config.devs[0].bars[0].vaddr = 0x60000000;
-    devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
-    devices_config.devs[0].irqs[0].ch = 16;
-    devices_config.devs[0].num_bars++;
-    devices_config.devs[0].num_irqs++;
-    devices_config.num_dev++;
-
-    // Hardware
-    /* devices_config.devs[0].bus = 1; */
-    /* devices_config.devs[0].dev = 0; */
+    /* devices_config.devs[0].bus = 0; */
+    /* devices_config.devs[0].dev = 2; */
     /* devices_config.devs[0].func = 0; */
-    /* devices_config.devs[0].bars[0].id = 0; */
-    /* devices_config.devs[0].bars[0].vaddr = 0x2000000; */
+    /* devices_config.devs[0].bars[0].id = 4; */
+    /* devices_config.devs[0].bars[0].vaddr = 0x60000000; */
     /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
     /* devices_config.devs[0].irqs[0].ch = 16; */
     /* devices_config.devs[0].num_bars++; */
     /* devices_config.devs[0].num_irqs++; */
     /* devices_config.num_dev++; */
+
+    // Hardware
+    devices_config.devs[0].bus = 1;
+    devices_config.devs[0].dev = 0;
+    devices_config.devs[0].func = 0;
+    devices_config.devs[0].bars[0].id = 0;
+    devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
+    devices_config.devs[0].irqs[0].ch = 16;
+    devices_config.devs[0].num_bars++;
+    devices_config.devs[0].num_irqs++;
+    devices_config.num_dev++;
 
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
     sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);

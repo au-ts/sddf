@@ -458,13 +458,13 @@ def generate(
         # )
 
         # Legacy I/O APIC
-        eth_irq = IrqIoapic(ioapic_id=0,
-                            pin=16,
-                            vector=8,
-                            trigger=IrqIoapic.Trigger.LEVEL,
-                            polarity=IrqIoapic.Polarity.ACTIVELOW,
-                            id=16)
-        ethernet_driver.add_irq(eth_irq)
+        # eth_irq = IrqIoapic(ioapic_id=0,
+        #                     pin=16,
+        #                     vector=8,
+        #                     trigger=IrqIoapic.Trigger.LEVEL,
+        #                     polarity=IrqIoapic.Polarity.ACTIVELOW,
+        #                     id=16)
+        # ethernet_driver.add_irq(eth_irq)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
