@@ -111,8 +111,7 @@ export fun tx_provide()
     var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
 
     var transferred = false;
-    while (true)
-    {
+    while (true) {
         var ts = uart_read_ts();
         if (ts & UART_TST_TX_FIFO_FULL) {
             break;
@@ -155,10 +154,8 @@ fun rx_return()
 
     var reprocess = true;
     var enqueued = false;
-    while (reprocess)
-    {
-        while (true)
-        {
+    while (reprocess) {
+        while (true) {
             var ts = uart_read_ts();
             if (ts & UART_TST_RX_FIFO_EMPTY) {
                 break;
@@ -212,8 +209,7 @@ fun handle_irq()
     var uart_sr1 = uart_read_sr1();
     var uart_cr1 = uart_read_cr1();
     while ((uart_sr1 & UART_SR1_ABNORMAL) || (uart_sr1 & UART_SR1_RX_RDY) ||
-          ((uart_cr1 & UART_CR1_TX_READY_INT) && (uart_sr1 & UART_SR1_TX_RDY)))
-    {
+          ((uart_cr1 & UART_CR1_TX_READY_INT) && (uart_sr1 & UART_SR1_TX_RDY))) {
         if (RX_ENABLED && (uart_sr1 & UART_SR1_RX_RDY)) {
             rx_return();
         }
