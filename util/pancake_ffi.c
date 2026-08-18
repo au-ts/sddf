@@ -28,7 +28,7 @@ void ffimicrokit_x86_ioport_write_8(unsigned char *c, long clen, unsigned char *
 
 void ffimicrokit_x86_ioport_read_8(unsigned char *c, long clen, unsigned char *a, long alen) {
     seL4_Uint8 ret = microkit_x86_ioport_read_8(clen, (seL4_Word) a);
-    *(seL4_Uint8 *)c = ret; 
+    *(seL4_Uint8 *)c = ret;
 }
 #endif
 
