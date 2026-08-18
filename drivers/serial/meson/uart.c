@@ -23,22 +23,27 @@ extern void *cml_stackend;
 
 extern void cml_main(void);
 
-void cml_exit(int arg) {
+void cml_exit(int arg)
+{
     microkit_dbg_puts("ERROR! We should not be getting here\n");
 }
 
-void cml_err(int arg) {
+void cml_err(int arg)
+{
     if (arg == 3) {
-        microkit_dbg_puts("Memory not ready for entry. You may have not run the init code yet, or be trying to enter during an FFI call.\n");
+        microkit_dbg_puts("Memory not ready for entry. You may have not run the init code yet, or be trying to enter "
+                          "during an FFI call.\n");
     }
     cml_exit(arg);
 }
 
-void cml_clear() {
+void cml_clear()
+{
     microkit_dbg_puts("Trying to clear cache\n");
 }
 
-void init_pancake_mem() {
+void init_pancake_mem()
+{
     unsigned long cml_heap_sz = 1024 * 10;
     unsigned long cml_stack_sz = 1024 * 10;
     cml_heap = cml_memory;
@@ -241,14 +246,14 @@ void init(void)
 #ifdef PANCAKE_SERIAL_DRIVER
     init_pancake_mem();
 
-    uintptr_t *pnk_mem = (uintptr_t *) cml_heap;
+    uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
 
-    pnk_mem[0] = (uintptr_t) uart_regs;
+    pnk_mem[0] = (uintptr_t)uart_regs;
     pnk_mem[1] = device_resources.irqs[0].id;
     pnk_mem[2] = config.rx.id;
     pnk_mem[3] = config.tx.id;
-    pnk_mem[4] = (uintptr_t) &rx_queue_handle;
-    pnk_mem[5] = (uintptr_t) &tx_queue_handle;
+    pnk_mem[4] = (uintptr_t)&rx_queue_handle;
+    pnk_mem[5] = (uintptr_t)&tx_queue_handle;
     pnk_mem[1024] = config.rx_enabled;
 
     cml_main();
