@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Pancake Serial Queue Library
- * 
+ *
  * Shared queue functions for serial drivers and components.
  * Provides common operations for managing serial queues in Pancake.
  *
