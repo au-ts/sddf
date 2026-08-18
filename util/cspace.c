@@ -1,5 +1,4 @@
 
-#pragma once
 #include <sddf/util/cspace.h>
 #include <sddf/util/printf.h>
 
@@ -106,7 +105,7 @@ seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
         if (offset_bit) break;
         max_align_size_bits += 1;
     }
-    seL4_Word max_align_size = (1ULL << max_align_size_bits);
+    /* seL4_Word max_align_size = (1ULL << max_align_size_bits); */
 
     seL4_Word avai_mem_size = src_cnode_specs->caps[target_ut_idx].end_addr - min_addr;
     seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);

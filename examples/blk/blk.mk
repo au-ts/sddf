@@ -103,7 +103,7 @@ ifneq ($(strip $(DTS)),)
 		$${NVME:+--nvme}
 else
 	$(PYTHON) \
-		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}

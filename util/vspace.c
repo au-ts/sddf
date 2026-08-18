@@ -1,4 +1,3 @@
-#pragma once
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/vspace.h>

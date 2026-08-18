@@ -17,7 +17,7 @@ ifeq (${X86_BOARD},)
 endif
 
 ifeq (${X86_BOARD},qemu_virt_x86)
-    BLK_DRIV_DIR ?= virtio/pci
+    BLK_DRIV_DIR ?= nvme
     NET_DRIV_DIR ?= virtio/pci
     ETH_DRIV ?= eth_driver_virtio.elf
     UART_DRIV_DIR ?= pc99
@@ -42,6 +42,7 @@ ifeq (${X86_BOARD},qemu_virt_x86)
     QEMU_BLK_ARGS ?= -device virtio-blk-pci,drive=hd,addr=0x3.0
 
 else ifeq ($(X86_BOARD), $(filter ${X86_BOARD},makatea vb_105 viscous))
+    BLK_DRIV_DIR ?= nvme
     NET_DRIV_DIR := ixgbe
     ETH_DRIV := eth_driver_ixgbe.elf
     UART_DRIV_DIR := pc99
