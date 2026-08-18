@@ -28,7 +28,7 @@ typedef struct net_queue {
     /* flag to indicate whether consumer requires signalling */
     uint32_t consumer_signalled;
     /* buffer descripter array */
-    net_buff_desc_t buffers[];
+    const net_buff_desc_t buffers[];
 } net_queue_t;
 
 typedef struct net_queue_handle {
@@ -37,7 +37,7 @@ typedef struct net_queue_handle {
     /* filled buffers */
     net_queue_t *active;
     /* capacity of the queues */
-    uint32_t capacity;
+    const uint32_t capacity;
 } net_queue_handle_t;
 
 /**

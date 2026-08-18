@@ -45,11 +45,11 @@
 
 #define THREAD_MEMORY_RELEASE() \
   @THREAD_MEMORY_RELEASE(0,0,0,0);
-/@ method ffiTHREAD_MEMORY_RELEASE(c: Int, cl: Int, a: Int, al: Int) @/
+///@ method ffiTHREAD_MEMORY_RELEASE(c: Int, cl: Int, a: Int, al: Int) @/
 
 #define THREAD_MEMORY_ACQUIRE() \
   @THREAD_MEMORY_ACQUIRE(0,0,0,0);
-/@ method ffiTHREAD_MEMORY_ACQUIRE(c: Int, cl: Int, a: Int, al: Int) @/
+///@ method ffiTHREAD_MEMORY_ACQUIRE(c: Int, cl: Int, a: Int, al: Int) @/
 
 #define seL4_SetMR(reg, value) \
   @seL4_SetMR(0,reg,0,value);

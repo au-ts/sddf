@@ -155,109 +155,61 @@ define queue_unchanged(queue_name, capacity)
 
 /////////////////////// RX_FREE queue
 method store_rx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed_addr) &&
-    acc(gv.rx_free.net_descr, 1/4) && acc(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr, 1/4) &&
-    acc(gv.rx_free.net_tail, 1/4)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/4)
   requires address == RX_FREE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
   requires value == (gv.rx_free.net_head + 1) % (MAX_INT16 + 1)
   requires gv.rx_free.net_head != gv.rx_free.net_tail
-  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed_addr) &&
-    acc(gv.rx_free.net_descr, 1/4) && acc(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_head)).ndescr_addr, 1/4) &&
-    acc(gv.rx_free.net_tail, 1/4)
-  ensures gv.rx_free.net_removed_addr == old(gv.rx_free.net_removed_addr) union Set(slotq(gv.rx_free.net_descr, old(gv.rx_free.net_head)).ndescr_addr)
-  ensures gv.rx_free.net_head == old(gv.rx_free.net_head) + 1
-{
-  gv.rx_free.net_removed_addr := gv.rx_free.net_removed_addr union Set(slotq(gv.rx_free.net_descr, gv.rx_free.net_head).ndescr_addr)
-  gv.rx_free.net_head := gv.rx_free.net_head + 1
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_RX_FREE
+  requires acc(gv.wm_qhead, 1/2) && gv.wm_qhead == gv.rx_free.net_head + 1
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/4)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_RX_FREE_2 &&
+    acc(gv.wm_qhead, 1/2)
 
 method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail)
-  requires acc(gv.rx_free.net_removed_addr, 1/4) && acc(gv.rx_handled, 1/4) && acc(gv.rx_free.net_descr, 1/4) &&
-    acc(gv.rx_free.net_head, 1/4)
-  requires 0 <= gv.rx_free.net_tail - gv.rx_free.net_head <= 256 &&
-    forall i: Int :: gv.rx_free.net_head <= i < gv.rx_free.net_tail ==>
-      acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail, 1/4) && acc(gv.rx_free.net_head, 1/4)
   requires address == RX_FREE_BASE + TAIL_OFFSET
-  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail)
-  ensures acc(gv.rx_free.net_removed_addr, 1/4) && acc(gv.rx_handled, 1/4) && acc(gv.rx_free.net_descr, 1/4) &&
-    acc(gv.rx_free.net_head, 1/4) && 0 <= old(gv.rx_free.net_tail) - gv.rx_free.net_head <= 256 &&
-    forall i: Int :: gv.rx_free.net_head <= i < old(gv.rx_free.net_tail) ==>
-      acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
-  ensures retval == gv.rx_free.net_tail % (MAX_INT16 + 1)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_tail, 1/4) && acc(gv.rx_free.net_head, 1/4)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_QM_RX_FREE
+  ensures acc(gv.wm_qtail) && retval == gv.wm_qtail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
-  ensures 0 <= gv.rx_free.net_tail - gv.rx_free.net_head <= 256
-  ensures gv.rx_free.net_tail >= old(gv.rx_free.net_tail)
-  ensures forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-    acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_free.net_descr, i).ndescr_len)
-  ensures forall i: Int, j: Int :: old(gv.rx_free.net_tail) <= i && i < gv.rx_free.net_tail &&
-    gv.rx_free.net_head <= j && j < gv.rx_free.net_tail &&
-    slotq(gv.rx_free.net_descr, i).ndescr_addr == slotq(gv.rx_free.net_descr, j).ndescr_addr ==>
-      i == j
-  ensures forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-    !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr)
-  ensures forall s: Seq[Int] :: s in gv.rx_handled ==>
-    |s| == 2 && forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-      s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr
-{
-  exhale acc(gv.rx_free.net_tail)
-  inhale acc(gv.rx_free.net_tail)
-  inhale 0 <= gv.rx_free.net_tail - gv.rx_free.net_head <= 256
-  inhale gv.rx_free.net_tail >= old(gv.rx_free.net_tail)
-  inhale forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-    acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_free.net_descr, i).ndescr_len)
-  inhale forall i: Int, j: Int :: old(gv.rx_free.net_tail) <= i && i < gv.rx_free.net_tail &&
-    gv.rx_free.net_head <= j && j < gv.rx_free.net_tail &&
-    slotq(gv.rx_free.net_descr, i).ndescr_addr == slotq(gv.rx_free.net_descr, j).ndescr_addr ==>
-      i == j
-  inhale forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-    !(slotq(gv.rx_free.net_descr, i).ndescr_addr in gv.rx_free.net_removed_addr)
-  inhale forall s: Seq[Int] :: s in gv.rx_handled ==>
-    |s| == 2 && forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-      s[0] != slotq(gv.rx_free.net_descr, i).ndescr_addr
-  retval := gv.rx_free.net_tail % (MAX_INT16 + 1)
-  refute false
-}
+  ensures 0 <= gv.wm_qtail - gv.rx_free.net_head <= 256
+  ensures gv.wm_qtail >= gv.rx_free.net_tail
 
 method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4)
   requires address == RX_FREE_BASE + HEAD_OFFSET
+  requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_LOAD_QM_RX_FREE)
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4)
   ensures retval == gv.rx_free.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
-{
-  retval := gv.rx_free.net_head % (MAX_INT16 + 1)
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == old(gv.wm_state)
 
 method store_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_signal)
   requires address == RX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
   requires value == 0 || value == 1
-  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_signal)
-  ensures value == (gv.rx_free.net_signal ? 1 : 0)
-{
-  gv.rx_free.net_signal := (value == 1)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && value == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_FREE_CONSUMER_SIGNALLED
 
+// WM: No WM handling needed, since we do not gain or lose information here.
 method load_rx_free_addr(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
   requires (address - NDESC_ADDR_OFF - BUFFERS_OFFSET - RX_FREE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_ADDR_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr, 1/4) &&
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr) &&
     valid_net_addr(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
-  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   ensures retval == slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr
+  ensures slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr == old(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   ensures valid_net_addr(retval)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_NONE
 {
   var index: Int := (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
   retval := slot(gv.rx_free.net_descr, index).ndescr_addr
@@ -269,11 +221,12 @@ method load_rx_free_len(heap: IArray, gv: Ref, address: Int)
   requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
   requires (address - NDESC_LEN_OFF - BUFFERS_OFFSET - RX_FREE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_LEN_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len, 1/4) &&
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len) &&
     valid_net_len(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
-  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   ensures retval == slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len
+  ensures slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len == old(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   ensures valid_net_len(retval)
 {
   var index: Int := (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
@@ -284,15 +237,16 @@ method load_rx_free_len(heap: IArray, gv: Ref, address: Int)
 /////////////////////// RX_ACTIVE queue
 method load_rx_active_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
+  requires acc(gv.wm_state, 1/2) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_RX_ACTIVE)
+  requires gv.wm_state == WM_NONE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
+  requires gv.wm_state == WM_STORE_QM_RX_ACTIVE ==> acc(gv.wm_qtail, 1/4)
   requires address == RX_ACTIVE_BASE + TAIL_OFFSET
-  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
-  ensures retval == gv.rx_active.net_tail % (MAX_INT16 + 1)
+  ensures acc(gv.wm_state, 1/2)
+  ensures gv.wm_state == WM_NONE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
+  ensures gv.wm_state == WM_STORE_QM_RX_ACTIVE ==> acc(gv.wm_qtail, 1/4)
+  ensures gv.wm_state == WM_NONE ==> retval == gv.rx_active.net_tail % (MAX_INT16 + 1)
+  ensures gv.wm_state == WM_STORE_QM_RX_ACTIVE ==> retval == gv.wm_qtail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
-{
-  retval := gv.rx_active.net_tail % (MAX_INT16 + 1)
-  refute false
-}
 
 /*function slotq_add_capacity_lemma(queue: Ref, i: Int): Bool
   requires acc(queue.net_descr, wildcard)
@@ -304,396 +258,236 @@ method load_rx_active_tail(heap: IArray, gv: Ref, address: Int)
 
 method load_rx_active_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
-  requires acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4)
-  requires 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256 &&
-    forall i: Int :: gv.rx_active.net_tail <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
-      acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 1/4)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head, 1/4) && acc(gv.rx_active.net_tail, 1/4)
   requires address == RX_ACTIVE_BASE + HEAD_OFFSET
-  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head)
-  ensures retval == gv.rx_active.net_head % (MAX_INT16 + 1)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_head, 1/4) && acc(gv.rx_active.net_tail, 1/4)
   ensures valid_net_head(retval)
-  ensures gv.rx_active.net_head >= old(gv.rx_active.net_head)
-  ensures acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_descr, 1/4) &&
-    0 <= gv.rx_active.net_tail - old(gv.rx_active.net_head) <= 256 &&
-    forall i: Int :: gv.rx_active.net_tail <= i < old(gv.rx_active.net_head) + QUEUE_CAPACITY ==>
-      acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 1/4)
-  ensures 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256
-  ensures forall i: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
-    acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_active.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_active.net_descr, i).ndescr_len)
-  ensures forall i: Int, j: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY &&
-    gv.rx_active.net_tail <= j < gv.rx_active.net_head + QUEUE_CAPACITY &&
-    slotq(gv.rx_active.net_descr, i).ndescr_addr == slotq(gv.rx_active.net_descr, j).ndescr_addr ==>
-      i == j
-{
-  exhale acc(gv.rx_active.net_head)
-  inhale acc(gv.rx_active.net_head)
-  inhale gv.rx_active.net_head >= old(gv.rx_active.net_head)
-  inhale 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256
-  inhale forall i: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
-    acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_active.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_active.net_descr, i).ndescr_len)
-  inhale forall i: Int, j: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY &&
-    gv.rx_active.net_tail <= j < gv.rx_active.net_head + QUEUE_CAPACITY &&
-    slotq(gv.rx_active.net_descr, i).ndescr_addr == slotq(gv.rx_active.net_descr, j).ndescr_addr ==>
-      i == j
-  retval := gv.rx_active.net_head % (MAX_INT16 + 1)
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_QM_RX_ACTIVE
+  ensures acc(gv.wm_qhead) && retval == gv.wm_qhead % (MAX_INT16 + 1)
+  ensures gv.wm_qhead >= gv.rx_active.net_head
+  ensures 0 <= gv.rx_active.net_tail - gv.wm_qhead <= 256
 
 method store_rx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_added) && acc(gv.rx_active.net_descr, 1/4) &&
-    acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_addr, 1/4) &&
-    acc(slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_len, 1/4) &&
-    acc(gv.rx_active.net_head, 1/4)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_head, 1/4) && acc(gv.wm_store_tail_count, 1/2)
   requires address == RX_ACTIVE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
-  requires value == (gv.rx_active.net_tail + 1) % (MAX_INT16 + 1)
-  requires gv.rx_active.net_tail - gv.rx_active.net_head != QUEUE_CAPACITY
-  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_added) && acc(gv.rx_active.net_descr, 1/4) &&
-    acc(slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_addr, 1/4) &&
-    acc(slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_len, 1/4) &&
-    acc(gv.rx_active.net_head, 1/4)
-  ensures gv.rx_active.net_added == old(gv.rx_active.net_added) union Set(Seq(
-    slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_addr,
-    slotq(gv.rx_active.net_descr, old(gv.rx_active.net_tail)).ndescr_len
-  ))
-  ensures gv.rx_active.net_tail == old(gv.rx_active.net_tail) + 1
-{
-  gv.rx_active.net_added := gv.rx_active.net_added union Set(Seq(
-    slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_addr,
-    slotq(gv.rx_active.net_descr, gv.rx_active.net_tail).ndescr_len
-  ))
-  gv.rx_active.net_tail := gv.rx_active.net_tail + 1
-  refute false
-}
+  requires value == (gv.rx_active.net_tail + gv.wm_store_tail_count) % (MAX_INT16 + 1)
+  requires (gv.rx_active.net_tail + gv.wm_store_tail_count - 1) - gv.rx_active.net_head != QUEUE_CAPACITY
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_RX_ACTIVE
+  requires acc(gv.wm_qtail) && gv.wm_qtail == gv.rx_active.net_tail + gv.wm_store_tail_count - 1
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4) && acc(gv.rx_active.net_head, 1/4) && acc(gv.wm_store_tail_count, 1/2)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_RX_ACTIVE && acc(gv.wm_qtail) && gv.wm_qtail == gv.rx_active.net_tail + gv.wm_store_tail_count
 
 method store_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
   requires address == RX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
   requires value == 0 || value == 1
-  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
-  ensures value == (gv.rx_active.net_signal ? 1 : 0)
-{
-  gv.rx_active.net_signal := (value == 1)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && value == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_RX_ACTIVE_CONSUMER_SIGNALLED
 
 method load_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
   requires address == RX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
-  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal)
-  ensures retval == (gv.rx_active.net_signal ? 1 : 0)
-{
-  exhale acc(gv.rx_active.net_signal)
-  inhale acc(gv.rx_active.net_signal)
-  retval := (gv.rx_active.net_signal ? 1 : 0)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && retval == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_RX_ACTIVE_CONSUMER_SIGNALLED
 
 method store_rx_active_addr(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
   requires (address - NDESC_ADDR_OFF - BUFFERS_OFFSET - RX_ACTIVE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_ADDR_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   requires valid_net_addr(value)
+  requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_RX_ACTIVE)
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
-  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
-  ensures slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr == value
-{
-  var index: Int := (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  slot(gv.rx_active.net_descr, index).ndescr_addr := value
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_ADDR_RX_ACTIVE && acc(gv.wm_qaddr) && gv.wm_qaddr == value &&
+    acc(gv.wm_qref) && gv.wm_qref == slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+  ensures acc(gv.wm_state_old) && gv.wm_state_old == old(gv.wm_state)
 
 method store_rx_active_len(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
   requires (address - NDESC_LEN_OFF - BUFFERS_OFFSET - RX_ACTIVE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_LEN_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   requires valid_net_len(value)
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_ADDR_RX_ACTIVE &&
+    acc(gv.wm_qref, 1/2) && gv.wm_qref == slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
-  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
-  ensures slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len == value
-{
-  var index: Int := (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  slot(gv.rx_active.net_descr, index).ndescr_len := value
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_DATA_RX_ACTIVE && acc(gv.wm_qref, 1/2) && acc(gv.wm_qlen) && gv.wm_qlen == value
 
 /////////////////////// TX_ACTIVE queue
+method f_store_queue_head_ghost(heap: IArray, gv: Ref, queue_ptr: Int)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4)
+  requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4)
+  ensures acc(gv.wm_state) && acc(gv.wm_qhead)
+  ensures queue_ptr == TX_ACTIVE_BASE ==> gv.wm_state == WM_STORE_QM_TX_ACTIVE &&
+    acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4) && gv.wm_qhead == gv.tx_active.net_head + 1
+  ensures queue_ptr == RX_FREE_BASE ==> gv.wm_state == WM_STORE_QM_RX_FREE &&
+    acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head, 1/4) && gv.wm_qhead == gv.rx_free.net_head + 1
+
 method store_tx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_removed) &&
-    acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_addr, 1/4) &&
-    acc(slotq(gv.tx_active.net_descr, gv.tx_active.net_head).ndescr_len, 1/4) &&
-    acc(gv.tx_active.net_tail, 1/4)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/4)
   requires address == TX_ACTIVE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
   requires value == (gv.tx_active.net_head + 1) % (MAX_INT16 + 1)
   requires gv.tx_active.net_head != gv.tx_active.net_tail
-  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_removed) &&
-    acc(gv.tx_active.net_descr, 1/4) &&
-    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr, 1/4) &&
-    acc(slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len, 1/4) &&
-    acc(gv.tx_active.net_tail, 1/4)
-  ensures gv.tx_active.net_removed == old(gv.tx_active.net_removed) union Set(Seq(
-            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr,
-            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len))
-  ensures gv.tx_active.net_head == old(gv.tx_active.net_head) + 1
-{
-  gv.tx_active.net_removed := gv.tx_active.net_removed union Set(Seq(
-            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_addr,
-            slotq(gv.tx_active.net_descr, old(gv.tx_active.net_head)).ndescr_len))
-  gv.tx_active.net_head := gv.tx_active.net_head + 1
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_TX_ACTIVE
+  requires acc(gv.wm_qhead, 1/2) && gv.wm_qhead == gv.tx_active.net_head + 1
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/4)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_TX_ACTIVE_2 && acc(gv.wm_qhead, 1/2)
 
 method load_tx_active_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
-  requires acc(gv.tx_active.net_removed, 1/4) && acc(gv.tx_handled, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
     acc(gv.tx_active.net_head, 1/4)
-  requires 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256 &&
-    forall i: Int :: gv.tx_active.net_head <= i < gv.tx_active.net_tail ==>
-      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
   requires address == TX_ACTIVE_BASE + TAIL_OFFSET
-  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail)
-  ensures acc(gv.tx_active.net_removed, 1/4) && acc(gv.tx_handled, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
-    acc(gv.tx_active.net_head, 1/4) && 0 <= old(gv.tx_active.net_tail) - gv.tx_active.net_head <= 256 &&
-    forall i: Int :: gv.tx_active.net_head <= i < old(gv.tx_active.net_tail) ==>
-      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
-  ensures retval == gv.tx_active.net_tail % (MAX_INT16 + 1)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_tail, 1/4) && acc(gv.tx_active.net_descr, 1/4) &&
+    acc(gv.tx_active.net_head, 1/4) && 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256
   ensures valid_net_tail(retval)
-  ensures 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256
-  ensures gv.tx_active.net_tail >= old(gv.tx_active.net_tail)
-  ensures forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
-    acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
-  ensures forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
-    gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
-    slotq(gv.tx_active.net_descr, i).ndescr_addr == slotq(gv.tx_active.net_descr, j).ndescr_addr ==>
-      i == j
-  ensures forall i: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail ==>
-    forall s: Seq[Int] :: s in gv.tx_active.net_removed ==> |s| == 2 &&
-      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
-  ensures forall s: Seq[Int] :: s in gv.tx_handled ==>
-    |s| == 2 && forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
-      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
-{
-  exhale acc(gv.tx_active.net_tail)
-  inhale acc(gv.tx_active.net_tail)
-  inhale 0 <= gv.tx_active.net_tail - gv.tx_active.net_head <= 256
-  inhale gv.tx_active.net_tail >= old(gv.tx_active.net_tail)
-  inhale forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
-    acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
-  inhale forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
-    gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
-    slotq(gv.tx_active.net_descr, i).ndescr_addr == slotq(gv.tx_active.net_descr, j).ndescr_addr ==>
-      i == j
-  inhale forall i: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail ==>
-    forall s: Seq[Int] :: s in gv.tx_active.net_removed ==> |s| == 2 &&
-      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
-  inhale forall s: Seq[Int] :: s in gv.tx_handled ==>
-    |s| == 2 && forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
-      s[0] != slotq(gv.tx_active.net_descr, i).ndescr_addr
-  retval := gv.tx_active.net_tail % (MAX_INT16 + 1)
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_QM_TX_ACTIVE
+  ensures acc(gv.wm_qtail) && retval == gv.wm_qtail % (MAX_INT16 + 1)
+  ensures 0 <= gv.wm_qtail - gv.tx_active.net_head <= 256
+  ensures gv.wm_qtail >= gv.tx_active.net_tail
 
 method load_tx_active_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4)
   requires address == TX_ACTIVE_BASE + HEAD_OFFSET
+  requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_LOAD_QM_TX_ACTIVE)
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_head, 1/4)
   ensures retval == gv.tx_active.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
-{
-  retval := gv.tx_active.net_head % (MAX_INT16 + 1)
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == old(gv.wm_state)
 
 method store_tx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_signal)
   requires address == TX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
   requires value == 0 || value == 1
-  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_signal)
-  ensures value == (gv.tx_active.net_signal ? 1 : 0)
-{
-  gv.tx_active.net_signal := (value == 1)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && value == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_ACTIVE_CONSUMER_SIGNALLED
 
+// No WM handling required: assumes exclusive control already.
 method load_tx_active_addr(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
   requires (address - NDESC_ADDR_OFF - BUFFERS_OFFSET - TX_ACTIVE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_ADDR_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr, 1/4) &&
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr) &&
     valid_net_addr(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
-  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   ensures retval == slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr
+  ensures slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr == old(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   ensures valid_net_addr(retval)
-{
-  var index: Int := (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  retval := slot(gv.tx_active.net_descr, index).ndescr_addr
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_NONE
 
 method load_tx_active_len(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
   requires (address - NDESC_LEN_OFF - BUFFERS_OFFSET - TX_ACTIVE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_LEN_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len, 1/4) &&
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len) &&
     valid_net_len(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
   ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
-  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   ensures retval == slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len
+  ensures slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len == old(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   ensures valid_net_len(retval)
-{
-  var index: Int := (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  retval := slot(gv.tx_active.net_descr, index).ndescr_len
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_NONE
 
 /////////////////////// TX_FREE queue
+method f_store_queue_tail_ghost(heap: IArray, gv: Ref, queue_ptr: Int)
+  requires acc(gv.wm_state_old, 1/2) && acc(gv.wm_state)
+  requires queue_ptr == RX_ACTIVE_BASE ==> gv.wm_state == WM_STORE_DATA_RX_ACTIVE && (gv.wm_state_old == WM_NONE || gv.wm_state_old == WM_STORE_QM_RX_ACTIVE)
+  requires queue_ptr == TX_FREE_BASE ==> gv.wm_state == WM_STORE_DATA_TX_FREE && (gv.wm_state_old == WM_NONE || gv.wm_state_old == WM_STORE_QM_TX_FREE)
+  requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
+  requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
+  requires gv.wm_state_old != WM_NONE ==> acc(gv.wm_store_tail_count)
+  ensures acc(gv.wm_state_old, 1/2) && acc(gv.wm_state) && acc(gv.wm_store_tail_count)
+  ensures gv.wm_state_old == old(gv.wm_state_old)
+  ensures gv.wm_store_tail_count == (gv.wm_state_old == WM_NONE ? 1 : old(gv.wm_store_tail_count) + 1)
+  ensures queue_ptr == RX_ACTIVE_BASE ==> gv.wm_state == WM_STORE_QM_W_DATA_RX_ACTIVE &&
+    acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_tail, 1/4)
+  ensures queue_ptr == TX_FREE_BASE ==> gv.wm_state == WM_STORE_QM_W_DATA_TX_FREE &&
+    acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
+  ensures queue_ptr == RX_ACTIVE_BASE && old(gv.wm_state_old) == WM_NONE ==> acc(gv.wm_qtail) && gv.wm_qtail == gv.rx_active.net_tail
+  ensures queue_ptr == TX_FREE_BASE && old(gv.wm_state_old) == WM_NONE ==> acc(gv.wm_qtail) && gv.wm_qtail == gv.tx_free.net_tail
+
 method load_tx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
+  requires acc(gv.wm_state, 1/2) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_TX_FREE)
+  requires gv.wm_state == WM_NONE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
+  requires gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(gv.wm_qtail, 1/4)
   requires address == TX_FREE_BASE + TAIL_OFFSET
-  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
-  ensures retval == gv.tx_free.net_tail % (MAX_INT16 + 1)
+  ensures acc(gv.wm_state, 1/2)
+  ensures gv.wm_state == WM_NONE ==> acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4)
+  ensures gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(gv.wm_qtail, 1/4)
+  ensures gv.wm_state == WM_NONE ==> retval == gv.tx_free.net_tail % (MAX_INT16 + 1)
+  ensures gv.wm_state == WM_STORE_QM_TX_FREE ==> retval == gv.wm_qtail % (MAX_INT16 + 1)
   ensures valid_net_tail(retval)
-{
-  retval := gv.tx_free.net_tail % (MAX_INT16 + 1)
-  refute false
-}
 
 method load_tx_free_head(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head)
-  requires acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4)
-  requires 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256 &&
-    forall i: Int :: gv.tx_free.net_tail <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
-      acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 1/4)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head, 1/4) && acc(gv.tx_free.net_tail, 1/4)
   requires address == TX_FREE_BASE + HEAD_OFFSET
-  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head)
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_head, 1/4) && acc(gv.tx_free.net_tail, 1/4)
   ensures retval == gv.tx_free.net_head % (MAX_INT16 + 1)
   ensures valid_net_head(retval)
-  ensures gv.tx_free.net_head >= old(gv.tx_free.net_head)
-  ensures acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_descr, 1/4) &&
-    0 <= gv.tx_free.net_tail - old(gv.tx_free.net_head) <= 256 &&
-    forall i: Int :: gv.tx_free.net_tail <= i < old(gv.tx_free.net_head) + QUEUE_CAPACITY ==>
-      acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 1/4)
-  ensures 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256
-  ensures forall i: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
-    acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_free.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_free.net_descr, i).ndescr_len)
-  ensures forall i: Int, j: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY &&
-    gv.tx_free.net_tail <= j < gv.tx_free.net_head + QUEUE_CAPACITY &&
-    slotq(gv.tx_free.net_descr, i).ndescr_addr == slotq(gv.tx_free.net_descr, j).ndescr_addr ==>
-      i == j
-{
-  exhale acc(gv.tx_free.net_head)
-  inhale acc(gv.tx_free.net_head)
-  inhale gv.tx_free.net_head >= old(gv.tx_free.net_head)
-  inhale 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256
-  inhale forall i: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
-    acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_free.net_descr, i).ndescr_len, 2/3) &&
-    is_valid_data_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_free.net_descr, i).ndescr_len)
-  inhale forall i: Int, j: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY &&
-    gv.tx_free.net_tail <= j < gv.tx_free.net_head + QUEUE_CAPACITY &&
-    slotq(gv.tx_free.net_descr, i).ndescr_addr == slotq(gv.tx_free.net_descr, j).ndescr_addr ==>
-      i == j
-  retval := gv.tx_free.net_head % (MAX_INT16 + 1)
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_QM_TX_FREE
+  ensures acc(gv.wm_qhead) && retval == gv.wm_qhead % (MAX_INT16 + 1)
+  ensures gv.wm_qhead >= gv.tx_free.net_head
+  ensures 0 <= gv.tx_free.net_tail - gv.wm_qhead <= 256
 
 method store_tx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_added) && acc(gv.tx_free.net_descr, 1/4) &&
-    acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_addr, 1/4) &&
-    acc(slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_len, 1/4) &&
-    acc(gv.tx_free.net_head, 1/4)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_head, 1/4) && acc(gv.wm_store_tail_count, 1/2)
   requires address == TX_FREE_BASE + TAIL_OFFSET
   requires valid_net_tail(value)
-  requires value == (gv.tx_free.net_tail + 1) % (MAX_INT16 + 1)
-  requires gv.tx_free.net_tail - gv.tx_free.net_head != QUEUE_CAPACITY
-  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_added) && acc(gv.tx_free.net_descr, 1/4) &&
-    acc(slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_addr, 1/4) &&
-    acc(slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_len, 1/4) &&
-    acc(gv.tx_free.net_head, 1/4)
-  ensures gv.tx_free.net_added == old(gv.tx_free.net_added) union Set(Seq(
-    slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_addr,
-    slotq(gv.tx_free.net_descr, old(gv.tx_free.net_tail)).ndescr_len
-  ))
-  ensures gv.tx_free.net_tail == old(gv.tx_free.net_tail) + 1
-{
-  gv.tx_free.net_added := gv.tx_free.net_added union Set(Seq(
-    slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_addr,
-    slotq(gv.tx_free.net_descr, gv.tx_free.net_tail).ndescr_len
-  ))
-  gv.tx_free.net_tail := gv.tx_free.net_tail + 1
-  refute false
-}
+  requires value == (gv.tx_free.net_tail + gv.wm_store_tail_count) % (MAX_INT16 + 1)
+  requires (gv.tx_free.net_tail + gv.wm_store_tail_count - 1) - gv.tx_free.net_head != QUEUE_CAPACITY
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_TX_FREE
+  requires acc(gv.wm_qtail) && gv.wm_qtail == gv.tx_free.net_tail + gv.wm_store_tail_count - 1
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_tail, 1/4) && acc(gv.tx_free.net_head, 1/4) && acc(gv.wm_store_tail_count, 1/2)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_QM_TX_FREE && acc(gv.wm_qtail) && gv.wm_qtail == gv.tx_free.net_tail + gv.wm_store_tail_count
 
 method store_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
   requires address == TX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
   requires value == 0 || value == 1
-  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
-  ensures value == (gv.tx_free.net_signal ? 1 : 0)
-{
-  gv.tx_free.net_signal := (value == 1)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && value == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_TX_FREE_CONSUMER_SIGNALLED
 
 method load_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
-  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
   requires address == TX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
-  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_signal)
-  ensures retval == (gv.tx_free.net_signal ? 1 : 0)
-{
-  exhale acc(gv.tx_free.net_signal)
-  inhale acc(gv.tx_free.net_signal)
-  retval := (gv.tx_free.net_signal ? 1 : 0)
-  refute false
-}
+  requires acc(gv.wm_state) && gv.wm_state == WM_NONE
+  ensures acc(gv.wm_consumer_signalled) && retval == (gv.wm_consumer_signalled ? 1 : 0)
+  ensures acc(gv.wm_state) && gv.wm_state == WM_LOAD_TX_FREE_CONSUMER_SIGNALLED
 
 method store_tx_free_addr(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
   requires (address - NDESC_ADDR_OFF - BUFFERS_OFFSET - TX_FREE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_ADDR_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
   requires valid_net_addr(value)
+  requires acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_TX_FREE)
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
-  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr)
-  ensures slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_addr == value
-{
-  var index: Int := (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  slot(gv.tx_free.net_descr, index).ndescr_addr := value
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_ADDR_TX_FREE && acc(gv.wm_qaddr) && gv.wm_qaddr == value &&
+    acc(gv.wm_qref) && gv.wm_qref == slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+  ensures acc(gv.wm_state_old) && gv.wm_state_old == old(gv.wm_state)
 
 method store_tx_free_len(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
   requires (address - NDESC_LEN_OFF - BUFFERS_OFFSET - TX_FREE_BASE) % NDESC_LEN == 0
   requires (address - NDESC_LEN_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
-  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
   requires valid_net_len(value)
+  requires acc(gv.wm_state) && gv.wm_state == WM_STORE_ADDR_TX_FREE &&
+    acc(gv.wm_qref, 1/2) && gv.wm_qref == slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
   ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
-  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len)
-  ensures slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN).ndescr_len == value
-{
-  var index: Int := (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
-  slot(gv.tx_free.net_descr, index).ndescr_len := value
-  refute false
-}
+  ensures acc(gv.wm_state) && gv.wm_state == WM_STORE_DATA_TX_FREE && acc(gv.wm_qref, 1/2) &&
+    acc(gv.wm_qlen) && gv.wm_qlen == value
 
 /////////////////////// shared buffers
 //define buffer_addr_range(addr)
