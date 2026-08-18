@@ -306,15 +306,16 @@ def generate(
         # Ethernet driver requires timer access to wait for reconfiguration
         timer_system.add_client(ethernet_driver)
 
-        eth_region_0 = MemoryRegion(
+        ixgbe_regs = MemoryRegion(
             sdf, name="eth_region_0", size=0x100000, paddr=board.ethernet
         )
-        sdf.add_mr(eth_region_0)
+        sdf.add_mr(ixgbe_regs)
         ethernet_driver.add_map(
-            Map(eth_region_0, vaddr=0x2000000, perms="rw", cached=False)
+            Map(ixgbe_regs, vaddr=0x2000000, perms="rw", cached=False)
         )
 
-        # Note: `write-back` cache is good and performant for hw_ring, so cached=True
+        # We can use `write-back` caching (i.e. cached=True) on x86 because the bus
+        # will perform cache snooping in hardware, making it DMA coherent.
         hw_rx_ring_buffer = MemoryRegion(
             sdf, name="hw_rx_ring_buffer", size=0x4000, paddr=0x10000000
         )

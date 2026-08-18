@@ -12,6 +12,8 @@ ETH_DRIV ?= eth_driver_virtio.elf
 TIMER_DRIV_DIR ?= tsc_hpet
 UART_DRIV_DIR ?= pc99
 
+CPU := generic
+
 ifeq (${X86_BOARD},)
     X86_BOARD := qemu_virt_x86
 endif
@@ -21,8 +23,6 @@ ifeq (${X86_BOARD},qemu_virt_x86)
     NET_DRIV_DIR ?= virtio/pci
     ETH_DRIV ?= eth_driver_virtio.elf
     UART_DRIV_DIR ?= pc99
-
-    CPU := generic
 
     SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
     SEL4_32B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4_32.elf
@@ -45,7 +45,6 @@ else ifeq ($(X86_BOARD), $(filter ${X86_BOARD},makatea vb_105 viscous))
     NET_DRIV_DIR := ixgbe
     ETH_DRIV := eth_driver_ixgbe.elf
     UART_DRIV_DIR := pc99
-    CPU := generic
 
     DTS :=
     SEL4_64B = $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf

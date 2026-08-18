@@ -423,7 +423,7 @@ void init_2(void)
 
     // sleep for 10 seconds. Just stabilize the hardware
     // Well. this ugliness costed us two days of debugging.
-    sddf_timer_set_timeout(timer_config.driver_id, 10 * NS_IN_S);
+    sddf_timer_set_timeout(timer_config.driver_id, 3 * NS_IN_S);
 }
 
 void init_3(void)
