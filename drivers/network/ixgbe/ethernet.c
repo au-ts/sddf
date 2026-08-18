@@ -39,6 +39,8 @@ const uint64_t hw_tx_ring_vaddr = 0x2404000;
 #define NUM_RX_DESCS 512llu
 #define TX_CLEAN_BATCH 32llu
 
+bool pci_ready = false;
+
 struct ixgbe_device {
     volatile ixgbe_adv_rx_desc_t *rx_ring;
     size_t rx_head, rx_tail;
@@ -297,6 +299,11 @@ void tx_return(void)
 
 void init(void)
 {
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     eth_regs = (eth_regs_t *)0x2000000;
 
     // see PCI Express Technology 3.0 Chapter 17 for more details.
@@ -487,6 +494,16 @@ void init_3(void)
 
 void notified(microkit_channel ch)
 {
+    if (ch == 10) {
+        pci_ready = true;
+        init();
+        return;
+    }
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     if (ch == timer_config.driver_id) {
         if (device.init_stage == 0) {
             init_1();
@@ -495,11 +512,9 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
         }
-    /* } else if (device.init_stage != 4 && ch == device_resources.irqs[0].id) { */
     } else if (device.init_stage != 4 && ch == 16) {
         microkit_deferred_irq_ack(ch);
     } else if (device.init_stage == 4) {
-        /* if (ch == device_resources.irqs[0].id) { */
         if (ch == 16) {
             // read-to-clear
             uint32_t cause = eth_regs->eicr;

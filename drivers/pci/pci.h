@@ -362,6 +362,7 @@ typedef struct pci_bridge_node {
 typedef struct pci_device_bar {
     uint8_t id;
     uintptr_t vaddr;
+    uint32_t size;
 } pci_device_bar_t;
 
 typedef struct pci_device_irq {
