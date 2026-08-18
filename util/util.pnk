@@ -27,6 +27,12 @@
 #define sddf_deferred_notify(channel) \
     @sddf_deferred_notify(0, channel, 0, 0)
 
+#define microkit_x86_ioport_write_8(ioport_id, port_addr, data) \
+    @microkit_x86_ioport_write_8(port_addr, ioport_id, data, 0)
+
+#define microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr) \
+    @microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr, 0)
+
 #define cache_clean(start, end) \
     @cache_clean(start, 0, end, 0)
 

@@ -1,0 +1,166 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define RX_CH                  pnk_mem(2)
+#define TX_CH                  pnk_mem(3)
+
+#define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
+#define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
+#define IOPORT_DATA            pnk_mem(6)
+#define IOPORT_DATA_PTR        pnk_mem_ptr(6)
+
+// @billn Need a way to express io port in sdfgen config structure
+#define IOPORT_ID 0
+#define IOPORT_BASE 1016
+// @billn need some sort of "machine description" format for x86 sdfgen to automatically pull in IRQ
+#define IRQ_ID 1
+
+/*
+ * Port offsets
+ * W    - write
+ * R    - read
+ * RW   - read and write
+ * DLAB - Alternate register function bit
+ */
+
+#define SERIAL_THR  0 /* Transmitter Holding Buffer (W ) DLAB = 0 */
+#define SERIAL_RBR  0 /* Receiver Buffer            (R ) DLAB = 0 */
+#define SERIAL_DLL  0 /* Divisor Latch Low Byte     (RW) DLAB = 1 */
+#define SERIAL_IER  1 /* Interrupt Enable Register  (RW) DLAB = 0 */
+#define SERIAL_DLH  1 /* Divisor Latch High Byte    (RW) DLAB = 1 */
+#define SERIAL_IIR  2 /* Interrupt Identification   (R ) */
+#define SERIAL_FCR  2 /* FIFO Control Register      (W ) */
+#define SERIAL_LCR  3 /* Line Control Register      (RW) */
+#define SERIAL_MCR  4 /* Modem Control Register     (RW) */
+#define SERIAL_LSR  5 /* Line Status Register       (R ) */
+#define SERIAL_MSR  6 /* Modem Status Register      (R ) */
+#define SERIAL_SR   7 /* Scratch Register           (RW) */
+#define SERIAL_DLAB BIT(7)
+#define SERIAL_LSR_DATA_READY BIT(0)
+#define SERIAL_LSR_TRANSMITTER_EMPTY BIT(5)
+
+#define MODEM_STATUS 0
+#define TX_HOLD_REG_EMPTY 1
+#define RX_DATA_AVAIL 2
+#define RX_LINE_STS 3
+
+inline fun write(1 port_offset, 1 v)
+{
+    microkit_x86_ioport_write_8(IOPORT_ID, IOPORT_BASE + port_offset, v);
+    return 0;
+}
+
+inline fun read(1 port_offset)
+{
+    var data_ptr = IOPORT_DATA_PTR;
+    microkit_x86_ioport_read_8(data_ptr, IOPORT_ID, IOPORT_BASE + port_offset);
+    var ret = 0;
+    !ld8 ret, data_ptr;
+    return ret;
+}
+
+inline fun tx_ready()
+{
+    var ret = read(SERIAL_LSR);
+    ret = ret & SERIAL_LSR_TRANSMITTER_EMPTY;
+    return ret;
+}
+
+inline fun rx_ready()
+{
+    var ret = read(SERIAL_LSR);
+    ret = ret & SERIAL_LSR_DATA_READY;
+    return ret;
+}
+
+fun tx_provide()
+{
+    var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
+
+    var transferred = false;
+    while (true) {
+        var {1, 1} res = serial_dequeue(tx_queue_handle);
+        if (res.0) {
+            break;
+        }
+        while (true) {
+            var ready = tx_ready();
+            if (ready) {
+                break;
+            }
+        }
+        write(SERIAL_THR, res.1 & MAX_UINT8);
+        transferred = true;
+    }
+
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
+    }
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle = SERIAL_RX_QUEUE_HANDLE;
+
+    var enqueued = false;
+    while (true) {
+        var ready = rx_ready();
+        if (!ready) {
+            break;
+        }
+
+        var tail = serial_queue_get_tail(rx_queue_handle);
+        var is_full = serial_queue_full(rx_queue_handle, tail);
+        if (is_full) {
+            break;
+        }
+
+        var c = read(SERIAL_RBR);
+        serial_enqueue(rx_queue_handle, c & MAX_UINT8);
+        enqueued = true;
+    }
+
+    if (enqueued) {
+        sddf_notify(RX_CH);
+    }
+
+    return 0;
+}
+
+fun handle_irq() {
+    var iir = read(SERIAL_IIR);
+    iir = iir >> 1;
+    if (iir & RX_DATA_AVAIL) {
+        rx_return();
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == TX_CH) {
+        tx_provide();
+    } else {
+        if (ch == RX_CH) {
+            rx_return();
+        } else {
+            if (ch == IRQ_ID) {
+                handle_irq();
+                sddf_deferred_irq_ack(IRQ_ID);
+            } else {
+                debug_print(ch);
+            }
+        }
+    }
+
+    return 0;
+}
