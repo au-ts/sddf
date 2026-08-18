@@ -216,16 +216,6 @@ BOARDS: List[Board] = [
         timer=0xFED00000,
         ethernet=0xFE000000,
     ),
-    # To define a custom x86_64 machine configuration, duplicate one of the examples
-    # below and replace values with the physical addresses for your target hardware.
-    # You will need to boot into Linux and have the root permission:
-    #   - `paddr_top`: Upper boundary of usable physical memory.
-    #   - `serial`: UART COM port I/O base address (0x3F8 for COM1 / ttyS0).
-    #       Find via: `sudo cat /proc/ioports | grep serial` or `sudo dmesg | grep ttyS`
-    #   - `timer`: HPET timer MMIO base address (typically 0xFED00000).
-    #       Find via: `sudo cat /proc/iomem | grep -i hpet` or `sudo dmesg | grep -i hpet`
-    #   - `ethernet`: Base physical address of Memory Region 0 (BAR0) for the ixgbe-compatible NIC
-    #       Find via: `lspci -vvv` (look under the Ethernet controller for "Region 0: Memory at ...")
     Board(
         name="vb_105",
         arch=SystemDescription.Arch.X86_64,
