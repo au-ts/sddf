@@ -139,10 +139,12 @@ export fun tx_provide()
         uart_write_cr1(cr1);
     }
 
-    var require_signal = serial_require_consumer_signal(tx_queue_handle);
-    if (transferred && require_signal) {
-        serial_cancel_consumer_signal(tx_queue_handle);
-        sddf_notify(TX_CH);
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
     }
 
     return 0;

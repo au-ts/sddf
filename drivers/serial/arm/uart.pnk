@@ -1,0 +1,258 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define UART_REG_BASE          pnk_mem(0)
+
+#define IRQ_CH                 pnk_mem(1)
+#define RX_CH                  pnk_mem(2)
+#define TX_CH                  pnk_mem(3)
+
+#define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
+#define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
+
+#define RX_ENABLED             pnk_mem(1024)
+
+#define PL011_DR            0   /* 0x000 Data Register */
+#define PL011_RSR_ECR       4   /* 0x004 Receive Status Register/Error Clear Register */
+#define PL011_FR            24  /* 0x018 Flag Register */
+#define PL011_ILPR          32  /* 0x020 IrDA Low-Power Counter Register */
+#define PL011_IBRD          36  /* 0x024 Integer Baud Rate Register */
+#define PL011_FBRD          40  /* 0x028 Fractional Baud Rate Register */
+#define PL011_LCR_H         44  /* 0x02c Line Control Register */
+#define PL011_TCR           48  /* 0x030 Control Register */
+#define PL011_IFLS          52  /* 0x034 Interrupt FIFO Level Select Register */
+#define PL011_IMSC          56  /* 0x038 Interrupt Mask Set/Clear Register */
+#define PL011_RIS           60  /* 0x03C Raw Interrupt Status Register */
+#define PL011_MIS           64  /* 0x040 Masked Interrupt Status Register */
+#define PL011_ICR           68  /* 0x044 Interrupt Clear Register */
+#define PL011_DMACR         72  /* 0x048 DMA Control Register */
+
+/* Data Register bits */
+#define PL011_DR_DATA_MASK          255            /* Read or write from/to these bits to rx or tx. */
+
+/* Flag Register bits */
+#define PL011_FR_TXFE               BIT(7)          /* Transmit FIFO empty. */
+#define PL011_FR_RXFF               BIT(6)          /* Receive FIFO full. */
+#define PL011_FR_TXFF               BIT(5)          /* Transmit FIFO full. */
+#define PL011_FR_RXFE               BIT(4)          /* Receive FIFO empty. */
+#define PL011_FR_UART_BUSY          BIT(3)          /* Uart busy transmitting data. */
+
+/* Line Control Register bits */
+#define PL011_LCR_WLEN_MASK         3             /* Word length. b00 = 5, b01 = 6, b10 = 7, b11 = 8. */
+#define PL011_LCR_WLEN_SHFT         5
+#define PL011_LCR_FIFO_EN           BIT(4)          /* Enable tx and rx FIFOs. */
+#define PL011_LCR_2_STP_BITS        BIT(3)          /* Set this bit to 1 to tx two stop bits. */
+#define PL011_LCR_PARTY_EVEN        BIT(2)          /* Even parity select. */
+#define PL011_LCR_PARTY_EN          BIT(1)          /* Enable parity checks and addition. */
+
+/* Control Register */
+#define PL011_CR_RX_EN              BIT(9)          /* Enable rx. */
+#define PL011_CR_TX_EN              BIT(8)          /* Enable tx. */
+#define PL011_CR_UART_EN            BIT(0)          /* Enable the uart. */
+
+/* Interrupt FIFO Level Select Register */
+#define PL011_IFLS_RX_MASK          7             /* Rx interrupt level select. b000 = 1/8, b001 = 1/4, b010 = 1/2, b011 = 3/4, b100 = 7/8. */
+#define PL011_IFLS_RX_SHFT          3
+#define PL011_IFLS_TX_MASK          7             /* Tx interrupt level select. b000 = 1/8, b001 = 1/4, b010 = 1/2, b011 = 3/4, b100 = 7/8. */
+#define PL011_IFLS_TX_SHFT          0
+
+/* Interrupt Mask Set/Clear Register */
+#define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Enable rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
+#define PL011_IMSC_TX_INT           BIT(5)          /* Enable tx interrupt when FIFO drops below programmed threshold. */
+#define PL011_IMSC_RX_INT           BIT(4)          /* Enable rx interrupt when FIFO exceeds programmed threshold. */
+
+/* Masked Interrupt Status Register */
+#define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
+#define PL011_IMSC_TX_INT           BIT(5)          /* Tx interrupt when FIFO drops below programmed threshold. */
+#define PL011_IMSC_RX_INT           BIT(4)          /* Rx interrupt when FIFO exceeds programmed threshold. */
+
+inline fun uart_read_reg(1 offset)
+{
+    var reg_addr = UART_REG_BASE + offset;
+    var val = 0;
+    !ld32 val, reg_addr;
+    return val;
+}
+
+inline fun uart_write_reg(1 offset, 1 val)
+{
+    var reg_addr = UART_REG_BASE + offset;
+    !st32 reg_addr, val;
+    return 0;
+}
+
+inline fun uart_read_fr()
+{
+    return uart_read_reg(PL011_FR);
+}
+
+inline fun uart_read_dr()
+{
+    var dr = uart_read_reg(PL011_DR);
+    return dr & PL011_DR_DATA_MASK;
+}
+
+inline fun uart_write_dr(1 c)
+{
+    uart_write_reg(PL011_DR, c);
+    return 0;
+}
+
+inline fun uart_read_imsc()
+{
+    return uart_read_reg(PL011_IMSC);
+}
+
+inline fun uart_write_imsc(1 val)
+{
+    uart_write_reg(PL011_IMSC, val);
+    return 0;
+}
+
+inline fun uart_read_mis()
+{
+    return uart_read_reg(PL011_MIS);
+}
+
+fun tx_provide()
+{
+    var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
+
+    var transferred = false;
+    while (true) {
+        var fr = uart_read_fr();
+        if (fr & PL011_FR_TXFF) {
+            break;
+        }
+
+        var {1, 1} res = serial_dequeue(tx_queue_handle);
+        if (res.0) {
+            break;
+        }
+        uart_write_dr(res.1 & MAX_UINT8);
+        transferred = true;
+    }
+
+    var head = serial_queue_get_head(tx_queue_handle);
+    var is_empty = serial_queue_empty(tx_queue_handle, head);
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!is_empty) {
+        var imsc = uart_read_imsc();
+        imsc = imsc | PL011_IMSC_TX_INT;
+        uart_write_imsc(imsc);
+    } else {
+        var imsc = uart_read_imsc();
+        imsc = imsc & bitwise_not(PL011_IMSC_TX_INT);
+        uart_write_imsc(imsc);
+    }
+
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
+    }
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle = SERIAL_RX_QUEUE_HANDLE;
+
+    var reprocess = true;
+    var enqueued = false;
+    while (reprocess) {
+        while (true) {
+            var fr = uart_read_fr();
+            if (fr & PL011_FR_RXFE) {
+                break;
+            }
+
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                break;
+            }
+
+            var c = uart_read_dr();
+            var err = serial_enqueue(rx_queue_handle, c & MAX_UINT8);
+            enqueued = true;
+        }
+
+        var fr = uart_read_fr();
+        if (!(fr & PL011_FR_RXFE)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                var imsc = uart_read_imsc();
+                /* Disable rx interrupts until virtualisers queue is no longer full. */
+                imsc = imsc & bitwise_not(PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+                uart_write_imsc(imsc);
+                serial_request_consumer_signal(rx_queue_handle);
+            }
+        }
+
+        reprocess = false;
+
+        fr = uart_read_fr();
+        if (!(fr & PL011_FR_RXFE)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (!is_full) {
+                serial_cancel_consumer_signal(rx_queue_handle);
+                var imsc = uart_read_imsc();
+                imsc = imsc | (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+                uart_write_imsc(imsc);
+                reprocess = true;
+            }
+        }
+    }
+
+    if (enqueued) {
+        sddf_notify(RX_CH);
+    }
+
+    return 0;
+}
+
+fun handle_irq() {
+    var uart_int_reg = uart_read_mis();
+    while (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_int_reg & PL011_IMSC_TX_INT) {
+        var rx_enabled = RX_ENABLED;
+        if (rx_enabled && uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
+            rx_return();
+        }
+        if (uart_int_reg & PL011_IMSC_TX_INT) {
+            tx_provide();
+        }
+        uart_int_reg = uart_read_mis();
+    }
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == IRQ_CH) {
+        handle_irq();
+        sddf_deferred_irq_ack(ch);
+    } else {
+        if (ch == TX_CH) {
+            tx_provide();
+        } else {
+            if (ch == RX_CH) {
+                var imsc = uart_read_imsc();
+                imsc = imsc | (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+                uart_write_imsc(imsc);
+                rx_return();
+            } else {
+                debug_print(ch);
+            }
+        }
+    }
+
+    return 0;
+}
