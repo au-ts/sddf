@@ -222,4 +222,4 @@
  * while after closing.  Increase the max number of concurrent streams to allow
  * for a few of these while the next benchmark runs.
  */
-#define MEMP_NUM_TCP_PCB 10
+#define MEMP_NUM_TCP_PCB 20
