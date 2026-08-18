@@ -26,6 +26,11 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
     build_dir = common.example_build_path(test_config)
     example_dir = get_example_dir(test_config.example)
 
+    if args.pancake:
+        pancake_args = ["PANCAKE_SERIAL_DRIVER=1"]
+    else:
+        pancake_args = []
+
     subprocess.run(
         [
             "make",
@@ -35,7 +40,7 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
             f"MICROKIT_SDK={args.microkit_sdk}",
             f"MICROKIT_BOARD={test_config.board}",
             f"MICROKIT_CONFIG={test_config.config}",
-        ],
+        ] + pancake_args,
         check=True,
     )
 
@@ -137,6 +142,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Do not remove any pre-existing CI build directory before building",
     )
+    parser.add_argument("--pancake", action="store_true", help="Use Pancake implementations")
 
     filters = parser.add_argument_group(title="filters")
     filters.add_argument(
