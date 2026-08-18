@@ -16,31 +16,31 @@
 
 /* Macros for FFI calls */
 #define sddf_irq_ack(channel) \
-  @sddf_irq_ack(0, channel, 0, 0)
+    @sddf_irq_ack(0, channel, 0, 0)
 
 #define sddf_notify(channel) \
-  @sddf_notify(0, channel, 0, 0)
+    @sddf_notify(0, channel, 0, 0)
 
 #define sddf_deferred_irq_ack(channel) \
-  @sddf_deferred_irq_ack(0, channel, 0, 0)
+    @sddf_deferred_irq_ack(0, channel, 0, 0)
 
 #define sddf_deferred_notify(channel) \
-  @sddf_deferred_notify(0, channel, 0, 0)
+    @sddf_deferred_notify(0, channel, 0, 0)
 
 #define cache_clean(start, end) \
-  @cache_clean(start, 0, end, 0)
+    @cache_clean(start, 0, end, 0)
 
 #define cache_clean_and_invalidate(start, end) \
-  @cache_clean_and_invalidate(start, 0, end, 0)
+    @cache_clean_and_invalidate(start, 0, end, 0)
 
 #define THREAD_MEMORY_RELEASE() \
-  @THREAD_MEMORY_RELEASE(0, 0, 0, 0)
+    @THREAD_MEMORY_RELEASE(0, 0, 0, 0)
 
 #define THREAD_MEMORY_ACQUIRE() \
-  @THREAD_MEMORY_ACQUIRE(0, 0, 0, 0)
+    @THREAD_MEMORY_ACQUIRE(0, 0, 0, 0)
 
 #define fence_seq_cst() \
-  @fence_seq_cst(0, 0, 0, 0)
+    @fence_seq_cst(0, 0, 0, 0)
 
 #define debug_print(value) \
-  @debug_print(0, __LINE__, 0, value)
+    @debug_print(0, value, 0, __LINE__)
