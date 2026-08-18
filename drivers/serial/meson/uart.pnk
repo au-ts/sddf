@@ -207,21 +207,20 @@ export fun notified(1 ch)
     if (ch == IRQ_CH) {
         handle_irq();
         sddf_deferred_irq_ack(ch);
-        return 0;
-    }
+    } else {
+        if (ch == TX_CH) {
+            tx_provide();
+        } else {
+            if (ch == RX_CH) {
+                var cr = uart_read_cr();
+                cr = cr | AML_UART_RX_INT_EN;
+                uart_write_cr(cr);
 
-    if (ch == TX_CH) {
-        tx_provide();
-        return 0;
-    }
-
-    if (ch == RX_CH) {
-        var cr = uart_read_cr();
-        cr = cr | AML_UART_RX_INT_EN;
-        uart_write_cr(cr);
-
-        rx_return();
-        return 0;
+                rx_return();
+            } else {
+                debug_print(ch);
+            }
+        }
     }
 
     return 0;
