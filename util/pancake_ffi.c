@@ -1,3 +1,8 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <microkit.h>
 #include <os/sddf.h>
 #include <sddf/util/cache.h>
