@@ -25,6 +25,38 @@
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
+#ifdef PANCAKE_SERIAL_DRIVER
+static char cml_memory[1024 * 20];
+extern void *cml_heap;
+extern void *cml_stack;
+extern void *cml_stackend;
+
+extern void cml_main(void);
+
+void cml_exit(int arg) {
+    microkit_dbg_puts("ERROR! We should not be getting here\n");
+}
+
+void cml_err(int arg) {
+    if (arg == 3) {
+        microkit_dbg_puts("Memory not ready for entry. You may have not run the init code yet, or be trying to enter during an FFI call.\n");
+    }
+    cml_exit(arg);
+}
+
+void cml_clear() {
+    microkit_dbg_puts("Trying to clear cache\n");
+}
+
+void init_pancake_mem() {
+    unsigned long cml_heap_sz = 1024 * 10;
+    unsigned long cml_stack_sz = 1024 * 10;
+    cml_heap = cml_memory;
+    cml_stack = cml_heap + cml_heap_sz;
+    cml_stackend = cml_stack + cml_stack_sz;
+}
+#endif /* PANCAKE_SERIAL_DRIVER */
+
 bool waiting_for_tx_to_finish = false;
 
 serial_queue_handle_t rx_queue_handle;
@@ -35,6 +67,7 @@ volatile uintptr_t uart_base;
 
 #define REG_PTR(off)     ((volatile uint32_t *)(uart_base + off))
 
+#ifndef PANCAKE_SERIAL_DRIVER
 static void tx_provide(void)
 {
     if (waiting_for_tx_to_finish) {
@@ -130,6 +163,7 @@ static void handle_irq(void)
         rx_return();
     }
 }
+#endif /* PANCAKE_SERIAL_DRIVER */
 
 static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd, uint8_t *bdiv)
 {
@@ -272,8 +306,27 @@ void init(void)
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
+#ifdef PANCAKE_SERIAL_DRIVER
+    init_pancake_mem();
+
+    uintptr_t *pnk_mem = (uintptr_t *) cml_heap;
+
+    pnk_mem[0] = (uintptr_t) uart_base;
+    pnk_mem[1] = device_resources.irqs[0].id;
+    pnk_mem[2] = config.rx.id;
+    pnk_mem[3] = config.tx.id;
+    pnk_mem[4] = (uintptr_t) &rx_queue_handle;
+    pnk_mem[5] = (uintptr_t) &tx_queue_handle;
+    pnk_mem[1024] = config.rx_enabled;
+
+    cml_main();
+#endif /* PANCAKE_SERIAL_DRIVER */
 }
 
+#ifdef PANCAKE_SERIAL_DRIVER
+extern void notified(sddf_channel ch);
+#else
 void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
@@ -287,3 +340,4 @@ void notified(sddf_channel ch)
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
+#endif /* PANCAKE_SERIAL_DRIVER */

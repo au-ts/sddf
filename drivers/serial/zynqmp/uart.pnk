@@ -1,0 +1,265 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define UART_REG_BASE          pnk_mem(0)
+
+#define IRQ_CH                 pnk_mem(1)
+#define RX_CH                  pnk_mem(2)
+#define TX_CH                  pnk_mem(3)
+
+#define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
+#define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
+
+#define RX_ENABLED             pnk_mem(1024)
+#define RX_ENABLED_PTR         pnk_mem_ptr(1024)
+#define WAITING_FOR_TX         pnk_mem(1025)
+#define WAITING_FOR_TX_PTR     pnk_mem_ptr(1025)
+
+/* Register offsets for the UART. */
+#define ZYNQMP_UART_CR            0  /* Control Register */
+#define ZYNQMP_UART_MR            4  /* Mode Register */
+#define ZYNQMP_UART_IER           8  /* Interrupt Enable */
+#define ZYNQMP_UART_IDR           12 /* Interrupt Disable */
+#define ZYNQMP_UART_IMR           16 /* Interrupt Mask */
+#define ZYNQMP_UART_ISR           20 /* Interrupt Status */
+#define ZYNQMP_UART_BAUDGEN       24 /* Baud Rate Generator */
+#define ZYNQMP_UART_RXTOUT        28 /* RX Timeout */
+#define ZYNQMP_UART_RXWM          32 /* RX FIFO Trigger Level */
+#define ZYNQMP_UART_MODEMCR       36 /* Modem Control */
+#define ZYNQMP_UART_MODEMSR       40 /* Modem Status */
+#define ZYNQMP_UART_SR            44 /* Channel Status */
+#define ZYNQMP_UART_FIFO          48 /* FIFO */
+#define ZYNQMP_UART_BAUDDIV       52 /* Baud Rate Divider */
+
+#define ZYNQMP_UART_CHANNEL_STS_RXEMPTY  BIT(1)
+#define ZYNQMP_UART_CHANNEL_STS_RXFULL   BIT(2)
+#define ZYNQMP_UART_CHANNEL_STS_TXEMPTY  BIT(3)
+#define ZYNQMP_UART_CHANNEL_STS_TXFULL   BIT(4)
+#define ZYNQMP_UART_CHANNEL_STS_TXACTIVE BIT(11)
+#define ZYNQMP_UART_CHANNEL_STS_TXNFULL  BIT(14)
+
+#define ZYNQMP_UART_CR_TX_DIS_SHIFT  5
+#define ZYNQMP_UART_CR_RX_DIS_SHIFT  3
+#define ZYNQMP_UART_CR_TX_EN_SHIFT   4
+#define ZYNQMP_UART_CR_RX_EN_SHIFT   2
+#define ZYNQMP_UART_CR_TX_RST_SHIFT  1
+#define ZYNQMP_UART_CR_RX_RST_SHIFT  0
+#define ZYNQMP_UART_CR_TX_EN         BIT(ZYNQMP_UART_CR_TX_EN_SHIFT)
+#define ZYNQMP_UART_CR_TX_DIS        BIT(ZYNQMP_UART_CR_TX_DIS_SHIFT)
+#define ZYNQMP_UART_CR_TX_RST        BIT(ZYNQMP_UART_CR_TX_RST_SHIFT)
+#define ZYNQMP_UART_CR_RX_EN         BIT(ZYNQMP_UART_CR_RX_EN_SHIFT)
+#define ZYNQMP_UART_CR_RX_DIS        BIT(ZYNQMP_UART_CR_RX_DIS_SHIFT)
+#define ZYNQMP_UART_CR_RX_RST        BIT(ZYNQMP_UART_CR_RX_RST_SHIFT)
+
+#define ZYNQMP_UART_IXR_TXEMPTY      8    /**< TX FIFO empty interrupt. */
+#define ZYNQMP_UART_IXR_RXOVR        1    /**< RX FIFO trigger interrupt. */
+#define ZYNQMP_UART_IXR_MASK         8191 /**< Valid bit mask */
+
+inline fun uart_read_sr()
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_SR;
+    var sr = 0;
+    !ld32 sr, reg_addr;
+    return sr;
+}
+
+inline fun uart_read_isr()
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_ISR;
+    var isr = 0;
+    !ld32 isr, reg_addr;
+    return isr;
+}
+
+inline fun uart_write_isr(1 val)
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_ISR;
+    !st32 reg_addr, val;
+    return 0;
+}
+
+inline fun uart_write_ier(1 val)
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_IER;
+    !st32 reg_addr, val;
+    return 0;
+}
+
+inline fun uart_write_idr(1 val)
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_IDR;
+    !st32 reg_addr, val;
+    return 0;
+}
+
+inline fun uart_read_char()
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_FIFO;
+    var c = 0;
+    !ld32 c, reg_addr;
+    return c & 255;
+}
+
+inline fun uart_write_char(1 c)
+{
+    var reg_addr = UART_REG_BASE + ZYNQMP_UART_FIFO;
+    !st32 reg_addr, c;
+    return 0;
+}
+
+fun tx_provide()
+{
+    var waiting = WAITING_FOR_TX;
+    if (waiting) {
+        /* Wait for TX FIFO empty IRQ before doing more work. */
+        return 0;
+    }
+
+    var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
+
+    var transferred = false;
+    /* Send characters until the TX FIFO is full. */
+    while (true) {
+        var sr = uart_read_sr();
+        if (sr & ZYNQMP_UART_CHANNEL_STS_TXNFULL) {
+            break;
+        }
+
+        var {1, 1} res = serial_dequeue(tx_queue_handle);
+        if (res.0) {
+            break;
+        }
+        uart_write_char(res.1 & MAX_UINT8);
+        transferred = true;
+    }
+
+    if (transferred) {
+        /* If work has been done, ensure that the TX FIFO empty IRQ status is cleared
+         * as the status bits are sticky to prevent stray interrupts. */
+        uart_write_isr(ZYNQMP_UART_IXR_TXEMPTY);
+    }
+
+    var head = serial_queue_get_head(tx_queue_handle);
+    var is_empty = serial_queue_empty(tx_queue_handle, head);
+    /* If there is more work to be done, raise a TX FIFO empty interrupt */
+    if (!is_empty) {
+        uart_write_ier(ZYNQMP_UART_IXR_TXEMPTY);
+        var waiting_ptr = WAITING_FOR_TX_PTR;
+        !st32 waiting_ptr, true;
+    }
+
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
+    }
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle = SERIAL_RX_QUEUE_HANDLE;
+
+    var reprocess = true;
+    var enqueued = false;
+    while (reprocess) {
+        /* Read from RX FIFO until it is empty. */
+        while (true) {
+            var sr = uart_read_sr();
+            if (sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY) {
+                break;
+            }
+
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                break;
+            }
+
+            var c = uart_read_char();
+            var err = serial_enqueue(rx_queue_handle, c & MAX_UINT8);
+            enqueued = true;
+        }
+
+        var sr = uart_read_sr();
+        if (!(sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                /* There's still data to receive but the RX queue is full. */
+                serial_request_consumer_signal(rx_queue_handle);
+            }
+        }
+
+        reprocess = false;
+
+        sr = uart_read_sr();
+        if (!(sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (!is_full) {
+                /* There's more space available in the queue. */
+                serial_cancel_consumer_signal(rx_queue_handle);
+                reprocess = true;
+            }
+        }
+    }
+
+    if (enqueued) {
+        sddf_notify(RX_CH);
+    }
+
+    return 0;
+}
+
+fun handle_irq()
+{
+    /* Read and clear the IRQ status bits so we don't get infinitely interrupted. */
+    var irq_status = uart_read_isr();
+    uart_write_isr(irq_status);
+
+    if (irq_status & ZYNQMP_UART_IXR_TXEMPTY) {
+        /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
+           while doing work, now continue. */
+        var waiting_ptr = WAITING_FOR_TX_PTR;
+        !st32 waiting_ptr, false;
+
+        /* Switch off the TX FIFO empty IRQ, only turn it on again when needed. */
+        uart_write_idr(ZYNQMP_UART_IXR_TXEMPTY);
+
+        /* Continue sending data from sDDF queue. */
+        tx_provide();
+    }
+
+    if (irq_status & ZYNQMP_UART_IXR_RXOVR) {
+        /* The RX FIFO level has hit the watermark, in this case it is 1 byte. Process RX FIFO. */
+        rx_return();
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == IRQ_CH) {
+        handle_irq();
+        sddf_deferred_irq_ack(ch);
+    } else {
+        if (ch == TX_CH) {
+            tx_provide();
+        } else {
+            if (ch == RX_CH) {
+                rx_return();
+            } else {
+                debug_print(ch);
+            }
+        }
+    }
+
+    return 0;
+}
