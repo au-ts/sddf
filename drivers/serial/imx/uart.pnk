@@ -122,7 +122,7 @@ export fun tx_provide()
         if (res.0) {
             break;
         }
-        uart_write_txd(res.1 & 255);
+        uart_write_txd(res.1 & MAX_UINT8);
         transferred = true;
         break;
     }
@@ -171,21 +171,21 @@ fun rx_return()
             }
 
             var rxd = uart_read_rxd();
-            var c = rxd & 255;
+            var c = rxd & MAX_UINT8;
             serial_enqueue(rx_queue_handle, c);
             enqueued = true;
         }
 
         var ts = uart_read_ts();
         var tail = serial_queue_get_tail(rx_queue_handle);
-        var is_full = serial_queue_full(rx_queue_handle, tail);        
+        var is_full = serial_queue_full(rx_queue_handle, tail);
         if ((!(ts & UART_TST_RX_FIFO_EMPTY)) && is_full) {
             var cr1 = uart_read_cr1();
             cr1 = cr1 & bitwise_not(UART_CR1_RX_READY_INT);
             uart_write_cr1(cr1);
             serial_request_consumer_signal(rx_queue_handle);
         }
-        
+
         reprocess = false;
 
         ts = uart_read_ts();
@@ -223,8 +223,8 @@ fun handle_irq()
         }
 
         if (uart_sr1 & UART_SR1_ABNORMAL) {
+            debug_print(uart_sr1);
             uart_cr1 = uart_read_cr1();
-            debug_print(uart_cr1);
             uart_write_sr1(uart_cr1 | UART_SR1_ABNORMAL);
         }
 
