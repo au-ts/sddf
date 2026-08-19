@@ -49,7 +49,7 @@ typedef struct acpi_header {
 typedef struct acpi_rsdt {
     acpi_header_t  header;
     uint32_t entry[1];
-} __attribute__((packed)) acpi_rsdt_t;
+} acpi_rsdt_t;
 
 typedef struct acpi_fadt {
     acpi_header_t header;
