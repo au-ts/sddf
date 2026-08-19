@@ -72,10 +72,10 @@ Breaking changes:
 #### Network
 
 * Support for the Pine64 Star64 board using the `dwmac-5.10a` driver.
-* Update copy component to drop active Rx DMA buffers if client buffer queue is empty
-* (TODO): LWIP changes to echo socket and tick timer and a bunch of other code
-   FIXME: courtney summary?
-    + a variety of extra features (see commits in aug 2025)
+* Update the copy component to drop active Rx DMA buffers if client's free queue is empty
+* Improve the echo server example's TCP echo socket
+* Add features to lib sDDF lwip to allow the user to intercept packets before
+  they are passed to the network subsystem (used by the firewall)
 * Support multiple ethernet drivers for the same board by producing alternate
   ELF files for the driver
 * Support for the [COMPULAB IOT-GATE-iMX8](
@@ -161,7 +161,7 @@ Breaking changes:
 * use /usr/bin/env instead of hardcoded shell paths
 * echo_server: fix process script for benchmarking events
 * echo_server: fixup duplicate uart_driver and virt_tx pds
-* benchmark: synchronises pmu interactions
+* benchmark: added required memory barriers to synchronise pmu interactions
 * drivers/tsc_hpet: serialise rdtsc
 * Makefile dependency fix
 * benchmark: Check for overflows during benchmarking
