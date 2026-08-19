@@ -1,5 +1,3 @@
-# Copyright 2025, UNSW
-# SPDX-License-Identifier: BSD-2-Clause
 import sys, os
 import argparse
 import struct
@@ -68,6 +66,7 @@ class BenchmarkConfig:
         core: int,
         last_core: bool,
         children: List[Tuple[int, str]],
+        pmu_events: List[int],
     ):
         self.ch_rx_start = ch_rx_start
         self.ch_tx_start = ch_tx_start
@@ -77,10 +76,11 @@ class BenchmarkConfig:
         self.core = core
         self.last_core = last_core
         self.children = children
+        self.pmu_events = pmu_events
 
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
-        pack_str = "<BBBBBB?B" + child_config_format * 64
+        pack_str = "<BBBBBB?B" + child_config_format * 64 + "BBBBBBB"
         child_bytes = bytearray()
         for child in self.children:
             c_name = child[1].encode("utf-8")
@@ -90,6 +90,11 @@ class BenchmarkConfig:
             child_bytes.extend(child[0].to_bytes(1, "little"))
         child_bytes = child_bytes.ljust(64 * 65, b"\0")
         child_bytes_list = [x.to_bytes(1, "little") for x in child_bytes]
+
+        num_pmu_events = len(self.pmu_events)
+        assert num_pmu_events <= 6
+        self.pmu_events.extend(0 for _ in range(6 - num_pmu_events))
+
         return struct.pack(
             pack_str,
             self.ch_rx_start,
@@ -101,6 +106,8 @@ class BenchmarkConfig:
             self.last_core,
             len(self.children),
             *child_bytes_list,
+            *self.pmu_events,
+            num_pmu_events,
         )
 
 
@@ -155,11 +162,10 @@ def update_elf_section(elf_name: str, section_name: str, data_name: str, data_nu
     )
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict,
+             pmu_event_ids: List[int]):
     get_core = lambda name: core_dict[name]
 
-    # Which clients exist is driven by the core-allocation file: any key of the
-    # form "clientN" (with a matching "clientN_net_copier") is instantiated.
     client_indices = sorted(
         int(m.group(1))
         for k in core_dict
@@ -336,6 +342,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
                 core_objs[i - 1]["core"],
                 False,
                 core_objs[i - 1]["children"],
+                list(pmu_event_ids),
             )
     core_objs[num_cores - 1]["bench_config"] = BenchmarkConfig(
         core_objs[num_cores - 1]["start_ch"].pd_b_id,
@@ -346,6 +353,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
         core_objs[num_cores - 1]["core"],
         True,
         core_objs[num_cores - 1]["children"],
+        list(pmu_event_ids),
     )
 
     assert serial_system.connect()
@@ -396,6 +404,29 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict):
         f.write(sdf.render())
 
 
+bench_pmu_events = {
+    "CACHE_L1I_MISS": (0, []),
+    "CACHE_L1D_MISS": (1, []),
+    "TLB_L1I_MISS": (2, []),
+    "TLB_L1D_MISS": (3, []),
+    "EXECUTE_INSTRUCTION": (4, []),
+    "BRANCH_MISPREDICT": (5, []),
+    "CPU_CYCLES": (6, []),
+    "MEM_ACCESS": (7, []),
+    "CHAIN": (8, []),
+}
+
+
+def resolve_pmu_events(events: List[str], board: str) -> List[int]:
+    """Map PMU event names to their enum ids, validating as we go."""
+
+    ids = []
+    for i, event in enumerate(events):
+        ids.append(bench_pmu_events[event][0])
+
+    return ids
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
@@ -405,6 +436,7 @@ if __name__ == "__main__":
     parser.add_argument("--sdf", required=True)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
+    parser.add_argument("--bench_pmu_events", required=False)
     args = parser.parse_args()
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
@@ -421,4 +453,19 @@ if __name__ == "__main__":
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, core_dict)
+    if args.bench_pmu_events:
+        pmu_events = args.bench_pmu_events.split(",")
+    else:
+        # If benchmarking PMU events are not provided, we use these default events
+        pmu_events = [
+            "EXECUTE_INSTRUCTION",
+            "CHAIN",
+            "MEM_ACCESS",
+            "CHAIN",
+            "CACHE_L1D_MISS",
+            "CHAIN",
+        ]
+
+    pmu_event_ids = resolve_pmu_events(pmu_events, args.board)
+
+    generate(args.sdf, args.output, dtb, core_dict, pmu_event_ids)

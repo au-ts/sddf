@@ -47,6 +47,7 @@ CFLAGS += \
 	  -MP
 
 CFLAGS += -Wno-tautological-constant-out-of-range-compare
+CFLAGS += $(EXTRA_CFLAGS)
 
 CFLAGS += -D'MJSON_REALLOC(p,s)=((void*)0)' -Dalloca=__builtin_alloca
 
@@ -68,7 +69,8 @@ ${IMAGES}: libsddf_util_debug.a
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+	    $(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf

@@ -9,16 +9,6 @@
 #include <stdbool.h>
 #include <sddf/network/constants.h>
 
-// #include "iperf3_client.h"
-
-#if defined(CONFIG_PLAT_QEMU_ARM_VIRT) || defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
-// We don't need to do any address conflict detection on QEMU
-// as it creates it's own isolated network.
-//
-// Disabling this option drastically decreases the time to
-// complete DHCP on QEMU.
-#define LWIP_DHCP_DOES_ACD_CHECK 0
-#endif
 
 /**
  * Use lwIP without OS-awareness (no thread, semaphores, mutexes or mboxes).
@@ -120,25 +110,16 @@
 #define TCP_MSS 1460
 
 /**
- * The size of a TCP window - Maximum data we can receive at once. This is the
- * receive-side flow-control limit and is the dominant lever for REVERSE
- * (download, server->client) throughput: the server may never have more than
- * TCP_WND bytes in flight to us, so reverse throughput ~= TCP_WND / RTT.
- * To exceed the 16-bit TCP window field's 65535-byte ceiling we must enable
- * receive-side window scaling (TCP_RCV_SCALE > 0 below). lwIP enforces
- * TCP_WND <= (0xFFFF << TCP_RCV_SCALE), so 256 KB needs TCP_RCV_SCALE >= 3.
+ * The size of a TCP window - Maximum data we can receive at once. This
+ * must be at least (2 * TCP_MSS) for things to work well. TCP_WND is chosen to
+ * be the smallest multiple of TCP_MSS which is less than < 65535, the largest
+ * TCP window that can be used without enabling window scaling
  */
 #define TCP_WND (256 * 1024)
 
 /**
- * TCP sender buffer space (bytes) — how much unacked data one connection may
- * have in flight. This is the dominant lever for SINGLE-stream throughput:
- * throughput ≈ TCP_SND_BUF / RTT. Measured (single_core, benchmark, 1 stream):
- *   30000 (old 3*TCP_WND) → ~200 Mbps
- *   256 KB               → ~640 Mbps   (sweet spot, ~fills QEMU's pipe)
- *   1 MB                 → ~475 Mbps   (past BDP: extra per-ACK CPU + bufferbloat)
- * 256 KB sits at the knee. (Sender-side knob; independent of TCP_WND, which is
- * the receive window and is pinned <= 65535 by TCP_RCV_SCALE=0.)
+ * TCP sender buffer space (bytes). To achieve good performance, this
+ * should be at least 2 * TCP_MSS.
  */
 #define TCP_SND_BUF (256 * 1024)
 
@@ -201,21 +182,6 @@
  */
 #define MEMP_NUM_TCP_SEG (3 * TCP_SND_QUEUELEN)
 
-//memp_malloc: out of memory in pool TCP_SEG
-// tcp_create_segment: no memory.
-// memp_malloc: out of memory in pool TCP_SEG
-
-// after test running has started
-
-/**
- * Statistics collection. We enable it (normally off for performance) to get an
- * exact TCP packet count, which is otherwise a byte stream with no datagram
- * count: read lwip_stats.tcp.xmit (segments sent, counted in core tcp_output).
- * LWIP_STATS_LARGE=1 makes the counters u32 (default u16 wraps at 65535 - far
- * too small for a bulk transfer). Everything else is left off to keep the
- * hot-path perturbation minimal. (LINK_STATS is useless here: sDDF's custom
- * netif output bypasses lwIP's link layer, so link.xmit never advances.)
- */
 #define LWIP_STATS        1
 #define LWIP_STATS_LARGE  1
 #define TCP_STATS         1
@@ -251,18 +217,12 @@
  */
 #define MEMP_NUM_TCP_PCB 15
 
-// causes memp_malloc: out of memory in pool TCP_PCB
-// iperf3_ctrl_recv: failed to create stream PCB
-
 /* One pcb per UDP stream plus the spare listener. Bidirectional doubles the
  * stream count, so this must be at least 2 * MAX_STREAMS + 1. */
 #define MEMP_NUM_UDP_PCB 32
 
 /* iperf3 has no UDP accept(): the listener pcb is converted into the stream pcb
- * and a replacement listener is bound to the same data port. udp_bind rejects a
- * duplicate local port unless every pcb on it sets SOF_REUSEADDR (udp.c:993).
- * Harmless for TCP - tcp_bind applies the same both-pcbs rule and nothing here
- * sets SOF_REUSEADDR on a TCP pcb. */
+ * and a replacement listener is bound to the same data port */
 #define SO_REUSE 1
 
 

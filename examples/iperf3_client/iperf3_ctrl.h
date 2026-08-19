@@ -54,6 +54,11 @@ typedef struct iperf_ctrl {
     bool test_done;
     bool test_active;
     bool sent_test_end;
+    /* Set between arming the UDP senders and TEST_START being ACKed */
+    bool udp_arm_pending;
+    /* Arm anyway once this passes. A bidirectional peer floods us the moment it
+     * starts, so its ACK can queue behind its own traffic */
+    uint32_t udp_arm_deadline_ms;
 
     double cpu_util_percent;
     char json_send_buf[4096];

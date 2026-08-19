@@ -225,8 +225,8 @@ void iperf3_tcp_rtt_aggregate(iperf_ctrl_t *ctrl, uint32_t *o_min, uint32_t *o_m
     *o_min  = rcnt ? rmin : 0;
     *o_mean = rmean;
     *o_max = rmax;
-    *o_sd   = rcnt ? isqrt64(rsumsq / rcnt - (uint64_t)rmean * rmean) : 0;
-    *o_n    = rcnt;
+    *o_sd = rcnt ? isqrt64(rsumsq / rcnt - (uint64_t)rmean * rmean) : 0;
+    *o_n  = rcnt;
 }
 
 /**
@@ -247,6 +247,7 @@ void iperf3_ctrl_init(iperf_ctrl_t *ctrl) {
     ctrl->sent_test_end = false;
     ctrl->test_active = false;
     ctrl->test_done = false;
+    ctrl->udp_arm_pending = false;
     ctrl->bytes_sent = 0;
     ctrl->omitting = false;
     ctrl->num_streams = 1;
@@ -365,7 +366,7 @@ static uint32_t iperf3_build_tcp_results(iperf_ctrl_t *ctrl) {
 }
 
 
-/**  UDP results, same shape as the TCP builder. Senders report the datagrams they
+/**  UDP results, same shape as TCP. Senders report the datagrams they
  * pumped; receivers report what arrived, plus loss (from the sender-seq span)
  * and RFC1889 jitter. Body goes at json_send_buf + 4. 
  * 
@@ -401,6 +402,7 @@ static uint32_t iperf3_build_udp_results(iperf_ctrl_t *ctrl) {
             jitter = us->rx_jitter;
             if (us->rx_have_first) {
                 int expected = (int)(us->rx_last_seq - us->rx_first_seq) + 1;
+                (void)expected;
                 lost = expected - (int)us->rx_packets;
                 if (lost < 0) lost = 0;
             }
@@ -418,7 +420,7 @@ static uint32_t iperf3_build_udp_results(iperf_ctrl_t *ctrl) {
 }
 
 /**
- * Simple helper to get mbps by dividing bytes sent over the secs 
+ * Helper to get mbps by dividing bytes sent over the secs 
  * 
  * @param bytes bytes
  * @param secs secs
@@ -453,7 +455,7 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
     int jlen = (int)strlen((char *)ctrl->result_json);
     uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
     if (total > MAX_STREAMS) total = MAX_STREAMS;
-    uint64_t tx_sum = 0, rx_sum = 0;
+    uint64_t tx_sum = 0, rx_sum = 0, peer_sum = 0;
 
     sddf_printf("\n[iperf3] ---------- summary (server) ----------\n");
     sddf_printf("[iperf3] proto=%s streams=%u time=%u s omit=%u s\n",
@@ -461,10 +463,24 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
                 ctrl->num_streams, ctrl->duration_s, ctrl->omit_s);
     for (uint32_t s = 0; s < total; s++) {
         int id = (s == 0) ? 1 : (int)(2 + s);
+        bool sender = ctrl->is_udp ? ctrl->udp_streams[s].is_sender
+                                   : ctrl->streams[s].is_sender;
+        if (sender) {
+            uint64_t tx = ctrl->is_udp ? ctrl->udp_streams[s].bytes_sent
+                                       : ctrl->streams[s].bytes;
+            tx_sum += tx;
+            sddf_printf("[iperf3] [%2d] we sent %llu B (%.2f Mbit/s)\n",
+                        id, (unsigned long long)tx, iperf3_mbps(tx, secs));
+            if (ctrl->is_udp)
+                sddf_printf("[iperf3] [%2d] packets sent=%llu\n", id,
+                            (unsigned long long)ctrl->udp_streams[s].packets_sent);
+            continue;
+        }
+
         uint64_t rx = ctrl->is_udp ? ctrl->udp_streams[s].rx_bytes
                                    : ctrl->streams[s].rx_bytes;
         uint64_t tx = iperf3_peer_stream_bytes((char *)ctrl->result_json, jlen, s);
-        tx_sum += tx;
+        peer_sum += tx;
         rx_sum += rx;
         sddf_printf("[iperf3] [%2d] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
                     id, (unsigned long long)tx, iperf3_mbps(tx, secs),
@@ -473,7 +489,7 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
             iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
             int lost = 0;
             if (us->rx_have_first) {
-                lost = (int)(us->rx_last_seq - us->rx_first_seq) + 1 - (int)us->rx_packets;
+                lost = (int)us->rx_lost;
                 if (lost < 0) lost = 0;
             }
             sddf_printf("[iperf3] [%2d] packets=%llu lost=%d jitter=%.4f ms\n",
@@ -482,9 +498,13 @@ static void iperf3_server_print_summary(iperf_ctrl_t *ctrl) {
         }
     }
     if (total > 1) {
-        sddf_printf("[iperf3] [SUM] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
-                    (unsigned long long)tx_sum, iperf3_mbps(tx_sum, secs),
-                    (unsigned long long)rx_sum, iperf3_mbps(rx_sum, secs));
+        if (rx_sum || peer_sum)
+            sddf_printf("[iperf3] [SUM] client sent %llu B (%.2f Mbit/s)  we received %llu B (%.2f Mbit/s)\n",
+                        (unsigned long long)peer_sum, iperf3_mbps(peer_sum, secs),
+                        (unsigned long long)rx_sum, iperf3_mbps(rx_sum, secs));
+        if (tx_sum)
+            sddf_printf("[iperf3] [SUM] we sent %llu B (%.2f Mbit/s)\n",
+                        (unsigned long long)tx_sum, iperf3_mbps(tx_sum, secs));
     }
     sddf_printf("[iperf3] --------------------------------------\n\n");
 }
@@ -566,6 +586,7 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
     ctrl->test_done = false;
     ctrl->omitting = false;
     ctrl->sent_test_end = false;
+    ctrl->udp_arm_pending = false;
     sddf_printf("[iperf3] server ready for next test\n");
 }
 
@@ -618,7 +639,7 @@ void iperf3_server_stream_ready(iperf_ctrl_t *ctrl) {
 
 /**
  * 
- * Once all UDP streams are ready and have recevied cookie then ready the stream
+ * Once all UDP streams are ready and have received cookie then ready the stream
  * and set and send test start and test running
  * 
  * @param ctrl ctrl
@@ -641,21 +662,52 @@ void iperf3_udp_server_start(iperf_ctrl_t *ctrl) {
     for (uint32_t s = 0; s < total; s++) {
         iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
         if (us->pcb == NULL || !us->is_sender) continue;
-        us->phase       = SEND_PAYLOAD;
-        us->tx_buf      = ctrl->payload;
+
+        us->tx_buf = ctrl->payload;
         us->payload_len = ctrl->payload_len;
-        /* Datagrams per 100ms tick to hit the rate target. */
-        us->burst_max   = ctrl->target_bw_mbps
-            ? (uint32_t)(((uint64_t)ctrl->target_bw_mbps * 1000000ULL)
-                         / (8ULL * (uint64_t)ctrl->payload_len * 10ULL))
-            : 10000;
-        if (us->burst_max == 0) us->burst_max = 1;
+        /* Time-based pacing */
+        us->rate_bps = (uint64_t)ctrl->target_bw_mbps * 1000000ULL;
+        us->rate_Bps = us->rate_bps / 8;
+        us->pace_start_ns = 0;
+        us->pace_bytes = 0;
+        
+        /* reset just in case */
+        us->seq_num = 0;
+        us->packets_sent = 0;
+        us->bytes_sent = 0;
     }
 
     sddf_printf("[iperf3] all UDP streams ready -> TEST_START\n");
+    ctrl->udp_arm_pending = true;
     iperf_set_send_state(ctrl, TEST_START);
     iperf_set_send_state(ctrl, TEST_RUNNING);
     ctrl->test_active = true;
+}
+
+/**
+ * Start the payload pump on every stream we own the sending half of.
+ *
+ * Deferred until the control connection has received ack for TEST_START
+ *
+ * @param ctrl ctrl
+ */
+static void iperf3_udp_arm_senders(iperf_ctrl_t *ctrl) {
+    uint32_t now_ms = sddf_timer_time_now(timer_config.driver_id) / 1000000;
+
+    /* Re-base the window on the real start, not on setup time. */
+    ctrl->omitting = ctrl->omit_ms > 0;
+    ctrl->omit_end_ms = now_ms + ctrl->omit_ms;
+    ctrl->end_time_ms = ctrl->omit_end_ms + ctrl->duration_ms;
+
+    uint32_t total = (uint32_t)(ctrl->is_bidirectional + 1) * ctrl->num_streams;
+    if (total > MAX_STREAMS) total = MAX_STREAMS;
+
+    for (uint32_t s = 0; s < total; s++) {
+        iperf3_udp_stream_t *us = &ctrl->udp_streams[s];
+        if (us->pcb == NULL || !us->is_sender) continue;
+        us->phase = SEND_PAYLOAD;
+    }
+    ctrl->udp_arm_pending = false;
 }
 
 /**
@@ -987,16 +1039,25 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                             if (stream->pcb == NULL) continue;
                             stream->phase = SEND_PAYLOAD;
                             if (ctrl->target_bw_mbps) {
-                                stream->burst_max = ((uint64_t)ctrl->target_bw_mbps * 1000000UL)
-                                                    / (8UL * (uint64_t)ctrl->payload_len * 10UL);
-                                if (stream->burst_max == 0) stream->burst_max = 1;
+                                stream->rate_bps = (uint64_t)ctrl->target_bw_mbps * 1000000ULL;
+                                stream->rate_Bps      = stream->rate_bps / 8;
+                                stream->pace_start_ns = 0;
+                                stream->pace_bytes = 0;
                             } else {
-                                stream->burst_max = 10000;
+                                /* Unlimited. */
+                                stream->rate_bps = 0;
+                                stream->rate_Bps = 0;
+                                stream->pace_start_ns = 0;
+                                stream->pace_bytes = 0;
                             }
                             stream->tx_buf = ctrl->payload;
                             stream->payload_len = ctrl->payload_len;
                             stream->ctrl = ctrl;
                             stream->is_sender = true;
+                            /* Per-test sender state */
+                            stream->seq_num = 0;
+                            stream->packets_sent = 0;
+                            stream->bytes_sent = 0;
                         }
                         for (int s = req_streams; s < 2 * req_streams; s++) {
                             ctrl->streams[s].phase = STOPPED;
@@ -1038,16 +1099,24 @@ err_t iperf_ctrl_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                             stream->phase = SEND_PAYLOAD;
 
                             if (ctrl->target_bw_mbps) {
-                                stream->burst_max = ((uint64_t)ctrl->target_bw_mbps * 1000000UL)
-                                                    / (8UL * (uint64_t)ctrl->payload_len * 10UL);
-                                if (stream->burst_max == 0) stream->burst_max = 1;
+                                stream->rate_bps = (uint64_t)ctrl->target_bw_mbps * 1000000ULL;
+                                stream->rate_Bps = stream->rate_bps / 8;
+                                stream->pace_start_ns = 0;
+                                stream->pace_bytes = 0;
                             } else {
-                                stream->burst_max = 10000;
+                                /* Unlimited reset from stale test */
+                                stream->rate_bps = 0;
+                                stream->rate_Bps = 0;
+                                stream->pace_start_ns = 0;
+                                stream->pace_bytes = 0;
                             }
                             stream->tx_buf = ctrl->payload;
                             stream->payload_len = ctrl->payload_len;
                             stream->ctrl = ctrl;
                             stream->is_sender = true;
+                            stream->seq_num = 0;
+                            stream->packets_sent = 0;
+                            stream->bytes_sent = 0;
                         }
                     } else {
                         for (int s = 0; s < MAX_STREAMS; s++) {
@@ -1123,12 +1192,16 @@ err_t iperf_ctrl_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     (void)tpcb;
     (void)len;
     iperf3_ctrl_maybe_tx(ctrl);
+    /* TEST_START has been written and ACKed so we can flood. */
+    if (ctrl->udp_arm_pending && ctrl->tx_off == ctrl->tx_len) {
+        iperf3_udp_arm_senders(ctrl);
+    }
     return ERR_OK;
 }
 
 /**
  * Counts number of blocks sent/received
- * 
+ *
  * @param arg ctrl
  * @param err error (no error msging atm)
  */

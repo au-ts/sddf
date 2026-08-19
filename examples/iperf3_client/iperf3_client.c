@@ -270,7 +270,7 @@ static void handle_command(char *line)
         }
         uint32_t dur = default_duration_s(is_udp);
         uint8_t streams = 1;
-        uint32_t bw = 0;
+        uint32_t bw = is_udp ? 1 : 0;
         uint16_t len = 1460;
         uint32_t blocks = 0;
         bool reverse = false;
@@ -283,7 +283,7 @@ static void handle_command(char *line)
         if ((q = parse_uint(rest, &v, &ok)), ok) { len = (uint16_t)v; rest = q; }
 
         
-        /* "blocks N" replaces the duration: stop after N blocks of <len>. */
+        /* blocks N replaces the duration: stop after N blocks of <len>. */
         while (*rest == ' ') rest++;
         if ((q = match_word(rest, "blocks"))) {
             rest = q;
@@ -545,7 +545,7 @@ void notified(sddf_channel ch)
                     bytes += us->rx_bytes;
                     packets += us->rx_packets;
                     if (us->rx_have_first) {
-                        int l = (int)(us->rx_last_seq - us->rx_first_seq) + 1 - (int)us->rx_packets;
+                        int l = (int)us->rx_lost;
                         if (l > 0) lost += l;
                     }
                     double jm = us->rx_jitter * 1000.0;   /* seconds -> ms */
