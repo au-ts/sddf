@@ -869,6 +869,8 @@ void init(void)
 
     uint32_t bar0 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR0);
     LOG_NVME("NVMe PCI BAR0 readback: %08x\n", bar0);
+    uint32_t bar1 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_BAR1);
+    LOG_NVME("NVMe PCI BAR1 readback: %08x\n", bar1);
 
     /* Enable Bus Master and Memory Space */
     uint32_t cmd = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, NVME_PCIE_CFG_OFFSET_COMMAND);

@@ -110,11 +110,12 @@ def generate(
         elif board.name == "vb_105" or board.name == 'viscous':
             # BAR0: MMIO (always uncached)
             nvme_bar0_mr = SystemDescription.MemoryRegion(
-                sdf, "nvme_bar0", 0x4000, paddr=0x6000400000
+                # sdf, "nvme_bar0", 0x4000, paddr=0x8f800000
+                sdf, "nvme_bar0", 0x4000, paddr=0x92100000
             )
             # IRQ
             nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0,
-                                                   pin=17,
+                                                   pin=16,
                                                    vector=1,
                                                    trigger=IrqIoapic.Trigger.LEVEL,
                                                    polarity=IrqIoapic.Polarity.ACTIVELOW,
