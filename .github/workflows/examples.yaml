@@ -111,7 +111,7 @@ jobs:
           if-no-files-found: error
 
   build_pancake_linux_x86_64_nix:
-    name: Build (Linux x86-64 Nix)
+    name: Build Pancake (Linux x86-64 Nix)
     runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout repository
