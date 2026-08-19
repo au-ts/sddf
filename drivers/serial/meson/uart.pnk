@@ -1,0 +1,225 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define UART_REG_BASE          pnk_mem(0)
+
+#define IRQ_CH                 pnk_mem(1)
+#define RX_CH                  pnk_mem(2)
+#define TX_CH                  pnk_mem(3)
+
+#define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
+#define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
+
+#define RX_ENABLED             pnk_mem(1024)
+
+#define WFIFO_OFFSET        0
+#define RFIFO_OFFSET        4
+#define CR_OFFSET           8
+#define SR_OFFSET           12
+
+/* AML_UART_CONTROL bits */
+#define AML_UART_CLEAR_ERR    BIT(24)             /* Clear error. */
+#define AML_UART_RX_INT_EN    BIT(27)             /* Rx byte interrupt. Set to 1 to enable interrupt generation when a byte is written to rx FIFO. */
+#define AML_UART_TX_INT_EN    BIT(28)             /* Tx byte interrupt. Set to 1 to enable interrupt generation when a byte is read from tx FIFO. */
+
+/* AML_UART_STATUS bits */
+#define AML_UART_PARITY_ERR   BIT(16)             /* Parity error. Clear by writing bit 24 to control register. */
+#define AML_UART_FRAME_ERR    BIT(17)             /* Frame error. Clear by writing bit 24 to control register. */
+#define AML_UART_TX_FIFO_WERR BIT(18)             /* This bit is set if the FIFO is written to when full. */
+#define AML_UART_RX_EMPTY     BIT(20)             /* rx FIFO empty. */
+#define AML_UART_TX_FULL      BIT(21)             /* tx FIFO full. */
+#define AML_UART_TX_BUSY      BIT(25)             /* tx state machine is busy. */
+#define AML_UART_RX_BUSY      BIT(26)             /* rx state machine is busy. */
+
+#define UART_INTR_ABNORMAL  (AML_UART_PARITY_ERR | AML_UART_FRAME_ERR | AML_UART_TX_FIFO_WERR)
+
+
+inline fun uart_read_sr()
+{
+    var reg_addr = UART_REG_BASE + SR_OFFSET;
+    var sr = 0;
+    !ld32 sr, reg_addr;
+    return sr;
+}
+
+inline fun uart_read_cr()
+{
+    var reg_addr = UART_REG_BASE + CR_OFFSET;
+    var cr = 0;
+    !ld32 cr, reg_addr;
+    return cr;
+}
+
+inline fun uart_write_cr(1 cr)
+{
+    var reg_addr = UART_REG_BASE + CR_OFFSET;
+    !st32 reg_addr, cr;
+    return 0;
+}
+
+inline fun uart_read_char()
+{
+    var reg_addr = UART_REG_BASE + RFIFO_OFFSET;
+    var c = 0;
+    !ld32 c, reg_addr;
+    return c;
+}
+
+inline fun uart_write_char(1 c)
+{
+    var reg_addr = UART_REG_BASE + WFIFO_OFFSET;
+    !st32 reg_addr, c;
+    return 0;
+}
+
+export fun tx_provide()
+{
+    var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
+
+    var transferred = false;
+    while (true) {
+        var sr = uart_read_sr();
+        if (sr & AML_UART_TX_FULL) {
+            break;
+        }
+
+        var {1, 1} res = serial_dequeue(tx_queue_handle);
+        if (res.0) {
+            break;
+        }
+        uart_write_char(res.1 & MAX_UINT8);
+        transferred = true;
+    }
+
+    var head = serial_queue_get_head(tx_queue_handle);
+    var is_empty = serial_queue_empty(tx_queue_handle, head);
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!is_empty) {
+        var cr = uart_read_cr();
+        cr = cr | AML_UART_TX_INT_EN;
+        uart_write_cr(cr);
+    } else {
+        var cr = uart_read_cr();
+        cr = cr & bitwise_not(AML_UART_TX_INT_EN);
+        uart_write_cr(cr);
+    }
+
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
+    }
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle = SERIAL_RX_QUEUE_HANDLE;
+
+    var reprocess = true;
+    var enqueued = false;
+    while (reprocess) {
+        while (true) {
+            var sr = uart_read_sr();
+            if (sr & AML_UART_RX_EMPTY) {
+                break;
+            }
+
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                break;
+            }
+
+            var c = uart_read_char();
+            serial_enqueue(rx_queue_handle, c & MAX_UINT8);
+            enqueued = true;
+        }
+
+        var sr = uart_read_sr();
+        var tail = serial_queue_get_tail(rx_queue_handle);
+        var is_full = serial_queue_full(rx_queue_handle, tail);
+        if ((!(sr & AML_UART_RX_EMPTY)) && is_full) {
+            /* Disable rx interrupts until virtualisers queue is no longer full. */
+            var cr = uart_read_cr();
+            cr = cr & bitwise_not(AML_UART_RX_INT_EN);
+            uart_write_cr(cr);
+            serial_request_consumer_signal(rx_queue_handle);
+        }
+
+        reprocess = false;
+
+        sr = uart_read_sr();
+        tail = serial_queue_get_tail(rx_queue_handle);
+        is_full = serial_queue_full(rx_queue_handle, tail);
+        if ((!(sr & AML_UART_RX_EMPTY)) && (!is_full)) {
+            serial_cancel_consumer_signal(rx_queue_handle);
+            var cr = uart_read_cr();
+            cr = cr | AML_UART_RX_INT_EN;
+            uart_write_cr(cr);
+            reprocess = true;
+        }
+    }
+
+    if (enqueued) {
+        sddf_notify(RX_CH);
+    }
+
+    return 0;
+}
+
+fun handle_irq()
+{
+    var uart_sr = uart_read_sr();
+    var uart_cr = uart_read_cr();
+    while ((uart_sr & UART_INTR_ABNORMAL) || (!(uart_sr & AML_UART_RX_EMPTY)) ||
+          ((uart_cr & AML_UART_TX_INT_EN) && (!(uart_sr & AML_UART_TX_FULL)))) {
+        if (RX_ENABLED && !(uart_sr & AML_UART_RX_EMPTY)) {
+            rx_return();
+        }
+
+        if ((uart_cr & AML_UART_TX_INT_EN) && (!(uart_sr & AML_UART_TX_FULL))) {
+            tx_provide();
+        }
+
+        if (uart_sr & UART_INTR_ABNORMAL) {
+            debug_print(uart_sr);
+            uart_cr = uart_read_cr();
+            uart_write_cr(uart_cr | AML_UART_CLEAR_ERR);
+        }
+
+        uart_sr = uart_read_sr();
+        uart_cr = uart_read_cr();
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == IRQ_CH) {
+        handle_irq();
+        sddf_deferred_irq_ack(ch);
+    } else {
+        if (ch == TX_CH) {
+            tx_provide();
+        } else {
+            if (ch == RX_CH) {
+                var cr = uart_read_cr();
+                cr = cr | AML_UART_RX_INT_EN;
+                uart_write_cr(cr);
+
+                rx_return();
+            } else {
+                debug_print(ch);
+            }
+        }
+    }
+
+    return 0;
+}

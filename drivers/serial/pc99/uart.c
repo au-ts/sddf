@@ -19,6 +19,43 @@
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
+#ifdef PANCAKE_SERIAL_DRIVER
+static char cml_memory[1024 * 20];
+extern void *cml_heap;
+extern void *cml_stack;
+extern void *cml_stackend;
+
+extern void cml_main(void);
+
+void cml_exit(int arg)
+{
+    microkit_dbg_puts("ERROR! We should not be getting here\n");
+}
+
+void cml_err(int arg)
+{
+    if (arg == 3) {
+        microkit_dbg_puts("Memory not ready for entry. You may have not run the init code yet, or be trying to enter "
+                          "during an FFI call.\n");
+    }
+    cml_exit(arg);
+}
+
+void cml_clear()
+{
+    microkit_dbg_puts("Trying to clear cache\n");
+}
+
+void init_pancake_mem()
+{
+    unsigned long cml_heap_sz = 1024 * 10;
+    unsigned long cml_stack_sz = 1024 * 10;
+    cml_heap = cml_memory;
+    cml_stack = cml_heap + cml_heap_sz;
+    cml_stackend = cml_stack + cml_stack_sz;
+}
+#endif /* PANCAKE_SERIAL_DRIVER */
+
 // @billn Need a way to express io port in sdfgen config structure
 #define IOPORT_ID 0
 #define IOPORT_BASE 0x3f8
@@ -64,6 +101,7 @@ uint8_t read(uint16_t port_offset)
     return microkit_x86_ioport_read_8((IOPORT_ID), IOPORT_BASE + port_offset);
 }
 
+#ifndef PANCAKE_SERIAL_DRIVER
 int tx_ready(void)
 {
     return read(SERIAL_LSR) & SERIAL_LSR_TRANSMITTER_EMPTY;
@@ -73,6 +111,7 @@ int rx_ready(void)
 {
     return read(SERIAL_LSR) & SERIAL_LSR_DATA_READY;
 }
+#endif /* PANCAKE_SERIAL_DRIVER */
 
 void init(void)
 {
@@ -102,8 +141,24 @@ void init(void)
     read(SERIAL_RBR); /* clear receiver port */
     read(SERIAL_LSR); /* clear line status port */
     read(SERIAL_MSR); /* clear modem status port */
+
+#ifdef PANCAKE_SERIAL_DRIVER
+    init_pancake_mem();
+
+    uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
+
+    pnk_mem[2] = config.rx.id;
+    pnk_mem[3] = config.tx.id;
+    pnk_mem[4] = (uintptr_t)&rx_queue_handle;
+    pnk_mem[5] = (uintptr_t)&tx_queue_handle;
+
+    cml_main();
+#endif /* PANCAKE_SERIAL_DRIVER */
 }
 
+#ifdef PANCAKE_SERIAL_DRIVER
+extern void notified(sddf_channel ch);
+#else
 static void tx_provide(void)
 {
     bool transferred = false;
@@ -156,3 +211,4 @@ void notified(microkit_channel ch)
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
+#endif /* PANCAKE_SERIAL_DRIVER */

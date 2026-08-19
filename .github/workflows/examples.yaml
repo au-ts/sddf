@@ -23,6 +23,7 @@ env:
   MICROKIT_VERSION: 2.3.0
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.3.0/
   SDFGEN_VERSION: 0.35.0
+  CAKE_JOB_ID: 3440
 
 jobs:
   build_linux_x86_64:
@@ -51,6 +52,39 @@ jobs:
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
 
+  build_pancake_linux_x86_64:
+    name: Build Pancake (Linux x86-64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Download Microkit SDK
+        run: |
+          wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
+          tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
+      - name: Install dependencies (via apt)
+        run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
+      - name: Setup pyenv
+        run: |
+          python3 -m venv venv
+          ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+        with:
+          path: systems-ci
+      - name: Setup Pancake compiler
+        run: |
+          wget https://cakeml.org/regression/artefacts/${{ env.CAKE_JOB_ID }}/cake-x64-64.tar.gz
+          tar -xf cake-x64-64.tar.gz
+          cd cake-x64-64
+          make
+          echo "$(pwd):$PATH" >> $GITHUB_PATH
+      - name: Build examples
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --example=serial
+        shell: bash
+        env:
+          PYTHON: ${{ github.workspace }}/venv/bin/python
+
   build_linux_x86_64_nix:
     name: Build (Linux x86-64 Nix)
     runs-on: [self-hosted, Linux, X64]
@@ -71,6 +105,31 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: loader-images
+          path: |
+            ci_build/**/loader.img
+            ci_build/**/sel4_32.elf
+          if-no-files-found: error
+
+  build_pancake_linux_x86_64_nix:
+    name: Build Pancake (Linux x86-64 Nix)
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+        with:
+          path: systems-ci
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --example=serial'
+      - name: Archive image artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: loader-images-pancake
           path: |
             ci_build/**/loader.img
             ci_build/**/sel4_32.elf

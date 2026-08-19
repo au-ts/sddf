@@ -73,6 +73,9 @@
             '';
           });
 
+          # pancake/cakeml compiler
+          pancake = pkgs.callPackage ./ci/cakeml.nix { };
+
           genmc = pkgs.callPackage ./ci/genmc/nix/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
 
           pythonTool = pkgs.python312.withPackages (ps: [
@@ -140,6 +143,7 @@
               llvm.libllvm
               dtc
               pythonTool
+              pancake
             ];
 
             # To avoid Nix adding compiler flags that are not available on a freestanding
