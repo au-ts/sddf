@@ -1,6 +1,6 @@
 \newif \ifDraft         \Draftfalse
 
-\Drafttrue
+% \Drafttrue
 
 % \newcommand{\Release}{Release 0.2, 2022-10-03}
 % Release 0.2: changeset 553cd65913097b9a73a43ea291ab29fc2768887d
@@ -16,12 +16,15 @@
 %\newcommand{\Release}{Release 0.6, 2025-03-21}
 % Release 0.6: changeset 909d280b aka RELEASE_0_6
 
-\newcommand{\Release}{Draft Release 0.7}
+\newcommand{\Release}{Release 0.7, 2026-08-19}
+% Release 0.7: changeset 79816a01 aka RELEASE_0_7
+
+% \newcommand{\Release}{Draft Release 0.8}
 
 
 \documentclass[a4paper,12pt]{report}
 \usepackage[copyright]{unsw}
-\copyYear{2022, 2024}
+\copyYear{2022, 2024, 2026}
 \Unit{School of Computer Science \& Engineering}
 \SubUnit{Trustworthy Systems Group}
 
@@ -183,7 +186,9 @@
 
 \title{sDDF Design}
 \SubTitle{Design, Implementation and Evaluation of the\\ seL4 Device Driver Framework}
-\author{Gernot Heiser, Peter Chubb, Alex Brown, Julia Vassiliki, Courtney Darville, Lucy Parker}
+\author{Gernot Heiser, Peter Chubb, Alex Brown, Tristan Clinton-Muehr,
+        Courtney Darville, Alwin Joshy, Craig McLaughlin, Bill Nguyen, Lesley Rossouw,
+        Lucy Fletcher, Julia Vassiliki, Ivan Velickovic, Jade Zhou}
 \Email{gernot@unsw.edu.au}
 \date{\Release \ifDraft\ of \today\fi}
 \maketitle
@@ -2649,6 +2654,8 @@ a single call that sets period and duty cycle.
 These device-class specifications are \textbf{subject to change}; code
 implementing them has not yet been merged.
 
+% FIXME: @julia experimental
+\iffalse
 \chapter{Hotplugging}\label{s:hotplugging}
 
 \section{Overview}
@@ -2907,7 +2914,7 @@ easily be changed.
 
   \item Initialisation failures are not communicated to the clients.
 \end{enumerate}
-
+\fi
 
 \chapter{Device Discovery}\label{s:discovery}
 
@@ -3639,6 +3646,10 @@ void sddf_set_mr(unsigned int n, uint64_t val);
 \end{lstlisting}
 
 \chapter{Overview of Changes}
+
+\section{Changes For Release 0.7 of 2025-03-21}
+
+Updates to the I2C class following a redesign \autoref{s:cl-i2c}.
 
 \section{Changes Since Release 0.6 of 2025-03-21}
 \subsection{New device classes}
