@@ -110,6 +110,31 @@ jobs:
             ci_build/**/sel4_32.elf
           if-no-files-found: error
 
+  build_pancake_linux_x86_64_nix:
+    name: Build (Linux x86-64 Nix)
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+        with:
+          path: systems-ci
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --example=serial'
+      - name: Archive image artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: loader-images-pancake
+          path: |
+            ci_build/**/loader.img
+            ci_build/**/sel4_32.elf
+          if-no-files-found: error
+
   build_macos_arm64_nix:
     name: Build (macOS ARM64 Nix)
     runs-on: [self-hosted, macos, ARM64]
