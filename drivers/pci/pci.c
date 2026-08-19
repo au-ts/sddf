@@ -77,7 +77,7 @@ pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar
     if (readback == 0) return bar_request;
 
     sddf_dprintf("BAR %u\n", bar_id);
-    sddf_dprintf("    Original Paddr: 0x%lx %lx\n", original_paddr_2, original_paddr_1);
+    sddf_dprintf("    Original Paddr: 0x%x %x\n", original_paddr_2, original_paddr_1);
     sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
     sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
     sddf_dprintf("    Width: %s\n", bar_width == 2 ? "64-bit BAR" : "32-bit BAR");
@@ -583,7 +583,7 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
     return bar_request_summary;
 }
 
-bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
+void alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
 {
 
     if (pci_bridge->parent && pci_bridge->parent->is_host_bridge == true) {
@@ -593,7 +593,7 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
         acpi_dev_t *acpi_dev = find_acpi_dev_by_header_offset((uint64_t)pci_bridge->bridge_header & ((1 << 28) - 1));
         if (acpi_dev == NULL) {
             sddf_dprintf("[Error] ACPI device for bridge is not found\n");
-            return false;
+            return;
         }
         pci_bridge->acpi_dev = acpi_dev;
         sddf_dprintf("==Allocate resource windows:\n");
@@ -718,6 +718,11 @@ void init(void)
     devices_config.devs[0].bars[0].size = 0x100000;
     devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
     devices_config.devs[0].irqs[0].ch = 16;
+    /* devices_config.devs[0].bars[0].id = 0; */
+    /* devices_config.devs[0].bars[0].vaddr = 0x20000000; */
+    /* devices_config.devs[0].bars[0].size = 0x4000; */
+    /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
+    /* devices_config.devs[0].irqs[0].ch = 17; */
     devices_config.devs[0].num_bars++;
     devices_config.devs[0].num_irqs++;
     devices_config.num_dev++;

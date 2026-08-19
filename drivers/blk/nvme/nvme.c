@@ -63,6 +63,8 @@ static nvme_queue_info_t io_queue;
 static blk_queue_handle_t blk_queue;
 static blk_storage_info_t *storage_info;
 
+bool pci_ready = false;
+
 /*
  * State machine flow:
  *   WAIT_NOT_READY -> WAIT_READY -> WAIT_IDENTIFY_CTRL (timer-driven, see nvme_poll_controller_status)
@@ -699,6 +701,7 @@ static void nvme_poll_controller_status(void)
 
         if (nvme_controller->csts & NVME_CSTS_RDY) {
             if (state_ctx.waited_ms < state_ctx.timeout_ms) {
+                LOG_NVME("timer ch id: %u\n", timer_config.driver_id);
                 sddf_timer_set_timeout(timer_config.driver_id, NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS);
                 state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
@@ -844,6 +847,11 @@ void nvme_controller_init()
 
 void init(void)
 {
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     LOG_NVME("Initializing NVMe Driver...\n");
 
     /* Validate device_resources */
@@ -913,7 +921,17 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    sddf_dprintf("notified ch: %u\n", ch);
+    sddf_dprintf("NVME|INFO: ch %u\n", ch);
+    if (ch == 10) {
+        pci_ready = true;
+        init();
+        return;
+    }
+    if (!pci_ready) {
+        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        return;
+    }
+
     if (ch == NVME_IRQ) {
         /* Guard against early IRQ delivery before admin queues are initialised. */
         if (state_ctx.state > NVME_STATE_WAIT_READY) {

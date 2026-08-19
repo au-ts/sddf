@@ -58,7 +58,7 @@ SDDF_CUSTOM_LIBC := 1
 include ${SDDF}/tools/make/board/common.mk
 
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf acpi_driver.elf pci_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
@@ -83,6 +83,8 @@ IMAGES += timer_driver.elf
 export BLK_NEED_TIMER
 endif
 
+include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pci/pci_driver.mk
 include ${SDDF}/util/util.mk
 include ${SDDF}/blk/components/blk_components.mk
 include ${SDDF}/serial/components/serial_components.mk
@@ -98,13 +100,13 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) \
 		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 else
 	$(PYTHON) \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
-		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		--output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 endif
