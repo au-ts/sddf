@@ -51,7 +51,7 @@ SDDF_CUSTOM_LIBC := 1
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
+IMAGES := eth_driver.elf echo.elf benchmark.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
 	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
