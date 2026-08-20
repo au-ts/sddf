@@ -109,6 +109,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 pass_resource_with_range(word_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
+                sddf_dprintf(" flags: %x\n", dev_res->flags);
                 break;
             }
             case DWORD_AS_DESCRIPTOR: {
@@ -122,6 +123,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 pass_resource_with_range(dword_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
+                sddf_dprintf(" flags: %x\n", dev_res->flags);
                 break;
             }
             case QWORD_AS_DESCRIPTOR: {
@@ -135,6 +137,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
                 pass_resource_with_range(qword_as->resource_type, dev_res->min_addr, dev_res->max_addr);
 
                 pci_resources->bridges[bridge_idx].num_dev_resources++;
+                sddf_dprintf(" flags: %x\n", dev_res->flags);
                 break;
             }
             case IO_PORT_DESCRIPTOR: {
@@ -146,6 +149,7 @@ void pass_crs_and_caps(aml_data_t crs_data, uint32_t bridge_idx)
 
                 sddf_dprintf("I/O Port ");
                 pass_resource_with_range(1, dev_res->min_addr, dev_res->max_addr);
+                sddf_dprintf(" flags: %x\n", dev_res->flags);
                 break;
             }
             case END_TAG: {

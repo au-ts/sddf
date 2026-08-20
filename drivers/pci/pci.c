@@ -152,19 +152,37 @@ pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
     bool mem_p_is_64bit = false;
     uintptr_t mem_p_base = 0;
     uintptr_t mem_np_base = 0;
-    if (req->mem_64bit > 0 && alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x100000000, 0x0, true, req->mem_64bit, &mem_p_base)) {
-        // 32-bit memory is constrainted resource so prioritise merging 32bit prefetchable and non-prefetchable requests
-        mem_32bit_np_size += req->mem_32bit;
-        mem_p_is_64bit = true;
-    } else if ((req->mem_32bit > 0 || req->mem_64bit > 0) && alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, true, req->mem_64bit + req->mem_32bit, &mem_p_base)) {
-        mem_p_size += req->mem_32bit;
-    } else {
-        mem_p_size = 0;
-        mem_32bit_np_size += req->mem_32bit + req->mem_64bit;
+    if (req->mem_32bit) {
+        // memory address must be <4GB if both 32bit and 64bit prefetchable memory is requested
+        if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, true, req->mem_64bit + req->mem_32bit, &mem_p_base)) {
+            // Try allocating from prefetchable windows first
+            mem_p_size = req->mem_32bit + req->mem_64bit;
+        } else if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_64bit + req->mem_32bit, &mem_p_base)) {
+            // Try allocating from non-prefetchable windows
+            mem_p_size = req->mem_32bit + req->mem_64bit;
+        } else {
+            sddf_dprintf("[Error] failed to allocate 0x%lx bytes for prefetchable memory\n", req->mem_64bit + req->mem_32bit);
+        }
+    } else if (req->mem_32bit == 0 && req->mem_64bit > 0) {
+        if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x100000000, 0x0, true, req->mem_64bit, &mem_p_base)) {
+            // Try allocating from >4GB prefetchable windows first
+            mem_p_size = req->mem_64bit;
+        } else if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, true, req->mem_64bit, &mem_p_base)) {
+            // Try allocating from <4GB prefetchable windows
+            mem_p_size = req->mem_64bit;
+        } else if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_64bit, &mem_p_base)) {
+            mem_p_size = req->mem_64bit;
+        } else {
+            sddf_dprintf("[Error] failed to allocate 0x%lx bytes for prefetchable memory\n", req->mem_64bit);
+        }
     }
 
-    if (mem_32bit_np_size > 0 && !alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, mem_32bit_np_size, &mem_np_base)) {
-        sddf_dprintf("[Error] failed to allocate 0x%x-byte memory from non-prefetchable windows\n", mem_32bit_np_size);
+    if (req->mem_32bit_np > 0) {
+        if (alloc_from_resource_windows(host_bridge->acpi_dev, ACPI_RES_TYPE_MEMORY, 0x0, 0x100000000, false, req->mem_32bit_np, &mem_np_base)) {
+            mem_32bit_np_size = req->mem_32bit_np;
+        } else {
+            sddf_dprintf("[Error] failed to allocate 0x%lx bytes for non-prefetchable memory\n", req->mem_64bit);
+        }
     }
 
     pci_resource_windows_t allocated_windows;
@@ -472,7 +490,7 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
         bind_irq(parent_bridge->acpi_dev, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->irqs[i].ch);
     }
 
-    pci_header->command = pci_header->command | BIT(2);
+    pci_header->command = pci_header->command | BIT(2) | BIT(1);
 }
 
 pci_bar_request_t merge_bar_requests(pci_bar_request_t bar_request_a, pci_bar_request_t bar_request_b)
@@ -506,7 +524,7 @@ pci_bar_request_t scan_and_calc_bar_size(uintptr_t host_bridge_base, pci_bridge_
                          pci_header->header_type & 0x3F);
 
             // Clear bit `Bus Master Enable` to disable I/O Requests before re-configuration
-            pci_header->command = pci_header->command & (~(1U << 2));
+            pci_header->command = pci_header->command & (~BIT(2)) & (~BIT(1));
 
             if (pci_header->header_type & 0x3F) {
                 struct pci_header_type1 *bridge_header = (struct pci_header_type1 *)pci_header;
@@ -583,9 +601,25 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
         // TODO: check if bridge supports 16bit
         /* bridge_header->io_base = (uint8_t)pci_bridge->windows.io_base; */
         /* bridge_header->io_limit = (uint8_t)pci_bridge->windows.io_limit; */
+        sddf_dprintf("==Bridge header before re-allocation\n");
+        sddf_dprintf("  - BAR 0: 0x%x\n", bridge_header->bar0);
+        sddf_dprintf("  - BAR 1: 0x%x\n", bridge_header->bar1);
+        sddf_dprintf("  - io_base: 0x%x\n", bridge_header->io_base);
+        sddf_dprintf("  - io_limit: 0x%x\n", bridge_header->io_limit);
+        sddf_dprintf("  - mem_base: 0x%x\n", bridge_header->mem_base);
+        sddf_dprintf("  - mem_limit: 0x%x\n", bridge_header->mem_limit);
+        sddf_dprintf("  - pre_mem_base: 0x%x\n", bridge_header->pre_mem_base);
+        sddf_dprintf("  - pre_mem_limit: 0x%x\n", bridge_header->pre_mem_limit);
+        sddf_dprintf("  - pre_mem_base_upper: 0x%lx\n", bridge_header->pre_mem_base_upper);
+        sddf_dprintf("  - pre_mem_base_limit: 0x%lx\n", bridge_header->pre_mem_limit_upper);
 
-        bridge_header->mem_base = (uint16_t)(pci_bridge->windows.mem_np_base >> 16);
-        bridge_header->mem_limit = (uint16_t)(pci_bridge->windows.mem_np_limit >> 16);
+        if (pci_bridge->windows.mem_np_base) {
+            bridge_header->mem_base = (uint16_t)(pci_bridge->windows.mem_np_base >> 16);
+            bridge_header->mem_limit = (uint16_t)(pci_bridge->windows.mem_np_limit >> 16);
+        } else {
+            bridge_header->mem_base = 0xFFFF;
+            bridge_header->mem_limit = 0x0000;
+        }
 
         // TODO: check if bridge supports 64bit
         if (pci_bridge->windows.mem_p_base) {
@@ -594,8 +628,24 @@ bool alloc_resource_for_bridges(pci_bridge_node_t *pci_bridge)
         } else if (pci_bridge->windows.mem_p_is_64bit) {
             bridge_header->pre_mem_base_upper = (uint32_t)(pci_bridge->windows.mem_p_base >> 32);
             bridge_header->pre_mem_limit_upper = (uint32_t)(pci_bridge->windows.mem_p_limit >> 32);
+        } else {
+            bridge_header->pre_mem_base = 0xFFFF;
+            bridge_header->pre_mem_limit = 0x0000;
+            bridge_header->pre_mem_base_upper = 0x00000000;
+            bridge_header->pre_mem_limit_upper = 0x00000000;
         }
-        bridge_header->command = bridge_header->command | BIT(2);
+        sddf_dprintf("==Bridge header after re-allocation\n");
+        sddf_dprintf("  - BAR 0: 0x%x\n", bridge_header->bar0);
+        sddf_dprintf("  - BAR 1: 0x%x\n", bridge_header->bar1);
+        sddf_dprintf("  - io_base: 0x%x\n", bridge_header->io_base);
+        sddf_dprintf("  - io_limit: 0x%x\n", bridge_header->io_limit);
+        sddf_dprintf("  - mem_base: 0x%x\n", bridge_header->mem_base);
+        sddf_dprintf("  - mem_limit: 0x%x\n", bridge_header->mem_limit);
+        sddf_dprintf("  - pre_mem_base: 0x%x\n", bridge_header->pre_mem_base);
+        sddf_dprintf("  - pre_mem_limit: 0x%x\n", bridge_header->pre_mem_limit);
+        sddf_dprintf("  - pre_mem_base_upper: 0x%lx\n", bridge_header->pre_mem_base_upper);
+        sddf_dprintf("  - pre_mem_base_limit: 0x%lx\n", bridge_header->pre_mem_limit_upper);
+        bridge_header->command = bridge_header->command | BIT(2) | BIT(1);
 
     } else if (pci_bridge->is_host_bridge == true) {
         // Do nothing for host bridge
@@ -696,7 +746,7 @@ void init(void)
         }
     }
 
-    sddf_deferred_notify(1);
+    /* sddf_deferred_notify(1); */
 }
 
 void notified(microkit_channel ch)
