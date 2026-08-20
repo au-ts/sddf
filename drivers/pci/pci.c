@@ -77,6 +77,7 @@ pci_bar_request_t read_bar_size(struct pci_header_type0 *pci_header, uint8_t bar
     if (readback == 0) return bar_request;
 
     sddf_dprintf("BAR %u\n", bar_id);
+    sddf_dprintf("    Readback: 0x%lx\n", readback);
     sddf_dprintf("    Original Paddr: 0x%x %x\n", original_paddr_2, original_paddr_1);
     sddf_dprintf("    Space Indicator: %s\n", space_indicator == 1 ? "I/O" : "Memory");
     sddf_dprintf("    Prefetchable: %s\n", prefetchable ? "true" : "false");
@@ -195,11 +196,11 @@ pci_resource_windows_t alloc_resource_from_host_bridge(pci_bar_request_t *req)
 
     pci_resource_windows_t allocated_windows;
     allocated_windows.io_base = io_base;
-    allocated_windows.io_limit = io_base + io_size;
+    allocated_windows.io_limit = io_base + io_size - 1;
     allocated_windows.mem_np_base = mem_np_base;
-    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size;
+    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size - 1;
     allocated_windows.mem_p_base = mem_p_base;
-    allocated_windows.mem_p_limit = mem_p_base + mem_p_size;
+    allocated_windows.mem_p_limit = mem_p_base + mem_p_size - 1;
     allocated_windows.mem_p_is_64bit = mem_p_is_64bit;
 
     return allocated_windows;
@@ -251,11 +252,11 @@ pci_resource_windows_t alloc_resource_from_bridge(pci_bridge_node_t *parent_brid
 
     pci_resource_windows_t allocated_windows;
     allocated_windows.io_base = io_base;
-    allocated_windows.io_limit = io_base + io_size;
+    allocated_windows.io_limit = io_base + io_size - 1;
     allocated_windows.mem_np_base = mem_np_base;
-    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size;
+    allocated_windows.mem_np_limit = mem_np_base + mem_32bit_np_size - 1;
     allocated_windows.mem_p_base = mem_p_base;
-    allocated_windows.mem_p_limit = mem_p_base + mem_p_size;
+    allocated_windows.mem_p_limit = mem_p_base + mem_p_size - 1;
     allocated_windows.mem_p_is_64bit = mem_p_is_64bit;
 
     return allocated_windows;

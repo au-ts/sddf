@@ -82,7 +82,7 @@ void pass_resource_with_range(uint8_t resource_type, uint64_t min_addr, uint64_t
             break;
         }
     }
-    sddf_dprintf(": [0x%lx-0x%lx]\n", min_addr, max_addr);
+    sddf_dprintf(": [0x%lx-0x%lx]", min_addr, max_addr);
 }
 
 // Section 6.4
