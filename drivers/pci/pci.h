@@ -338,13 +338,13 @@ typedef struct {
 
 typedef struct pci_bridge_windows {
     uint32_t io_base;
-    uint32_t io_limit;
+    uint32_t io_size;
 
     uint32_t mem_np_base;
-    uint32_t mem_np_limit;
+    uint32_t mem_np_size;
 
     uint64_t mem_p_base;
-    uint64_t mem_p_limit;
+    uint64_t mem_p_size;
     bool mem_p_is_64bit;
 } pci_resource_windows_t;
 
