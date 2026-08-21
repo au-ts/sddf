@@ -1183,8 +1183,7 @@ inline fun {1,1,1} tx_return_body()
   /@ requires forall x: Int :: x in gv.tx_processed ==> element2_seq(x, 0) in gv.tx_free.net_added @/
   /@ requires forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2 && s[1] == 0 &&
                s[0] in gv.tx_processed @/
-  /@ requires (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) + (gv.hw_tx_tail - gv.hw_tx_head) <= QUEUE_CAPACITY @/
-  /@ ensures acc(gv.wm_state) @/
+  /@ ensures acc(gv.wm_state) && (gv.wm_state == WM_NONE || gv.wm_state == WM_STORE_QM_TX_FREE) @/
   /@ ensures gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(gv.wm_store_tail_count) && acc(gv.wm_qtail) @/
   /@ ensures retval.0 == 0 || retval.0 == 1 @/
   /@ ensures retval.0 == 0 ==> gv.wm_state == WM_STORE_QM_TX_FREE @/
@@ -1233,15 +1232,11 @@ inline fun {1,1,1} tx_return_body()
                  gv.wm_qtail <= j && j < gv.tx_free.net_head &&
                  slotq(gv.tx_free.net_descr, i).ndescr_addr == slotq(gv.tx_free.net_descr, j).ndescr_addr ==> i == j @/
   /@ ensures valid_hardware_ring_tx_read() && valid_hardware_ring_tx_mdata_read() @/
-  /@ ensures retval.0 == 0 ==> retval.1 == (gv.hw_tx_tail == gv.hw_tx_head) @/
-  /@ ensures unfolding valid_hardware_ring_tx_read() in
-                 (retval.0 != 0) ==> is_TXD_READY(slot(gv.hardware_ring_tx, gv.hw_tx_head % QUEUE_CAPACITY).hw_stat) @/
   /@ ensures disjoint_device_unprocessed_net_added_tx() @/
   /@ ensures retval.0 == 0 ==> gv.hw_tx_head == (old(gv.hw_tx_head) + 1) % (MAX_INT16 + 1) @/
   /@ ensures retval.0 == 0 && old(gv.wm_state) == WM_NONE ==> gv.wm_qtail == old(gv.tx_free.net_tail) + 1 @/
   /@ ensures retval.0 == 0 && old(gv.wm_state) == WM_STORE_QM_TX_FREE ==> gv.wm_qtail == old(gv.wm_qtail) + 1 @/
   /@ ensures retval.0 == 1 && gv.wm_state == WM_STORE_QM_TX_FREE ==> gv.wm_qtail == old(gv.wm_qtail) @/
-  /@ ensures retval.0 == 1 ==> gv.tx_free.net_tail == old(gv.tx_free.net_tail) && gv.hw_tx_head == old(gv.hw_tx_head) @/
   /@ ensures retval.0 == 1 ==> gv.tx_free.net_added == old(gv.tx_free.net_added) @/
   /@ ensures retval.0 == 0 ==> retval.1 == (gv.hw_tx_tail == gv.hw_tx_head) @/
   /@ ensures retval.0 == 1 ==> gv.tx_free.net_tail == old(gv.tx_free.net_tail) && gv.hw_tx_head == old(gv.hw_tx_head) @/
@@ -1259,6 +1254,7 @@ inline fun {1,1,1} tx_return_body()
                old(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, i).hw_stat) ==
                  unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, i).hw_stat @/
 
+  /@ assert disjoint_device_unprocessed_net_added_tx() @/
   /@ unfold valid_hardware_ring_tx_read() @/
   /@ label l @/
 
@@ -1269,8 +1265,22 @@ inline fun {1,1,1} tx_return_body()
   var reached_ready = 0;
   var enqueued = 0;
   var empty = 0;
+//  /@ assert forall s: Seq[Word] :: s in gv.tx_free.net_added ==>
+//      |s| == 2 &&
+//      forall i: Word :: 0 <= i && i < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+//        ((gv.hw_tx_tail % gv.hw_tx_capacity) <= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          ? i < (gv.hw_tx_tail % gv.hw_tx_capacity) || i >= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          : i < (gv.hw_tx_tail % gv.hw_tx_capacity) && i >= (gv.hw_tx_head % gv.hw_tx_capacity)) &&
+//         gv.hw_tx_head != gv.hw_tx_tail ==> s[0] != slot(gv.hardware_ring_tx, i).hw_addr @/
   !ld16 stat, dscr_addr + DESCR_STAT_OFF;
   THREAD_MEMORY_ACQUIRE()
+//  /@ assert forall s: Seq[Word] :: s in gv.tx_free.net_added ==>
+//      |s| == 2 &&
+//      forall i: Word :: 0 <= i && i < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+//        ((gv.hw_tx_tail % gv.hw_tx_capacity) <= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          ? i < (gv.hw_tx_tail % gv.hw_tx_capacity) || i >= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          : i < (gv.hw_tx_tail % gv.hw_tx_capacity) && i >= (gv.hw_tx_head % gv.hw_tx_capacity)) &&
+//         gv.hw_tx_head != gv.hw_tx_tail ==> s[0] != slot(gv.hardware_ring_tx, i).hw_addr @/
   /@ assert !is_TXD_READY(slot(gv.hardware_ring_tx, idx).hw_stat) ==>
        forall j: Int :: 0 <= j && j < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, j).hw_stat) &&
          slot(gv.hardware_ring_tx, idx).hw_addr == slot(gv.hardware_ring_tx, j).hw_addr ==> j == idx @/
@@ -1286,13 +1296,19 @@ inline fun {1,1,1} tx_return_body()
     /@ assert gv.wm_state == WM_STORE_QM_TX_FREE ==> gv.wm_qtail < gv.tx_free.net_head + QUEUE_CAPACITY @/
     /@ assert gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(slotq(gv.tx_free.net_descr, gv.wm_qtail).ndescr_addr) @/
     /@ assert gv.wm_state == WM_STORE_QM_TX_FREE ==> acc(slotq(gv.tx_free.net_descr, gv.wm_qtail).ndescr_len) @/
-    /@ assert acc(slot(gv.hardware_ring_tx, idx).ghost_unprocessed) @/
     net_enqueue(net_tx_free, io_addr, 0, net_tx_capacity);
+//    /@ assert acc(slot(gv.hardware_ring_tx, idx).ghost_unprocessed) @/
     /@ call tx_set_descr_processed(idx) @/
+    /@ assert union_elem_seq(gv.tx_free.net_added, old(gv.tx_free.net_added), element2_seq(slot(gv.hardware_ring_tx, idx).hw_addr, 0)) @/
 
     enqueued = true;
     var temp = wrap_int16(hw_tx_head + 1);
     hw_tx_head = temp;
+//    /@ assert forall i: Word :: 0 <= i && i < QUEUE_CAPACITY && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) &&
+//        ((gv.hw_tx_tail % gv.hw_tx_capacity) <= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          ? i < (gv.hw_tx_tail % gv.hw_tx_capacity) || i >= (gv.hw_tx_head % gv.hw_tx_capacity)
+//          : i < (gv.hw_tx_tail % gv.hw_tx_capacity) && i >= (gv.hw_tx_head % gv.hw_tx_capacity)) &&
+//         gv.hw_tx_head != gv.hw_tx_tail ==> slot(gv.hardware_ring_tx, idx).hw_addr != slot(gv.hardware_ring_tx, i).hw_addr @/
 
     empty = tx_hw_ring_empty();
     /@ assert gv.wm_state == WM_STORE_QM_TX_FREE @/
@@ -1301,9 +1317,6 @@ inline fun {1,1,1} tx_return_body()
     /@ assert old(gv.wm_state) == WM_NONE ==> gv.wm_qtail == old(gv.tx_free.net_tail) + 1 @/
     /@ assert old(gv.wm_state) == WM_NONE ==> 0 <= gv.wm_qtail - gv.tx_free.net_head && gv.wm_qtail - gv.tx_free.net_head <= QUEUE_CAPACITY @/
     /@ assert union_elem_seq(gv.tx_free.net_added, old(gv.tx_free.net_added), element2_seq(slot(gv.hardware_ring_tx, idx).hw_addr, 0)) @/
-    /@ assert !((gv.hw_tx_tail % gv.hw_tx_capacity) <= (gv.hw_tx_head % gv.hw_tx_capacity)
-          ? idx < (gv.hw_tx_tail % gv.hw_tx_capacity) || idx >= (gv.hw_tx_head % gv.hw_tx_capacity)
-          : idx < (gv.hw_tx_tail % gv.hw_tx_capacity) && idx >= (gv.hw_tx_head % gv.hw_tx_capacity)) @/
   } else {
     reached_ready = 1;
   }
@@ -1415,6 +1428,7 @@ fun tx_return()
                  acc(gv.tx_free.net_tail) &&
                  gv.tx_free.net_tail == old(gv.tx_free.net_tail) &&
                  acc(gv.tx_free.net_head, 2/3) &&
+                 gv.tx_free.net_head == old(gv.tx_free.net_head) &&
                  acc(gv.tx_free.net_signal) && acc(gv.tx_free.net_added) &&
                  acc(gv.tx_free.net_descr, 2/3) @/
     /@ invariant gv.wm_state == WM_NONE ==>
@@ -1463,7 +1477,6 @@ fun tx_return()
                    reached_ready ==> gv.tx_processed != empty_set() @/
     /@ invariant !is_TXD_READY(old(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, old(gv.hw_tx_head) % QUEUE_CAPACITY).hw_stat)) ==>
                    !is_TXD_READY(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, old(gv.hw_tx_head) % QUEUE_CAPACITY).hw_stat) @/
-    /@ invariant (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) + (gv.hw_tx_tail - gv.hw_tx_head) <= QUEUE_CAPACITY @/
     /@ invariant true @/
 
     /@ label l_start @/
