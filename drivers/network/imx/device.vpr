@@ -228,18 +228,28 @@ define valid_rx_read_slot(x) (
 predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_rx, 3/4) &&
-    forall i: Int ::
-        (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
-            bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
-            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
-                acc(slot(gv.hardware_ring_rx, i).hw_addr, 3/4) &&
-                is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
-                is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_len, 3/4) &&
-                is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed))
-        )
+    (forall i: Int :: //{ slot(gv.hardware_ring_rx, i).hw_stat }
+        i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4)) &&
+    (forall i: Int ::
+        //{ bounded16(slot(gv.hardware_ring_rx, i).hw_stat) }
+        //{ bounded32(slot(gv.hardware_ring_rx, i).hw_stat) }
+        //{ bounded64(slot(gv.hardware_ring_rx, i).hw_stat) }
+        i >= 0 && i < hw_capacity ==>
+        bounded16(slot(gv.hardware_ring_rx, i).hw_stat)) &&
+    (forall i: Int :: //{ is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_addr }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_addr, 3/4) &&
+            is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr)) &&
+    (forall i: Int :: //{ is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_stat }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat)) &&
+    (forall i: Int :: //{ is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_len }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_len, 3/4) &&
+            is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len)) &&
+    (forall i: Int :: //{ is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).ghost_unprocessed }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed))
 }
 
 /*function valid_hardware_ring_rx_mdata_read(heap: IArray, gv: Ref): Bool
@@ -318,19 +328,28 @@ function f_ring_head_incr_lemma(heap: IArray, gv: Ref, a: Int, b: Int, i: Int): 
 predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_rx, write) &&
-    forall i: Int ::
-        (i >= 0 && i < hw_capacity ==>
+    (forall i: Int :: //{ slot(gv.hardware_ring_rx, i).hw_stat }
+        i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2)) &&
+    (forall i: Int ::
+//        { bounded16(slot(gv.hardware_ring_rx, i).hw_stat) }
+//        { bounded32(slot(gv.hardware_ring_rx, i).hw_stat) }
+//        { bounded64(slot(gv.hardware_ring_rx, i).hw_stat) }
+        i >= 0 && i < hw_capacity ==> bounded16(slot(gv.hardware_ring_rx, i).hw_stat)) &&
+    (forall i: Int ::// { is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_addr }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_addr, write) &&
+            is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr)) &&
+    (forall i: Int ::// { is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_stat }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
-            bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
-            (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
-                acc(slot(gv.hardware_ring_rx, i).hw_addr, write) &&
-                is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
-                is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat) &&
-                acc(slot(gv.hardware_ring_rx, i).hw_len, write) &&
-                is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed))
-        )
+            is_valid_rx_stat(slot(gv.hardware_ring_rx, i).hw_stat)) &&
+    (forall i: Int ::// { is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).hw_len }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_len, write) &&
+            is_valid_data_len(slot(gv.hardware_ring_rx, i).hw_len)) &&
+    (forall i: Int ::// { is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat), slot(gv.hardware_ring_rx, i).ghost_unprocessed }
+        i >= 0 && i < hw_capacity && !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_rx, i).ghost_unprocessed))
 }
 
 /*function valid_hardware_ring_rx_mdata_write(heap: IArray, gv: Ref): Bool
@@ -393,18 +412,28 @@ define valid_tx_read_slot(x) (
 predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, 3/4) &&
-    forall i: Int ::
-        (i >= 0 && i < hw_capacity ==>
-            acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
-            bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
-            (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
-                acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
-                is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
-                is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_len, 3/4) &&
-                is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
-        )
+    (forall i: Int :: { slot(gv.hardware_ring_tx, i).hw_stat }
+        i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4)) &&
+    (forall i: Int ::
+        { bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
+        { bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
+        { bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
+        i >= 0 && i < hw_capacity ==>
+        bounded16(slot(gv.hardware_ring_tx, i).hw_stat)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
+            is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).hw_len, 3/4) &&
+            is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
 }
 
 /*function valid_hardware_ring_tx_mdata_read(heap: IArray, gv: Ref): Bool
@@ -456,19 +485,28 @@ define valid_hardware_ring_tx_mdata_read(heap, gv)
 predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, write) &&
-    forall i: Int ::
-        (i >= 0 && i < hw_capacity ==>
+    (forall i: Int :: { slot(gv.hardware_ring_tx, i).hw_stat }
+        i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2)) &&
+    (forall i: Int ::
+        { bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
+        { bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
+        { bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
+        i >= 0 && i < hw_capacity ==> bounded16(slot(gv.hardware_ring_tx, i).hw_stat)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).hw_addr, write) &&
+            is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
-            bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
-            (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
-                acc(slot(gv.hardware_ring_tx, i).hw_addr, write) &&
-                is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
-                is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat) &&
-                acc(slot(gv.hardware_ring_tx, i).hw_len, write) &&
-                is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len) &&
-                acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
-        )
+            is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).hw_len, write) &&
+            is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len)) &&
+    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
+        i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
+            acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
 }
 
 /*function valid_hardware_ring_tx_mdata_write(heap: IArray, gv: Ref): Bool
