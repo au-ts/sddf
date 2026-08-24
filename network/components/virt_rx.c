@@ -94,7 +94,6 @@ void rx_return(void)
                     assert(!err);
                     notify_clients[i] = true;
                 }
-                continue;
             } else if (client >= 0) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
