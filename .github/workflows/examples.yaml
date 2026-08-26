@@ -125,7 +125,7 @@ jobs:
       - name: Get Nix dependencies
         run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
-        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --example=serial'
+        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py $MICROKIT_SDK $(nproc) --pancake --example=serial'
       - name: Archive image artifacts
         uses: actions/upload-artifact@v7
         with:
