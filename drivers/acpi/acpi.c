@@ -329,7 +329,11 @@ void init(void)
     // TODO: is end empty?
     for (uint64_t i = capDLBootInfo->untypeds.start; i < capDLBootInfo->untypeds.end; i++) {
         post_boot_cnode.caps[i].base_addr = capDLBootInfo->untypedList[i].paddr;
-        post_boot_cnode.caps[i].end_addr = post_boot_cnode.caps[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits);
+        if (capDLBootInfo->untypedList[i].sizeBits) {
+            post_boot_cnode.caps[i].end_addr = post_boot_cnode.caps[i].base_addr + (1ULL << capDLBootInfo->untypedList[i].sizeBits);
+        } else {
+            post_boot_cnode.caps[i].end_addr = post_boot_cnode.caps[i].base_addr;
+        }
         post_boot_cnode.caps[i].is_device = capDLBootInfo->untypedList[i].isDevice;
         post_boot_cnode.caps[i].object_type = seL4_UntypedObject;
         post_boot_cnode.end = i + 1;

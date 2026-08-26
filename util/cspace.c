@@ -158,7 +158,7 @@ seL4_Error untyped_retype(cnode_specs_t *cnode_specs,
                                 cnode_specs->cptr, 0, 0,
                                 cnode_specs->end, 1);
     if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to retype an object type %lu, cptr: 0x%lx, size_bits: %lu - error: %d\n", object_type, cnode_specs->cptr + ut_idx, size_bits, error);
+        sddf_dprintf("Error: failed to retype an object type %lu, cptr: 0x%lx, size_bits: %lu, ut_idx: %u - error: %d\n", object_type, cnode_specs->cptr + ut_idx, size_bits, ut_idx, error);
         return error;
     }
 
@@ -274,8 +274,8 @@ void update_active_ut_idx(cnode_specs_t *cnode_specs)
     uint32_t non_dev_mem_id = 0;
     uint32_t i;
     for (i = cnode_specs->start; i < cnode_specs->end; i++) {
-        if (cnode_specs->caps[i].is_device == false && cnode_specs->caps[i].object_type == seL4_UntypedObject) {
-            if (non_dev_mem_id == 5) {
+        if (cnode_specs->caps[i].is_device == false && cnode_specs->caps[i].object_type == seL4_UntypedObject && cnode_specs->caps[i].end_addr > cnode_specs->caps[i].base_addr) {
+            if (non_dev_mem_id == 10) {
                 cnode_specs->active_ut_idx = i;
                 break;
             }
