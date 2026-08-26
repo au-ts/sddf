@@ -716,30 +716,30 @@ void init(void)
     /* devices_config.num_dev++; */
 
     // Hardware ethernet
-    /* devices_config.devs[0].bus = 1; */
-    /* devices_config.devs[0].dev = 0; */
-    /* devices_config.devs[0].func = 0; */
-    /* devices_config.devs[0].bars[0].id = 0; */
-    /* devices_config.devs[0].bars[0].vaddr = 0x2000000; */
-    /* devices_config.devs[0].bars[0].size = 0x100000; */
-    /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
-    /* devices_config.devs[0].irqs[0].ch = 16; */
-    /* devices_config.devs[0].num_bars++; */
-    /* devices_config.devs[0].num_irqs++; */
-    /* devices_config.num_dev++; */
-
-    // Hardware NVMe
-    devices_config.devs[0].bus = 2;
+    devices_config.devs[0].bus = 1;
     devices_config.devs[0].dev = 0;
     devices_config.devs[0].func = 0;
     devices_config.devs[0].bars[0].id = 0;
-    devices_config.devs[0].bars[0].vaddr = 0x20000000;
-    devices_config.devs[0].bars[0].size = 0x4000;
+    devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    devices_config.devs[0].bars[0].size = 0x100000;
     devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
-    devices_config.devs[0].irqs[0].ch = 17;
+    devices_config.devs[0].irqs[0].ch = 16;
     devices_config.devs[0].num_bars++;
     devices_config.devs[0].num_irqs++;
     devices_config.num_dev++;
+
+    // Hardware NVMe
+    /* devices_config.devs[0].bus = 2; */
+    /* devices_config.devs[0].dev = 0; */
+    /* devices_config.devs[0].func = 0; */
+    /* devices_config.devs[0].bars[0].id = 0; */
+    /* devices_config.devs[0].bars[0].vaddr = 0x20000000; */
+    /* devices_config.devs[0].bars[0].size = 0x4000; */
+    /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
+    /* devices_config.devs[0].irqs[0].ch = 17; */
+    /* devices_config.devs[0].num_bars++; */
+    /* devices_config.devs[0].num_irqs++; */
+    /* devices_config.num_dev++; */
 
     cnode_specs = (cnode_specs_t *)&pci_resources->cnode_specs;
     sddf_dprintf("cptr_pci_resources: 0x%lx\n", (uintptr_t)CPTR_CNODE_PCI_RESOURCES);
