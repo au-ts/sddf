@@ -80,7 +80,7 @@ jobs:
           make
           echo "$(pwd):$PATH" >> $GITHUB_PATH
       - name: Build examples
-        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --example=serial
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --examples=serial
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
@@ -203,6 +203,36 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ci-logs-qemu
+          path: ci_logs
+          if-no-files-found: error
+
+  tests_qemu_pancake:
+    name: Tests Pancake (QEMU)
+    runs-on: ubuntu-latest
+    needs: build_pancake_linux_x86_64_nix
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v6
+      - name: Install dependencies (via apt)
+        run: |
+          sudo apt update
+          sudo apt-get install qemu-system-arm qemu-system-misc qemu-system-x86
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+      - name: Download images
+        uses: actions/download-artifact@v8
+        with:
+          name: loader-images-pancake
+          path: ci_build
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          exec ./ci/run.py --only-qemu --examples=serial
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs-qemu-pancake
           path: ci_logs
           if-no-files-found: error
 
