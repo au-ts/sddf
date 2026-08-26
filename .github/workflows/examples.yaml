@@ -252,7 +252,7 @@ jobs:
          }}
     needs: build_linux_x86_64_nix
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -303,7 +303,7 @@ jobs:
          }}
     needs: build_pancake_linux_x86_64_nix
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -354,7 +354,7 @@ jobs:
          }}
     needs: build_linux_x86_64_nix
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-bench-${{ github.event.number }}-${{ strategy.job-index }}
+      group: ${{ github.workflow }}-sddf-hardware-bench-${{ github.event.number }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
