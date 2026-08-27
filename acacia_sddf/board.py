@@ -50,7 +50,7 @@ BOARDS: list[Board] = [
             "fsl,imx8mm-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
         ),
         timer=DriverDouble("fsl,imx8mm-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
     ),
     Board(
         name="imx8mp_evk",
@@ -60,7 +60,9 @@ BOARDS: list[Board] = [
             "fsl,imx8mp-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
         ),
         timer=DriverDouble("fsl,imx8mp-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30bf0000"),
+        ethernet=DriverDouble(
+            "nxp,imx8mp-dwmac-eqos", "soc@0/bus@30800000/ethernet@30bf0000"
+        ),
     ),
     Board(
         name="imx8mp_iotgate",
@@ -68,7 +70,9 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mp-uart", "soc@0/bus@30800000/serial@30890000"),
         timer=DriverDouble("fsl,imx8mp-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30bf0000"),
+        ethernet=DriverDouble(
+            "nxp,imx8mp-dwmac-eqos", "soc@0/bus@30800000/ethernet@30bf0000"
+        ),
     ),
     Board(
         name="imx8mq_evk",
@@ -76,7 +80,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
     ),
     Board(
         name="kria_k26",
@@ -84,6 +88,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         timer=DriverDouble("cdns,ttc", "axi/timer@ff140000"),
         serial=DriverDouble("xlnx,zynqmp-uart", "axi/serial@ff010000"),
+        ethernet=DriverDouble("xlnx,zynqmp-gem", "axi/ethernet@ff0e0000"),
     ),
     Board(
         name="maaxboard",
@@ -91,8 +96,8 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
         blk=DriverDouble("fsl,imx8mq-usdhc", "soc@0/bus@30800000/mmc@30b40000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
         partition=2,
     ),
     Board(
@@ -101,7 +106,7 @@ BOARDS: list[Board] = [
         paddr_top=0x60000000,
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@c8100000/serial@4c0"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@c1100000/watchdog@98d0"),
-        ethernet=DriverDouble("", "soc/ethernet@c9410000"),
+        ethernet=DriverDouble("amlogic,meson-gxbb-dwmac", "soc/ethernet@c9410000"),
         baud_rate=115200,
     ),
     Board(
@@ -111,7 +116,7 @@ BOARDS: list[Board] = [
         i2c=DriverDouble("amlogic,meson-axg-i2c", "soc/bus@ffd00000/i2c@1d000"),
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@ff800000/serial@3000"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@ffd00000/watchdog@f0d0"),
-        ethernet=DriverDouble("amlogic,meson-gx-uart", "soc/ethernet@ff3f0000"),
+        ethernet=DriverDouble("amlogic,meson-g12a-dwmac", "soc/ethernet@ff3f0000"),
         baud_rate=115200,
     ),
     Board(
@@ -121,7 +126,7 @@ BOARDS: list[Board] = [
         serial=DriverDouble("arm,pl011", "pl011@9000000"),
         timer=DriverDouble("arm,armv8-timer", "timer"),
         blk=DriverDouble("virtio,mmio", "virtio_mmio@a000200"),
-        ethernet=DriverDouble("", "virtio_mmio@a000000"),
+        ethernet=DriverDouble("virtio,mmio", "virtio_mmio@a000000"),
         i2c=None,
     ),
     Board(
@@ -141,7 +146,7 @@ BOARDS: list[Board] = [
         paddr_top=0xEC000000,
         serial=DriverDouble("snps,dw-apb-uart", "serial@fe660000"),
         timer=DriverDouble("rockchip,rk3568-timer", "rktimer@fe5f0000"),
-        ethernet=DriverDouble("", "ethernet@fe2a0000"),
+        ethernet=DriverDouble("snps,dwmac-4.20a", "ethernet@fe2a0000"),
         baud_rate=1500000,
     ),
     Board(
@@ -150,6 +155,7 @@ BOARDS: list[Board] = [
         paddr_top=0xF7000000,
         serial=DriverDouble("snps,dw-apb-uart", "serial@ff1a0000"),
         timer=DriverDouble("rockchip,rk3399-timer", "rktimer@ff850000"),
+        ethernet=DriverDouble("rockchip,rk3399-gmac", "ethernet@fe300000"),
         # https://github.com/u-boot/u-boot/blob/v2024.10/configs/rockpro64-rk3399_defconfig#L77
         baud_rate=1500000,
     ),
@@ -159,7 +165,7 @@ BOARDS: list[Board] = [
         paddr_top=0x2_000_000,
         serial=DriverDouble("brcm,bcm2835-aux-uart", "soc/serial@7e215040"),
         timer=DriverDouble("brcm,bcm2835-system-timer", "soc/timer@7e003000"),
-        ethernet=DriverDouble("", "scb/ethernet@7d580000"),
+        ethernet=DriverDouble("brcm,bcm2711-genet-v5", "scb/ethernet@7d580000"),
     ),
     Board(
         name="serengeti",
@@ -175,7 +181,7 @@ BOARDS: list[Board] = [
         paddr_top=0x100000000,
         serial=DriverDouble("starfive,jh7110-uart", "soc/serial@10000000"),
         timer=DriverDouble("starfive,jh7110-timer", "soc/timer@13050000"),
-        ethernet=DriverDouble("", "soc/ethernet@16030000"),
+        ethernet=DriverDouble("snps,dwmac-5.20", "soc/ethernet@16030000"),
     ),
     Board(
         name="zcu102",
@@ -183,6 +189,7 @@ BOARDS: list[Board] = [
         paddr_top=0x80000000,
         timer=DriverDouble("cdns,ttc", "axi/timer@ff140000"),
         serial=DriverDouble("xlnx,zynqmp-uart", "axi/serial@ff000000"),
+        ethernet=DriverDouble("xlnx,zynqmp-gem", "axi/ethernet@ff0e0000"),
     ),
     Board(
         name="x86_64_generic",
