@@ -86,7 +86,10 @@ static void handle_driver()
         switch (reqbk.code) {
         case BLK_REQ_READ:
             if (drv_status == BLK_RESP_OK) {
-                /* Invalidate cache */
+                /* Invalidate the cache following the DMA write to memory.
+                 * This relies on the cache already being clean for correctness,
+                 * which we ensure by performing a cache_clean() in handle_client().
+                 */
                 cache_clean_and_invalidate(reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
             }
             break;
@@ -178,6 +181,19 @@ static bool handle_client(int cli_id)
                 resp_status = BLK_RESP_ERR_INVALID_PARAM;
                 goto req_fail;
             }
+
+            /* Perform a cache_clean operation.
+             * - For BLK_REQ_READ (i.e. DMA writes happen), we need to ensure that
+             *   the cache is clean prior to DMA, as we perform cache_clean_and_invalidate()
+             *   in handle_driver(); if the cache was dirty that post-DMA clean
+             *   could overwrite DMA'd data.
+             * - For BLK_REQ_WRITE (i.e. DMA reads happen), we need to ensure that
+             *   the data in the cache is written out to memory, so clean
+             *   forces that flush.
+             */
+            cache_clean(cli_data_base_vaddr + cli_offset,
+                        cli_data_base_vaddr + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
+
             break;
         }
         case BLK_REQ_FLUSH:
@@ -188,11 +204,6 @@ static bool handle_client(int cli_id)
             LOG_BLK_VIRT_ERR("client %d gave an invalid request code %d\n", cli_id, cli_code);
             resp_status = BLK_RESP_ERR_INVALID_PARAM;
             goto req_fail;
-        }
-
-        if (cli_code == BLK_REQ_WRITE) {
-            cache_clean(cli_data_base_vaddr + cli_offset,
-                        cli_data_base_vaddr + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
         }
 
         /* Bookkeep client request and generate driver req id */
