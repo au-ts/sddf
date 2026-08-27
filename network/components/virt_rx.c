@@ -77,6 +77,9 @@ void rx_return(void)
             // We would invalidate if it worked in usermode. Alas, it
             // does not -- see [1]. The fastest operation that works is a
             // usermode CleanInvalidate (faster than a Invalidate via syscall).
+            // This relies on the fact that we map the RX buffers in RO, so
+            // it is not possible to have dirty cache lines that will be written
+            // out with the clean.
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
@@ -148,9 +151,12 @@ void rx_provide(void)
                 }
 
                 // To avoid having to perform a cache clean here we ensure that
-                // the DMA region is only mapped in read only. This avoids the
-                // case where pending writes are only written to the buffer
-                // memory after DMA has occured.
+                // the DMA region is only mapped in read only in both the
+                // virtualiser and rx copier. This avoids the case where
+                // pending writes from dirty cache lines are only written to
+                // the buffer memory after DMA has occurred.
+                // i.e. the correctness of this assumes read-only access to
+                // RX buffers.
                 buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
