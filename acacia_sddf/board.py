@@ -102,7 +102,7 @@ BOARDS: List[Board] = [
         paddr_top=0x60000000,
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@c8100000/serial@4c0"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@c1100000/watchdog@98d0"),
-        ethernet=DriverDouble("", "soc/ethernet@c9410000"),
+        ethernet=DriverDouble("amlogic,meson-g12a-dwmac", "soc/ethernet@c9410000"),
         baud_rate=115200,
     ),
     Board(
@@ -112,7 +112,7 @@ BOARDS: List[Board] = [
         i2c=DriverDouble("amlogic,meson-axg-i2c", "soc/bus@ffd00000/i2c@1d000"),
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@ff800000/serial@3000"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@ffd00000/watchdog@f0d0"),
-        ethernet=DriverDouble("amlogic,meson-gx-uart", "soc/ethernet@ff3f0000"),
+        ethernet=DriverDouble("amlogic,meson-g12a-dwmac", "soc/ethernet@ff3f0000"),
         baud_rate=115200,
     ),
     Board(
