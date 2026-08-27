@@ -6,4 +6,5 @@ from .timer import sDDFTimer
 from .serial import sDDFSerial
 from .blk import sDDFBlk
 from .sddf import sDDFDriverClass, sDDFDriverConfig, sDDFDriverManifest
+from .net import sDDFEthernet
 from .board import BOARDS, Board
