@@ -1,0 +1,375 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define UART_REG_BASE          pnk_mem(0)
+
+#define IRQ_CH                 pnk_mem(1)
+#define RX_CH                  pnk_mem(2)
+#define TX_CH                  pnk_mem(3)
+
+#define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
+#define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
+
+#define RX_ENABLED             pnk_mem(1024)
+#define REG_IO_WIDTH           pnk_mem(1025)
+#define REG_SHIFT              pnk_mem(1026)
+#define DW_APB_REGISTERS       pnk_mem(1027)
+#define PLAT_HIFIVE_P550       pnk_mem(1028)
+
+/* These register offsets are given as their offset in terms of reg-io-width;
+ * e.g. for reg-io-width of 4 (32 bit accesses) the true offset for 0x1 is 0x4.
+ * These drivers are also weird, as multiple registers are mapped to the same
+ * memory and their access depends on the current state of the UART.
+ */
+
+/* UART Receive Buffer Register (R) */
+#define UART_RBR    0
+
+/* UART Transmit Holding Register (W) */
+#define UART_THR    0
+
+/* UART Divisor Low Latch Register (R/W) */
+#define UART_DLL    0
+
+/* UART Divisor High Latch Register (R/W) */
+#define UART_DLH    1
+
+/* UART Interrupt Enable Register (R/W) */
+#define UART_IER    1
+/* UART Interrupt Enable Register (R/W) */
+/* Enable Received Data Available Interrupt, if FIFOs are enabled, the
+ * Character Timeout Interrupt. */
+#define UART_IER_ERBFI BIT(0)
+/* Enable Transmit Holding Register Empty Interrupt */
+#define UART_IER_ETBEI BIT(1)
+
+/* UART Interrupt Identity Register (R) */
+#define UART_IIR    2
+/* Interrupt ID Mask.
+ * According to the DW_APB_UART manual, this is bits 3:0, i.e. should be 0b1111
+ * The UART_IER_ERBFI (received data available interrupt) also enables the
+ * character timeout interrupt, i.e. 0b1100 for the IID.
+ * Furthermore, the manual specifies that the priorities put the received data
+ * interrupt *above* the character timeout interrupt.
+ *
+ * However, QEMU seems to disagree, and places the timeout interrupt above the
+ * received data interrupt.
+ *
+ * It appears that Zephyr just ignores it, which seems suspicious. But so does
+ * Linux.
+ *
+ * ??
+ */
+#define UART_IIR_IID_MASK   7
+/* Interrupt ID = Transmit Holding Register Indicator */
+#define UART_IIR_IID_THRI   2
+/* Interrupt ID = Received Data Available */
+#define UART_IIR_IID_RDI    4
+
+/* UART FIFO Control Register (W) */
+#define UART_FCR            2
+/* FIFO Enable */
+#define UART_FCR_FIFOE      BIT(0)
+/* Receive FIFO Reset */
+#define UART_FCR_RFIFOR     BIT(1)
+/* Transmit FIFO Reset */
+#define UART_FCR_XFIFOR     BIT(2)
+
+/* UART Line Control Register (RW) */
+#define UART_LCR            3
+/* Divisor Latch Access Bit */
+#define UART_LCR_DLAB       BIT(7)
+
+/* UART Modem Control Register (RW) */
+#define UART_MCR            4
+/* Data Terminal Ready */
+#define UART_MCR_DTR        BIT(0)
+/* Request to Send */
+#define UART_MCR_RTS        BIT(1)
+
+/* UART Line Status Register (R) */
+#define UART_LSR            5
+/* Data Ready */
+#define UART_LSR_DR         BIT(0)
+/* Parity Error Bit */
+#define UART_LSR_PE         BIT(2)
+/* Framing Error Bit */
+#define UART_LSR_FE         BIT(3)
+/* Transmit Holding Register Empty */
+#define UART_LSR_THRE       BIT(5)
+/* Transmit FIFO and Transmit Shift register Empty */
+#define UART_LSR_TEMT       BIT(6)
+/* Recv FIFO Error Bit */
+#define UART_LSR_RFE        BIT(7)
+
+/*
+ * These registers are special to the DW APB UART implementation.
+ */
+
+/* UART Status Register (0x7C >> 2 = 0x1f) */
+#define UART_USR            31
+/* UART BUSY */
+#define UART_USR_BUSY       BIT(0)
+/* Transmit FIFO Not Full */
+#define UART_USR_TFNF       BIT(1)
+
+inline fun uart_read_reg(1 offset)
+{
+    var reg_shift = REG_SHIFT;
+    var io_width = REG_IO_WIDTH;
+
+    var shifted_offset = offset;
+    if (reg_shift == 2) {
+        shifted_offset = offset * 4;
+    }
+
+    var reg_addr = UART_REG_BASE + shifted_offset;
+    var val = 0;
+
+    if (io_width == 1) {
+        !ld8 val, reg_addr;
+        return val;
+    }
+
+    if (io_width == 4) {
+        !ld32 val, reg_addr;
+        return val;
+    }
+
+    return 0;
+}
+
+inline fun uart_write_reg(1 offset, 1 val)
+{
+    var reg_shift = REG_SHIFT;
+    var io_width = REG_IO_WIDTH;
+
+    var shifted_offset = offset;
+    if (reg_shift == 2) {
+        shifted_offset = offset * 4;
+    }
+
+    var reg_addr = UART_REG_BASE + shifted_offset;
+
+    if (io_width == 1) {
+        !st8 reg_addr, val;
+        return 0;
+    }
+
+    if (io_width == 4) {
+        !st32 reg_addr, val;
+        return 0;
+    }
+
+    return 0;
+}
+
+inline fun tx_fifo_not_full()
+{
+    var dw_apb_regs = DW_APB_REGISTERS;
+    var plat_hifive_p550 = PLAT_HIFIVE_P550;
+    if (dw_apb_regs && !plat_hifive_p550) {
+        /**
+         * On DesignWare APB-derived 16550a-like IPs, they provide a TFNF bit in
+         * the UART Status Register (USR).
+         */
+        var usr = uart_read_reg(UART_USR);
+        return !(!(usr & UART_USR_TFNF));
+    } else {
+        /**
+         * On a standard NS16550a UART IP, we don't have a "transmit FIFO (not) full"
+         * indicator bit. Instead we have a FIFO empty / holding register empty bit.
+         * This means that despite *notionally* having a TX FIFO, it is never filled
+         * more than 1 bit at a time. This makes the TX rather slow. If we only use
+         * this on our Star64, we see interleaved serial output in debug mode [1].
+         *
+         * Ref [2] also describes this similar issue, and demonstrates the "intended"
+         * use is to write a FIFO-size (i.e. 16 characters) at once to the UART THR.
+         * This is also what Zephyr [3] and Linux [4] do.
+         *
+         * However, as we run on top of seL4, we may be preempted at any time.
+         * Specifically, another process may use a debug print through OpenSBI's
+         * driver [5] which will write to the UART THR. Because a TX overrun on the
+         * NS16550a will corrupt what had previously been written (as opposed to
+         * not doing anything), we can't detect whether or not we would corrupt
+         * the serial output.
+         *
+         * It would be possible, if OpenSBI's driver handled "polling uart in an IRQ
+         * context" like Linux does [6], where it wants for the THR to empty both
+         * before *and* after emitting a character. However, this is not the case.
+         *
+         * Hence, on standard ns16550a we are likely to see interleaved serial output
+         * because of how slow waiting for an interrupt for *every* output character
+         * is.
+         *
+         * [1]: https://github.com/au-ts/sddf/issues/411#issuecomment-2864845777
+         * [2]: https://www.ele.uva.es/~jesus/UltimatePutchar.pdf
+         * [3]: https://github.com/zephyrproject-rtos/zephyr/blob/zephyr-v3.5.0/drivers/serial/uart_ns16550.c#L773-L798
+         * [4]: https://github.com/torvalds/linux/blob/v6.14/drivers/tty/serial/8250/8250_port.c#L1794-L1855
+         * [5]: https://github.com/riscv-software-src/opensbi/blob/v1.6/lib/utils/serial/uart8250.c#L74-L80
+         * [6]: https://github.com/torvalds/linux/commit/f2d937f3bf00665ccf048b3b6616ef95859b0945
+         */
+        var lsr = uart_read_reg(UART_LSR);
+        return !(!(lsr & UART_LSR_THRE));
+    }
+}
+
+inline fun rx_has_data()
+{
+    var lsr = uart_read_reg(UART_LSR);
+    return !(!(lsr & UART_LSR_DR));
+}
+
+fun tx_provide()
+{
+    var tx_queue_handle = SERIAL_TX_QUEUE_HANDLE;
+
+    var transferred = false;
+
+    while (true) {
+        var fifo_not_full = tx_fifo_not_full();
+        if (!fifo_not_full) {
+            break;
+        }
+
+        var {1, 1} res = serial_dequeue(tx_queue_handle);
+        if (res.0) {
+            break;
+        }
+        uart_write_reg(UART_THR, res.1 & MAX_UINT8);
+        transferred = true;
+    }
+
+    var head = serial_queue_get_head(tx_queue_handle);
+    var is_empty = serial_queue_empty(tx_queue_handle, head);
+    /* If we still have data to be sent after filling the FIFO, enable TX empty IRQ */
+    if (!is_empty) {
+        var ier = uart_read_reg(UART_IER);
+        ier = ier | UART_IER_ETBEI;
+        uart_write_reg(UART_IER, ier);
+    } else {
+        var ier = uart_read_reg(UART_IER);
+        ier = ier & bitwise_not(UART_IER_ETBEI);
+        uart_write_reg(UART_IER, ier);
+    }
+
+    if (transferred) {
+        var require_signal = serial_require_consumer_signal(tx_queue_handle);
+        if (require_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle);
+            sddf_notify(TX_CH);
+        }
+    }
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle = SERIAL_RX_QUEUE_HANDLE;
+
+    var reprocess = true;
+    var enqueued = false;
+    while (reprocess) {
+        while (true) {
+            var has_data = rx_has_data();
+            if (!has_data) {
+                break;
+            }
+
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                break;
+            }
+
+            var c = uart_read_reg(UART_RBR);
+            var err = serial_enqueue(rx_queue_handle, c & MAX_UINT8);
+            // assert(!err);
+            enqueued = true;
+        }
+
+        /* If we have more RX device data available, but no space in the queue with the virtualiser,
+         * we disable RX IRQs until space becomes available. */
+        var has_data = rx_has_data();
+        if (has_data) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                var ier = uart_read_reg(UART_IER);
+                ier = ier & bitwise_not(UART_IER_ERBFI);
+                uart_write_reg(UART_IER, ier);
+                serial_request_consumer_signal(rx_queue_handle);
+            }
+        }
+
+        reprocess = false;
+
+        /* While RX data is still available, we enable the RX IRQ and continue processing */
+        has_data = rx_has_data();
+        if (has_data) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (!is_full) {
+                serial_cancel_consumer_signal(rx_queue_handle);
+                var ier = uart_read_reg(UART_IER);
+                ier = ier | UART_IER_ERBFI;
+                uart_write_reg(UART_IER, ier);
+                reprocess = true;
+            }
+        }
+    }
+
+    if (enqueued) {
+        sddf_notify(RX_CH);
+    }
+
+    return 0;
+}
+
+fun handle_irq()
+{
+    /* Reading this register auto-clears the error bits.
+       So we have to do this before rx_return() / tx_provide() which needs to
+       read LSR for THRE/DR. */
+    var line_status = uart_read_reg(UART_LSR);
+    if (line_status & (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)) {
+        debug_print(line_status);
+    }
+
+    /* IRQ ID is a priority-based *single* indication, not a bitvector */
+    var irq_id = uart_read_reg(UART_IIR);
+    irq_id = irq_id & UART_IIR_IID_MASK;
+    var rx_enabled = RX_ENABLED;
+    if (rx_enabled && (irq_id == UART_IIR_IID_RDI)) {
+        rx_return();
+    } else {
+        if (irq_id == UART_IIR_IID_THRI) {
+            tx_provide();
+        }
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == IRQ_CH) {
+        handle_irq();
+        sddf_deferred_irq_ack(ch);
+    } else {
+        if (ch == TX_CH) {
+            tx_provide();
+        } else {
+            if (ch == RX_CH) {
+                rx_return();
+            } else {
+                debug_print(ch);
+            }
+        }
+    }
+
+    return 0;
+}

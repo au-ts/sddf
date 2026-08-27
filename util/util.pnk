@@ -1,0 +1,52 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/* Helper constants */
+#define MAX_UINT32        4294967295
+#define MAX_UINT16        65535
+#define MAX_UINT8         255
+
+/* Some helper macros */
+#define BIT(nr)           (1 << nr) // TODO: add parentheses prevented by a parse error
+#define pnk_mem_ptr(idx)  (@base + (idx) * @biw)
+#define pnk_mem(idx)      (lds 1 pnk_mem_ptr(idx))
+#define bitwise_not(n)    ((n) ^ -1)
+
+/* Macros for FFI calls */
+#define sddf_irq_ack(channel) \
+    @sddf_irq_ack(0, channel, 0, 0)
+
+#define sddf_notify(channel) \
+    @sddf_notify(0, channel, 0, 0)
+
+#define sddf_deferred_irq_ack(channel) \
+    @sddf_deferred_irq_ack(0, channel, 0, 0)
+
+#define sddf_deferred_notify(channel) \
+    @sddf_deferred_notify(0, channel, 0, 0)
+
+#define microkit_x86_ioport_write_8(ioport_id, port_addr, data) \
+    @microkit_x86_ioport_write_8(port_addr, ioport_id, data, 0)
+
+#define microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr) \
+    @microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr, 0)
+
+#define cache_clean(start, end) \
+    @cache_clean(start, 0, end, 0)
+
+#define cache_clean_and_invalidate(start, end) \
+    @cache_clean_and_invalidate(start, 0, end, 0)
+
+#define THREAD_MEMORY_RELEASE() \
+    @THREAD_MEMORY_RELEASE(0, 0, 0, 0)
+
+#define THREAD_MEMORY_ACQUIRE() \
+    @THREAD_MEMORY_ACQUIRE(0, 0, 0, 0)
+
+#define fence_seq_cst() \
+    @fence_seq_cst(0, 0, 0, 0)
+
+#define debug_print(value) \
+    @debug_print(0, value, 0, __LINE__)

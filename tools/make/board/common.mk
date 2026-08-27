@@ -27,6 +27,7 @@ endif
 
 include ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk
 include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
+include ${SDDF}/tools/make/toolchain/pancake.mk
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
