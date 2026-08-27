@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <sddf/resources/common.h>
 
-#define DEVICE_MAGIC_LEN 5
+#define DEVICE_MAGIC_LEN 6
 static char DEVICE_MAGIC[DEVICE_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x1 };
 
 #define DEVICE_MAX_REGIONS 64
