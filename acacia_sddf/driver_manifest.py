@@ -37,7 +37,7 @@ class sDDFDriverConfig:
     irqs: List[DTSIRQ]
 
     def __post_init__(self):
-        if type(self.compatible) is str:
+        if isinstance(self.compatible, str):
             self.compatible = [self.compatible]
         assert type(self.regions) is list
         assert type(self.irqs) is list
