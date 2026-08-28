@@ -26,7 +26,7 @@ typedef struct device_irq_resource {
 } device_irq_resource_t;
 
 typedef struct device_resources {
-    char magic[5];
+    char magic[DEVICE_MAGIC_LEN];
     uint8_t num_regions;
     uint8_t num_irqs;
     device_region_resource_t regions[DEVICE_MAX_REGIONS];
