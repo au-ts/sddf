@@ -26,12 +26,8 @@ __attribute__((__section__(".net_virt_rx_config"))) net_virt_rx_config_t config;
   * all clients have returned the buffer. */
 uint8_t *buffer_refs;
 
-typedef struct state {
-    net_queue_handle_t rx_queue_drv;
-    net_queue_handle_t rx_queue_clients[SDDF_NET_MAX_CLIENTS];
-} state_t;
-
-state_t state;
+net_queue_handle_t rx_queue_drv;
+net_queue_handle_t rx_queue_clients[SDDF_NET_MAX_CLIENTS];
 
 /* Boolean to indicate whether a packet has been enqueued into the driver's free queue during notification handling */
 static bool notify_drv;
@@ -62,9 +58,9 @@ void rx_return(void)
     bool reprocess = true;
     bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
     while (reprocess) {
-        while (!net_queue_empty_active(&state.rx_queue_drv)) {
+        while (!sddf_queue_empty(&rx_queue_drv.active)) {
             net_buff_desc_t buffer;
-            int err = net_dequeue_active(&state.rx_queue_drv, &buffer);
+            int err = sddf_dequeue(&rx_queue_drv.active, &buffer);
             assert(!err);
 
             buffer.io_or_offset = buffer.io_or_offset - config.data.io_addr;
@@ -93,7 +89,7 @@ void rx_return(void)
                 buffer_refs[ref_index] = config.num_clients;
 
                 for (int i = 0; i < config.num_clients; i++) {
-                    err = net_enqueue_active(&state.rx_queue_clients[i], buffer);
+                    err = sddf_enqueue(&rx_queue_clients[i].active, buffer);
                     assert(!err);
                     notify_clients[i] = true;
                 }
@@ -102,28 +98,28 @@ void rx_return(void)
                 assert(buffer_refs[ref_index] == 0);
                 buffer_refs[ref_index] = 1;
 
-                err = net_enqueue_active(&state.rx_queue_clients[client], buffer);
+                err = sddf_enqueue(&rx_queue_clients[client].active, buffer);
                 assert(!err);
                 notify_clients[client] = true;
             } else {
                 buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
-                err = net_enqueue_free(&state.rx_queue_drv, buffer);
+                err = sddf_enqueue(&rx_queue_drv.free, buffer);
                 assert(!err);
                 notify_drv = true;
             }
         }
-        net_request_signal_active(&state.rx_queue_drv);
+        sddf_request_producer_signal(&rx_queue_drv.active);
         reprocess = false;
 
-        if (!net_queue_empty_active(&state.rx_queue_drv)) {
-            net_cancel_signal_active(&state.rx_queue_drv);
+        if (!sddf_queue_empty(&rx_queue_drv.active)) {
+            sddf_cancel_producer_signal(&rx_queue_drv.active);
             reprocess = true;
         }
     }
 
     for (int client = 0; client < config.num_clients; client++) {
-        if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
-            net_cancel_signal_active(&state.rx_queue_clients[client]);
+        if (notify_clients[client] && sddf_require_producer_signal(&rx_queue_clients[client].active)) {
+            sddf_cancel_producer_signal(&rx_queue_clients[client].active);
             sddf_notify(config.clients[client].conn.id);
         }
     }
@@ -134,12 +130,12 @@ void rx_provide(void)
     for (int client = 0; client < config.num_clients; client++) {
         bool reprocess = true;
         while (reprocess) {
-            while (!net_queue_empty_free(&state.rx_queue_clients[client])) {
+            while (!sddf_queue_empty(&rx_queue_clients[client].free)) {
                 net_buff_desc_t buffer;
-                int err = net_dequeue_free(&state.rx_queue_clients[client], &buffer);
+                int err = sddf_dequeue(&rx_queue_clients[client].free, &buffer);
                 assert(!err);
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE)
-                       && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_drv.capacity));
+                       && (buffer.io_or_offset < NET_BUFFER_SIZE * rx_queue_drv.active.capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] != 0);
@@ -158,23 +154,23 @@ void rx_provide(void)
                 // i.e. the correctness of this assumes read-only access to
                 // RX buffers.
                 buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
-                err = net_enqueue_free(&state.rx_queue_drv, buffer);
+                err = sddf_enqueue(&rx_queue_drv.free, buffer);
                 assert(!err);
                 notify_drv = true;
             }
 
-            net_request_signal_free(&state.rx_queue_clients[client]);
+            sddf_request_producer_signal(&rx_queue_clients[client].free);
             reprocess = false;
 
-            if (!net_queue_empty_free(&state.rx_queue_clients[client])) {
-                net_cancel_signal_free(&state.rx_queue_clients[client]);
+            if (!sddf_queue_empty(&rx_queue_clients[client].free)) {
+                sddf_cancel_producer_signal(&rx_queue_clients[client].free);
                 reprocess = true;
             }
         }
     }
 
-    if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
-        net_cancel_signal_free(&state.rx_queue_drv);
+    if (notify_drv && sddf_require_producer_signal(&rx_queue_drv.free)) {
+        sddf_cancel_producer_signal(&rx_queue_drv.free);
         sddf_deferred_notify(config.driver.id);
         notify_drv = false;
     }
@@ -194,17 +190,17 @@ void init(void)
 
     /* Set up client queues */
     for (int i = 0; i < config.num_clients; i++) {
-        net_queue_init(&state.rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+        net_queue_init(&rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
                        config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+    net_queue_init(&rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
                    config.driver.num_buffers);
-    net_buffers_init(&state.rx_queue_drv, config.data.io_addr);
+    net_buffers_init(&rx_queue_drv, config.data.io_addr);
 
-    if (net_require_signal_free(&state.rx_queue_drv)) {
-        net_cancel_signal_free(&state.rx_queue_drv);
+    if (sddf_require_producer_signal(&rx_queue_drv.free)) {
+        sddf_cancel_producer_signal(&rx_queue_drv.free);
         sddf_deferred_notify(config.driver.id);
     }
 }
