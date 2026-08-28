@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #define SDDF_TIMER_MAX_CLIENTS 64
-#define SDDF_TIMER_MAGIC_LEN 5
+#define SDDF_TIMER_MAGIC_LEN 6
 static char SDDF_TIMER_MAGIC[SDDF_TIMER_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x6 };
 
 typedef struct timer_client_config {
