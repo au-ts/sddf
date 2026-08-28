@@ -13,7 +13,7 @@
 #define SDDF_SERIAL_MAX_CLIENTS 64
 #define SDDF_SERIAL_BEGIN_STR_MAX_LEN 128
 
-#define SDDF_SERIAL_MAGIC_LEN 5
+#define SDDF_SERIAL_MAGIC_LEN 6
 static char SDDF_SERIAL_MAGIC[SDDF_SERIAL_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x3 };
 
 typedef struct serial_connection_resource {

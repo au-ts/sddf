@@ -3,3 +3,4 @@
 
 from .sddf import sDDFDriverClass, sDDFDriverConfig, sDDFDriverManifest
 from .board import BOARDS, Board
+from .serial import sDDFSerial
