@@ -7,8 +7,6 @@ import importlib
 from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob
 from acacia.arch import x86_64
 
-# Use importlib to dynamically load. Using `from` import below other code is bad style.
-# board_module = importlib.import_module("board")
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 from acacia_sddf import BOARDS, sDDFTimer
 
