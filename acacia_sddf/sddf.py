@@ -81,7 +81,7 @@ class sDDFDriverClass(Subsystem):
         elif len(matching_configs) != 1:
             raise RuntimeError(
                 f"Multiple sDDF drivers satisfy {dev_compatible}! "
-                f"There whould be only one.\n{matching_configs}"
+                f"There should be only one.\n{matching_configs}"
             )
         self.sddf_driver_config = matching_configs[0]
         self.create_dtb_resources()
@@ -96,9 +96,7 @@ class sDDFDriverClass(Subsystem):
         self.__region_maps = []
         self.__irq_ids = []
         if self.dtb is None:
-            print(f"sddf.py: no DTB! Creating dummy device resources.")
             # x86 or otherwise no DTB!
-            print("sddf.py: no DTB! Assuming x86")
             self.x86_resources()
             return
 
