@@ -4,7 +4,7 @@ cat \
 	ethernet_header.pnk \
 	../../../include/sddf/network/queue.pnk \
 	ethernet.pnk | cpp -P > ethernet_full.pnk
-$HOME/Documents/pancake-transpiler-private/target/debug/pancake2viper \
+pancake2viper \
 	-I device.vpr \
 	-I virtualiser.vpr \
 	--allow-undefined-shared \
