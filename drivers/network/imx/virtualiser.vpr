@@ -40,7 +40,11 @@ predicate valid_virt(heap: IArray, virt: Ref)
   valid_net_queue_consume(heap, virt, virt.rx_free, RX_QUEUE_CAPACITY) &&
   valid_net_queue_produce(heap, virt, virt.rx_active, RX_QUEUE_CAPACITY) &&
   valid_net_queue_produce(heap, virt, virt.tx_free, TX_QUEUE_CAPACITY) &&
-  valid_net_queue_consume(heap, virt, virt.tx_active, TX_QUEUE_CAPACITY)
+  valid_net_queue_consume(heap, virt, virt.tx_active, TX_QUEUE_CAPACITY) &&
+  acc(virt.rx_free.net_removed_addr) &&
+  acc(virt.rx_active.net_added) &&
+  acc(virt.tx_free.net_added) &&
+  acc(virt.tx_active.net_removed)
 }
 define f_valid_virt(a, b) valid_virt(a, b) // silly transpiler bug
 
