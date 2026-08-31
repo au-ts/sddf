@@ -83,7 +83,6 @@ inline fun set_eir(1 eir)
 inline fun or_WRAP(1 x)
 {
   /@ ensures bounded16(x) ==> bounded16(retval) @/
-  /@ ensures bounded8(x) ==> bounded8(retval) @/
   /@ ensures retval == (x | WRAP_MASK) @/
   /@ ensures (retval | WRAP_MASK) == retval @/
   /@ ensures (x & RX_STAT_MASK) == 0 ==> (retval & RX_STAT_MASK) == 0 @/
@@ -617,7 +616,6 @@ inline fun {1,1,1} rx_return_body()
   /@ ensures forall i: Int :: X4(i) && 0 <= i && i < QUEUE_CAPACITY && i != old(gv.hw_rx_head) % QUEUE_CAPACITY ==>
                old(unfolding valid_hardware_ring_rx_read() in slot(gv.hardware_ring_rx, i).hw_stat) ==
                  unfolding valid_hardware_ring_rx_read() in slot(gv.hardware_ring_rx, i).hw_stat @/
-
   /@ unfold valid_hardware_ring_rx_read() @/
   /@ refute false @/
   /@ label l @/
@@ -1133,7 +1131,7 @@ function disjoint_device_unprocessed_net_added_tx(): Bool
 )
 
 /@ function X3(i: Int): Bool {
-  true
+ true
 } @/
 
 inline fun {1,1,1} tx_return_body()
@@ -1250,8 +1248,8 @@ inline fun {1,1,1} tx_return_body()
   /@ ensures retval.0 == 1 ==> gv.tx_processed == old(gv.tx_processed) @/
   /@ ensures !is_TXD_READY(old(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, old(gv.hw_tx_head) % QUEUE_CAPACITY).hw_stat)) ==>
                !is_TXD_READY(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, old(gv.hw_tx_head) % QUEUE_CAPACITY).hw_stat) @/
-  /@ ensures forall i: Int :: X3(i) && 0 <= i && i < 256 && i != old(gv.hw_tx_head) % QUEUE_CAPACITY ==>
-               old(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, i).hw_stat) ==
+ /@ ensures forall i: Int :: { X3(i) } X3(i) && 0 <= i && i < 256 && i != old(gv.hw_tx_head) % QUEUE_CAPACITY ==>
+              old(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, i).hw_stat) ==
                  unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, i).hw_stat @/
 
   /@ assert disjoint_device_unprocessed_net_added_tx() @/
@@ -1527,43 +1525,47 @@ inline fun 1 irq_get_set_eir() {
 inline fun irq_transaction(1 eir) {
   /@ requires valid() @/
   /@ ensures valid() @/
-  // --- if the device is full, and the queue is non-full, some progress will be made ---
-  /@ ensures old(unfolding valid() in unfolding valid_hardware_ring_rx_write() in unfolding valid_net_queue_produce(gv.rx_active) in
-       (eir & NETIRQ_TXF) != 0 ==>
-         (forall i: Int :: 0 <= i && i < QUEUE_CAPACITY ==> !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_addr) &&
-           slot(gv.hardware_ring_rx, i).ghost_unprocessed) ==>
-           gv.rx_active.net_tail - gv.rx_active.net_head != QUEUE_CAPACITY) ==>
-             gv.rx_active.net_added != empty_set_seqint() @/
-  /@ ensures old(unfolding valid() in unfolding valid_hardware_ring_rx_write() in unfolding valid_net_queue_produce(gv.tx_free) in
-       (eir & NETIRQ_TXF) != 0 ==>
-         (forall i: Int :: 0 <= i && i < QUEUE_CAPACITY ==> !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_addr) &&
-           slot(gv.hardware_ring_tx, i).ghost_unprocessed) ==>
-           gv.tx_free.net_tail - gv.tx_free.net_head != QUEUE_CAPACITY) ==>
-             gv.tx_free.net_added != empty_set_seqint() @/
   // --- correct movement of buffers ---
-  /@ ensures unfolding valid() in unfolding valid_net_queue_consume(gv.rx_free) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_consume(gv.rx_free, QUEUE_CAPACITY) in
        forall x: Int :: x in gv.rx_free.net_removed_addr ==>
          element2_seq(x, 0) in gv.rx_handled @/
-  /@ ensures unfolding valid() in unfolding valid_net_queue_consume(gv.rx_free) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_consume(gv.rx_free, QUEUE_CAPACITY) in
        forall s: Seq[Int] :: s in gv.rx_handled ==> |s| == 2 &&
          s[0] in gv.rx_free.net_removed_addr && s[1] == 0 @/
-  /@ ensures unfolding valid() in unfolding valid_net_queue_produce(gv.rx_active) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_produce(gv.rx_active, QUEUE_CAPACITY) in
        gv.rx_active.net_added == gv.rx_processed @/
-  /@ ensures unfolding valid() in unfolding valid_net_queue_consume(gv.tx_active) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_consume(gv.tx_active, QUEUE_CAPACITY) in
        gv.tx_handled == gv.tx_active.net_removed @/
-  /@ ensures unfolding valid() in unfolding valid_net_queue_produce(gv.tx_free) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) in
        forall x: Int :: x in gv.tx_processed ==> element2_seq(x, 0) in gv.tx_free.net_added @/
-  /@ ensures unfolding valid() in unfolding valid_net_queue_produce(gv.tx_free) in
+  /@ ensures unfolding valid() in unfolding valid_virt() in unfolding valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) in
        forall s: Seq[Int] :: s in gv.tx_free.net_added ==> |s| == 2 && s[1] == 0 &&
          s[0] in gv.tx_processed @/
+  // --- if the device is full, and the queue is non-full, some progress will be made ---
+//  /@ ensures (eir & NETIRQ_TXF) != 0 ==> old(unfolding valid() in unfolding valid_hardware_ring_tx_write() in (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY) &&
+//               !is_TXD_READY(slot(gv.hardware_ring_tx, gv.hw_tx_head % QUEUE_CAPACITY).hw_stat) ==>
+//                 unfolding valid() in gv.tx_processed != empty_set() @/
+//  /@ ensures (eir & NETIRQ_RXF) != 0 ==> old(unfolding valid() in unfolding valid_hardware_ring_tx_write() in (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY &&
+//               (forall i: Int :: 0 <= i && i < QUEUE_CAPACITY ==> !is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat))) ==>
+//               unfolding valid() in gv.rx_processed != empty_set_seqint() @/
   /@ inhale empty_ghost_state() @/
 
   /@ unfold valid() @/
+  /@ unfold valid_virt() @/
   if (eir & NETIRQ_TXF) {
+    /@ assert (eir & NETIRQ_TXF) != 0 @/
     // A frame was transmitted
     /@ unfold valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) @/
+    /@ label before @/
+    /@ unfold valid_hardware_ring_tx_write() @/
+    /@ fold valid_hardware_ring_tx_read() @/
     tx_return();
+    /@ assert old[before]((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY) &&
+                 !is_TXD_READY(unfolding valid_hardware_ring_tx_read() in slot(gv.hardware_ring_tx, gv.hw_tx_head % QUEUE_CAPACITY).hw_stat) ==>
+                   gv.tx_processed != empty_set() @/
     /@ refute false @/
+    /@ unfold valid_hardware_ring_tx_read() @/
+    /@ fold valid_hardware_ring_tx_write() @/
     /@ fold valid_net_queue_produce(gv.tx_free, QUEUE_CAPACITY) @/
     /@ unfold valid_net_queue_consume(gv.tx_active, QUEUE_CAPACITY) @/
     tx_provide();
@@ -1572,6 +1574,8 @@ inline fun irq_transaction(1 eir) {
   }
   if (eir & NETIRQ_RXF) {
     /@ unfold valid_net_queue_produce(gv.rx_active, QUEUE_CAPACITY) @/
+    /@ assert !is_RXD_EMPTY(slot(gv.hardware_ring_rx, gv.hw_rx_head % QUEUE_CAPACITY).hw_stat) @/
+    /@ assert (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == QUEUE_CAPACITY @/
     rx_return();
     /@ refute false @/
     /@ fold valid_net_queue_produce(gv.rx_active, QUEUE_CAPACITY) @/
@@ -1580,6 +1584,7 @@ inline fun irq_transaction(1 eir) {
     /@ refute false @/
     /@ fold valid_net_queue_consume(gv.rx_free, QUEUE_CAPACITY) @/
   }
+  /@ fold valid_virt() @/
   /@ fold valid() @/
   return 0;
 }

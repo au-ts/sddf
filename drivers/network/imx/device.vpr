@@ -412,26 +412,26 @@ define valid_tx_read_slot(x) (
 predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, 3/4) &&
-    (forall i: Int :: { slot(gv.hardware_ring_tx, i).hw_stat }
+    (forall i: Int :: //{ slot(gv.hardware_ring_tx, i).hw_stat }
         i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4)) &&
     (forall i: Int ::
-        { bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
-        { bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
-        { bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
         i >= 0 && i < hw_capacity ==>
         bounded16(slot(gv.hardware_ring_tx, i).hw_stat)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
             is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_len, 3/4) &&
             is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
 }
@@ -485,26 +485,26 @@ define valid_hardware_ring_tx_mdata_read(heap, gv)
 predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
 {
     acc(gv.hardware_ring_tx, write) &&
-    (forall i: Int :: { slot(gv.hardware_ring_tx, i).hw_stat }
+    (forall i: Int :: //{ slot(gv.hardware_ring_tx, i).hw_stat }
         i >= 0 && i < hw_capacity ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2)) &&
     (forall i: Int ::
-        { bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
-        { bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
-        { bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded16(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded32(slot(gv.hardware_ring_tx, i).hw_stat) }
+        //{ bounded64(slot(gv.hardware_ring_tx, i).hw_stat) }
         i >= 0 && i < hw_capacity ==> bounded16(slot(gv.hardware_ring_tx, i).hw_stat)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_addr }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_addr, write) &&
             is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_stat }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
             is_valid_tx_stat(slot(gv.hardware_ring_tx, i).hw_stat)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).hw_len }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).hw_len, write) &&
             is_valid_data_len(slot(gv.hardware_ring_tx, i).hw_len)) &&
-    (forall i: Int :: { is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
+    (forall i: Int :: //{ is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat), slot(gv.hardware_ring_tx, i).ghost_unprocessed }
         i >= 0 && i < hw_capacity && !is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
             acc(slot(gv.hardware_ring_tx, i).ghost_unprocessed))
 }
@@ -1181,7 +1181,7 @@ method f_ffiTHREAD_MEMORY_ACQUIRE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int,
         acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 1/4)
     ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> 0 <= gv.tx_free.net_tail - gv.tx_free.net_head <= 256
     ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> forall i: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY ==>
-      acc(slotq(gv.tx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_free.net_descr, i).ndescr_len, 2/3) &&
+      acc(slotq(gv.tx_free.net_descr, i).ndescr_addr) && acc(slotq(gv.tx_free.net_descr, i).ndescr_len) &&
       is_valid_data_addr(slotq(gv.tx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_free.net_descr, i).ndescr_len)
     ensures old(gv.wm_state) == WM_LOAD_QM_TX_FREE ==> forall i: Int, j: Int :: old(gv.tx_free.net_head) + QUEUE_CAPACITY <= i < gv.tx_free.net_head + QUEUE_CAPACITY &&
       gv.tx_free.net_tail <= j < gv.tx_free.net_head + QUEUE_CAPACITY &&
@@ -1195,7 +1195,7 @@ method f_ffiTHREAD_MEMORY_ACQUIRE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int,
         forall i: Int :: gv.tx_active.net_head <= i < old(gv.tx_active.net_tail) ==>
             acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 1/4)
     ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall i: Int :: old(gv.tx_active.net_tail) <= i < gv.tx_active.net_tail ==>
-      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len, 2/3) &&
+      acc(slotq(gv.tx_active.net_descr, i).ndescr_addr) && acc(slotq(gv.tx_active.net_descr, i).ndescr_len) &&
       is_valid_data_addr(slotq(gv.tx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.tx_active.net_descr, i).ndescr_len)
     ensures old(gv.wm_state) == WM_LOAD_QM_TX_ACTIVE ==> forall i: Int, j: Int :: old(gv.tx_active.net_tail) <= i && i < gv.tx_active.net_tail &&
       gv.tx_active.net_head <= j && j < gv.tx_active.net_tail &&
@@ -1215,7 +1215,7 @@ method f_ffiTHREAD_MEMORY_ACQUIRE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int,
         acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 1/4)
     ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> 0 <= gv.rx_active.net_tail - gv.rx_active.net_head <= 256
     ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> forall i: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY ==>
-      acc(slotq(gv.rx_active.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_active.net_descr, i).ndescr_len, 2/3) &&
+      acc(slotq(gv.rx_active.net_descr, i).ndescr_addr) && acc(slotq(gv.rx_active.net_descr, i).ndescr_len) &&
       is_valid_data_addr(slotq(gv.rx_active.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_active.net_descr, i).ndescr_len)
     ensures old(gv.wm_state) == WM_LOAD_QM_RX_ACTIVE ==> forall i: Int, j: Int :: old(gv.rx_active.net_head) + QUEUE_CAPACITY <= i < gv.rx_active.net_head + QUEUE_CAPACITY &&
       gv.rx_active.net_tail <= j < gv.rx_active.net_head + QUEUE_CAPACITY &&
@@ -1229,7 +1229,7 @@ method f_ffiTHREAD_MEMORY_ACQUIRE(heap: IArray, gv: Ref, a: Int, b: Int, c: Int,
         acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 1/4)
     ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> 0 <= old(gv.rx_free.net_tail) - gv.rx_free.net_head <= 256 &&
       forall i: Int :: old(gv.rx_free.net_tail) <= i < gv.rx_free.net_tail ==>
-        acc(slotq(gv.rx_free.net_descr, i).ndescr_addr, 2/3) && acc(slotq(gv.rx_free.net_descr, i).ndescr_len, 2/3) &&
+        acc(slotq(gv.rx_free.net_descr, i).ndescr_addr) && acc(slotq(gv.rx_free.net_descr, i).ndescr_len) &&
         is_valid_data_addr(slotq(gv.rx_free.net_descr, i).ndescr_addr) && is_valid_data_len(slotq(gv.rx_free.net_descr, i).ndescr_len)
     ensures old(gv.wm_state) == WM_LOAD_QM_RX_FREE ==> forall i: Int, j: Int :: old(gv.rx_free.net_tail) <= i && i < gv.rx_free.net_tail &&
       gv.rx_free.net_head <= j && j < gv.rx_free.net_tail &&

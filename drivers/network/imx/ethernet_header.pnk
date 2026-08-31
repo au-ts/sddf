@@ -226,8 +226,6 @@ var 1 eth_reg = ETH_REG;
 
 /@
   predicate valid() {
-	valid_hardware_ring_rx_mdata_write() && valid_hardware_ring_tx_mdata_write() &&
-  	valid_virt() &&
   	acc(gv.eth_reg) && gv.eth_reg == HW_ETH_BASE &&
   	acc(gv.hw_tx_tail, 99/100) && acc(gv.hw_tx_head, 99/100) &&
 	acc(gv.hw_tx_capacity, 99/100) && acc(gv.hw_tx_descr) &&
@@ -248,26 +246,21 @@ var 1 eth_reg = ETH_REG;
     acc(gv.irq_ch) && acc(gv.rx_ch) && acc(gv.tx_ch) &&
 	acc(gv.tx_await_ack) && acc(gv.rx_await_ack) &&
 	gv.tx_await_ack == empty_seq() && gv.rx_await_ack == empty_seq() &&
-	acc(gv.rx_handled) &&
+	acc(gv.rx_handled) && acc(gv.tx_handled) && acc(gv.rx_processed) && acc(gv.tx_processed) &&
     0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
-    0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity
+    0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity &&
+	valid_hardware_ring_rx_write() && valid_hardware_ring_tx_write() &&
+	valid_hardware_ring_rx_mdata_write() && valid_hardware_ring_tx_mdata_write() &&
+  	valid_virt()
   }
 @/
 
 #define empty_ghost_state() ( \
 	unfolding valid() in unfolding valid_virt() in \
 		gv.rx_active.net_added == empty_set_seqint() && \
-		gv.rx_free.net_added == empty_set_seqint() && \
-		gv.tx_active.net_added == empty_set_seqint() && \
 		gv.tx_free.net_added == empty_set_seqint() && \
-		gv.rx_active.net_removed_addr == empty_set() && \
 		gv.rx_free.net_removed_addr == empty_set() && \
-		gv.tx_active.net_removed_addr == empty_set() && \
-		gv.tx_free.net_removed_addr == empty_set() && \
-		gv.rx_active.net_removed == empty_set_seqint() && \
-		gv.rx_free.net_removed == empty_set_seqint() && \
 		gv.tx_active.net_removed == empty_set_seqint() && \
-		gv.tx_free.net_removed == empty_set_seqint() && \
 		gv.rx_handled == empty_set_seqint() && \
 		gv.tx_handled == empty_set_seqint() && \
 		gv.rx_await_ack == empty_seq() && \
