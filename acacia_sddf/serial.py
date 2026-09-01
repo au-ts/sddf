@@ -1,26 +1,26 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import os
+import sys
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple, Type, Union
+
 from acacia import (
-    System,
-    Subsystem,
-    ProtectionDomain,
     Channel,
+    ConfigStruct,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
+    ProtectionDomain,
     SchedulingProperties,
-    ConfigStruct,
     SubsystemBuildError,
+    System,
 )
-from acacia.x86 import IOPort
 from acacia.irq import IrqIoapic
-import sys, os
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
-from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
-from collections import defaultdict
-from typing import List, Dict, Type, Union, Optional
+from acacia.x86 import IOPort
+
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .sddf import RegionResourceFactory, sDDFDriverClass
 
 SERIAL_DEFAULT_BEGIN_STR = "Begin input\r\n"
 SERIAL_MAX_BEGIN_STR_LEN = 128
@@ -64,7 +64,12 @@ class sDDFSerial(sDDFDriverClass):
             cpu=self.cpu,
         )
         super().__init__(
-            sdf, driver, "serial", dev_compatible, dev_dt_path, magic="sDDF" + chr(0x1)
+            sdf,
+            driver,
+            f"serial",
+            dev_compatible,
+            dev_dt_path,
+            magic="sDDF" + chr(0x1),
         )
         self.allow_rx = allow_rx
         self.data_size = data_size
@@ -76,10 +81,12 @@ class sDDFSerial(sDDFDriverClass):
                 f"begin_str length {len(begin_str)} exceeds max {SERIAL_MAX_BEGIN_STR_LEN}"
             )
         self.begin_str = begin_str
-        self.virt_tx = None
         self.virt_rx = None
         self.virt_rx_elf = virt_rx_elf
         self.virt_tx_elf = virt_tx_elf
+
+        # Client management
+        self.client_perms = {}
 
         # Stubs of config structs that we need to collect in construct_infrastructure and connect_clients
         self.virt_tx_config = None
@@ -87,7 +94,7 @@ class sDDFSerial(sDDFDriverClass):
         self.driver_config = None
         self.virt_tx_driver_conn = None
         self.virt_rx_driver_conn = None
-        self.client_configs = []
+        self.client_configs: Dict[ProtectionDomain, Tuple[bool, bool]] = {}
         self.construct_infrastructure(
             virt_rx_prio if virt_rx_prio else -1, virt_tx_prio
         )
@@ -197,6 +204,16 @@ class sDDFSerial(sDDFDriverClass):
             driver_rx_conn,
         )
 
+    def add_client(
+        self, client: ProtectionDomain, allow_tx: bool = True, allow_rx: bool = True
+    ):
+        super().add_client(client)
+        if allow_rx != self.allow_rx:
+            print(
+                f"Warning: client {client} requests serial RX but serial RX is disabled!"
+            )
+        self.client_configs[client] = (allow_rx, allow_tx)
+
     def connect_clients(self):
         assert self.virt_tx is not None
         assert self.driver is not None
@@ -206,58 +223,65 @@ class sDDFSerial(sDDFDriverClass):
         client_configs = []
 
         for c in self.clients:
-            if c.priority >= self.virt_tx.priority:
+            rx_enabled = self.client_configs[c][0] and self.allow_rx
+            tx_enabled = self.client_configs[c][1]
+            if tx_enabled and c.priority >= self.virt_tx.priority:
                 raise SubsystemBuildError(
                     f"Client {c} has a priority higher than virt_tx's "
                     f"({self.virt_tx.priority})!"
                 )
-            if self.virt_rx and c.priority >= self.virt_rx.priority:
+            if rx_enabled and c.priority >= self.virt_rx.priority:
                 raise SubsystemBuildError(
                     f"Client {c} has a priority higher than virt_rx's "
                     f"({self.virt_rx.priority})!"
                 )
 
+            client_rx_conn = None
+            client_tx_conn = None
+
             # TX connection: virt_tx -> client
-            tx_queue_mr = MemoryRegion(
-                self.sdf, f"serial_tx_queue_{c.name}", self.queue_size
-            )
-            tx_data_mr = MemoryRegion(
-                self.sdf, f"serial_tx_data_{c.name}", self.data_size
-            )
+            if tx_enabled:
+                tx_queue_mr = MemoryRegion(
+                    self.sdf, f"serial_tx_queue_{c.name}", self.queue_size
+                )
+                tx_data_mr = MemoryRegion(
+                    self.sdf, f"serial_tx_data_{c.name}", self.data_size
+                )
 
-            virt_tx_tx_queue_map = self.virt_tx.create_automap(
-                tx_queue_mr, Map.Permissions(r=True, w=True)
-            )
-            virt_tx_tx_data_map = self.virt_tx.create_automap(
-                tx_data_mr, Map.Permissions(r=True, w=True)
-            )
-            c_tx_queue_map = c.create_automap(
-                tx_queue_mr, Map.Permissions(r=True, w=True)
-            )
-            c_tx_data_map = c.create_automap(
-                tx_data_mr, Map.Permissions(r=True, w=True)
-            )
+                virt_tx_tx_queue_map = self.virt_tx.create_automap(
+                    tx_queue_mr, Map.Permissions(r=True, w=True)
+                )
+                virt_tx_tx_data_map = self.virt_tx.create_automap(
+                    tx_data_mr, Map.Permissions(r=True, w=True)
+                )
+                c_tx_queue_map = c.create_automap(
+                    tx_queue_mr, Map.Permissions(r=True, w=True)
+                )
+                c_tx_data_map = c.create_automap(
+                    tx_data_mr, Map.Permissions(r=True, w=True)
+                )
 
-            tx_ch = Channel(
-                self.sdf,
-                Channel.End(self.virt_tx, can_notify=True, can_pp=False),
-                Channel.End(c, can_notify=True, can_pp=False),
-            )
+                tx_ch = Channel(
+                    self.sdf,
+                    Channel.End(self.virt_tx, can_notify=True, can_pp=False),
+                    Channel.End(c, can_notify=True, can_pp=False),
+                )
 
-            virt_tx_conn = self.serial_connection_resource_factory(
-                virt_tx_tx_queue_map, virt_tx_tx_data_map, tx_ch.id_for_pd(self.virt_tx)
-            )
-            client_tx_conn = self.serial_connection_resource_factory(
-                c_tx_queue_map, c_tx_data_map, tx_ch.id_for_pd(c)
-            )
+                virt_tx_conn = self.serial_connection_resource_factory(
+                    virt_tx_tx_queue_map,
+                    virt_tx_tx_data_map,
+                    tx_ch.id_for_pd(self.virt_tx),
+                )
+                client_tx_conn = self.serial_connection_resource_factory(
+                    c_tx_queue_map, c_tx_data_map, tx_ch.id_for_pd(c)
+                )
 
-            virt_tx_client_structs.append(
-                self.serial_virt_tx_client_config_factory(c.name, virt_tx_conn)
-            )
+                virt_tx_client_structs.append(
+                    self.serial_virt_tx_client_config_factory(c.name, virt_tx_conn)
+                )
 
             # RX connection (if enabled): virt_rx -> client
-            client_rx_conn = None
-            if self.virt_rx:
+            if rx_enabled:
                 rx_queue_mr = MemoryRegion(
                     self.sdf, f"serial_rx_queue_{c.name}", self.queue_size
                 )
@@ -443,7 +467,7 @@ class sDDFSerial(sDDFDriverClass):
     ) -> ConfigStruct:
         fields = {
             "magic": magic,
-            "tx": tx_connection,
+            "tx": tx_connection if tx_connection else ConfigStruct({}, empty=True),
             "rx": rx_connection if rx_connection else ConfigStruct({}, empty=True),
         }
         return ConfigStruct(
