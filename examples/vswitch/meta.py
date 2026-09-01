@@ -152,9 +152,18 @@ def generate(
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
 
     vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
+    vswitch_orchestrator = ProtectionDomain(
+        "vswitch_orchestrator", "vswitch_orchestrator.elf", priority=96
+    )
 
     net_system = Sddf.Net(
-        sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch
+        sdf,
+        ethernet_node,
+        ethernet_driver,
+        net_virt_tx,
+        net_virt_rx,
+        vswitch=vswitch,
+        vswitch_orchestrator=vswitch_orchestrator,
     )
 
     client0_elf = copy_elf("client", "client", 0)
@@ -188,10 +197,12 @@ def generate(
     serial_system.add_client(client1)
     serial_system.add_client(client2)
     serial_system.add_client(client3)
+    serial_system.add_client(vswitch_orchestrator)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
     timer_system.add_client(client2)
     timer_system.add_client(client3)
+    timer_system.add_client(vswitch_orchestrator)
     net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
     net_system.add_client_with_copier(client1, client1_net_copier, vswitch=True)
     net_system.add_client_with_copier(client2, client2_net_copier, vswitch=True)
@@ -210,6 +221,7 @@ def generate(
         net_virt_tx,
         net_virt_rx,
         vswitch,
+        vswitch_orchestrator,
         client0,
         client0_net_copier,
         client1,
