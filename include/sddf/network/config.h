@@ -143,6 +143,11 @@ typedef struct net_vswitch_config {
     uint8_t orchestrator_id;
 } net_vswitch_config_t;
 
+typedef struct net_vswitch_orchestrator_config {
+    char magic[SDDF_NET_MAGIC_LEN];
+    uint8_t vswitch_id;
+} net_vswitch_orchestrator_config_t;
+
 static inline bool net_config_check_magic(void *config)
 {
     char *magic = (char *)config;
