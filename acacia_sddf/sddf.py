@@ -1,22 +1,25 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys, os
-from typing import List, Optional, Tuple
+import os
+import sys
 from abc import abstractmethod
+from typing import List, Optional, Tuple
+
 from acacia import (
-    Subsystem,
-    ProtectionDomain,
+    IRQ,
     Channel,
+    ConfigStruct,
+    DeviceTreeBlob,
+    DTBNode,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
+    ProtectionDomain,
     SchedulingProperties,
-    ConfigStruct,
-    IRQ,
+    Subsystem,
     System,
 )
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
+
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
 
 
 class sDDFDriverClass(Subsystem):
@@ -37,7 +40,7 @@ class sDDFDriverClass(Subsystem):
         dev_dt_path: str,
         magic: str,
     ):
-        super().__init__(system, class_name)
+        super().__init__(system, f"{class_name}_{dev_dt_path}")
         self.driver = driver_pd
         self.sdf = system
         self.dtb = system.dtb
