@@ -49,7 +49,8 @@ vpath %.c ${SDDF} ${VSWITCH}
 
 IMAGES := eth_driver.elf client.elf network_virt_rx.elf \
 	  network_virt_tx.elf network_copy.elf timer_driver.elf \
-	  serial_driver.elf serial_virt_tx.elf network_vswitch.elf
+	  serial_driver.elf serial_virt_tx.elf network_vswitch.elf \
+	  vswitch_orchestrator.elf
 
 
 CFLAGS += \
@@ -72,12 +73,16 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
 	--end-group
 
 VSWITCH_OBJS := client.o icmp.o
+ORCHESTRATOR_OBJS := orchestrator.o
 
-DEPS := $(VSWITCH_OBJS:.o=.d)
+DEPS := $(VSWITCH_OBJS:.o=.d) $(ORCHESTRATOR_OBJS:.o=.d)
 
 all: loader.img
 
 client.elf: $(VSWITCH_OBJS) libsddf_util.a lib_sddf_lwip_client.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+vswitch_orchestrator.elf: $(ORCHESTRATOR_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
@@ -127,6 +132,9 @@ endif
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client2.data client2.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client3.data client3.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
+	$(OBJCOPY) --update-section .net_vswitch_orchestrator_config=net_vswitch_orchestrator.data vswitch_orchestrator.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_vswitch_orchestrator.data vswitch_orchestrator.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_vswitch_orchestrator.data vswitch_orchestrator.elf
 	touch $@
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

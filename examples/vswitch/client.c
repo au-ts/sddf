@@ -44,6 +44,12 @@ typedef struct neighbors {
 static neighbors_t neighbors[SDDF_NET_MAX_CLIENTS];
 
 #define LWIP_TICK_MS 100
+#define ACL_TEST_PORT0 0
+#define ACL_TEST_PORT1 1
+#define ACL_TEST_INTERVAL_TICKS (NS_IN_S / (LWIP_TICK_MS * NS_IN_MS))
+
+static uint8_t vswitch_client_id = SDDF_NET_MAX_CLIENTS;
+static uint8_t acl_test_tick_count;
 
 /**
  * Pings all other reachable vswitch clients exactly once, after their IP
@@ -58,6 +64,27 @@ static void ping_neighbors()
         send_icmp_request(&neighbors[i].icmp_ctx, i);
         neighbors[i].icmp_ctx.pinged = true;
     }
+}
+
+/* Client 0 probes client 1 once per second as an ACL data-plane test. */
+static void send_acl_test_probe()
+{
+    /* Only Client 0 can begin the test */
+    if (vswitch_client_id != ACL_TEST_PORT0) {
+        return;
+    }
+
+    if (++acl_test_tick_count < ACL_TEST_INTERVAL_TICKS) {
+        return;
+    }
+    acl_test_tick_count = 0;
+
+    icmp_context_t *ctx = &neighbors[ACL_TEST_PORT1].icmp_ctx;
+    if (!neighbors[ACL_TEST_PORT1].pingable || !ctx->ip_addr) {
+        return;
+    }
+    /* Replies are logged by the ICMP receive callback when the ACL permits them. */
+    send_icmp_request(ctx, ACL_TEST_PORT1);
 }
 
 /**
@@ -140,6 +167,7 @@ void init(void)
         sddf_printf("Client %s could not query vswitch state!\n", sddf_get_pd_name());
     }
 
+    vswitch_client_id = sddf_get_mr(VSWITCH_QUERY_RET_CLIENT_ID);
     uint64_t reachable_neighbours = sddf_get_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP);
     for (uint8_t i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         neighbors[i].pingable = reachable_neighbours & ((uint64_t)1 << i);
@@ -161,6 +189,7 @@ void notified(sddf_channel ch)
             ping_neighbors();
             tick_count = 0;
         }
+        send_acl_test_probe();
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {
         // Nothing to do
     } else {

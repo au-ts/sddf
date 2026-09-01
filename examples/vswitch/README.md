@@ -11,6 +11,11 @@ The example has a similar set up to the [echo
 server](/examples/echo_server/README.md) example, however has four network
 clients which are all clients of the vswitch.
 
+The example also contains a separate `vswitch_orchestrator` PD. It connects
+to the vSwitch and toggles the bidirectional ACL between ports 0 and 1 every 5 seconds.
+Client 0 sends an ICMP probe to client 1 once per second.
+Replies appear in the serial output only while the runtime ACL permits the packets to pass.
+
 The system architecture of a vswitch client system is described
 [here](/docs/network/vswitch.md).
 
@@ -34,6 +39,14 @@ This indicates that each client has successfully completed DHCP and printed its
 IP address. Clients will then register their IP addresses with the vswitch,
 request their reachable neighbours, request the IP address of each reachable
 neighbour then try to ping each neighbour once.
+
+The orchestrator also reports each runtime ACL update, for example:
+
+```
+vSwitch ACL: port 0 <-> port 1 is disabled
+vSwitch ACL: port 0 <-> port 1 is enabled
+ICMP reply matched on netif client0 peer=1 seq=18 from 10.0.2.17
+```
 
 Here is the output from client 0, which has permissions to contact each of it's
 three neighbours:
