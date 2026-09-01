@@ -135,6 +135,12 @@ typedef struct net_vswitch_config {
      * (ports[0].tx.num_buffers + ... + ports[num_ports].tx.num_buffers) * sizeof(uin8_t) bytes
      */
     region_resource_t buffer_metadata;
+
+    /**
+     * Optional protected-procedure-call channel used by a vSwitch
+     * orchestrator. Zero when no orchestrator is connected.
+     */
+    uint8_t orchestrator_id;
 } net_vswitch_config_t;
 
 static inline bool net_config_check_magic(void *config)
