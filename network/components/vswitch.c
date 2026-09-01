@@ -187,6 +187,20 @@ static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
+static void vswitch_set_acl(uint8_t port0, uint8_t port1, bool allow)
+{
+    uint64_t port0_bit = (uint64_t)1 << port0;
+    uint64_t port1_bit = (uint64_t)1 << port1;
+
+    if (allow) {
+        state.allow_list[port0] |= port1_bit;
+        state.allow_list[port1] |= port0_bit;
+    } else {
+        state.allow_list[port0] &= ~port1_bit;
+        state.allow_list[port1] &= ~port0_bit;
+    }
+}
+
 static uint8_t mac_addr_find(const mac_addr_t *dest_macaddr)
 {
     mac_addr_t *mac;
@@ -404,6 +418,32 @@ void init(void)
 
 seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
+    if (ch == config.orchestrator_id) {
+        if (microkit_msginfo_get_label(msginfo) != VSWITCH_SET_ACL) {
+            LOG_VSWITCH_ERR("Received invalid orchestrator operation\n");
+            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_OPERATION);
+            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+        }
+
+        seL4_Word port0 = sddf_get_mr(VSWITCH_ACL_PORT0);
+        seL4_Word port1 = sddf_get_mr(VSWITCH_ACL_PORT1);
+        seL4_Word allow = sddf_get_mr(VSWITCH_ACL_VALUE);
+
+        if (port0 >= config.num_ports || port1 >= config.num_ports || port0 == port1) {
+            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_PORT);
+            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+        }
+        if (allow > 1) {
+            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_ACL_VALUE);
+            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+        }
+
+        vswitch_set_acl((uint8_t)port0, (uint8_t)port1, allow != 0);
+        LOG_VSWITCH("Orchestrator set ports %u and %u to %u\n", port0, port1, allow);
+        sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_OKAY);
+        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+    }
+
     uint8_t ppc_client = 0;
     while (ppc_client < config.num_ports) {
         if (ch == config.ports[ppc_client].tx.id) {

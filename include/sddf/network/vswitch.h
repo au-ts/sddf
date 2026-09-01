@@ -19,6 +19,10 @@ typedef enum {
     VSWITCH_ERR_VIRT_PORT,
     /* Unsupported operation */
     VSWITCH_ERR_INVALID_OPERATION,
+    /* Port ID is outside the configured port range */
+    VSWITCH_ERR_INVALID_PORT,
+    /* ACL value must be either zero or one */
+    VSWITCH_ERR_INVALID_ACL_VALUE,
 } vswitch_err_t;
 
 /**
@@ -81,3 +85,27 @@ typedef enum {
     /* Number of return arguments */
     VSWITCH_REQ_RET_NUM_ARGS,
 } vswitch_req_ret_args_t;
+
+/**
+ * Enable or disable bidirectional traffic between two vSwitch ports.
+ * This operation is only available to the configured vSwitch orchestrator.
+ */
+#define VSWITCH_SET_ACL 3
+
+typedef enum {
+    /* First vSwitch port whose ACL entry will be updated */
+    VSWITCH_ACL_PORT0 = 0,
+    /* Second vSwitch port whose ACL entry will be updated */
+    VSWITCH_ACL_PORT1,
+    /* Whether traffic is allowed (0 to deny, 1 to allow) */
+    VSWITCH_ACL_VALUE,
+    /* Number of arguments */
+    VSWITCH_ACL_NUM_ARGS,
+} vswitch_acl_args_t;
+
+typedef enum {
+    /* Success or failure of the operation */
+    VSWITCH_ACL_RET_ERR = 0,
+    /* Number of return arguments */
+    VSWITCH_ACL_RET_NUM_ARGS,
+} vswitch_acl_ret_args_t;
