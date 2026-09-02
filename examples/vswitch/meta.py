@@ -49,6 +49,21 @@ def update_elf_section(elf_name: str, section_name: str, data_name: str):
     )
 
 
+def create_client(client_number: int):
+    client_elf = copy_elf("client", "client", client_number)
+    client = ProtectionDomain(
+        f"client{client_number}", client_elf, priority=96, budget=20000
+    )
+    net_copier = ProtectionDomain(
+        f"client{client_number}_net_copier",
+        f"network_copy{client_number}.elf",
+        priority=98,
+        budget=20000,
+    )
+
+    return client, net_copier
+
+
 def generate(
     sdf_file: str,
     output_dir: str,
@@ -152,55 +167,36 @@ def generate(
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
 
     vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
+    vswitch_orchestrator = ProtectionDomain(
+        "vswitch_orchestrator", "vswitch_orchestrator.elf", priority=96
+    )
 
     net_system = Sddf.Net(
-        sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch
+        sdf,
+        ethernet_node,
+        ethernet_driver,
+        net_virt_tx,
+        net_virt_rx,
+        vswitch=vswitch,
+        vswitch_orchestrator=vswitch_orchestrator,
     )
+    serial_system.add_client(vswitch_orchestrator)
+    timer_system.add_client(vswitch_orchestrator)
 
-    client0_elf = copy_elf("client", "client", 0)
-    client0 = ProtectionDomain("client0", client0_elf, priority=96, budget=20000)
-    client0_net_copier = ProtectionDomain(
-        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
-    )
+    clients = [create_client(client_number) for client_number in range(4)]
 
-    client1_elf = copy_elf("client", "client", 1)
-    client1 = ProtectionDomain("client1", client1_elf, priority=96, budget=20000)
-    client1_net_copier = ProtectionDomain(
-        "client1_net_copier",
-        "network_copy1.elf",
-        priority=98,
-        budget=20000,
-    )
+    for client, _ in clients:
+        serial_system.add_client(client)
+    for client, _ in clients:
+        timer_system.add_client(client)
+    for client, net_copier in clients:
+        net_system.add_client_with_copier(client, net_copier, vswitch=True)
 
-    client2_elf = copy_elf("client", "client", 2)
-    client2 = ProtectionDomain("client2", client2_elf, priority=96, budget=20000)
-    client2_net_copier = ProtectionDomain(
-        "client2_net_copier", "network_copy2.elf", priority=98, budget=20000
-    )
+    lwip_clients = [Sddf.Lwip(sdf, net_system, client) for client, _ in clients]
 
-    client3_elf = copy_elf("client", "client", 3)
-    client3 = ProtectionDomain("client3", client3_elf, priority=96, budget=20000)
-    client3_net_copier = ProtectionDomain(
-        "client3_net_copier", "network_copy3.elf", priority=98, budget=20000
-    )
-
-    serial_system.add_client(client0)
-    serial_system.add_client(client1)
-    serial_system.add_client(client2)
-    serial_system.add_client(client3)
-    timer_system.add_client(client0)
-    timer_system.add_client(client1)
-    timer_system.add_client(client2)
-    timer_system.add_client(client3)
-    net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
-    net_system.add_client_with_copier(client1, client1_net_copier, vswitch=True)
-    net_system.add_client_with_copier(client2, client2_net_copier, vswitch=True)
-    net_system.add_client_with_copier(client3, client3_net_copier, vswitch=True)
-
-    client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
-    client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
-    client2_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client2)
-    client3_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client3)
+    # We use Client 0/1 to demonstrate how orchestrator toggles ACL rules
+    sdf.add_channel(Channel(clients[0][0], vswitch_orchestrator, a_id=60, b_id=60))
+    sdf.add_channel(Channel(clients[1][0], vswitch_orchestrator, a_id=60, b_id=61))
 
     # Echo server protection domains
     pds = [
@@ -210,14 +206,8 @@ def generate(
         net_virt_tx,
         net_virt_rx,
         vswitch,
-        client0,
-        client0_net_copier,
-        client1,
-        client1_net_copier,
-        client2,
-        client2_net_copier,
-        client3,
-        client3_net_copier,
+        vswitch_orchestrator,
+        *(pd for client, net_copier in clients for pd in (client, net_copier)),
         timer_driver,
     ]
     for pd in pds:
@@ -232,26 +222,21 @@ def generate(
     # 1 -> 0, 2, V
     # 2 -> 0, 1, V
     # 3 -> 0, V
-    net_system.add_acl_rule(client0, client1, True, True)
-    net_system.add_acl_rule(client0, client2, True, True)
-    net_system.add_acl_rule(client0, client3, True, True)
-    net_system.add_acl_rule(client0, net_virt_tx, True, True)
-    net_system.add_acl_rule(client1, client2, True, True)
-    net_system.add_acl_rule(client1, net_virt_tx, True, True)
-    net_system.add_acl_rule(client2, net_virt_tx, True, True)
-    net_system.add_acl_rule(client3, net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[0][0], clients[1][0], True, True)
+    net_system.add_acl_rule(clients[0][0], clients[2][0], True, True)
+    net_system.add_acl_rule(clients[0][0], clients[3][0], True, True)
+    net_system.add_acl_rule(clients[0][0], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[1][0], clients[2][0], True, True)
+    net_system.add_acl_rule(clients[1][0], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[2][0], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[3][0], net_virt_tx, True, True)
 
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
-    assert client0_lib_sddf_lwip.connect()
-    assert client0_lib_sddf_lwip.serialise_config(output_dir)
-    assert client1_lib_sddf_lwip.connect()
-    assert client1_lib_sddf_lwip.serialise_config(output_dir)
-    assert client2_lib_sddf_lwip.connect()
-    assert client2_lib_sddf_lwip.serialise_config(output_dir)
-    assert client3_lib_sddf_lwip.connect()
-    assert client3_lib_sddf_lwip.serialise_config(output_dir)
+    for lwip in lwip_clients:
+        assert lwip.connect()
+        assert lwip.serialise_config(output_dir)
 
     if board.name == "rpi4b_1gb":
         update_elf_section(
