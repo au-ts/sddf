@@ -48,6 +48,10 @@ static neighbors_t neighbors[SDDF_NET_MAX_CLIENTS];
 #define ACL_TEST_PORT1 1
 #define ACL_TEST_INTERVAL_TICKS (NS_IN_S / (LWIP_TICK_MS * NS_IN_MS))
 
+#define ORCHESTRATOR_CHANNEL 60
+
+static bool orchestrator_notified;
+
 static uint8_t vswitch_client_id = SDDF_NET_MAX_CLIENTS;
 static uint8_t acl_test_tick_count;
 
@@ -109,6 +113,25 @@ static void query_ips()
 
         neighbors[i].icmp_ctx.ip_addr = sddf_get_mr(VSWITCH_REQ_RET_IP_ADDR);
     }
+}
+
+static void notify_orchestrator_when_ready()
+{
+    /* We use Client 0/1 as the demonstrator for the ACL test */
+    if (orchestrator_notified || vswitch_client_id > ACL_TEST_PORT1) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (neighbors[i].pingable && !neighbors[i].icmp_ctx.ip_addr) {
+            return;
+        }
+    }
+
+    sddf_notify(ORCHESTRATOR_CHANNEL);
+
+    orchestrator_notified = true;
+    sddf_printf("Client %s completed neighbour discovery\n", sddf_get_pd_name());
 }
 
 /**
@@ -187,6 +210,7 @@ void notified(sddf_channel ch)
         if (tick_count == 50) {
             query_ips();
             ping_neighbors();
+            notify_orchestrator_when_ready();
             tick_count = 0;
         }
         send_acl_test_probe();

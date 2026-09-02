@@ -194,6 +194,10 @@ def generate(
 
     lwip_clients = [Sddf.Lwip(sdf, net_system, client) for client, _ in clients]
 
+    # We use Client 0/1 to demonstrate how orchestrator toggles ACL rules
+    sdf.add_channel(Channel(clients[0][0], vswitch_orchestrator, a_id=60, b_id=60))
+    sdf.add_channel(Channel(clients[1][0], vswitch_orchestrator, a_id=60, b_id=61))
+
     # Echo server protection domains
     pds = [
         uart_driver,
