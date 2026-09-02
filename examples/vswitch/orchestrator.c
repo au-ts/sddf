@@ -15,6 +15,9 @@
 
 /* Allow DHCP and client IP discovery to complete before the first ACL change. */
 #define ACL_UPDATE_INTERVAL_NS (5 * NS_IN_S)
+#define ACL_TEST_NUM_CLIENTS 2
+#define CLIENT0_CHANNEL 60
+#define CLIENT1_CHANNEL 61
 
 __attribute__((__section__(".net_vswitch_orchestrator_config"))) net_vswitch_orchestrator_config_t vswitch_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
@@ -22,6 +25,35 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 static serial_queue_handle_t serial_tx_queue_handle;
 static bool acl_enabled = true;
+static bool clients_ready[ACL_TEST_NUM_CLIENTS];
+
+static bool all_clients_ready()
+{
+    for (uint8_t i = 0; i < ACL_TEST_NUM_CLIENTS; i++) {
+        if (!clients_ready[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* Wait for Client 0 and 1 to claim ready for ACL tests */
+static bool handle_client_ready(sddf_channel ch)
+{
+    if (ch == CLIENT0_CHANNEL) {
+        clients_ready[0] = true;
+        sddf_printf("vSwitch orchestrator: client 0 completed neighbour discovery\n");
+        return true;
+    }
+    if (ch == CLIENT1_CHANNEL) {
+        clients_ready[1] = true;
+        sddf_printf("vSwitch orchestrator: client 1 completed neighbour discovery\n");
+        return true;
+    }
+
+    return false;
+}
 
 /* Update both directions of the ACL between two vSwitch ports. */
 static void set_acl(uint8_t port0, uint8_t port1, bool enabled)
@@ -56,10 +88,14 @@ void init(void)
 void notified(sddf_channel ch)
 {
     if (ch == timer_config.driver_id) {
-        acl_enabled = !acl_enabled;
-        set_acl(0, 1, acl_enabled);
+        if (all_clients_ready()) {
+            acl_enabled = !acl_enabled;
+            set_acl(0, 1, acl_enabled);
+        }
         sddf_timer_set_timeout(timer_config.driver_id, ACL_UPDATE_INTERVAL_NS);
-    } else if (ch != serial_config.tx.id) {
+    } else if (ch == serial_config.tx.id) {
+        // Nothing to do
+    } else if (!handle_client_ready(ch)) {
         sddf_dprintf("vSwitch orchestrator: unexpected notification %u\n", ch);
     }
 }
