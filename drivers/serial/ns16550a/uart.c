@@ -39,7 +39,7 @@ volatile uintptr_t uart_base;
 
 static inline bool tx_fifo_not_full(void)
 {
-#if UART_DW_APB_REGISTERS && !defined(CONFIG_PLAT_HIFIVE_P550) && !defined(CONFIG_PLAT_ROCKPRO64)
+#if UART_DW_APB_REGISTERS && !defined(CONFIG_PLAT_HIFIVE_P550)
     /**
      * On DesignWare APB-derived 16550a-like IPs, they provide a TFNF bit in
      * the UART Status Register (USR).
@@ -201,7 +201,7 @@ void init(void)
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* Ensure that the FIFO's are empty */
-    while (!(*REG_PTR(UART_LSR) & (UART_LSR_THRE | UART_LSR_TEMT)));
+    while (~(*REG_PTR(UART_LSR)) & (UART_LSR_THRE | UART_LSR_TEMT));
 
     /* Disable all interrupts for now */
     *REG_PTR(UART_IER) = 0;
