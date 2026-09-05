@@ -56,6 +56,10 @@
 #elif defined(CONFIG_PLAT_RK3568)
 #define UART_CLK 0x16e3600
 #define UART_DW_APB_REGISTERS 1
+#elif defined(CONFIG_PLAT_ROCKPRO64)
+/* https://github.com/u-boot/u-boot/blob/v2024.10/arch/arm/dts/rk3399-u-boot.dtsi#L175 */
+#define UART_CLK 0x16e3600
+#define UART_DW_APB_REGISTERS 1
 #else
 #error "unknown UART clock/APB register support"
 #endif
