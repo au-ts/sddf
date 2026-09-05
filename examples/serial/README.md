@@ -26,6 +26,7 @@ The following platforms are supported:
 * qemu_virt_riscv64
 * rock3b
 * rpi4b_1gb
+* rockpro64
 * serengeti
 * star64
 * x86_64_generic
