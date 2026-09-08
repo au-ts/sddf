@@ -101,9 +101,35 @@ typedef struct net_vswitch_port_config {
      * The mac address field is ignored in the case of the virtualiser port.
      */
     mac_addr_t mac_addr;
-    uint64_t acl;
-    bool acl_set_permission;
+    /** ACL state installed when the vSwitch starts. */
+    uint64_t initial_acl;
 } net_vswitch_port_config_t;
+
+/**
+ * A tagged reference to a vSwitch client's connection.
+ *
+ * The upper two bits identify whether the lower six bits contain a port ID or
+ * a direct PPC channel ID. Microkit channel IDs range from 0 to 61, so both
+ * channel IDs and vSwitch port IDs fit in the lower six bits. The remaining
+ * tag values are reserved for future connection types and are invalid today.
+ */
+typedef uint8_t net_vswitch_client_connection_t;
+
+/** Tag and value fields of net_vswitch_client_connection_t. */
+#define NET_VSWITCH_CONNECTION_TYPE_MASK  UINT8_C(0b11000000)
+#define NET_VSWITCH_CONNECTION_VALUE_MASK UINT8_C(0b00111111)
+#define NET_VSWITCH_CONNECTION_CHANNEL    UINT8_C(0b00000000)
+#define NET_VSWITCH_CONNECTION_PORT       UINT8_C(0b01000000)
+
+/** Returned when a client connection cannot be resolved to a channel. */
+#define NET_VSWITCH_CONNECTION_INVALID_CHANNEL (UINT8_MAX)
+
+typedef struct net_vswitch_client_config {
+    /** A tagged reference to either a port or a direct PPC channel. */
+    net_vswitch_client_connection_t connection;
+    /** Whether this client may update ACLs. Extend this if more permissions are needed. */
+    bool acl_set_permission;
+} net_vswitch_client_config_t;
 
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
@@ -123,9 +149,9 @@ typedef struct net_vswitch_config {
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
-    /** PPC channels for ACL clients without a data-plane port. */
-    uint8_t acl_client_ids[SDDF_NET_MAX_CLIENTS];
-    uint8_t num_acl_clients;
+    /** Clients which may issue PPCs to the vSwitch. */
+    net_vswitch_client_config_t clients[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_clients;
 
     /**
      * The vswitch uses the buffer_metadata region for storing reference counts
@@ -142,6 +168,53 @@ typedef struct net_vswitch_config {
     region_resource_t buffer_metadata;
 
 } net_vswitch_config_t;
+
+/** Return whether a client connection refers to a port. */
+static inline bool net_vswitch_conn_is_port(net_vswitch_client_connection_t connection)
+{
+    return (connection & NET_VSWITCH_CONNECTION_TYPE_MASK) == NET_VSWITCH_CONNECTION_PORT;
+}
+
+/** Return whether a client connection contains a direct PPC channel. */
+static inline bool net_vswitch_conn_is_channel(net_vswitch_client_connection_t connection)
+{
+    return (connection & NET_VSWITCH_CONNECTION_TYPE_MASK) == NET_VSWITCH_CONNECTION_CHANNEL;
+}
+
+/** Extract the port or channel ID stored in a client connection. */
+static inline uint8_t net_vswitch_conn_value(net_vswitch_client_connection_t connection)
+{
+    return connection & NET_VSWITCH_CONNECTION_VALUE_MASK;
+}
+
+/**
+ * Resolve a client's PPC channel. Port-backed clients use the channel of their
+ * port's Tx connection; channel-backed clients contain the channel directly.
+ * Returns NET_VSWITCH_CONNECTION_INVALID_CHANNEL for an invalid tag or port.
+ */
+static inline uint8_t net_vswitch_client_channel(const net_vswitch_config_t *config,
+                                                 const net_vswitch_client_config_t *client)
+{
+    uint8_t value = net_vswitch_conn_value(client->connection);
+
+    if (net_vswitch_conn_is_port(client->connection)) {
+        return value < config->num_ports ? config->ports[value].tx.id : NET_VSWITCH_CONNECTION_INVALID_CHANNEL;
+    }
+    return net_vswitch_conn_is_channel(client->connection) ? value : NET_VSWITCH_CONNECTION_INVALID_CHANNEL;
+}
+
+/**
+ * Resolve a client's port. Returns false for a channel-backed
+ * client; otherwise writes the port ID and returns true.
+ */
+static inline bool net_vswitch_client_port(const net_vswitch_client_config_t *client, uint8_t *port)
+{
+    if (!net_vswitch_conn_is_port(client->connection)) {
+        return false;
+    }
+    *port = net_vswitch_conn_value(client->connection);
+    return true;
+}
 
 static inline bool net_config_check_magic(void *config)
 {

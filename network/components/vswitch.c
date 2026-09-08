@@ -67,11 +67,9 @@ typedef struct vswitch_state {
 } vswitch_state_t;
 
 /**
- * A resolved vSwitch PPC caller. A data-plane client owns a port and its
- * queues, and may optionally have ACL-set permission. An ACL-only client owns
- * only a PPC channel and always has ACL-set permission. A data-plane client
- * may also be registered as an ACL client; in that case it keeps its port,
- * reuses the same channel, and has ACL-set permission.
+ * A resolved vSwitch PPC caller. A port-backed client owns data-plane queues;
+ * a channel-backed client is control-only. Permissions are independent of the
+ * connection type, so a port-backed client may also manage ACLs.
  */
 typedef struct vswitch_ppc_client {
     uint8_t port;
@@ -209,7 +207,8 @@ static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
 static void vswitch_set_acl(uint8_t port, uint64_t iw_bitmap, uint64_t ow_bitmap)
 {
     uint64_t port_bit = (uint64_t)1 << port;
-    uint64_t port_mask = config.num_ports == SDDF_NET_MAX_CLIENTS ? UINT64_MAX : (((uint64_t)1 << config.num_ports) - 1);
+    uint64_t port_mask = config.num_ports == SDDF_NET_MAX_CLIENTS ? UINT64_MAX
+                                                                  : (((uint64_t)1 << config.num_ports) - 1);
 
     if (iw_bitmap != VSWITCH_ACL_NO_CHANGE) {
         /* allow_list[src] records the ports to which src may transmit. Thus,
@@ -435,7 +434,7 @@ void init(void)
                        config.ports[i].tx.num_buffers);
 
         /* Set the allow_list based on predefined settings */
-        state.allow_list[i] = config.ports[i].acl;
+        state.allow_list[i] = config.ports[i].initial_acl;
 
         /* Pre-calculate the start of the buffer reference count for each client
         for faster reference count calculations */
@@ -452,27 +451,21 @@ void init(void)
  */
 static bool vswitch_find_ppc_client(sddf_channel ch, vswitch_ppc_client_t *client)
 {
-    /* Check if ch belongs to a Data-plane client */
-    for (uint8_t port = 0; port < config.num_ports; port++) {
-        if (ch == config.ports[port].tx.id) {
-            *client = (vswitch_ppc_client_t){
-                .port = port,
-                .has_port = true,
-                .acl_set_permission = config.ports[port].acl_set_permission,
-            };
-            return true;
-        }
-    }
+    for (uint8_t i = 0; i < config.num_clients; i++) {
+        const net_vswitch_client_config_t *config_client = &config.clients[i];
 
-    /* Check if ch belongs to a ACL-only client */
-    for (uint8_t i = 0; i < config.num_acl_clients; i++) {
-        if (ch == config.acl_client_ids[i]) {
-            *client = (vswitch_ppc_client_t){
-                .has_port = false,
-                .acl_set_permission = true,
-            };
-            return true;
+        if (ch != net_vswitch_client_channel(&config, config_client)) {
+            continue;
         }
+
+        uint8_t port = 0;
+        bool has_port = net_vswitch_client_port(config_client, &port);
+        *client = (vswitch_ppc_client_t) {
+            .has_port = has_port,
+            .port = port,
+            .acl_set_permission = config_client->acl_set_permission,
+        };
+        return true;
     }
 
     return false;
