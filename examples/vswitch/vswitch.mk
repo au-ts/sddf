@@ -132,7 +132,7 @@ endif
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client2.data client2.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client3.data client3.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
-	$(OBJCOPY) --update-section .net_vswitch_orchestrator_config=net_vswitch_orchestrator.data vswitch_orchestrator.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_vswitch_orchestrator.data vswitch_orchestrator.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_vswitch_orchestrator.data vswitch_orchestrator.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_vswitch_orchestrator.data vswitch_orchestrator.elf
 	touch $@

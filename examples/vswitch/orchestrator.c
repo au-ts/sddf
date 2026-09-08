@@ -19,7 +19,7 @@
 #define CLIENT0_CHANNEL 60
 #define CLIENT1_CHANNEL 61
 
-__attribute__((__section__(".net_vswitch_orchestrator_config"))) net_vswitch_orchestrator_config_t vswitch_config;
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
@@ -55,13 +55,31 @@ static bool handle_client_ready(sddf_channel ch)
     return false;
 }
 
-/* Update both directions of the ACL between two vSwitch ports. */
-static void set_acl(uint8_t port0, uint8_t port1, bool enabled)
+/* Update port 0 and 1 while preserving their other demo ACL entries. */
+static void set_bi_direct_acl(bool enabled, uint8_t port0, uint8_t port1)
 {
-    sddf_set_mr(VSWITCH_ACL_PORT0, port0);
-    sddf_set_mr(VSWITCH_ACL_PORT1, port1);
-    sddf_set_mr(VSWITCH_ACL_VALUE, enabled);
-    sddf_ppcall(vswitch_config.vswitch_id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
+    /*
+     * Bit 4 is the external-network port and bits 3..0 correspond to clients
+     * 3..0. The ACL manager has no data-plane port.
+     * Preserve every other permission while toggling the peer client bit.
+     */
+    uint64_t port_a_acl = enabled ? 0b11110 : 0b11100;
+    uint64_t port_b_acl = enabled ? 0b10101 : 0b10100;
+
+    sddf_set_mr(VSWITCH_ACL_PORT, port0);
+    sddf_set_mr(VSWITCH_ACL_IW_BITMAP, port_a_acl);
+    sddf_set_mr(VSWITCH_ACL_OW_BITMAP, port_a_acl);
+    sddf_ppcall(net_config.tx.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
+
+    if (sddf_get_mr(VSWITCH_ACL_RET_ERR) != VSWITCH_ERR_OKAY) {
+        sddf_printf("vSwitch ACL update failed\n");
+        return;
+    }
+
+    sddf_set_mr(VSWITCH_ACL_PORT, port1);
+    sddf_set_mr(VSWITCH_ACL_IW_BITMAP, port_b_acl);
+    sddf_set_mr(VSWITCH_ACL_OW_BITMAP, port_b_acl);
+    sddf_ppcall(net_config.tx.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
 
     vswitch_err_t err = sddf_get_mr(VSWITCH_ACL_RET_ERR);
     if (err == VSWITCH_ERR_OKAY) {
@@ -73,7 +91,7 @@ static void set_acl(uint8_t port0, uint8_t port1, bool enabled)
 
 void init(void)
 {
-    assert(net_config_check_magic(&vswitch_config));
+    assert(net_config_check_magic(&net_config));
     assert(serial_config_check_magic(&serial_config));
     assert(timer_config_check_magic(&timer_config));
 
@@ -90,7 +108,7 @@ void notified(sddf_channel ch)
     if (ch == timer_config.driver_id) {
         if (all_clients_ready()) {
             acl_enabled = !acl_enabled;
-            set_acl(0, 1, acl_enabled);
+            set_bi_direct_acl(acl_enabled, 0, 1);
         }
         sddf_timer_set_timeout(timer_config.driver_id, ACL_UPDATE_INTERVAL_NS);
     } else if (ch == serial_config.tx.id) {

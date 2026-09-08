@@ -19,10 +19,10 @@ typedef enum {
     VSWITCH_ERR_VIRT_PORT,
     /* Unsupported operation */
     VSWITCH_ERR_INVALID_OPERATION,
-    /* Port ID is outside the configured port range */
-    VSWITCH_ERR_INVALID_PORT,
-    /* ACL value must be either zero or one */
-    VSWITCH_ERR_INVALID_ACL_VALUE,
+    /* Client is not permitted to update ACLs */
+    VSWITCH_ERR_ACL_PERMISSION_DENIED,
+    /* ACL target port is outside the configured port range */
+    VSWITCH_ERR_ACL_INVALID_PORT,
 } vswitch_err_t;
 
 /**
@@ -87,18 +87,22 @@ typedef enum {
 } vswitch_req_ret_args_t;
 
 /**
- * Enable or disable bidirectional traffic between two vSwitch ports.
- * This operation is only available to the configured vSwitch orchestrator.
+ * Set a port's allowed incoming and outgoing traffic.
+ * This operation is only available to clients with ACL-set permission.
+ * Each ACL-set event can change both the inward ACLs and onward ACLs
+ * for unidirectional or bidirectional ACL modifications.
  */
 #define VSWITCH_SET_ACL 3
 
 typedef enum {
-    /* First vSwitch port whose ACL entry will be updated */
-    VSWITCH_ACL_PORT0 = 0,
-    /* Second vSwitch port whose ACL entry will be updated */
-    VSWITCH_ACL_PORT1,
-    /* Whether traffic is allowed (0 to deny, 1 to allow) */
-    VSWITCH_ACL_VALUE,
+    /* Target port */
+    VSWITCH_ACL_PORT,
+    /* Inward ACLs, i.e., can receive from whom
+       (Do nothing when all bits are set) */
+    VSWITCH_ACL_IW_BITMAP,
+    /* Outward ACLs, i.e., can send to whom
+       (Do nothing when all bits are set) */
+    VSWITCH_ACL_OW_BITMAP,
     /* Number of arguments */
     VSWITCH_ACL_NUM_ARGS,
 } vswitch_acl_args_t;

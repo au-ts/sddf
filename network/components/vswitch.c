@@ -66,7 +66,26 @@ typedef struct vswitch_state {
     uint32_t client_ip_addrs[SDDF_NET_MAX_CLIENTS];
 } vswitch_state_t;
 
+/**
+ * A resolved vSwitch PPC caller. A data-plane client owns a port and its
+ * queues, and may optionally have ACL-set permission. An ACL-only client owns
+ * only a PPC channel and always has ACL-set permission. A data-plane client
+ * may also be registered as an ACL client; in that case it keeps its port,
+ * reuses the same channel, and has ACL-set permission.
+ */
+typedef struct vswitch_ppc_client {
+    uint8_t port;
+    bool has_port;
+    bool acl_set_permission;
+} vswitch_ppc_client_t;
+
 static vswitch_state_t state;
+
+/**
+ * Sentinel value for leaving an ACL unchanged. When used as the inward or
+ * outward bitmap, the corresponding direction is not updated.
+ */
+#define VSWITCH_ACL_NO_CHANGE (UINT64_MAX)
 
 bool need_rx_signal[SDDF_NET_MAX_CLIENTS];
 bool need_tx_signal[SDDF_NET_MAX_CLIENTS];
@@ -187,17 +206,27 @@ static bool vswitch_can_send_to(uint8_t src_id, uint8_t dst_id)
     return state.allow_list[src_id] & ((uint64_t)1 << dst_id);
 }
 
-static void vswitch_set_acl(uint8_t port0, uint8_t port1, bool allow)
+static void vswitch_set_acl(uint8_t port, uint64_t iw_bitmap, uint64_t ow_bitmap)
 {
-    uint64_t port0_bit = (uint64_t)1 << port0;
-    uint64_t port1_bit = (uint64_t)1 << port1;
+    uint64_t port_bit = (uint64_t)1 << port;
+    uint64_t port_mask = config.num_ports == SDDF_NET_MAX_CLIENTS ? UINT64_MAX : (((uint64_t)1 << config.num_ports) - 1);
 
-    if (allow) {
-        state.allow_list[port0] |= port1_bit;
-        state.allow_list[port1] |= port0_bit;
-    } else {
-        state.allow_list[port0] &= ~port1_bit;
-        state.allow_list[port1] &= ~port0_bit;
+    if (iw_bitmap != VSWITCH_ACL_NO_CHANGE) {
+        /* allow_list[src] records the ports to which src may transmit. Thus,
+         * changing who may transmit to 'port' requires updating port's bit in
+         * every source port's allow list. */
+        for (uint8_t i = 0; i < config.num_ports; i++) {
+            if (iw_bitmap & ((uint64_t)1 << i)) {
+                state.allow_list[i] |= port_bit;
+            } else {
+                state.allow_list[i] &= ~port_bit;
+            }
+        }
+    }
+    if (ow_bitmap != VSWITCH_ACL_NO_CHANGE) {
+        /* Outward permissions are exactly the destinations to which port may
+         * transmit, so they are stored directly in port's own allow list. */
+        state.allow_list[port] = ow_bitmap & port_mask;
     }
 }
 
@@ -416,73 +445,102 @@ void init(void)
     }
 }
 
+/**
+ * Resolve a PPC channel to a vSwitch client. Data-plane clients have a port
+ * and may have ACL-set permission. ACL-only clients have permission but no
+ * port. Returns false when the channel does not belong to either client type.
+ */
+static bool vswitch_find_ppc_client(sddf_channel ch, vswitch_ppc_client_t *client)
+{
+    /* Check if ch belongs to a Data-plane client */
+    for (uint8_t port = 0; port < config.num_ports; port++) {
+        if (ch == config.ports[port].tx.id) {
+            *client = (vswitch_ppc_client_t){
+                .port = port,
+                .has_port = true,
+                .acl_set_permission = config.ports[port].acl_set_permission,
+            };
+            return true;
+        }
+    }
+
+    /* Check if ch belongs to a ACL-only client */
+    for (uint8_t i = 0; i < config.num_acl_clients; i++) {
+        if (ch == config.acl_client_ids[i]) {
+            *client = (vswitch_ppc_client_t){
+                .has_port = false,
+                .acl_set_permission = true,
+            };
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static inline bool vswitch_operation_requires_port(seL4_Word operation)
+{
+    return operation != VSWITCH_SET_ACL;
+}
+
 seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
-    if (ch == config.orchestrator_id) {
-        if (microkit_msginfo_get_label(msginfo) != VSWITCH_SET_ACL) {
-            LOG_VSWITCH_ERR("Received invalid orchestrator operation\n");
-            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_OPERATION);
-            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
-        }
-
-        seL4_Word port0 = sddf_get_mr(VSWITCH_ACL_PORT0);
-        seL4_Word port1 = sddf_get_mr(VSWITCH_ACL_PORT1);
-        seL4_Word allow = sddf_get_mr(VSWITCH_ACL_VALUE);
-
-        if (port0 >= config.num_ports || port1 >= config.num_ports || port0 == port1) {
-            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_PORT);
-            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
-        }
-        if (allow > 1) {
-            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_INVALID_ACL_VALUE);
-            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
-        }
-
-        vswitch_set_acl((uint8_t)port0, (uint8_t)port1, allow != 0);
-        LOG_VSWITCH("Orchestrator set ports %u and %u to %u\n", port0, port1, allow);
-        sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_OKAY);
-        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
-    }
-
-    uint8_t ppc_client = 0;
-    while (ppc_client < config.num_ports) {
-        if (ch == config.ports[ppc_client].tx.id) {
-            break;
-        }
-        ppc_client++;
-    }
-
-    if (ppc_client == config.num_ports) {
+    vswitch_ppc_client_t client;
+    if (!vswitch_find_ppc_client(ch, &client)) {
         LOG_VSWITCH_ERR("Received PPC from unknown channel %u\n", ch);
         sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }
 
-    switch (microkit_msginfo_get_label(msginfo)) {
+    seL4_Word op = microkit_msginfo_get_label(msginfo);
+    if (!client.has_port && vswitch_operation_requires_port(op)) {
+        LOG_VSWITCH_ERR("ACL-only client requested invalid operation %lu\n", op);
+        sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
+        return seL4_MessageInfo_new(0, 0, 0, 1);
+    }
+
+    switch (op) {
+    case VSWITCH_SET_ACL: {
+        if (!client.acl_set_permission) {
+            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_ACL_PERMISSION_DENIED);
+            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+        }
+
+        seL4_Word port = sddf_get_mr(VSWITCH_ACL_PORT);
+        if (port >= config.num_ports) {
+            sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_ACL_INVALID_PORT);
+            return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+        }
+
+        vswitch_set_acl((uint8_t)port, sddf_get_mr(VSWITCH_ACL_IW_BITMAP), sddf_get_mr(VSWITCH_ACL_OW_BITMAP));
+        sddf_set_mr(VSWITCH_ACL_RET_ERR, VSWITCH_ERR_OKAY);
+        return seL4_MessageInfo_new(0, 0, 0, VSWITCH_ACL_RET_NUM_ARGS);
+    }
+    /* The remaining operations are exclusive to data-plane clients. */
     case VSWITCH_SET_IP_ADDR: {
         uint32_t ip_addr = sddf_get_mr(VSWITCH_SET_IP_ADDR_ARG);
-        LOG_VSWITCH("Client %u registered IP address 0x%08x\n", ppc_client, ip_addr);
+        LOG_VSWITCH("Client %u registered IP address 0x%08x\n", client.port, ip_addr);
         if (ip_addr == 0) {
             sddf_set_mr(VSWITCH_SET_RET_ERR, VSWITCH_ERR_INVALID_IP);
             return seL4_MessageInfo_new(0, 0, 0, 1);
         }
-        state.client_ip_addrs[ppc_client] = ip_addr;
+        state.client_ip_addrs[client.port] = ip_addr;
         sddf_set_mr(VSWITCH_SET_RET_ERR, VSWITCH_ERR_OKAY);
 
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_SET_RET_NUM_ARGS);
     }
     case VSWITCH_QUERY_STATE: {
-        LOG_VSWITCH("Client %u queried vswitch state, returning 0x%lx\n", ppc_client, state.allow_list[ppc_client]);
+        LOG_VSWITCH("Client %u queried vswitch state, returning 0x%lx\n", client.port, state.allow_list[client.port]);
         sddf_set_mr(VSWITCH_QUERY_RET_ERR, VSWITCH_ERR_OKAY);
-        sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, ppc_client);
-        sddf_set_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP, state.allow_list[ppc_client]);
+        sddf_set_mr(VSWITCH_QUERY_RET_CLIENT_ID, client.port);
+        sddf_set_mr(VSWITCH_QUERY_RET_REACHABLE_BITMAP, state.allow_list[client.port]);
 
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_QUERY_RET_NUM_ARGS);
     }
     case VSWITCH_REQ_CLIENT: {
         uint8_t req_client = sddf_get_mr(VSWITCH_REQ_CLIENT_ID);
-        LOG_VSWITCH("Client %u requested client %u's IP address\n", ppc_client, req_client);
-        if (!vswitch_can_send_to(ppc_client, req_client)) {
+        LOG_VSWITCH("Client %u requested client %u's IP address\n", client.port, req_client);
+        if (!vswitch_can_send_to(client.port, req_client)) {
             sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OPERATION_DENIED);
             return seL4_MessageInfo_new(0, 0, 0, 1);
         } else if (req_client == config.num_ports - 1) {
@@ -493,14 +551,14 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
             return seL4_MessageInfo_new(0, 0, 0, 1);
         }
         uint32_t ip_addr = state.client_ip_addrs[req_client];
-        LOG_VSWITCH("Replying to client %u with client %u's IP address 0x%08x\n", ppc_client, req_client, ip_addr);
+        LOG_VSWITCH("Replying to client %u with client %u's IP address 0x%08x\n", client.port, req_client, ip_addr);
         sddf_set_mr(VSWITCH_REQ_RET_ERR, VSWITCH_ERR_OKAY);
         sddf_set_mr(VSWITCH_REQ_RET_IP_ADDR, ip_addr);
 
         return seL4_MessageInfo_new(0, 0, 0, VSWITCH_REQ_RET_NUM_ARGS);
     }
     default: {
-        LOG_VSWITCH_ERR("Received PPC from client %u with invalid label\n", ppc_client);
+        LOG_VSWITCH_ERR("Received PPC from channel %u with invalid label\n", ch);
         sddf_set_mr(0, VSWITCH_ERR_INVALID_OPERATION);
         return seL4_MessageInfo_new(0, 0, 0, 1);
     }

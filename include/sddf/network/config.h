@@ -102,6 +102,7 @@ typedef struct net_vswitch_port_config {
      */
     mac_addr_t mac_addr;
     uint64_t acl;
+    bool acl_set_permission;
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
@@ -122,6 +123,10 @@ typedef struct net_vswitch_config {
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
+    /** PPC channels for ACL clients without a data-plane port. */
+    uint8_t acl_client_ids[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_acl_clients;
+
     /**
      * The vswitch uses the buffer_metadata region for storing reference counts
      * of each of its clients Tx buffers, as well as the Rx DMA buffers. Since a
@@ -136,17 +141,7 @@ typedef struct net_vswitch_config {
      */
     region_resource_t buffer_metadata;
 
-    /**
-     * Optional protected-procedure-call channel used by a vSwitch
-     * orchestrator. Zero when no orchestrator is connected.
-     */
-    uint8_t orchestrator_id;
 } net_vswitch_config_t;
-
-typedef struct net_vswitch_orchestrator_config {
-    char magic[SDDF_NET_MAGIC_LEN];
-    uint8_t vswitch_id;
-} net_vswitch_orchestrator_config_t;
 
 static inline bool net_config_check_magic(void *config)
 {

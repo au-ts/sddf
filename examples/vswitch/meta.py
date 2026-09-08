@@ -49,19 +49,36 @@ def update_elf_section(elf_name: str, section_name: str, data_name: str):
     )
 
 
-def create_client(client_number: int):
-    client_elf = copy_elf("client", "client", client_number)
-    client = ProtectionDomain(
-        f"client{client_number}", client_elf, priority=96, budget=20000
-    )
-    net_copier = ProtectionDomain(
-        f"client{client_number}_net_copier",
-        f"network_copy{client_number}.elf",
-        priority=98,
-        budget=20000,
-    )
+def create_clients(num_clients: int):
+    return [
+        ProtectionDomain(
+            f"client{i}",
+            copy_elf("client", "client", i),
+            priority=96,
+            budget=20000,
+        )
+        for i in range(num_clients)
+    ]
 
-    return client, net_copier
+
+def create_copiers(num_clients: int):
+    return [
+        ProtectionDomain(
+            f"client{i}_net_copier",
+            f"network_copy{i}.elf",
+            priority=98,
+            budget=20000,
+        )
+        for i in range(num_clients)
+    ]
+
+
+def subsystems_add_clients(serial_system, timer_system, net_system, clients, copiers):
+    for client in clients:
+        serial_system.add_client(client)
+        timer_system.add_client(client)
+    for client, copier in zip(clients, copiers):
+        net_system.add_client_with_copier(client, copier, vswitch=True)
 
 
 def generate(
@@ -178,25 +195,22 @@ def generate(
         net_virt_tx,
         net_virt_rx,
         vswitch=vswitch,
-        vswitch_orchestrator=vswitch_orchestrator,
     )
     serial_system.add_client(vswitch_orchestrator)
     timer_system.add_client(vswitch_orchestrator)
 
-    clients = [create_client(client_number) for client_number in range(4)]
+    clients = create_clients(4)
+    copiers = create_copiers(4)
+    subsystems_add_clients(serial_system, timer_system, net_system, clients, copiers)
 
-    for client, _ in clients:
-        serial_system.add_client(client)
-    for client, _ in clients:
-        timer_system.add_client(client)
-    for client, net_copier in clients:
-        net_system.add_client_with_copier(client, net_copier, vswitch=True)
+    net_system.add_acl_client(vswitch_orchestrator)
 
-    lwip_clients = [Sddf.Lwip(sdf, net_system, client) for client, _ in clients]
+    lwip_clients = [Sddf.Lwip(sdf, net_system, client) for client in clients]
 
-    # We use Client 0/1 to demonstrate how orchestrator toggles ACL rules
-    sdf.add_channel(Channel(clients[0][0], vswitch_orchestrator, a_id=60, b_id=60))
-    sdf.add_channel(Channel(clients[1][0], vswitch_orchestrator, a_id=60, b_id=61))
+    # We use ports 0/1 to demonstrate how orchestrator toggles ACL rules.
+    # Ports 0/1 belong to clients 0/1 respectively.
+    sdf.add_channel(Channel(clients[0], vswitch_orchestrator, a_id=60, b_id=60))
+    sdf.add_channel(Channel(clients[1], vswitch_orchestrator, a_id=60, b_id=61))
 
     # Echo server protection domains
     pds = [
@@ -207,7 +221,8 @@ def generate(
         net_virt_rx,
         vswitch,
         vswitch_orchestrator,
-        *(pd for client, net_copier in clients for pd in (client, net_copier)),
+        *clients,
+        *copiers,
         timer_driver,
     ]
     for pd in pds:
@@ -222,14 +237,14 @@ def generate(
     # 1 -> 0, 2, V
     # 2 -> 0, 1, V
     # 3 -> 0, V
-    net_system.add_acl_rule(clients[0][0], clients[1][0], True, True)
-    net_system.add_acl_rule(clients[0][0], clients[2][0], True, True)
-    net_system.add_acl_rule(clients[0][0], clients[3][0], True, True)
-    net_system.add_acl_rule(clients[0][0], net_virt_tx, True, True)
-    net_system.add_acl_rule(clients[1][0], clients[2][0], True, True)
-    net_system.add_acl_rule(clients[1][0], net_virt_tx, True, True)
-    net_system.add_acl_rule(clients[2][0], net_virt_tx, True, True)
-    net_system.add_acl_rule(clients[3][0], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[0], clients[1], True, True)
+    net_system.add_acl_rule(clients[0], clients[2], True, True)
+    net_system.add_acl_rule(clients[0], clients[3], True, True)
+    net_system.add_acl_rule(clients[0], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[1], clients[2], True, True)
+    net_system.add_acl_rule(clients[1], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[2], net_virt_tx, True, True)
+    net_system.add_acl_rule(clients[3], net_virt_tx, True, True)
 
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
