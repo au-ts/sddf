@@ -163,6 +163,14 @@ BOARDS: List[Board] = [
         baud_rate=1500000,
     ),
     Board(
+        name="rockpro64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xF7000000,
+        serial="serial@ff1a0000",
+        # https://github.com/u-boot/u-boot/blob/v2024.10/configs/rockpro64-rk3399_defconfig#L77
+        baud_rate=1500000,
+    ),
+    Board(
         name="rpi4b_1gb",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x2_000_000,

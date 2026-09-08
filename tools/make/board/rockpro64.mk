@@ -14,4 +14,4 @@ ETH_DRIV := eth_driver_dwmac-5.10a.elf
 #TIMER_DRIV_DIR := arm
 UART_DRIV_DIR := ns16550a
 
-CPU := cortex-a72
+CPU := cortex-a53
