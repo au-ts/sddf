@@ -93,15 +93,25 @@ typedef struct net_client_config {
     mac_addr_t mac_addr;
 } net_client_config_t;
 
+typedef struct net_vswitch_control_client {
+    char magic[SDDF_NET_MAGIC_LEN];
+    uint8_t id;
+} net_vswitch_control_client_t;
+
 typedef struct net_vswitch_port_config {
     net_connection_resource_t rx;
     net_connection_resource_t tx;
     region_resource_t tx_data;
+    uint8_t ppc_id; // Set to tx.id for tx clients
     /**
      * The mac address field is ignored in the case of the virtualiser port.
      */
     mac_addr_t mac_addr;
-    uint64_t acl;
+    uint64_t initial_acl;
+    /**
+     * Whether this port has permission to update ACLs of other ports.
+     */
+    bool acl_update;
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
@@ -122,6 +132,10 @@ typedef struct net_vswitch_config {
     net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
     uint8_t num_ports;
 
+    /** Clients which may issue PPCs to the vSwitch. */
+    net_vswitch_client_config_t clients[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_clients;
+
     /**
      * The vswitch uses the buffer_metadata region for storing reference counts
      * of each of its clients Tx buffers, as well as the Rx DMA buffers. Since a
@@ -135,6 +149,7 @@ typedef struct net_vswitch_config {
      * (ports[0].tx.num_buffers + ... + ports[num_ports].tx.num_buffers) * sizeof(uin8_t) bytes
      */
     region_resource_t buffer_metadata;
+
 } net_vswitch_config_t;
 
 static inline bool net_config_check_magic(void *config)

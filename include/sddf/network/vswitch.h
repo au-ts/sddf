@@ -19,6 +19,10 @@ typedef enum {
     VSWITCH_ERR_VIRT_PORT,
     /* Unsupported operation */
     VSWITCH_ERR_INVALID_OPERATION,
+    /* Client is not permitted to update ACLs */
+    VSWITCH_ERR_ACL_PERMISSION_DENIED,
+    /* ACL target port is outside the configured port range */
+    VSWITCH_ERR_ACL_INVALID_PORT,
 } vswitch_err_t;
 
 /**
@@ -81,3 +85,31 @@ typedef enum {
     /* Number of return arguments */
     VSWITCH_REQ_RET_NUM_ARGS,
 } vswitch_req_ret_args_t;
+
+/**
+ * Set a port's allowed incoming and outgoing traffic.
+ * This operation is only available to clients with ACL-set permission.
+ * Each ACL-set event can change both the inward ACLs and onward ACLs
+ * for unidirectional or bidirectional ACL modifications.
+ */
+#define VSWITCH_SET_ACL 3
+
+typedef enum {
+    /* Target port */
+    VSWITCH_ACL_PORT,
+    /* Inward ACLs, i.e., can receive from whom
+       (Do nothing when all bits are set) */
+    VSWITCH_ACL_IW_BITMAP,
+    /* Outward ACLs, i.e., can send to whom
+       (Do nothing when all bits are set) */
+    VSWITCH_ACL_OW_BITMAP,
+    /* Number of arguments */
+    VSWITCH_ACL_NUM_ARGS,
+} vswitch_acl_args_t;
+
+typedef enum {
+    /* Success or failure of the operation */
+    VSWITCH_ACL_RET_ERR = 0,
+    /* Number of return arguments */
+    VSWITCH_ACL_RET_NUM_ARGS,
+} vswitch_acl_ret_args_t;
