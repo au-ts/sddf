@@ -19,7 +19,7 @@
 #define CLIENT0_CHANNEL 60
 #define CLIENT1_CHANNEL 61
 
-__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+__attribute__((__section__(".net_vswitch_control_client_config"))) net_vswitch_control_client_t vswitch_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
@@ -69,7 +69,7 @@ static void set_bi_direct_acl(bool enabled, uint8_t port0, uint8_t port1)
     sddf_set_mr(VSWITCH_ACL_PORT, port0);
     sddf_set_mr(VSWITCH_ACL_IW_BITMAP, port_a_acl);
     sddf_set_mr(VSWITCH_ACL_OW_BITMAP, port_a_acl);
-    sddf_ppcall(net_config.tx.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
+    sddf_ppcall(vswitch_config.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
 
     if (sddf_get_mr(VSWITCH_ACL_RET_ERR) != VSWITCH_ERR_OKAY) {
         sddf_printf("vSwitch ACL update failed\n");
@@ -79,7 +79,7 @@ static void set_bi_direct_acl(bool enabled, uint8_t port0, uint8_t port1)
     sddf_set_mr(VSWITCH_ACL_PORT, port1);
     sddf_set_mr(VSWITCH_ACL_IW_BITMAP, port_b_acl);
     sddf_set_mr(VSWITCH_ACL_OW_BITMAP, port_b_acl);
-    sddf_ppcall(net_config.tx.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
+    sddf_ppcall(vswitch_config.id, seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0, VSWITCH_ACL_NUM_ARGS));
 
     vswitch_err_t err = sddf_get_mr(VSWITCH_ACL_RET_ERR);
     if (err == VSWITCH_ERR_OKAY) {
@@ -91,7 +91,7 @@ static void set_bi_direct_acl(bool enabled, uint8_t port0, uint8_t port1)
 
 void init(void)
 {
-    assert(net_config_check_magic(&net_config));
+    assert(net_config_check_magic(&vswitch_config));
     assert(serial_config_check_magic(&serial_config));
     assert(timer_config_check_magic(&timer_config));
 
