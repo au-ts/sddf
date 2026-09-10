@@ -20,8 +20,11 @@ serial_driver.elf: serial/arm/serial_driver_pnk.o serial/arm/serial_driver.o uti
 serial/arm/serial_driver_pnk.o: serial/arm/serial_driver_pnk.S |serial/arm
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-serial/arm/serial_driver_pnk.S: $(DRIVER_PNK) |serial/arm
-	cat $(DRIVER_PNK) | cpp -P | $(PANCAKE_COMPILER) $(PANCAKE_FLAGS) > $@
+serial/arm/serial_driver_pnk.S: serial/arm/serial_driver_pnk.pnk |serial/arm
+	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
+
+serial/arm/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/arm
+	cat $^ | cpp -P -nostdinc > $@
 
 serial/arm/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -DPANCAKE_SERIAL_DRIVER -I${SERIAL_DRIVER_DIR}/include -o $@ $<

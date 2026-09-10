@@ -20,8 +20,11 @@ serial_driver.elf: serial/meson/serial_driver_pnk.o serial/meson/serial_driver.o
 serial/meson/serial_driver_pnk.o: serial/meson/serial_driver_pnk.S |serial/meson
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-serial/meson/serial_driver_pnk.S: $(DRIVER_PNK) |serial/meson
-	cat $(DRIVER_PNK) | cpp -P | $(PANCAKE_COMPILER) $(PANCAKE_FLAGS) > $@
+serial/meson/serial_driver_pnk.S: serial/meson/serial_driver_pnk.pnk |serial/meson
+	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
+
+serial/meson/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/meson
+	cat $^ | cpp -P > $@
 
 serial/meson/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/meson $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -DPANCAKE_SERIAL_DRIVER -I${SERIAL_DRIVER_DIR}/include -o $@ $<
