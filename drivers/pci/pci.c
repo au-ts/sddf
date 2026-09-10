@@ -266,7 +266,7 @@ pci_resource_windows_t alloc_resource_from_bridge(pci_bridge_node_t *parent_brid
     return allocated_windows;
 }
 
-void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_header, uint8_t bar_id, uintptr_t target_vaddr, uint32_t bar_size)
+void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_header, uint8_t bar_id, uint8_t vspace_cptr_slot, uintptr_t target_vaddr, uint32_t bar_size)
 {
     pci_bar_request_t bar_request = read_bar_size(pci_header, bar_id);
     pci_resource_windows_t allocated_windows;
@@ -317,7 +317,7 @@ void map_pci_bar(pci_bridge_node_t *parent_bridge, struct pci_header_type0 *pci_
     uintptr_t end_paddr = realloc_paddr + bar_size;
     uintptr_t cur_vaddr = target_vaddr;
     while (cur_paddr < end_paddr) {
-        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, CPTR_VSPACE_ETHERNET_DRIVER, seL4_X86_4K, seL4_ReadWrite);
+        error = retype_and_map_frame(cnode_specs, cur_paddr, cur_vaddr, microkit_cspace_root_slot_to_cptr(vspace_cptr_slot), seL4_X86_4K, seL4_ReadWrite);
         if (error != seL4_NoError) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return;
@@ -409,7 +409,7 @@ acpi_dev_t *find_acpi_dev_by_header_offset(uintptr_t header_offset)
     return ret_bridge;
 }
 
-void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t irq_num)
+void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8_t pci_bus, uint8_t pci_dev, uint8_t pci_func, uint8_t cspace_cptr_slot, uint8_t irq_num, uint8_t irq_vector)
 {
     uint8_t base_irq_cap = 138;
 
@@ -440,8 +440,8 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
         return;
     }
 
-    sddf_dprintf("Try creating an IRQ handler capability: ");
-    seL4_Error error = seL4_IRQControl_GetIOAPIC(CPTR_CNODE_PCI_RESOURCES + 1, CPTR_CSPACE_ETHERNET_DRIVER, base_irq_cap + irq_num, 58, 0, gsi_number, 1, 1, 1);
+    sddf_dprintf("Try creating an IRQ handler capability (GSI number: %u): ", gsi_number);
+    seL4_Error error = seL4_IRQControl_GetIOAPIC(CPTR_CNODE_PCI_RESOURCES + 1, microkit_cspace_root_slot_to_cptr(cspace_cptr_slot), base_irq_cap + irq_num, 58, 0, gsi_number, 1, 1, irq_vector);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to create an IO/APIC IRQ handler - %d\n", error);
     } else {
@@ -449,15 +449,16 @@ void bind_irq(acpi_dev_t *pci_bridge, struct pci_header_type0 *pci_header, uint8
     }
 
     sddf_dprintf("Try minting a notification capability: ");
-    error = seL4_CNode_Mint(CPTR_CNODE_PCI_RESOURCES, 511, 58, CPTR_CSPACE_ETHERNET_DRIVER, 1, 58, seL4_ReadWrite, 1 << irq_num);
+    seL4_CPtr ntf_cap = CPTR_CNODE_PCI_RESOURCES + cnode_specs->end;
+    error = seL4_CNode_Mint(CPTR_CNODE_PCI_RESOURCES, cnode_specs->end, 58, microkit_cspace_root_slot_to_cptr(cspace_cptr_slot), 1, 58, seL4_ReadWrite, 1 << irq_num);
     if (error != seL4_NoError) {
         sddf_dprintf("Error: failed to mint a notification - %d\n", error);
     } else {
         sddf_dprintf("Success!\n");
     }
+    cnode_specs->end++;
 
-    seL4_CPtr handler_cap = CPTR_CSPACE_ETHERNET_DRIVER + base_irq_cap + irq_num;
-    seL4_CPtr ntf_cap = CPTR_CNODE_PCI_RESOURCES + 511;
+    seL4_CPtr handler_cap = microkit_cspace_root_slot_to_cptr(cspace_cptr_slot) + base_irq_cap + irq_num;
 
     seL4_Word ret = seL4_DebugCapIdentify(handler_cap);
     sddf_dprintf("ret: %lu\n", ret);
@@ -495,16 +496,18 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
 
     sddf_dprintf("parent_bridge: 0x%lx, header: 0x%lx\n", (uintptr_t)parent_bridge->acpi_dev, (uintptr_t)parent_bridge->bridge_header);
     for (int i = 0; i < device_config->num_bars; i++) {
-        map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->bars[i].vaddr, device_config->bars[i].size);
+        map_pci_bar(parent_bridge, pci_header, device_config->bars[i].id, device_config->vspace_cptr_slot, device_config->bars[i].vaddr, device_config->bars[i].size);
     }
     sddf_dprintf("Finished BAR mapping\n");
 
     for (int i = 0; i < device_config->num_irqs; i++) {
         // FIXME: support only legacy I/O APIC for now
-        bind_irq(parent_bridge->acpi_dev, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->irqs[i].ch);
+        bind_irq(parent_bridge->acpi_dev, pci_header, device_config->bus, device_config->dev, device_config->func, device_config->cspace_cptr_slot, device_config->irqs[i].ch, device_config->irqs[i].vector);
     }
 
     pci_header->command = pci_header->command | BIT(2) | BIT(1);
+
+    sddf_deferred_notify(device_config->notify_ch);
 }
 
 pci_bar_request_t merge_bar_requests(pci_bar_request_t bar_request_a, pci_bar_request_t bar_request_b)
@@ -703,30 +706,50 @@ void init(void)
     }
 
     // QEMU
-    /* devices_config.devs[0].bus = 0; */
-    /* devices_config.devs[0].dev = 2; */
-    /* devices_config.devs[0].func = 0; */
-    /* devices_config.devs[0].bars[0].id = 4; */
-    /* devices_config.devs[0].bars[0].vaddr = 0x60000000; */
-    /* devices_config.devs[0].bars[0].size = 0x4000; */
-    /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
-    /* devices_config.devs[0].irqs[0].ch = 16; */
-    /* devices_config.devs[0].num_bars++; */
-    /* devices_config.devs[0].num_irqs++; */
-    /* devices_config.num_dev++; */
-
-    // Hardware ethernet
-    devices_config.devs[0].bus = 1;
-    devices_config.devs[0].dev = 0;
+    devices_config.devs[0].bus = 0;
+    devices_config.devs[0].dev = 2;
     devices_config.devs[0].func = 0;
-    devices_config.devs[0].bars[0].id = 0;
-    devices_config.devs[0].bars[0].vaddr = 0x2000000;
-    devices_config.devs[0].bars[0].size = 0x100000;
+    devices_config.devs[0].notify_ch = 1;
+    devices_config.devs[0].vspace_cptr_slot = 2;
+    devices_config.devs[0].cspace_cptr_slot = 3;
+    devices_config.devs[0].bars[0].id = 4;
+    devices_config.devs[0].bars[0].vaddr = 0x60000000;
+    devices_config.devs[0].bars[0].size = 0x4000;
     devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
     devices_config.devs[0].irqs[0].ch = 16;
+    devices_config.devs[0].irqs[0].vector = 1;
     devices_config.devs[0].num_bars++;
     devices_config.devs[0].num_irqs++;
     devices_config.num_dev++;
+
+    devices_config.devs[1].bus = 0;
+    devices_config.devs[1].dev = 4;
+    devices_config.devs[1].func = 0;
+    devices_config.devs[1].notify_ch = 2;
+    devices_config.devs[1].vspace_cptr_slot = 4;
+    devices_config.devs[1].cspace_cptr_slot = 5;
+    devices_config.devs[1].bars[0].id = 0;
+    devices_config.devs[1].bars[0].vaddr = 0x20000000;
+    devices_config.devs[1].bars[0].size = 0x4000;
+    devices_config.devs[1].irqs[0].type = IRQ_IOAPIC;
+    devices_config.devs[1].irqs[0].ch = 17;
+    devices_config.devs[1].irqs[0].vector = 2;
+    devices_config.devs[1].num_bars++;
+    devices_config.devs[1].num_irqs++;
+    devices_config.num_dev++;
+
+    // Hardware ethernet
+    // devices_config.devs[0].bus = 1;
+    // devices_config.devs[0].dev = 0;
+    // devices_config.devs[0].func = 0;
+    // devices_config.devs[0].bars[0].id = 0;
+    // devices_config.devs[0].bars[0].vaddr = 0x2000000;
+    // devices_config.devs[0].bars[0].size = 0x100000;
+    // devices_config.devs[0].irqs[0].type = IRQ_IOAPIC;
+    // devices_config.devs[0].irqs[0].ch = 16;
+    // devices_config.devs[0].num_bars++;
+    // devices_config.devs[0].num_irqs++;
+    // devices_config.num_dev++;
 
     // Hardware NVMe
     /* devices_config.devs[0].bus = 2; */
@@ -737,7 +760,7 @@ void init(void)
     /* devices_config.devs[0].bars[0].size = 0x4000; */
     /* devices_config.devs[0].irqs[0].type = IRQ_IOAPIC; */
     /* devices_config.devs[0].irqs[0].ch = 17; */
-    /* devices_config.devs[0].num_bars++; */
+    /* devices_config.devs[-1].num_bars++; */
     /* devices_config.devs[0].num_irqs++; */
     /* devices_config.num_dev++; */
 
@@ -772,8 +795,6 @@ void init(void)
             config_pci_device(&devices_config.devs[j], pci_seg_group->base_addr, pci_seg_group->bus_start, pci_seg_group->bus_end);
         }
     }
-
-    sddf_deferred_notify(1);
 }
 
 void notified(microkit_channel ch)

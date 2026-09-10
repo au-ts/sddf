@@ -848,7 +848,7 @@ void nvme_controller_init()
 void init(void)
 {
     if (!pci_ready) {
-        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        sddf_dprintf("NVME|PCI driver has not set things up. Waiting for signaling\n");
         return;
     }
 
@@ -928,7 +928,7 @@ void notified(microkit_channel ch)
         return;
     }
     if (!pci_ready) {
-        sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
+        sddf_dprintf("NVME|PCI driver has not set things up. Waiting for signaling\n");
         return;
     }
 
