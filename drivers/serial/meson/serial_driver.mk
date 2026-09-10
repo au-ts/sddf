@@ -14,7 +14,7 @@ DRIVER_PNK = \
 	${SDDF}/include/sddf/serial/queue.pnk \
 	${SERIAL_DRIVER_DIR}/uart.pnk
 
-serial_driver.elf: serial/meson/serial_driver_pnk.o serial/meson/serial_driver.o util/pancake_ffi.o libsddf_util_debug.a
+serial_driver.elf: serial/meson/serial_driver_pnk.o serial/meson/serial_driver.o util/pancake_ffi.o libsddf_util_debug.a util/pancake_common.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 serial/meson/serial_driver_pnk.o: serial/meson/serial_driver_pnk.S |serial/meson
