@@ -368,12 +368,16 @@ typedef struct pci_device_bar {
 typedef struct pci_device_irq {
     irq_kind_t type;
     uint8_t ch;
+    uint8_t vector;
 } pci_device_irq_t;
 
 typedef struct pci_device_config {
     uint8_t bus;
     uint8_t dev;
     uint8_t func;
+    uint8_t notify_ch;
+    uint8_t vspace_cptr_slot;
+    uint8_t cspace_cptr_slot;
     pci_device_bar_t bars[6];
     pci_device_irq_t irqs[10];
     uint8_t num_bars;
