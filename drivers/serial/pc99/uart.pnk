@@ -46,6 +46,19 @@
 #define RX_DATA_AVAIL 2
 #define RX_LINE_STS 3
 
+inline fun microkit_x86_ioport_write_8(1 ioport_id, 1 port_addr, 1 data)
+{
+    @microkit_x86_ioport_write_8(port_addr, ioport_id, data, 0);
+    return 0;
+}
+
+inline fun microkit_x86_ioport_read_8(1 dst_addr, 1 ioport_id, 1 port_addr) {
+    @microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr, 0);
+    var ret = 0;
+    !ld8 ret, dst_addr;
+    return ret;
+}
+
 inline fun write(1 port_offset, 1 v)
 {
     microkit_x86_ioport_write_8(IOPORT_ID, IOPORT_BASE + port_offset, v);
@@ -55,9 +68,7 @@ inline fun write(1 port_offset, 1 v)
 inline fun read(1 port_offset)
 {
     var data_ptr = IOPORT_DATA_PTR;
-    microkit_x86_ioport_read_8(data_ptr, IOPORT_ID, IOPORT_BASE + port_offset);
-    var ret = 0;
-    !ld8 ret, data_ptr;
+    var ret = microkit_x86_ioport_read_8(data_ptr, IOPORT_ID, IOPORT_BASE + port_offset);
     return ret;
 }
 

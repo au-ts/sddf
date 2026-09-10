@@ -15,38 +15,60 @@
 #define bitwise_not(n)    ((n) ^ -1)
 
 /* Macros for FFI calls */
-#define sddf_irq_ack(channel) \
-    @sddf_irq_ack(0, channel, 0, 0)
-
-#define sddf_notify(channel) \
-    @sddf_notify(0, channel, 0, 0)
-
-#define sddf_deferred_irq_ack(channel) \
-    @sddf_deferred_irq_ack(0, channel, 0, 0)
-
-#define sddf_deferred_notify(channel) \
-    @sddf_deferred_notify(0, channel, 0, 0)
-
-#define microkit_x86_ioport_write_8(ioport_id, port_addr, data) \
-    @microkit_x86_ioport_write_8(port_addr, ioport_id, data, 0)
-
-#define microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr) \
-    @microkit_x86_ioport_read_8(dst_addr, ioport_id, port_addr, 0)
-
-#define cache_clean(start, end) \
-    @cache_clean(start, 0, end, 0)
-
-#define cache_clean_and_invalidate(start, end) \
-    @cache_clean_and_invalidate(start, 0, end, 0)
-
-#define THREAD_MEMORY_RELEASE() \
-    @THREAD_MEMORY_RELEASE(0, 0, 0, 0)
-
-#define THREAD_MEMORY_ACQUIRE() \
-    @THREAD_MEMORY_ACQUIRE(0, 0, 0, 0)
-
-#define fence_seq_cst() \
-    @fence_seq_cst(0, 0, 0, 0)
-
 #define debug_print(value) \
     @debug_print(0, value, 0, __LINE__)
+
+/* Helper functions for FFI calls */
+inline fun sddf_irq_ack(1 channel)
+{
+    @sddf_irq_ack(0, channel, 0, 0);
+    return 0;
+}
+
+inline fun sddf_notify(1 channel)
+{
+    @sddf_notify(0, channel, 0, 0);
+    return 0;
+}
+
+inline fun sddf_deferred_irq_ack(1 channel)
+{
+    @sddf_deferred_irq_ack(0, channel, 0, 0);
+    return 0;
+}
+
+inline fun sddf_deferred_notify(1 channel)
+{
+    @sddf_deferred_notify(0, channel, 0, 0);
+    return 0;
+}
+
+inline fun cache_clean(start, end)
+{
+    @cache_clean(start, 0, end, 0);
+    return 0;
+}
+
+inline fun cache_clean_and_invalidate(start, end)
+{
+    @cache_clean_and_invalidate(start, 0, end, 0);
+    return 0;
+}
+
+inline fun THREAD_MEMORY_RELEASE()
+{
+    @THREAD_MEMORY_RELEASE(0, 0, 0, 0);
+    return 0;
+}
+
+inline fun THREAD_MEMORY_ACQUIRE()
+{
+    @THREAD_MEMORY_ACQUIRE(0, 0, 0, 0);
+    return 0;
+}
+
+inline fun fence_seq_cst()
+{
+    @fence_seq_cst(0, 0, 0, 0);
+    return 0;
+}
