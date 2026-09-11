@@ -20,12 +20,20 @@
 #define BIT_MASK(start, end) ((BIT(((end) - (start)) + 1U) - 1U) << (start))
 #endif
 
+#ifndef likely
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
 #else
 #define likely(x)   (!!(x))
+#endif
+#endif
+
+#ifndef unlikely
+#ifdef __GNUC__
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
 #define unlikely(x) (!!(x))
+#endif
 #endif
 
 #ifndef BYTE_ORDER
