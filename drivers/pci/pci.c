@@ -507,7 +507,10 @@ void config_pci_device(pci_device_config_t *device_config, uintptr_t bus_base, u
 
     pci_header->command = pci_header->command | BIT(2) | BIT(1);
 
-    sddf_deferred_notify(device_config->notify_ch);
+    /* Multiple devices are configured in one init pass.  A deferred notify
+     * has only one pending slot in libmicrokit, so a later device would
+     * overwrite an earlier device's ready notification. */
+    sddf_notify(device_config->notify_ch);
 }
 
 pci_bar_request_t merge_bar_requests(pci_bar_request_t bar_request_a, pci_bar_request_t bar_request_b)
