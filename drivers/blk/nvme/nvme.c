@@ -921,7 +921,6 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    sddf_dprintf("NVME|INFO: ch %u\n", ch);
     if (ch == 10) {
         pci_ready = true;
         init();
