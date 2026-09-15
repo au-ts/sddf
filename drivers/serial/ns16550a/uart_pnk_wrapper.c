@@ -27,4 +27,6 @@ void post_init()
 #else
     pnk_mem[1028] = 0;
 #endif
+
+    cml_main();
 }
