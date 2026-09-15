@@ -8,33 +8,14 @@
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-ifeq ($(PANCAKE_SERIAL_DRIVER),1)
-DRIVER_PNK = \
-	${UTIL}/util.pnk \
-	${SDDF}/include/sddf/serial/queue.pnk \
-	${SERIAL_DRIVER_DIR}/uart.pnk
-
-serial_driver.elf: serial/arm/serial_driver_pnk.o serial/arm/serial_driver.o util/pancake_ffi.o util/pancake_common.o
+serial_driver.elf: serial/arm/uart.o serial/arm/uart_common.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/arm/serial_driver_pnk.o: serial/arm/serial_driver_pnk.S |serial/arm
-	$(CC) -c $(CFLAGS) -o $@ $<
+serial/arm/uart.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $^
 
-serial/arm/serial_driver_pnk.S: serial/arm/serial_driver_pnk.pnk |serial/arm
-	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
-
-serial/arm/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/arm
-	cat $^ | cpp -P -nostdinc > $@
-
-serial/arm/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
-	$(CC) -c $(CFLAGS) -DPANCAKE_SERIAL_DRIVER -I${SERIAL_DRIVER_DIR}/include -o $@ $<
-else
-serial_driver.elf: serial/arm/serial_driver.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-
-serial/arm/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
-	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
-endif
+serial/arm/uart_common.o: ${SERIAL_DRIVER_DIR}/uart_common.c |serial/arm $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $^
 
 serial/arm:
 	mkdir -p $@
