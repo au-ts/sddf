@@ -8,11 +8,14 @@
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-serial_driver.elf: serial/arm/serial_driver.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+serial_driver.elf: serial/arm/uart.o serial/arm/uart_common.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/arm/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
-	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
+serial/arm/uart.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $^
+
+serial/arm/uart_common.o: ${SERIAL_DRIVER_DIR}/uart_common.c |serial/arm $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $^
 
 serial/arm:
 	mkdir -p $@
@@ -20,6 +23,7 @@ serial/arm:
 -include serial/arm/serial_driver.d
 
 clean::
-	rm -f serial/arm/serial_driver.[do]
+	rm -f serial/arm/uart.[do] serial/arm/uart_common.[do]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial

@@ -8,10 +8,13 @@
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-serial_driver.elf: serial/ns16550a/serial_driver.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+serial_driver.elf: serial/ns16550a/uart.o serial/ns16550a/uart_common.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/ns16550a/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
+serial/ns16550a/uart.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
+
+serial/ns16550a/uart_common.o: ${SERIAL_DRIVER_DIR}/uart_common.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
 serial/ns16550a:
@@ -20,6 +23,7 @@ serial/ns16550a:
 -include serial/ns16550a/serial_driver.d
 
 clean::
-	rm -f serial/ns16550a/serial_driver.[do]
+	rm -f serial/ns16550a/uart.[do] serial/ns16550a/uart_common.[do]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial
