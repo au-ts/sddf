@@ -23,6 +23,7 @@ serial/ns16550a:
 -include serial/ns16550a/serial_driver.d
 
 clean::
-	rm -f serial/ns16550a/serial_driver.[do] serial/ns16550a/serial_driver_pnk.[oS]
+	rm -f serial/ns16550a/uart.[do] serial/ns16550a/uart_common.[do]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial

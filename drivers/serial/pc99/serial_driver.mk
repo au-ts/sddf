@@ -26,7 +26,7 @@ serial/pc99:
 -include serial/pc99/serial_driver.d
 
 clean::
-	rm -f serial/pc99/serial_driver.[do] serial/pc99/serial_driver_pnk.[oS]
+	rm -f serial/pc99/uart.[do] serial/pc99/uart_common.[do]
 
 clobber::
 	rm -rf serial

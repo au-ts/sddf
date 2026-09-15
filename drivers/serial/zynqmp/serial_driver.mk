@@ -24,7 +24,7 @@ serial/zynqmp:
 	mkdir -p $@
 
 clean::
-	rm -f serial/zynqmp/serial_driver.[do] serial/zynqmp/serial_driver_pnk.[oS]
+	rm -f serial/zynqmp/uart.[do] serial/zynqmp/uart_common.[do]
 
 clobber::
 	rm -rf serial
