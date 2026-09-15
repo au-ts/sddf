@@ -8,33 +8,14 @@
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-ifeq ($(PANCAKE_SERIAL_DRIVER),1)
-DRIVER_PNK = \
-	${UTIL}/util.pnk \
-	${SDDF}/include/sddf/serial/queue.pnk \
-	${SERIAL_DRIVER_DIR}/uart.pnk
-
-serial_driver.elf: serial/ns16550a/serial_driver_pnk.o serial/ns16550a/serial_driver.o util/pancake_ffi.o libsddf_util_debug.a util/pancake_common.o
+serial_driver.elf: serial/ns16550a/uart.o serial/ns16550a/uart_common.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/ns16550a/serial_driver_pnk.o: serial/ns16550a/serial_driver_pnk.S |serial/ns16550a
-	$(CC) -c $(CFLAGS) -o $@ $<
-
-serial/ns16550a/serial_driver_pnk.S: serial/ns16550a/serial_driver_pnk.pnk |serial/ns16550a
-	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
-
-serial/ns16550a/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/ns16550a
-	cat $^ | cpp -P -nostdinc > $@
-
-serial/ns16550a/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
-	$(CC) -c $(CFLAGS) -DPANCAKE_SERIAL_DRIVER -I${SERIAL_DRIVER_DIR}/include -o $@ $<
-else
-serial_driver.elf: serial/ns16550a/serial_driver.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-
-serial/ns16550a/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
+serial/ns16550a/uart.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
-endif
+
+serial/ns16550a/uart_common.o: ${SERIAL_DRIVER_DIR}/uart_common.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
 serial/ns16550a:
 	mkdir -p $@
