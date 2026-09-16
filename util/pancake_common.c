@@ -15,14 +15,16 @@ extern void *cml_stackend;
 
 void cml_exit(int arg)
 {
-    sddf_dprintf("ERROR! We should not be getting here\n");
+    sddf_dprintf("Pancake program exited.\n");
+    __builtin_trap();
 }
 
 void cml_err(int arg)
 {
     if (arg == 3) {
-        sddf_dprintf("Memory not ready for entry. You may have not run the init code yet, or be trying to enter "
-                     "during an FFI call.\n");
+        sddf_dprintf("CakeML Memory not ready for entry. "
+                     "You may have not run the init code yet, "
+                     "or be trying to enter during an FFI call.\n");
     }
     cml_exit(arg);
 }
