@@ -1,17 +1,17 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from dataclasses import dataclass
-from typing import List, Dict, Type, Union, Optional
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
 class DTSRegion:
     name: str
-    perms: str = None
-    size: int = None
-    dt_idx: int = None
+    perms: Optional[str] = None
+    size: Optional[int] = None
+    dt_idx: Optional[int] = None
 
 
 @dataclass
@@ -32,9 +32,9 @@ class sDDFDriverConfig:
     TODO: make this better in future
     """
 
-    compatible: Union[List[str], str]
-    regions: List[DTSRegion]
-    irqs: List[DTSIRQ]
+    compatible: list[str] | str
+    regions: list[DTSRegion]
+    irqs: list[DTSIRQ]
 
     def __post_init__(self):
         if isinstance(self.compatible, str):
@@ -58,13 +58,13 @@ class __sDDFDriverManifest:
     """
 
     def __init__(self):
-        self.map: Dict[Type[sDDFDeviceClass], Dict[str, sDDFDriverConfig]] = (
+        self.map: dict[type[sDDFDeviceClass], dict[str, sDDFDriverConfig]] = (
             defaultdict(dict)
         )
 
     def add_driver_config(
         self,
-        subsystem_type: Type[sDDFDriverConfig],
+        subsystem_type: type[sDDFDriverConfig],
         driver_name: str,
         config: sDDFDriverConfig,
     ):
@@ -80,8 +80,8 @@ class __sDDFDriverManifest:
         return self.map[item]
 
     def get_configs_matching_compatible(
-        self, subsystem_type: Type[sDDFDriverConfig], compat: str
-    ) -> List[sDDFDriverConfig]:
+        self, subsystem_type: type[sDDFDriverConfig], compat: str
+    ) -> list[sDDFDriverConfig]:
         return [c for c in self.map[subsystem_type].values() if compat in c.compatible]
 
 
