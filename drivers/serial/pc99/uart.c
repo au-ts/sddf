@@ -11,10 +11,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
-
-#ifdef PANCAKE_SERIAL_DRIVER
-#include <sddf/util/pancake_common.h>
-#endif /* PANCAKE_SERIAL_DRIVER */
+#include <uart.h>
 
 // TODO: the retain and used attributes are necessary as nothing uses/refers to this section
 // in release mode in this driver.
@@ -68,7 +65,6 @@ uint8_t read(uint16_t port_offset)
     return microkit_x86_ioport_read_8((IOPORT_ID), IOPORT_BASE + port_offset);
 }
 
-#ifndef PANCAKE_SERIAL_DRIVER
 int tx_ready(void)
 {
     return read(SERIAL_LSR) & SERIAL_LSR_TRANSMITTER_EMPTY;
@@ -78,7 +74,6 @@ int rx_ready(void)
 {
     return read(SERIAL_LSR) & SERIAL_LSR_DATA_READY;
 }
-#endif /* PANCAKE_SERIAL_DRIVER */
 
 void init(void)
 {
@@ -108,24 +103,8 @@ void init(void)
     read(SERIAL_RBR); /* clear receiver port */
     read(SERIAL_LSR); /* clear line status port */
     read(SERIAL_MSR); /* clear modem status port */
-
-#ifdef PANCAKE_SERIAL_DRIVER
-    init_pancake_mem();
-
-    uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
-
-    pnk_mem[2] = config.rx.id;
-    pnk_mem[3] = config.tx.id;
-    pnk_mem[4] = (uintptr_t)&rx_queue_handle;
-    pnk_mem[5] = (uintptr_t)&tx_queue_handle;
-
-    cml_main();
-#endif /* PANCAKE_SERIAL_DRIVER */
 }
 
-#ifdef PANCAKE_SERIAL_DRIVER
-extern void notified(sddf_channel ch);
-#else
 static void tx_provide(void)
 {
     bool transferred = false;
@@ -178,4 +157,3 @@ void notified(microkit_channel ch)
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
-#endif /* PANCAKE_SERIAL_DRIVER */
