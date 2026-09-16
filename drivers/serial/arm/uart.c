@@ -11,10 +11,6 @@
 #include <sddf/serial/config.h>
 #include <uart.h>
 
-#ifdef PANCAKE_SERIAL_DRIVER
-#include <sddf/util/pancake_common.h>
-#endif /* PANCAKE_SERIAL_DRIVER */
-
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
@@ -43,7 +39,6 @@ static void set_baud(long bps)
     uart_regs->fbrd = baud_div_frac;
 }
 
-#ifndef PANCAKE_SERIAL_DRIVER
 static void tx_provide(void)
 {
     bool transferred = false;
@@ -109,7 +104,6 @@ static void handle_irq(void)
         uart_int_reg = uart_regs->mis;
     }
 }
-#endif /* PANCAKE_SERIAL_DRIVER */
 
 static void uart_setup(void)
 {
@@ -171,27 +165,8 @@ void init(void)
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
-
-#ifdef PANCAKE_SERIAL_DRIVER
-    init_pancake_mem();
-
-    uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
-
-    pnk_mem[0] = (uintptr_t)uart_regs;
-    pnk_mem[1] = device_resources.irqs[0].id;
-    pnk_mem[2] = config.rx.id;
-    pnk_mem[3] = config.tx.id;
-    pnk_mem[4] = (uintptr_t)&rx_queue_handle;
-    pnk_mem[5] = (uintptr_t)&tx_queue_handle;
-    pnk_mem[1024] = config.rx_enabled;
-
-    cml_main();
-#endif /* PANCAKE_SERIAL_DRIVER */
 }
 
-#ifdef PANCAKE_SERIAL_DRIVER
-extern void notified(sddf_channel ch);
-#else
 void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
@@ -206,4 +181,3 @@ void notified(sddf_channel ch)
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
-#endif /* PANCAKE_SERIAL_DRIVER */
