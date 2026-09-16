@@ -123,7 +123,6 @@ export fun tx_provide()
         }
         uart_write_txd(res.1 & MAX_UINT8);
         transferred = true;
-        break;
     }
 
     var head = serial_queue_get_head(tx_queue_handle);
@@ -176,26 +175,31 @@ fun rx_return()
         }
 
         var ts = uart_read_ts();
-        var tail = serial_queue_get_tail(rx_queue_handle);
-        var is_full = serial_queue_full(rx_queue_handle, tail);
-        if ((!(ts & UART_TST_RX_FIFO_EMPTY)) && is_full) {
-            var cr1 = uart_read_cr1();
-            cr1 = cr1 & bitwise_not(UART_CR1_RX_READY_INT);
-            uart_write_cr1(cr1);
-            serial_request_consumer_signal(rx_queue_handle);
+        if (!(ts & UART_TST_RX_FIFO_EMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                /* Disable rx interrupts until virtualisers queue is no longer full. */
+                var cr1 = uart_read_cr1();
+                cr1 = cr1 & bitwise_not(UART_CR1_RX_READY_INT);
+                uart_write_cr1(cr1);
+                serial_request_consumer_signal(rx_queue_handle);
+            }
         }
 
         reprocess = false;
 
         ts = uart_read_ts();
-        tail = serial_queue_get_tail(rx_queue_handle);
-        is_full = serial_queue_full(rx_queue_handle, tail);
-        if ((!(ts & UART_TST_RX_FIFO_EMPTY)) && (!is_full)) {
-            serial_cancel_consumer_signal(rx_queue_handle);
-            var cr1 = uart_read_cr1();
-            cr1 = cr1 | UART_CR1_RX_READY_INT;
-            uart_write_cr1(cr1);
-            reprocess = true;
+        if (!(ts & UART_TST_RX_FIFO_EMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (!is_full) {
+                serial_cancel_consumer_signal(rx_queue_handle);
+                var cr1 = uart_read_cr1();
+                cr1 = cr1 | UART_CR1_RX_READY_INT;
+                uart_write_cr1(cr1);
+                reprocess = true;
+            }
         }
     }
 
@@ -222,8 +226,8 @@ fun handle_irq()
 
         if (uart_sr1 & UART_SR1_ABNORMAL) {
             debug_print(uart_sr1);
-            uart_cr1 = uart_read_cr1();
-            uart_write_sr1(uart_cr1 | UART_SR1_ABNORMAL);
+            uart_sr1 = uart_read_sr1();
+            uart_write_sr1(uart_sr1 | UART_SR1_ABNORMAL);
         }
 
         uart_sr1 = uart_read_sr1();

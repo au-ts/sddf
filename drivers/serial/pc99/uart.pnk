@@ -148,7 +148,7 @@ fun rx_return()
 
 fun handle_irq() {
     var iir = read(SERIAL_IIR);
-    iir = iir >> 1;
+    iir = iir >>> 1;
     if (iir & RX_DATA_AVAIL) {
         rx_return();
     }

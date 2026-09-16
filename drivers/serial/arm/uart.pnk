@@ -221,7 +221,7 @@ fun rx_return()
 
 fun handle_irq() {
     var uart_int_reg = uart_read_mis();
-    while (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_int_reg & PL011_IMSC_TX_INT) {
+    while ((uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) || (uart_int_reg & PL011_IMSC_TX_INT)) {
         var rx_enabled = RX_ENABLED;
         if (rx_enabled && uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
             rx_return();

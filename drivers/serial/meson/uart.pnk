@@ -142,27 +142,31 @@ fun rx_return()
         }
 
         var sr = uart_read_sr();
-        var tail = serial_queue_get_tail(rx_queue_handle);
-        var is_full = serial_queue_full(rx_queue_handle, tail);
-        if ((!(sr & AML_UART_RX_EMPTY)) && is_full) {
-            /* Disable rx interrupts until virtualisers queue is no longer full. */
-            var cr = uart_read_cr();
-            cr = cr & bitwise_not(AML_UART_RX_INT_EN);
-            uart_write_cr(cr);
-            serial_request_consumer_signal(rx_queue_handle);
+        if (!(sr & AML_UART_RX_EMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (is_full) {
+                /* Disable rx interrupts until virtualisers queue is no longer full. */
+                var cr = uart_read_cr();
+                cr = cr & bitwise_not(AML_UART_RX_INT_EN);
+                uart_write_cr(cr);
+                serial_request_consumer_signal(rx_queue_handle);
+            }
         }
 
         reprocess = false;
 
         sr = uart_read_sr();
-        tail = serial_queue_get_tail(rx_queue_handle);
-        is_full = serial_queue_full(rx_queue_handle, tail);
-        if ((!(sr & AML_UART_RX_EMPTY)) && (!is_full)) {
-            serial_cancel_consumer_signal(rx_queue_handle);
-            var cr = uart_read_cr();
-            cr = cr | AML_UART_RX_INT_EN;
-            uart_write_cr(cr);
-            reprocess = true;
+        if (!(sr & AML_UART_RX_EMPTY)) {
+            var tail = serial_queue_get_tail(rx_queue_handle);
+            var is_full = serial_queue_full(rx_queue_handle, tail);
+            if (!is_full) {
+                serial_cancel_consumer_signal(rx_queue_handle);
+                var cr = uart_read_cr();
+                cr = cr | AML_UART_RX_INT_EN;
+                uart_write_cr(cr);
+                reprocess = true;
+            }
         }
     }
 

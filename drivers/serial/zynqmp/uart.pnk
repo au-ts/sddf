@@ -12,11 +12,6 @@
 #define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
 #define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
 
-#define RX_ENABLED             pnk_mem(1024)
-#define RX_ENABLED_PTR         pnk_mem_ptr(1024)
-#define WAITING_FOR_TX         pnk_mem(1025)
-#define WAITING_FOR_TX_PTR     pnk_mem_ptr(1025)
-
 /* Register offsets for the UART. */
 #define ZYNQMP_UART_CR            0  /* Control Register */
 #define ZYNQMP_UART_MR            4  /* Mode Register */
@@ -56,6 +51,8 @@
 #define ZYNQMP_UART_IXR_TXEMPTY      8    /**< TX FIFO empty interrupt. */
 #define ZYNQMP_UART_IXR_RXOVR        1    /**< RX FIFO trigger interrupt. */
 #define ZYNQMP_UART_IXR_MASK         8191 /**< Valid bit mask */
+
+var waiting_for_tx_to_finish = false;
 
 inline fun uart_read_sr()
 {
@@ -111,8 +108,7 @@ inline fun uart_write_char(1 c)
 
 fun tx_provide()
 {
-    var waiting = WAITING_FOR_TX;
-    if (waiting) {
+    if (waiting_for_tx_to_finish) {
         /* Wait for TX FIFO empty IRQ before doing more work. */
         return 0;
     }
@@ -146,8 +142,7 @@ fun tx_provide()
     /* If there is more work to be done, raise a TX FIFO empty interrupt */
     if (!is_empty) {
         uart_write_ier(ZYNQMP_UART_IXR_TXEMPTY);
-        var waiting_ptr = WAITING_FOR_TX_PTR;
-        !st32 waiting_ptr, true;
+        waiting_for_tx_to_finish = true;
     }
 
     if (transferred) {
@@ -226,8 +221,7 @@ fun handle_irq()
     if (irq_status & ZYNQMP_UART_IXR_TXEMPTY) {
         /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
            while doing work, now continue. */
-        var waiting_ptr = WAITING_FOR_TX_PTR;
-        !st32 waiting_ptr, false;
+        waiting_for_tx_to_finish = false;
 
         /* Switch off the TX FIFO empty IRQ, only turn it on again when needed. */
         uart_write_idr(ZYNQMP_UART_IXR_TXEMPTY);

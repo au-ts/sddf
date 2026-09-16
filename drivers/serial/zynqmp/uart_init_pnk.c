@@ -24,7 +24,6 @@ void init(void)
     pnk_mem[3] = config.tx.id;
     pnk_mem[4] = (uintptr_t)&rx_queue_handle;
     pnk_mem[5] = (uintptr_t)&tx_queue_handle;
-    pnk_mem[1024] = config.rx_enabled;
 
     cml_main();
 }
