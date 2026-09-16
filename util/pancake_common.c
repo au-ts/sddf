@@ -3,14 +3,13 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <sddf/util/pancake_common.h>
 #include <sddf/util/printf.h>
 
 static char cml_memory[1024 * 20];
 extern void *cml_heap;
 extern void *cml_stack;
 extern void *cml_stackend;
-
-extern void cml_main(void);
 
 void cml_exit(int arg)
 {
