@@ -1,9 +1,8 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
-from acacia import System, ProtectionDomain, aarch64, riscv64, x86_64, Arch
-from importlib.metadata import version
+
+from acacia import Arch, aarch64, riscv64, x86_64
 
 
 @dataclass(frozen=True)
@@ -18,18 +17,18 @@ class Board:
     arch: Arch
     paddr_top: int
     # Driver mappings -> (compatible, preferred_node) tuples
-    serial: Optional[DriverDouble] = DriverDouble(None, None)
-    ethernet: Optional[DriverDouble] = DriverDouble(None, None)
-    timer: Optional[DriverDouble] = DriverDouble(None, None)
-    i2c: Optional[DriverDouble] = DriverDouble(None, None)
-    blk: Optional[DriverDouble] = DriverDouble(None, None)
+    serial: DriverDouble = DriverDouble(None, None)
+    ethernet: DriverDouble = DriverDouble(None, None)
+    timer: DriverDouble = DriverDouble(None, None)
+    i2c: DriverDouble = DriverDouble(None, None)
+    blk: DriverDouble = DriverDouble(None, None)
     partition: int = 0
-    baud_rate: Optional[int] = None
+    baud_rate: int | None = None
 
 
 # Keep this list in alphabetical order by board name
 # TODO: convert to Dictionary
-BOARDS: List[Board] = [
+BOARDS: list[Board] = [
     Board(
         name="cheshire",
         arch=riscv64,
