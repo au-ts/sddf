@@ -5,6 +5,7 @@ import os
 import sys
 
 from acacia import DeviceTreeBlob, ProtectionDomain, System
+from acacia.arch import x86_64
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 from acacia_sddf import BOARDS, sDDFTimer

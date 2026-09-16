@@ -47,7 +47,7 @@ class sDDFTimer(sDDFDriverClass):
 
     def connect_clients(self):
         # Clients are connected with:
-        # a. channel allowing PPCs -> driver, notifications -> clienet
+        # a. channel allowing PPCs -> driver, notifications -> client
         # ... that's it!
         for c in self.clients:
             if c.priority > self.driver.priority:
