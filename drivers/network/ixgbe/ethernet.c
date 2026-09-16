@@ -39,7 +39,6 @@ const uintptr_t hw_tx_ring_vaddr = 0x2404000;
 
 #define NUM_TX_DESCS 512llu
 #define NUM_RX_DESCS 512llu
-#define TX_CLEAN_BATCH 32llu
 
 struct ixgbe_device {
     volatile ixgbe_adv_rx_desc_t *rx_ring;
@@ -78,18 +77,18 @@ static inline bool hw_rx_ring_full(void)
     return (device.rx_tail + 1) % NUM_RX_DESCS == device.rx_head;
 }
 
-void clear_interrupts(void)
+static inline void clear_interrupts(void)
 {
     (void)eth_regs->eicr;
 }
 
-void disable_interrupts(void)
+static inline void disable_interrupts(void)
 {
     eth_regs->eimc = IXGBE_IRQ_CLEAR_MASK;
     clear_interrupts();
 }
 
-void enable_interrupts(void)
+static inline void enable_interrupts(void)
 {
     // Section 8.2.2.6.10
     //   - Bit[5:0] vector number for RX_QUEUE 0, BIT(vector number) is set on EICR if triggered
