@@ -1,26 +1,26 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import os
+import sys
+from collections import defaultdict
+from typing import Optional, Union, List, Dict
+
 from acacia import (
-    System,
-    Subsystem,
-    ProtectionDomain,
     Channel,
+    ConfigStruct,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
+    ProtectionDomain,
     SchedulingProperties,
-    ConfigStruct,
     SubsystemBuildError,
+    System,
 )
-from acacia.x86 import IOPort
 from acacia.irq import IrqIoapic
-import sys, os
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
-from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
-from collections import defaultdict
-from typing import List, Dict, Type, Union, Optional
+from acacia.x86 import IOPort
+
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .sddf import DeviceResourcesFactory, RegionResourceFactory, sDDFDriverClass
 
 SERIAL_DEFAULT_BEGIN_STR = "Begin input\r\n"
 SERIAL_MAX_BEGIN_STR_LEN = 128
@@ -455,8 +455,8 @@ class sDDFSerial(sDDFDriverClass):
 
     # x86 Util
     def add_x86_serial_port(self):
-        # The serial device does not located on PCIe and the interrupts are
-        # conventionally configured by BIOS. The IRQ number can be read from
+        # The serial device is not located on PCIe and the interrupts are
+        # conventionally configured by firmware. The IRQ number can be read from
         # Linux or APCI tables.
         self.driver.add_ioport(IOPort(0x3F8, 8, 0))
         self.driver.add_irq(IrqIoapic(0, 4, 0, id=1))
@@ -473,9 +473,9 @@ def add_driver_config(driver_name: str, config: sDDFDriverConfig):
 add_driver_config(
     "meson",
     sDDFDriverConfig(
-        ["amlogic,meson-gx-uart", "amlogic,meson-ao-uart"],
-        [DTSRegion("regs", "rw", 4096, 0)],
-        [DTSIRQ(0)],
+        compatible=["amlogic,meson-gx-uart", "amlogic,meson-ao-uart"],
+        regions=[DTSRegion("regs", "rw", 4096, 0)],
+        irqs=[DTSIRQ(0)],
     ),
 )
 
