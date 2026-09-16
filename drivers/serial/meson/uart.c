@@ -9,7 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
-#include <uart.h>
+#include "uart.h"
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 

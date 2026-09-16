@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 #include <sddf/util/pancake_common.h>
-#include <uart.h>
+#include "uart.h"
 
 /* renamed from the init() function of the C driver */
 extern void c_init(void);

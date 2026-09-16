@@ -9,7 +9,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
-#include <uart.h>
+#include "uart.h"
 
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
