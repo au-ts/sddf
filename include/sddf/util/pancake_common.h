@@ -7,4 +7,4 @@
 extern void *cml_heap;
 
 extern void cml_main(void);
-extern void init_pancake_mem();
+extern void init_pancake_mem(void);
