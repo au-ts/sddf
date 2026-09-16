@@ -5,10 +5,6 @@
 
 #pragma once
 
-#include <sddf/resources/device.h>
-#include <sddf/serial/config.h>
-#include <sddf/serial/queue.h>
-
 #define LOG_DRIVER(...) do{ sddf_dprintf("%s|INFO: ", sddf_get_pd_name()); sddf_dprintf(__VA_ARGS__); }while(0)
 #define LOG_DRIVER_ERR(...) do{ sddf_dprintf("%s|ERROR: ", sddf_get_pd_name()); sddf_dprintf(__VA_ARGS__); }while(0)
 
@@ -168,30 +164,4 @@
 #define UART_USR_BUSY BIT(0)
 /* Transmit FIFO Not Full */
 #define UART_USR_TFNF BIT(1)
-#endif
-
-extern __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
-
-extern __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
-extern serial_queue_handle_t rx_queue_handle;
-extern serial_queue_handle_t tx_queue_handle;
-
-/* UART device registers */
-extern volatile uintptr_t uart_base;
-
-extern void post_init();
-
-/* TODO: Use the value from the device tree*/
-#if defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_CHESHIRE) || defined(CONFIG_PLAT_BCM2711)                       \
-    || defined(CONFIG_PLAT_HIFIVE_P550) || defined(CONFIG_PLAT_RK3568) || defined(CONFIG_PLAT_ROCKPRO64)
-#define REG_IO_WIDTH 4
-#define REG_SHIFT 2
-#define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
-#elif defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
-#define REG_IO_WIDTH 1
-#define REG_SHIFT 0
-#define REG_PTR(off)     ((volatile uint8_t *)((uart_base) + (off << REG_SHIFT)))
-#else
-#error "unknown platform reg-io-width"
 #endif

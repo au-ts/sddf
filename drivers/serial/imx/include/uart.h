@@ -7,8 +7,6 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
-#include <sddf/resources/device.h>
-#include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 
 /* The driver is based on the i.MX 8M Mini Applications Processor Reference Manual Rev 0, 02/2019.
@@ -114,14 +112,3 @@ typedef volatile struct imx_uart_regs imx_uart_regs_t;
 #define UART_TST_SFT_RST            BIT(0)          /* Software Reset Status. */
 #define UART_TST_TX_FIFO_FULL       BIT(4)          /* Tx FIFO is full. */
 #define UART_TST_RX_FIFO_EMPTY      BIT(5)          /* Rx FIFO is empty. */
-
-extern __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
-extern __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
-
-extern serial_queue_handle_t rx_queue_handle;
-extern serial_queue_handle_t tx_queue_handle;
-
-extern volatile imx_uart_regs_t *uart_regs;
-
-extern void post_init();

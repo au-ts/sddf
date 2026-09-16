@@ -7,8 +7,6 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
-#include <sddf/resources/device.h>
-#include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 
 /* Odroidc4 : The driver is based on the Amlogic S905X3 Data Sheet Revision 02.
@@ -92,14 +90,3 @@ struct uart_clock_state {
     unsigned long baud;                                 /* Configured baud rate. */
     uint32_t reference_ticks_per_symbol;                /* Baud rate in terms of divided reference clock ticks per symbol. */
 };
-
-extern __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
-extern __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
-
-extern serial_queue_handle_t rx_queue_handle;
-extern serial_queue_handle_t tx_queue_handle;
-
-extern volatile meson_uart_regs_t *uart_regs;
-
-extern void post_init();

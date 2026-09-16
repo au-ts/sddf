@@ -22,8 +22,24 @@
 #include <sddf/serial/config.h>
 #include <uart.h>
 
+#ifdef PANCAKE_SERIAL_DRIVER
+#include <sddf/util/pancake_common.h>
+#endif /* PANCAKE_SERIAL_DRIVER */
+
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+
 bool waiting_for_tx_to_finish = false;
 
+serial_queue_handle_t rx_queue_handle;
+serial_queue_handle_t tx_queue_handle;
+
+/* UART device registers */
+volatile uintptr_t uart_base;
+
+#define REG_PTR(off)     ((volatile uint32_t *)(uart_base + off))
+
+#ifndef PANCAKE_SERIAL_DRIVER
 static void tx_provide(void)
 {
     if (waiting_for_tx_to_finish) {
@@ -119,7 +135,170 @@ static void handle_irq(void)
         rx_return();
     }
 }
+#endif /* PANCAKE_SERIAL_DRIVER */
 
+static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd, uint8_t *bdiv)
+{
+    /* Page 589 of TRM
+
+    Baud rate = sel_clk / (CD * (BDIV + 1))
+
+    This function's goal is to calculate the CD and BDIV values for setting the baud rate. Where:
+        sel_clk = clock_hz
+        CD      = baud rate generator divisor value
+        BDIV    = baud rate divider value
+
+    CD is used to derive the baud sample rate
+    CD and BDIV are used to derive the RX and TX baud rate.
+
+    BDIV can be programmed with a value between 4 and 255.
+    For the target bps, solve for the optimal baudgen divider (CD).
+    Take the first result that is <3% in error. So:
+
+    sel_clk = baud * (CD * (BDIV + 1))
+    CD * (BDIV + 1) = sel_clk / baud
+    CD = (sel_clk / baud) / (BDIV + 1)
+    */
+
+    uint64_t computed_bdiv = ZYNQMP_UART_BDIV_MIN;
+    uint64_t computed_cd = 0;
+    double acceptable_error_rate = 0.03;
+    for (; computed_bdiv <= ZYNQMP_UART_BDIV_MAX; computed_bdiv++) {
+        uint64_t guessed_cd = (clock_hz / (baudrate * 1.0)) / (computed_bdiv + 1);
+
+        /* If CD yields 0 or 1, go to the next possible BDIV because those are
+           reserved values. Register references, UG1087: "Baud_rate_gen (UART) Register Description"
+         */
+        if (guessed_cd < ZYNQMP_UART_CD_MIN) {
+            continue;
+        }
+
+        /* Now solve the equation. */
+        double actual_baud = clock_hz / ((guessed_cd * (computed_bdiv + 1)) * 1.0);
+
+        double difference = ABS(actual_baud - baudrate);
+        double error_rate = difference / baudrate;
+        if (error_rate < acceptable_error_rate) {
+            computed_cd = guessed_cd;
+            break;
+        }
+    }
+
+    /* Should never trip, unless your uart clock or baud rate are incorrect */
+    assert(computed_cd >= ZYNQMP_UART_CD_MIN && computed_cd <= ZYNQMP_UART_CD_MAX);
+
+    *cd = (uint16_t)computed_cd;
+    *bdiv = (uint8_t)computed_bdiv;
+}
+
+static void tx_fifo_drain_wait(void)
+{
+    /* Wait for the TX FIFO to drain. */
+    while (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
+    /* Wait for the Transmitter to finish sending the signals. */
+    while ((*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
+}
+
+static void uart_setup(void)
+{
+    /* Wait for any previous UART access to complete before we reset the serial device. */
+    tx_fifo_drain_wait();
+
+    /* Compute the correct clock dividers to set the baud rate. */
+    uint16_t cd;
+    uint8_t bdiv;
+    compute_clk_divs(ZYNQMP_UART_REF_CLOCK_RATE, config.default_baud, &cd, &bdiv);
+
+    /* Disable TX and RX before the UART registers can be reprogrammed (page 589).
+     * First clear the enable bit then set the disabled bit.
+     */
+    uint32_t cr = *REG_PTR(ZYNQMP_UART_CR);
+    cr &= ~((uint32_t)(BIT(ZYNQMP_UART_CR_TX_EN_SHIFT) | BIT(ZYNQMP_UART_CR_RX_EN_SHIFT)));
+    cr |= ZYNQMP_UART_CR_TX_DIS | ZYNQMP_UART_CR_RX_DIS;
+    *REG_PTR(ZYNQMP_UART_CR) = cr;
+
+    /* Clear the mode register to make sure the device is operating in normal mode
+     * and the clock isn't divided by 8 */
+    *REG_PTR(ZYNQMP_UART_MR) = 0;
+
+    /* Set the baud rate by programming the clock dividers */
+    *REG_PTR(ZYNQMP_UART_BAUDDIV) = bdiv;
+    *REG_PTR(ZYNQMP_UART_BAUDGEN) = cd;
+
+    /* Reset TX and RX and wait for the reset to complete. */
+    *REG_PTR(ZYNQMP_UART_CR) |= ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST;
+    while (*REG_PTR(ZYNQMP_UART_CR) & (ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST));
+
+    /* Clear the TX and RX disable bit. */
+    cr = *REG_PTR(ZYNQMP_UART_CR);
+    cr &= ~((uint32_t)(BIT(ZYNQMP_UART_CR_TX_DIS_SHIFT) | BIT(ZYNQMP_UART_CR_RX_DIS_SHIFT)));
+
+    /* Enable TX and RX. */
+    cr |= ZYNQMP_UART_CR_TX_EN | ZYNQMP_UART_CR_RX_EN;
+    *REG_PTR(ZYNQMP_UART_CR) = cr;
+
+    /* Select 8 bytes character length. */
+    uint32_t mr = *REG_PTR(ZYNQMP_UART_MR);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_CHARLEN_SHIFT);
+
+    /* No parity checks */
+    mr |= ZYNQMP_UART_MR_PARITY_NONE;
+
+    /* One stop bit to detect on RX and to generate on TX */
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_STOPMODE_SHIFT);
+
+    /* Put the UART device in normal operating mode */
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_CHMODE_SHIFT);
+    *REG_PTR(ZYNQMP_UART_MR) = mr;
+
+    /* Turn off all the interrupts, then only turn on the ones we need. */
+    *REG_PTR(ZYNQMP_UART_IDR) = ZYNQMP_UART_IXR_MASK;
+    *REG_PTR(ZYNQMP_UART_ISR) = ZYNQMP_UART_IXR_MASK;
+
+    if (config.rx_enabled) {
+        /* Set the watermark to raise an interrupt for every received byte. */
+        *REG_PTR(ZYNQMP_UART_RXWM) = 1;
+
+        /* Enable IRQ on every bytes received. */
+        *REG_PTR(ZYNQMP_UART_IER) = ZYNQMP_UART_IXR_RXOVR;
+    }
+}
+
+void init(void)
+{
+    assert(serial_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
+    uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
+    uart_setup();
+
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
+#ifdef PANCAKE_SERIAL_DRIVER
+    init_pancake_mem();
+
+    uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
+
+    pnk_mem[0] = (uintptr_t)uart_base;
+    pnk_mem[1] = device_resources.irqs[0].id;
+    pnk_mem[2] = config.rx.id;
+    pnk_mem[3] = config.tx.id;
+    pnk_mem[4] = (uintptr_t)&rx_queue_handle;
+    pnk_mem[5] = (uintptr_t)&tx_queue_handle;
+    pnk_mem[1024] = config.rx_enabled;
+
+    cml_main();
+#endif /* PANCAKE_SERIAL_DRIVER */
+}
+
+#ifdef PANCAKE_SERIAL_DRIVER
+extern void notified(sddf_channel ch);
+#else
 void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
@@ -133,7 +312,4 @@ void notified(sddf_channel ch)
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
-
-void post_init()
-{
-}
+#endif /* PANCAKE_SERIAL_DRIVER */
