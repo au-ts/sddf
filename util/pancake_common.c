@@ -27,10 +27,12 @@ void cml_err(int arg)
     cml_exit(arg);
 }
 
+#ifdef CONFIG_ARCH_X86_64
 void cml_clear(void)
 {
     sddf_dprintf("Trying to clear cache.\n");
 }
+#endif
 
 void init_pancake_mem()
 {
