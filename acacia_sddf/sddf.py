@@ -1,22 +1,15 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys, os
-from typing import List, Optional, Tuple
-from abc import abstractmethod
 from acacia import (
-    Subsystem,
-    ProtectionDomain,
-    Channel,
+    ConfigStruct,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
-    SchedulingProperties,
-    ConfigStruct,
-    IRQ,
+    ProtectionDomain,
+    Subsystem,
     System,
 )
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
+
+from .driver_manifest import sDDFDriverManifest
 
 
 class sDDFDriverClass(Subsystem):
@@ -57,7 +50,7 @@ class sDDFDriverClass(Subsystem):
 
         # make sure compatible matches!
         if dev_compatible not in (a_c := self.dtb.get_compatible(target_node)):
-            raise IOError(
+            raise OSError(
                 f"Target node {dev_dt_path} has compatible {a_c}... "
                 f"doesn't match expected {dev_compatible}!"
             )
@@ -194,10 +187,9 @@ class sDDFDriverClass(Subsystem):
 
         By default nothing will happen.
         """
-        ...
 
 
-def RegionResourceFactory(map: Map, section_name: Optional[str] = None, offset=0):
+def RegionResourceFactory(map: Map, section_name: str | None = None, offset=0):
     fields = {"vaddr": map.vaddr + offset, "size": map.mr.size}
     return ConfigStruct(
         fields, type_name="region_resource_t", section_name=section_name
@@ -217,8 +209,8 @@ def DeviceIRQResourceFactory(id: int):
 
 def DeviceResourcesFactory(
     magic_str: str,
-    maps_offsets: List[Tuple[Map, int]],
-    irq_ids: List[int],
+    maps_offsets: list[tuple[Map, int]],
+    irq_ids: list[int],
     target_file: str,
     section_name="device_resources",
 ):

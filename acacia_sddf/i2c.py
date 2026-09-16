@@ -1,24 +1,22 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from acacia import (
-    System,
-    Subsystem,
-    ProtectionDomain,
-    Channel,
-    Map,
-    MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
-    SchedulingProperties,
-    ConfigStruct,
-)
-import sys, os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Type, Union, Optional
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
-from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
+
+from acacia import (
+    Channel,
+    ConfigStruct,
+    DTBNode,
+    Map,
+    MemoryRegion,
+    ProtectionDomain,
+    SchedulingProperties,
+    System,
+)
+
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .sddf import RegionResourceFactory, sDDFDriverClass
 
 I2C_DATA_SZ = 0x1000
 I2C_NUM_BUFS = 128  # TODO: add support for dynamically sized queues
@@ -47,7 +45,7 @@ class sDDFI2C(sDDFDriverClass):
         dev_dt_path: str,
         driver_prio: int,
         virt_prio: int,
-        cpu: Optional[int] = None,
+        cpu: int | None = None,
         virt_elf: str = "i2c_virt.elf",
         driver_elf: str = "i2c_driver.elf",
     ):
@@ -150,7 +148,7 @@ class sDDFI2C(sDDFDriverClass):
         # a. request queue
         # b. response queue
         # c. data region shared with driver
-        # c. channel for notifications and PPCs
+        # d. channel for notifications and PPCs
         virt_client_configs = []
         for c in self.clients:
             if c.priority >= self.virt.priority:
@@ -227,7 +225,7 @@ class sDDFI2C(sDDFDriverClass):
         )
 
     # ### dtb utility functions for drivers that depend on i2c ###
-    def get_i2c_addresses_from_dtb(self, device_node: DTBNode) -> List[I2CAddress]:
+    def get_i2c_addresses_from_dtb(self, device_node: DTBNode) -> list[I2CAddress]:
         """
         Try and get the i2c addresses of a device on the bus controlled by this driver.
 
@@ -238,6 +236,11 @@ class sDDFI2C(sDDFDriverClass):
         Returns:
             List[I2CAddress]
         """
+        if not self.dtb:
+            raise RuntimeError(
+                "Cannot get I2C addresses from DTB when system has no DTB!"
+            )
+
         # first: check that this path belongs to us
         if self.dtb_node.path not in device_node.path:
             raise ValueError(
@@ -308,7 +311,7 @@ class sDDFI2C(sDDFDriverClass):
         magic: str,
         num_clients: int,
         driver_connection: ConfigStruct,
-        client_connections: List[ConfigStruct],
+        client_connections: list[ConfigStruct],
     ) -> ConfigStruct:
         fields = {
             "magic": magic,
@@ -339,7 +342,7 @@ class sDDFI2C(sDDFDriverClass):
 
 
 # Driver configs
-i2c_driver_configs: Dict[str, List[sDDFDriverConfig]] = defaultdict(list)
+i2c_driver_configs: dict[str, list[sDDFDriverConfig]] = defaultdict(list)
 
 
 def add_driver_config(driver_name: str, config: sDDFDriverConfig):
