@@ -40,6 +40,9 @@ serial/arm:
 -include serial/arm/serial_driver.d
 
 clean::
-	rm -f serial/arm/serial_driver.[do] serial/arm/serial_driver_pnk.[oS]
+	rm -f serial/arm/serial_driver_init_pnk.[do] serial/arm/serial_driver.o
+	rm -f serial/arm/serial_driver_pre.[do] serial/arm/serial_driver_pnk.pnk
+	rm -f serial/arm/serial_driver_pnk.[doS]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial

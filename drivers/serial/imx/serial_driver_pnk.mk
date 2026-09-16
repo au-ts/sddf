@@ -40,7 +40,9 @@ serial/imx:
 	mkdir -p $@
 
 clean::
-	rm -f serial/imx/serial_driver.[do] serial/imx/serial_driver_pnk.[oS]
+	rm -f serial/imx/serial_driver_init_pnk.[do] serial/imx/serial_driver.o
+	rm -f serial/imx/serial_driver_pre.[do] serial/imx/serial_driver_pnk.pnk
+	rm -f serial/imx/serial_driver_pnk.[doS]
 
 clobber::
-	rm -rf serial
+	rm -rf serial_driver.elf serial

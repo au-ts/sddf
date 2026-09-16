@@ -40,7 +40,9 @@ serial/meson:
 -include serial/meson/serial_driver.d
 
 clean::
-	rm -f serial/meson/serial_driver.[do] serial/meson/serial_driver_pnk.[oS]
+	rm -f serial/meson/serial_driver_init_pnk.[do] serial/meson/serial_driver.o
+	rm -f serial/meson/serial_driver_pre.[do] serial/meson/serial_driver_pnk.pnk
+	rm -f serial/meson/serial_driver_pnk.[doS]
 
 clobber::
-	rm -rf serial
+	rm -rf serial_driver.elf serial

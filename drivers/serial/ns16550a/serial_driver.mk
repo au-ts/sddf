@@ -21,5 +21,6 @@ serial/ns16550a:
 
 clean::
 	rm -f serial/ns16550a/serial_driver.[do]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial
