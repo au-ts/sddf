@@ -140,7 +140,7 @@ class sDDFDriverClass(Subsystem):
                 # and acacia assigns a paddr upon calling `System.assemble`. We make the
                 # config structs in `generate_config_structs` - Acacia only calls it AFTER
                 # assembling, ensuring that our MRs have a paddr in the config struct.
-                mr = MemoryRegion(self.sdf, region_name, region.size, physical=True)
+                mr = MemoryRegion(self.sdf, region_name, region.size, physical=True, cached=False)
                 d_reg_offset = 0
 
             # Second: set up map

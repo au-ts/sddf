@@ -30,6 +30,8 @@ from .sddf import (
 
 BLK_PROTOCOL_MAGIC = "sDDF" + chr(0x2)
 BLK_STORAGE_INFO_SZ = 0x1000
+BLK_MAX_CLIENTS = 64
+BLK_QUEUE_ENTRY_SZ = 128
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,7 @@ class sDDFBlk(sDDFDriverClass):
         virt_prio: int,
         cpu: Optional[int] = None,
         # We leave this as configurable just in case...
-        driver_data_size: int = 0x1000,
+        driver_data_size: int = 10 * 0x1000,
         virt_elf: str = "blk_virt.elf",
         driver_elf: str = "blk_driver.elf",
     ):
@@ -60,11 +62,13 @@ class sDDFBlk(sDDFDriverClass):
         self.driver_data_size = driver_data_size
         self.virt = None
         self.virt_elf = virt_elf
+        self.connected = False
         driver = ProtectionDomain(
             sdf,
             "blk_driver",
             driver_elf,
             scheduling=SchedulingProperties(driver_prio),
+            stack_size=0x2000,
             cpu=self.cpu,
         )
         super().__init__(
@@ -77,7 +81,8 @@ class sDDFBlk(sDDFDriverClass):
         # Stubs of config structs that we need to collect in construct_infrastructure and connect_clients
         self.virt_config = None
         self.driver_config = None
-        self.virt_driver_conn = None
+        self.virt_driver_config_proto = None
+        self.virt_client_struct_protos = []
         self.client_config_protos = []
         self.construct_infrastructure(virt_prio)
 
@@ -87,6 +92,7 @@ class sDDFBlk(sDDFDriverClass):
             "blk_virt",
             self.virt_elf,
             scheduling=SchedulingProperties(virt_prio),
+            stack_size=0x2000,
             cpu=self.cpu,
         )
 
@@ -109,8 +115,8 @@ class sDDFBlk(sDDFDriverClass):
         # on the number of clients. We do it after connecting clients instead.
         self.driver_virt_ch = Channel(
             self.sdf,
-            Channel.End(self.driver, can_notify=True, can_pp=False),
             Channel.End(self.virt, can_notify=True, can_pp=False),
+            Channel.End(self.driver, can_notify=True, can_pp=False),
         )
 
     def create_driver_virt_connection(self):
@@ -120,13 +126,13 @@ class sDDFBlk(sDDFDriverClass):
                 for cc in self.client_blk_configs
             ]
         )
-        assert driver_q_capacity > 0
-        driver_q_mr_sz = driver_q_capacity * 128
-
-        # Make maps from data region created in create_infrastructure
-        virt_data_map = self.virt.create_automap(
-            self.driver_data_mr, Map.Permissions(r=True, w=True)
-        )
+        if driver_q_capacity <= 0:
+            raise SubsystemBuildError("Blk subsystem has no clients!")
+        if driver_q_capacity > 0xFFFF:
+            raise SubsystemBuildError(
+                f"Total blk queue capacity {driver_q_capacity} does not fit in uint16_t!"
+            )
+        driver_q_mr_sz = driver_q_capacity * BLK_QUEUE_ENTRY_SZ
 
         # queue regions
         driver_req_mr = MemoryRegion(self.sdf, "blk_driver_request", driver_q_mr_sz)
@@ -135,14 +141,19 @@ class sDDFBlk(sDDFDriverClass):
         driver_req_map = self.driver.create_automap(
             driver_req_mr, Map.Permissions(r=True, w=True)
         )
-        driver_resp_map = self.driver.create_automap(
-            driver_resp_mr, Map.Permissions(r=True, w=True)
-        )
         virt_req_map = self.virt.create_automap(
             driver_req_mr, Map.Permissions(r=True, w=True)
         )
+        driver_resp_map = self.driver.create_automap(
+            driver_resp_mr, Map.Permissions(r=True, w=True)
+        )
         virt_resp_map = self.virt.create_automap(
             driver_resp_mr, Map.Permissions(r=True, w=True)
+        )
+
+        # Make maps from data region created in create_infrastructure
+        virt_data_map = self.virt.create_automap(
+            self.driver_data_mr, Map.Permissions(r=True, w=True)
         )
 
         # Create driver config
@@ -177,6 +188,24 @@ class sDDFBlk(sDDFDriverClass):
         queue_capacity: Optional[int] = BlkClientOptions.queue_capacity,
         data_size: Optional[int] = BlkClientOptions.data_size,
     ):
+        if client in self.client_blk_configs:
+            raise SubsystemBuildError(f"Duplicate blk client {client.name}!")
+        if client.name == self.driver.name:
+            raise SubsystemBuildError(
+                f"Invalid blk client, same name as driver '{client.name}'"
+            )
+        if client.name == self.virt.name:
+            raise SubsystemBuildError(
+                f"Invalid blk client, same name as virt '{client.name}'"
+            )
+        if len(self.client_blk_configs) >= BLK_MAX_CLIENTS:
+            raise SubsystemBuildError(
+                f"Blk supports at most {BLK_MAX_CLIENTS} clients!"
+            )
+        if not 0 < queue_capacity <= 0xFFFF:
+            raise SubsystemBuildError(
+                f"Client {client.name} queue_capacity={queue_capacity} does not fit in uint16_t!"
+            )
         self.client_blk_configs[client] = BlkClientOptions(
             partition_number, queue_capacity, data_size
         )
@@ -186,8 +215,10 @@ class sDDFBlk(sDDFDriverClass):
         assert self.virt is not None
         assert self.driver is not None
 
+        # Create driver-virt queues now that we know how they should be sized.
+        self.create_driver_virt_connection()
+
         virt_client_struct_protos = []
-        virt_rx_client_conns = []
         client_config_protos = []
 
         for c in self.clients:
@@ -209,7 +240,7 @@ class sDDFBlk(sDDFDriverClass):
                 strg_info_mr, Map.Permissions(r=True, w=False)
             )
 
-            queue_mr_sz = cfg.queue_capacity * 128
+            queue_mr_sz = cfg.queue_capacity * BLK_QUEUE_ENTRY_SZ
             req_mr = MemoryRegion(self.sdf, f"blk_client_{c.name}_request", queue_mr_sz)
             resp_mr = MemoryRegion(
                 self.sdf, f"blk_client_{c.name}_response", queue_mr_sz
@@ -218,18 +249,18 @@ class sDDFBlk(sDDFDriverClass):
                 self.sdf, f"blk_client_{c.name}_data", cfg.data_size, physical=True
             )
 
-            client_req_map = c.create_automap(req_mr, Map.Permissions(r=True, w=True))
-            client_resp_map = c.create_automap(resp_mr, Map.Permissions(r=True, w=True))
-            client_data_map = c.create_automap(data_mr, Map.Permissions(r=True, w=True))
             virt_req_map = self.virt.create_automap(
                 req_mr, Map.Permissions(r=True, w=True)
             )
+            client_req_map = c.create_automap(req_mr, Map.Permissions(r=True, w=True))
             virt_resp_map = self.virt.create_automap(
                 resp_mr, Map.Permissions(r=True, w=True)
             )
+            client_resp_map = c.create_automap(resp_mr, Map.Permissions(r=True, w=True))
             virt_data_map = self.virt.create_automap(
                 data_mr, Map.Permissions(r=True, w=True)
             )
+            client_data_map = c.create_automap(data_mr, Map.Permissions(r=True, w=True))
 
             ch = Channel(
                 self.sdf,
@@ -265,14 +296,14 @@ class sDDFBlk(sDDFDriverClass):
         self.client_config_protos = client_config_protos
         self.virt_client_struct_protos = virt_client_struct_protos
 
-        # Create driver-virt queues now that we know how they should be sized.
-        self.create_driver_virt_connection()
-
     def x86_resources(self):
         # Nothing needed for now?
         ...
 
     def generate_config_structs(self):
+        assert self.driver_config is not None
+        assert self.virt_driver_config_proto is not None
+
         # Assemble configs that depended on an unassigned paddr, now that
         # Acacia has assigned all paddrs.
         client_configs = [
@@ -340,7 +371,7 @@ class sDDFBlk(sDDFDriverClass):
             ),
             "partition": partition_no,
         }
-        return ConfigStruct(fields, "blk_virt_client_t")
+        return ConfigStruct(fields, "blk_virt_config_client_t")
 
     def blk_virt_driver_config_factory(
         self, driver_conn: ConfigStruct, data_map: Map
@@ -354,7 +385,7 @@ class sDDFBlk(sDDFDriverClass):
                 RegionResourceFactory(data_map), data_map.mr.paddr
             ),
         }
-        return ConfigStruct(fields, "blk_virt_client_t")
+        return ConfigStruct(fields, "blk_virt_config_driver_t")
 
     def blk_virt_config_factory(
         self,
@@ -364,6 +395,7 @@ class sDDFBlk(sDDFDriverClass):
         virt_client_config_protos: List[ConfigStruct],
     ) -> ConfigStruct:
         assert len(virt_client_config_protos) == len(self.clients)
+        assert len(virt_client_config_protos) <= BLK_MAX_CLIENTS
         fields = {
             "magic": magic,
             "num_clients": len(virt_client_config_protos),
@@ -375,7 +407,6 @@ class sDDFBlk(sDDFDriverClass):
             "blk_virt_config_t",
             target_file=virt_pd.prog_image,
             section_name="blk_virt_config",
-
         )
 
     def blk_client_config_factory(
