@@ -44,6 +44,11 @@ You can reproduce what the CI builds with:
 
 You will need to provide the path to your Microkit SDK.
 
+To build with available Pancake components instead of C components, add
+`--pancake` to the command line. This requires the Pancake compiler `cake` to
+be available in `PATH`. For more information on building Pancake components,
+see the [documentation](../docs/pancake.md).
+
 There are various options to speed up development, such as only compiling a
 particular example or for a particular board.
 
