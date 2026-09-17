@@ -23,7 +23,7 @@ serial/arm/serial_driver_pnk.S: serial/arm/serial_driver_pnk.pnk |serial/arm
 	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
 
 serial/arm/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/arm
-	cat $^ | cpp -P -nostdinc > $@
+	cat $^ | $(CPP) -P -CC -nostdinc > $@
 
 serial/arm/serial_driver_pre.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/arm $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<

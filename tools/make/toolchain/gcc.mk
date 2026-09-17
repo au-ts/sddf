@@ -31,6 +31,7 @@ AR := ${TRIPLE}-ar
 OBJCOPY := ${TRIPLE}-objcopy
 OBJDUMP := ${TRIPLE}-objdump
 SIZE := ${TRIPLE}-size
+CPP := ${TRIPLE}-cpp
 
 OPTIMISATION ?= -g -O2
 

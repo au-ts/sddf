@@ -23,7 +23,7 @@ serial/meson/serial_driver_pnk.S: serial/meson/serial_driver_pnk.pnk |serial/mes
 	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
 
 serial/meson/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/meson
-	cat $^ | cpp -P > $@
+	cat $^ | $(CPP) -P -CC -nostdinc > $@
 
 serial/meson/serial_driver_pre.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/meson $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<

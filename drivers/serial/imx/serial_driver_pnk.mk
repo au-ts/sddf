@@ -23,7 +23,7 @@ serial/imx/serial_driver_pnk.S: serial/imx/serial_driver_pnk.pnk |serial/imx
 	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
 
 serial/imx/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/imx
-	cat $^ | cpp -P -nostdinc > $@
+	cat $^ | $(CPP) -P -CC -nostdinc > $@
 
 serial/imx/serial_driver_pre.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/imx $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<

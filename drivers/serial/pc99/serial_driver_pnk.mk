@@ -26,7 +26,7 @@ serial/pc99/serial_driver_pnk.S: serial/pc99/serial_driver_pnk.pnk |serial/pc99
 	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
 
 serial/pc99/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/pc99
-	cat $^ | cpp -P -nostdinc > $@
+	cat $^ | $(CPP) -P -CC -nostdinc > $@
 
 serial/pc99/serial_driver_pre.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/pc99 $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<

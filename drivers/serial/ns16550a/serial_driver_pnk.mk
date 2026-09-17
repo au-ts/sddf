@@ -23,7 +23,7 @@ serial/ns16550a/serial_driver_pnk.S: serial/ns16550a/serial_driver_pnk.pnk |seri
 	$(PANCAKE_COMPILER) $(PANCAKE_FLAGS) < $< > $@
 
 serial/ns16550a/serial_driver_pnk.pnk: $(DRIVER_PNK) |serial/ns16550a
-	cat $^ | cpp -P -nostdinc > $@
+	cat $^ | $(CPP) -P -CC -nostdinc > $@
 
 serial/ns16550a/serial_driver_pre.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
