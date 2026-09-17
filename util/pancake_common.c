@@ -45,7 +45,7 @@ void init_pancake_mem()
     cml_stackend = cml_stack + cml_stack_sz;
 
     /* All cml_* pointers must be word aligned. */
-    assert((uintptr_t) cml_heap % sizeof(uintptr_t) == 0);
-    assert((uintptr_t) cml_stack % sizeof(uintptr_t) == 0);
-    assert((uintptr_t) cml_stackend % sizeof(uintptr_t) == 0);
+    assert((uintptr_t)cml_heap % sizeof(uintptr_t) == 0);
+    assert((uintptr_t)cml_stack % sizeof(uintptr_t) == 0);
+    assert((uintptr_t)cml_stackend % sizeof(uintptr_t) == 0);
 }
