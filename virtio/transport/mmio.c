@@ -45,7 +45,7 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
     }
 
     if (regs->DeviceID != device_id) {
-        LOG_VIRTIO_TRANSPORT("not correct virtIO device ID (expected %d, got %d)!\n", regs->DeviceID, device_id);
+        LOG_VIRTIO_TRANSPORT("not correct virtIO device ID (expected %d, got %d)!\n", device_id, regs->DeviceID);
         return false;
     }
 
