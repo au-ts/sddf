@@ -114,11 +114,11 @@
     "systems-ci": {
       "flake": false,
       "locked": {
-        "lastModified": 1784859398,
-        "narHash": "sha256-Q4dqAW9yzl+6iAFqAvxvUSFKLPp2ECNiybMP2G1Lan0=",
+        "lastModified": 1788777190,
+        "narHash": "sha256-Chh44N+vZ96KMNLX9/p+YlZqSQMBpkJ9RcKELdqhpDw=",
         "owner": "au-ts",
         "repo": "systems-ci",
-        "rev": "39ada3f51b3f1ae167e05c5ced6946e8f75786e0",
+        "rev": "8f51c6f4e72ca031d8f8098dde352bf2d29978e6",
         "type": "github"
       },
       "original": {
