@@ -19,7 +19,7 @@ void cml_exit(int arg)
     /* trap because both cml_exit() and cml_err() should not be called
      * for normal Pancake programs
      */
-    __builtin_trap();
+    assert(false);
 }
 
 void cml_err(int arg)
@@ -39,7 +39,7 @@ void cml_clear(void)
     /* trap because sddf components are statically compiled,
      * and this function should not be called
      */
-    __builtin_trap();
+    assert(false);
 }
 #endif
 
