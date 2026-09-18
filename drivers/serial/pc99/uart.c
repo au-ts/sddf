@@ -107,7 +107,7 @@ void init(void)
 static void tx_provide(void)
 {
     bool transferred = false;
-    char c;
+    char c = 0;
     while (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         serial_dequeue(&tx_queue_handle, &c);
         while (!tx_ready());
