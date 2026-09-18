@@ -12,6 +12,8 @@ ifeq ($(ARCH),aarch64)
 	TRIPLE := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	TRIPLE := riscv64-unknown-elf
+else ifeq ($(ARCH),x86_64)
+	TRIPLE := x86_64-linux-gnu
 else
 $(error Unsupported ARCH given)
 endif
@@ -36,9 +38,12 @@ OPTIMISATION ?= -g -O2
 
 CFLAGS += \
 	-MD \
-	-mstrict-align \
 	-ffreestanding \
 	${OPTIMISATION} \
 	-Wall \
 	${CFLAGS_ARCH} \
 	-I ${BOARD_DIR}/include
+
+ifneq ($(ARCH),x86_64)
+	CFLAGS += -mstrict-align
+endif
