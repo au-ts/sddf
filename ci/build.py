@@ -35,6 +35,7 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
             f"MICROKIT_SDK={args.microkit_sdk}",
             f"MICROKIT_BOARD={test_config.board}",
             f"MICROKIT_CONFIG={test_config.config}",
+            f"TOOLCHAIN={args.toolchain}"
         ],
         check=True,
     )
@@ -137,6 +138,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Do not remove any pre-existing CI build directory before building",
     )
+    parser.add_argument("--toolchain", default="clang", type=str)
 
     filters = parser.add_argument_group(title="filters")
     filters.add_argument(
