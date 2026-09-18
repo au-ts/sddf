@@ -35,7 +35,7 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
             f"MICROKIT_SDK={args.microkit_sdk}",
             f"MICROKIT_BOARD={test_config.board}",
             f"MICROKIT_CONFIG={test_config.config}",
-            f"TOOLCHAIN={args.toolchain}"
+            f"TOOLCHAIN={args.toolchain}",
         ],
         check=True,
     )
