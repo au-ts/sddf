@@ -311,7 +311,10 @@ class sDDFBlk(sDDFDriverClass):
             "num_buffers": num_buffers,
             "id": ch_id,
         }
-        return ConfigStruct("blk_connection_resource_t", fields=fields)
+        return ConfigStruct(
+            type_name="blk_connection_resource_t",
+            fields=fields,
+        )
 
     def blk_driver_config_factory(
         self,
@@ -321,7 +324,7 @@ class sDDFBlk(sDDFDriverClass):
     ) -> ConfigStruct:
         fields = {"magic": magic, "virt": virt_connection}
         return ConfigStruct(
-            "blk_driver_config_t",
+            type_name="blk_driver_config_t",
             target_file=driver_pd.prog_image,
             section_name="blk_driver_config",
             fields=fields,
@@ -340,7 +343,10 @@ class sDDFBlk(sDDFDriverClass):
             ),
             "partition": partition_no,
         }
-        return ConfigStruct("blk_virt_client_t", fields=fields)
+        return ConfigStruct(
+            type_name="blk_virt_client_t",
+            fields=fields,
+        )
 
     def blk_virt_driver_config_factory(
         self, driver_conn: ConfigStruct, data_map: Map
@@ -354,7 +360,10 @@ class sDDFBlk(sDDFDriverClass):
                 RegionResourceFactory(data_map), data_map.mr.paddr
             ),
         }
-        return ConfigStruct("blk_virt_client_t", fields=fields)
+        return ConfigStruct(
+            type_name="blk_virt_client_t",
+            fields=fields,
+        )
 
     def blk_virt_config_factory(
         self,
@@ -371,7 +380,7 @@ class sDDFBlk(sDDFDriverClass):
             "clients": virt_client_config_protos,
         }
         return ConfigStruct(
-            "blk_virt_config_t",
+            type_name="blk_virt_config_t",
             target_file=virt_pd.prog_image,
             section_name="blk_virt_config",
             fields=fields,
@@ -390,7 +399,7 @@ class sDDFBlk(sDDFDriverClass):
             "data": RegionResourceFactory(data_map),
         }
         return ConfigStruct(
-            "blk_client_config_t",
+            type_name="blk_client_config_t",
             target_file=client_pd.prog_image,
             section_name="blk_client_config",
             fields=fields,
