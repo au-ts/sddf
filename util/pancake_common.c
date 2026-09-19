@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sddf/util/pancake_common.h>
 #include <sddf/util/printf.h>
@@ -40,6 +41,15 @@ void cml_clear(void)
      * and this function should not be called
      */
     assert(false);
+}
+
+void *cml_install(uint8_t *src, size_t len, uint8_t *dest) {
+    sddf_dprintf("Trying to install code.\n");
+    /* trap because sddf components are statically compiled,
+     * and this function should not be called
+     */
+    assert(false);
+    return NULL;
 }
 #endif
 
