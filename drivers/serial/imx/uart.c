@@ -10,7 +10,7 @@
 #include <sddf/serial/config.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <uart.h>
+#include "uart.h"
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 

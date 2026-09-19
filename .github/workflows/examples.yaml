@@ -23,6 +23,7 @@ env:
   MICROKIT_VERSION: 2.3.0
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.3.0/
   SDFGEN_VERSION: 0.35.0
+  CAKE_JOB_ID: 3440
 
 jobs:
   build_linux_x86_64:
@@ -51,6 +52,39 @@ jobs:
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
 
+  build_pancake_linux_x86_64:
+    name: Build Pancake (Linux x86-64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Download Microkit SDK
+        run: |
+          wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
+          tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
+      - name: Install dependencies (via apt)
+        run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
+      - name: Setup pyenv
+        run: |
+          python3 -m venv venv
+          ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+        with:
+          path: systems-ci
+      - name: Setup Pancake compiler
+        run: |
+          wget https://cakeml.org/regression/artefacts/${{ env.CAKE_JOB_ID }}/cake-x64-64.tar.gz
+          tar -xf cake-x64-64.tar.gz
+          cd cake-x64-64
+          make
+          echo "$(pwd):$PATH" >> $GITHUB_PATH
+      - name: Build examples
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --pancake --examples=serial
+        shell: bash
+        env:
+          PYTHON: ${{ github.workspace }}/venv/bin/python
+
   build_linux_x86_64_nix:
     name: Build (Linux x86-64 Nix)
     runs-on: [self-hosted, Linux, X64]
@@ -71,6 +105,31 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: loader-images
+          path: |
+            ci_build/**/loader.img
+            ci_build/**/sel4_32.elf
+          if-no-files-found: error
+
+  build_pancake_linux_x86_64_nix:
+    name: Build Pancake (Linux x86-64 Nix)
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+        with:
+          path: systems-ci
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py $MICROKIT_SDK $(nproc) --pancake --example=serial'
+      - name: Archive image artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: loader-images-pancake
           path: |
             ci_build/**/loader.img
             ci_build/**/sel4_32.elf
@@ -147,6 +206,36 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
+  tests_qemu_pancake:
+    name: Tests Pancake (QEMU)
+    runs-on: ubuntu-latest
+    needs: build_pancake_linux_x86_64_nix
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v6
+      - name: Install dependencies (via apt)
+        run: |
+          sudo apt update
+          sudo apt-get install qemu-system-arm qemu-system-misc qemu-system-x86
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+      - name: Download images
+        uses: actions/download-artifact@v8
+        with:
+          name: loader-images-pancake
+          path: ci_build
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          exec ./ci/run.py --only-qemu --examples=serial
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs-qemu-pancake
+          path: ci_logs
+          if-no-files-found: error
+
   tests_hardware:
     name: Tests (hardware)
     runs-on: ubuntu-latest
@@ -163,7 +252,7 @@ jobs:
          }}
     needs: build_linux_x86_64_nix
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -198,6 +287,57 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
+  tests_hardware_pancake:
+    name: Tests Pancake (hardware)
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'au-ts' &&
+              (
+                (github.event_name == 'schedule') ||
+                (github.event_name == 'pull_request' &&
+                  (
+                    (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test')) ||
+                    (github.event.action == 'labeled' && github.event.label.name == 'hardware-test')
+                  )
+                )
+              )
+         }}
+    needs: build_pancake_linux_x86_64_nix
+    concurrency:
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake
+      cancel-in-progress: true
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v6
+      - name: Get machine queue
+        uses: actions/checkout@v6
+        with:
+          repository: seL4/machine_queue
+          path: machine_queue
+      - name: Download images
+        uses: actions/download-artifact@v8
+        with:
+          name: loader-images-pancake
+          path: ci_build
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+      - name: Setup machine queue SSH key
+        run: .github/workflows/setup_ssh_key.sh
+        env:
+          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          # GitHub Actions is broken
+          # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
+          exec ./ci/run.py --no-only-qemu --examples=serial
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs-hardware-pancake
+          path: ci_logs
+          if-no-files-found: error
+
   bench_hardware:
     name: Benchmarks (hardware)
     runs-on: ubuntu-latest
@@ -214,7 +354,7 @@ jobs:
          }}
     needs: build_linux_x86_64_nix
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-bench-${{ github.event.number }}-${{ strategy.job-index }}
+      group: ${{ github.workflow }}-sddf-hardware-bench-${{ github.event.number }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository

@@ -24,4 +24,4 @@ clean::
 	rm -f serial/zynqmp/serial_driver.[do]
 
 clobber::
-	rm -rf serial
+	rm -rf serial_driver.elf serial

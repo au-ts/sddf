@@ -7,6 +7,9 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
+#include <sddf/resources/device.h>
+#include <sddf/serial/config.h>
+#include <sddf/serial/queue.h>
 
 #if defined(CONFIG_PLAT_ZYNQMP)
 /* 100MHz reference UART clock on the zynqmp platform.
@@ -110,3 +113,9 @@
 #define ZYNQMP_UART_IXR_RXEMPTY 0x00000002U /**< RX FIFO empty interrupt. */
 #define ZYNQMP_UART_IXR_RXOVR   0x00000001U /**< RX FIFO trigger interrupt. */
 #define ZYNQMP_UART_IXR_MASK    0x00001FFFU /**< Valid bit mask */
+
+extern __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
+extern __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+extern serial_queue_handle_t rx_queue_handle;
+extern serial_queue_handle_t tx_queue_handle;
+extern volatile uintptr_t uart_base;
