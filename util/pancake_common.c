@@ -43,7 +43,8 @@ void cml_clear(void)
     assert(false);
 }
 
-void *cml_install(uint8_t *src, size_t len, uint8_t *dest) {
+void *cml_install(uint8_t *src, size_t len, uint8_t *dest)
+{
     sddf_dprintf("Trying to install code.\n");
     /* trap because sddf components are statically compiled,
      * and this function should not be called
