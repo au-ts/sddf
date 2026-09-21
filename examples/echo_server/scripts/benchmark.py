@@ -174,7 +174,7 @@ if __name__ == "__main__":
     print("    throughputs: {}".format(", ".join(str(t) for t in args.throughputs)))
     print("    packet sizes: {}".format(", ".join(str(sz) for sz in packet_sizes)))
 
-    heading = "Requested_Throughput,Receive_Throughput,Send_Throughput,Packet_Size,Minimum_RTT,Average_RTT,Maximum_RTT,Stdev_RTT,Median_RTT,Bad_Packets,Idle_Cycles,Total_Cycles\n"
+    heading = "Requested_Throughput,Receive_Throughput,Send_Throughput,Packet_Size,Minimum_RTT,Average_RTT,Maximum_RTT,Stdev_RTT,Median_RTT,Bad_Packets\n"
 
     data = ""
     with open(file, "w") as data_out:
@@ -184,7 +184,10 @@ if __name__ == "__main__":
         try:
             for packet_size in packet_sizes:
                 for throughput in args.throughputs:
-                    row = run_benchmark(args, throughput, packet_size) + "\n"
+                    row = (
+                        run_benchmark(args, throughput, packet_size).rsplit(",", 2)[0]
+                        + "\n"
+                    )
 
                     data_out.write(row)
                     data += row
