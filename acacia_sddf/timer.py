@@ -21,6 +21,8 @@ from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
 from collections import defaultdict
 from typing import List, Dict, Type, Union, Optional
 
+TIMER_PROTOCOL_MAGIC = "sDDF" + chr(6)
+
 
 class sDDFTimer(sDDFDriverClass):
     def __init__(
@@ -32,13 +34,14 @@ class sDDFTimer(sDDFDriverClass):
         cpu: Optional[int] = None,
         driver_elf: str = "timer_driver.elf",
     ):
+        self.cpu = cpu
         driver = ProtectionDomain(
             sdf,
             "timer_driver",
             driver_elf,
             scheduling=SchedulingProperties(driver_prio, passive=True),
+            cpu=self.cpu,
         )
-        self.cpu = cpu
         super().__init__(
             sdf, driver, "timer", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
         )
@@ -50,9 +53,9 @@ class sDDFTimer(sDDFDriverClass):
         # a. channel allowing PPCs -> driver, notifications -> client
         # ... that's it!
         for c in self.clients:
-            if c.priority > self.driver.priority:
+            if c.priority >= self.driver.priority:
                 raise SubsystemBuildError(
-                    f"Client {c} has higher priority than timer driver!"
+                    f"Client {c} has higher or equal priority to timer driver!"
                 )
             ch = Channel(
                 self.sdf,
@@ -77,7 +80,7 @@ class sDDFTimer(sDDFDriverClass):
         create timer_client_config for client_pd with serial id n
         """
         # invariant: this PD only is a client to timer one time.
-        fields = {"magic": "sDDF" + chr(6), "driver_id": driver_id}
+        fields = {"magic": TIMER_PROTOCOL_MAGIC, "driver_id": driver_id}
         return ConfigStruct(
             fields,
             type_name="timer_client_config_t",
@@ -98,7 +101,9 @@ class sDDFTimer(sDDFDriverClass):
         )
         self.driver.add_irq(hpet_irq)
         # paddr=0xFED00000 is a x86 convention for HPET, though it may be different on some machines depending on their BIOS.
-        hpet_regs = MemoryRegion(self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000)
+        hpet_regs = MemoryRegion(
+            self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000, cached=False
+        )
         hpet_regs_map = Map(hpet_regs, 0x5000_0000, "rw")
         self.driver.add_map(hpet_regs_map)
 
