@@ -26,4 +26,4 @@ clean::
 	rm -f serial/pc99/serial_driver.[do]
 
 clobber::
-	rm -rf serial
+	rm -rf serial_driver.elf serial

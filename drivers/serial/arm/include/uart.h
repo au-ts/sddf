@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
+#include <sddf/resources/device.h>
+#include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 
 /*
@@ -86,3 +88,9 @@ typedef volatile struct pl011_uart_regs pl011_uart_regs_t;
 #define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
 #define PL011_IMSC_TX_INT           BIT(5)          /* Tx interrupt when FIFO drops below programmed threshold. */
 #define PL011_IMSC_RX_INT           BIT(4)          /* Rx interrupt when FIFO exceeds programmed threshold. */
+
+extern __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
+extern __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+extern serial_queue_handle_t rx_queue_handle;
+extern serial_queue_handle_t tx_queue_handle;
+extern volatile pl011_uart_regs_t *uart_regs;

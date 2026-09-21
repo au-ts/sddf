@@ -11,6 +11,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
+#include "uart.h"
 
 // TODO: the retain and used attributes are necessary as nothing uses/refers to this section
 // in release mode in this driver.

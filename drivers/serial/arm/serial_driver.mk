@@ -21,5 +21,6 @@ serial/arm:
 
 clean::
 	rm -f serial/arm/serial_driver.[do]
+
 clobber:: clean
 	rm -rf serial_driver.elf serial
