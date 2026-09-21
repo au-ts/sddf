@@ -37,18 +37,22 @@ const uintptr_t hw_rx_ring_vaddr = 0x2400000;
 const uintptr_t hw_tx_ring_paddr = 0x10004000;
 const uintptr_t hw_tx_ring_vaddr = 0x2404000;
 
-#define NUM_TX_DESCS 512llu
-#define NUM_RX_DESCS 512llu
+#define TX_COUNT 512llu
+#define RX_COUNT 512llu
+#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-struct ixgbe_device {
-    volatile ixgbe_adv_rx_desc_t *rx_ring;
-    uint32_t rx_head, rx_tail;
-    volatile ixgbe_adv_tx_desc_t *tx_ring;
-    uint32_t tx_head, tx_tail;
-    net_buff_desc_t rx_descr_mdata[NUM_RX_DESCS];
-    net_buff_desc_t tx_descr_mdata[NUM_TX_DESCS];
-    int init_stage;
-} device;
+typedef struct {
+    uint16_t head; /* index to insert at */
+    uint16_t tail; /* index to remove from */
+    uint16_t capacity; /* capacity of the ring */
+    net_buff_desc_t descr_mdata[MAX_COUNT];
+} hw_ring_t;
+
+int init_stage;
+hw_ring_t rx;
+hw_ring_t tx;
+volatile ixgbe_adv_rx_desc_t *rx_ring;
+volatile ixgbe_adv_tx_desc_t *tx_ring;
 
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
@@ -57,24 +61,14 @@ net_queue_handle_t tx_queue;
 
 volatile eth_regs_t *eth_regs = (volatile eth_regs_t *)0x2000000;
 
-static inline bool hw_tx_ring_empty(void)
+static inline bool hw_ring_empty(hw_ring_t *ring)
 {
-    return device.tx_head == device.tx_tail;
+    return ring->tail - ring->head == 0;
 }
 
-static inline bool hw_tx_ring_full(void)
+static inline bool hw_ring_full(hw_ring_t *ring)
 {
-    return (device.tx_tail + 1) % NUM_TX_DESCS == device.tx_head;
-}
-
-static inline bool hw_rx_ring_empty(void)
-{
-    return device.rx_head == device.rx_tail;
-}
-
-static inline bool hw_rx_ring_full(void)
-{
-    return (device.rx_tail + 1) % NUM_RX_DESCS == device.rx_head;
+    return ring->tail - ring->head + 1 == ring->capacity;
 }
 
 static inline void clear_interrupts(void)
@@ -152,37 +146,39 @@ void rx_provide(void)
     while (reprocess) {
         bool provided = false;
 
-        while (!hw_rx_ring_full() && !net_queue_empty_free(&rx_queue)) {
+        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
 
-            volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
+            uint16_t idx = rx.tail % rx.capacity;
+            volatile ixgbe_adv_rx_desc_t *desc = &rx_ring[idx];
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
             // Section 7.1.5.2.2 - We need a local copy becasue RX descriptor
             // does not contain the address at write-back phase.
-            device.rx_descr_mdata[device.rx_tail] = buffer;
+            rx.descr_mdata[idx] = buffer;
 
-            device.rx_tail = (device.rx_tail + 1) % NUM_RX_DESCS;
+            rx.tail++;
             provided = true;
         }
 
         if (provided) {
             wwmb();
-            eth_regs->rx_dma[0].rdt = device.rx_tail;
+            /* Hardware does not auto-wrap the tail register; modulo manually. */
+            eth_regs->rx_dma[0].rdt = rx.tail % rx.capacity;
         }
 
-        /* Only request a notification from multiplexer if HW ring is empty */
-        if (!hw_rx_ring_full()) {
+        /* Only request a notification from virtualiser if HW ring is empty */
+        if (!hw_ring_full(&rx)) {
             net_request_signal_free(&rx_queue);
         } else {
             net_cancel_signal_free(&rx_queue);
         }
         reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_rx_ring_full()) {
+        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
@@ -192,8 +188,9 @@ void rx_provide(void)
 static void rx_return(void)
 {
     bool packets_transferred = false;
-    while (!hw_rx_ring_empty()) {
-        ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
+    while (!hw_ring_empty(&rx)) {
+        uint16_t idx = rx.head % rx.capacity;
+        ixgbe_adv_rx_desc_wb_t desc = rx_ring[idx].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) {
             // The desciptor hasn't been used by hardware, implying no more available packets received
             break;
@@ -207,18 +204,18 @@ static void rx_return(void)
         // The access to `status_error` field should be ordered before the access to the `length` field
         rrmb();
 
-        net_buff_desc_t buffer = device.rx_descr_mdata[device.rx_head];
+        net_buff_desc_t buffer = rx.descr_mdata[idx];
         buffer.len = desc.upper.length;
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
         packets_transferred = true;
-        device.rx_head = (device.rx_head + 1) % NUM_RX_DESCS;
+        rx.head++;
     }
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
+        sddf_notify(config.virt_rx.id);
     }
 }
 
@@ -228,13 +225,14 @@ void tx_provide(void)
     while (reprocess) {
         bool provided = false;
 
-        while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
+        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
 
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
-            volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
+            uint16_t idx = tx.tail % tx.capacity;
+            volatile ixgbe_adv_tx_desc_t *desc = &tx_ring[idx];
             desc->read.buffer_addr = buffer.io_or_offset;
             desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS
                                     | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | (uint32_t)buffer.len;
@@ -242,22 +240,23 @@ void tx_provide(void)
 
             // Section 7.2.3.2.3 - We need a local copy becasue TX descriptor
             // does not contain the address at write-back phase.
-            device.tx_descr_mdata[device.tx_tail] = buffer;
+            tx.descr_mdata[idx] = buffer;
 
-            device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
+            tx.tail++;
             provided = true;
         }
 
         if (provided) {
             wwmb();
-            eth_regs->tx_dma[0].tdt = device.tx_tail;
-            eth_regs->tx_dma[0].tdt; // Write flush
+            /* Hardware does not auto-wrap the tail register; modulo manually. */
+            eth_regs->tx_dma[0].tdt = tx.tail % tx.capacity;
+            /* eth_regs->tx_dma[0].tdt; // Write flush */
         }
 
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
-        if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
+        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
         }
@@ -267,31 +266,34 @@ void tx_provide(void)
 void tx_return(void)
 {
     bool enqueued = false;
-    while (!hw_tx_ring_empty()) {
+    while (!hw_ring_empty(&tx)) {
         /* Ensure that this buffer has been sent by the device */
-        ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
+        uint16_t idx = tx.head % tx.capacity;
+        ixgbe_adv_tx_desc_wb_t hw_desc = tx_ring[idx].wb;
 
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0)
             break;
 
-        net_buff_desc_t descr_mdata = device.tx_descr_mdata[device.tx_head];
+        net_buff_desc_t descr_mdata = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, descr_mdata);
         assert(!err);
         enqueued = true;
 
-        device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
+        tx.head++;
     }
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
+        sddf_notify(config.virt_tx.id);
     }
 }
 
 void init(void)
 {
-    device.rx_ring = (void *)hw_rx_ring_vaddr;
-    device.tx_ring = (void *)hw_tx_ring_vaddr;
+    rx_ring = (void *)hw_rx_ring_vaddr;
+    tx_ring = (void *)hw_tx_ring_vaddr;
+    rx.capacity = RX_COUNT;
+    tx.capacity = TX_COUNT;
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
@@ -315,7 +317,7 @@ void init(void)
 
 void init_1(void)
 {
-    device.init_stage = 1;
+    init_stage = 1;
     // section 4.6.3.1 - disable interrupts again after reset
     disable_interrupts();
 
@@ -364,7 +366,7 @@ void init_1(void)
         eth_regs->rx_dma[0].srrctl |= IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF | IXGBE_SRRCTL_DROP_EN;
         eth_regs->rx_dma[0].rdbal = (uint32_t)(hw_rx_ring_paddr & 0xFFFFFFFFull);
         eth_regs->rx_dma[0].rdbah = (uint32_t)(hw_rx_ring_paddr >> 32);
-        eth_regs->rx_dma[0].rdlen = NUM_RX_DESCS * sizeof(ixgbe_adv_rx_desc_t);
+        eth_regs->rx_dma[0].rdlen = rx.capacity * sizeof(ixgbe_adv_rx_desc_t);
         eth_regs->rx_dma[0].rdh = 0;
         eth_regs->rx_dma[0].rdt = 0;
 
@@ -391,7 +393,7 @@ void init_1(void)
         eth_regs->tx_dma[0].tdh = 0;
         eth_regs->tx_dma[0].tdt = 0;
 
-        eth_regs->tx_dma[0].tdlen = NUM_TX_DESCS * sizeof(ixgbe_adv_tx_desc_t);
+        eth_regs->tx_dma[0].tdlen = tx.capacity * sizeof(ixgbe_adv_tx_desc_t);
 
         // Section 8.2.2.10.10
         //   - Bits[6:0]   pthresh: pre-fetch if less than `pthresh` unprocessed descriptors valid
@@ -418,7 +420,7 @@ void init_2(void)
         return;
     }
 
-    device.init_stage = 2;
+    init_stage = 2;
 
     // sleep for 10 seconds. Just stabilize the hardware
     // Well. this ugliness costed us two days of debugging.
@@ -427,7 +429,7 @@ void init_2(void)
 
 void init_3(void)
 {
-    device.init_stage = 3;
+    init_stage = 3;
 
     rx_provide();
     tx_provide();
@@ -435,22 +437,22 @@ void init_3(void)
     enable_interrupts();
 
     LOG_DRIVER("Finish NIC reset\n");
-    device.init_stage = 4;
+    init_stage = 4;
 }
 
 void notified(microkit_channel ch)
 {
     if (ch == timer_config.driver_id) {
-        if (device.init_stage == 0) {
+        if (init_stage == 0) {
             init_1();
-        } else if (device.init_stage == 1) {
+        } else if (init_stage == 1) {
             init_2();
-        } else if (device.init_stage == 2) {
+        } else if (init_stage == 2) {
             init_3();
         }
-    } else if (device.init_stage != 4 && ch == IRQ_CH) {
+    } else if (init_stage != 4 && ch == IRQ_CH) {
         sddf_deferred_irq_ack(ch);
-    } else if (device.init_stage == 4) {
+    } else if (init_stage == 4) {
         if (ch == IRQ_CH) {
             // read-to-clear
             uint32_t cause = eth_regs->eicr;
