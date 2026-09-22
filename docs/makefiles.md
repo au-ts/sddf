@@ -90,6 +90,10 @@ CFLAGS to build and optimise for the board's CPU.
 CFLAGS includes an OPTIMISATION variable; this is set by default to `-O3 -g`,
 but can be overridden on the Make command line.
 
+We specify `-std=gnu17` as fixed C version, as it is both modern but also old
+enough to have broad compiler support (C23 support is still incomplete, and both
+GCC (pre-15) and Clang still default to C17 support).
+
 ### Driver Make Snippets ###
 
 Each driver make snippet (except for Ethernet) generates an ELF file called
