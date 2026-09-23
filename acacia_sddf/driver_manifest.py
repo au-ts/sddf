@@ -12,6 +12,7 @@ class DTSRegion:
     perms: Optional[str] = None
     size: Optional[int] = None
     dt_idx: Optional[int] = None
+    cached: bool = False
 
 
 @dataclass
