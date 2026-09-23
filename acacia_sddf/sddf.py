@@ -133,14 +133,24 @@ class sDDFDriverClass(Subsystem):
                 else:
                     # This is new (or overlapping with a different start)
                     mr = MemoryRegion(
-                        self.sdf, region_name, mr_sz, paddr=d_paddr, cached=False
+                        self.sdf,
+                        region_name,
+                        mr_sz,
+                        paddr=d_paddr,
+                        cached=region.cached,
                     )
             else:
                 # This is a physical region that needs an arbitrary paddr. We make it now
                 # and acacia assigns a paddr upon calling `System.assemble`. We make the
                 # config structs in `generate_config_structs` - Acacia only calls it AFTER
                 # assembling, ensuring that our MRs have a paddr in the config struct.
-                mr = MemoryRegion(self.sdf, region_name, region.size, physical=True)
+                mr = MemoryRegion(
+                    self.sdf,
+                    region_name,
+                    region.size,
+                    physical=True,
+                    cached=region.cached,
+                )
                 d_reg_offset = 0
 
             # Second: set up map
