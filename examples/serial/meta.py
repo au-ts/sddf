@@ -1,14 +1,14 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys, os
 import argparse
-from typing import List
-from dataclasses import dataclass
-from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob
+import os
+import sys
+
+from acacia import DeviceTreeBlob, ProtectionDomain, System
 from acacia.arch import x86_64
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
-from acacia_sddf import sDDFSerial, BOARDS
+from acacia_sddf import BOARDS, sDDFSerial
 
 
 def generate(sdf_file: str, output_dir: str):
@@ -31,7 +31,6 @@ def generate(sdf_file: str, output_dir: str):
 
     sdf.make_config_structs()
     out_file = f"{output_dir}/{sdf_file}"
-    print(f"Saving to {out_file}")
     sdf.write_xml_file(out_file)
 
 

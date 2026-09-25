@@ -7,8 +7,8 @@ from acacia import Arch, aarch64, riscv64, x86_64
 
 @dataclass(frozen=True)
 class DriverDouble:
-    compatible: str
-    node_path: str
+    compatible: str | None
+    node_path: str | None
 
 
 @dataclass
