@@ -16,7 +16,6 @@
 #include "lwip/pbuf.h"
 #include "lwip/ip_addr.h"
 #include "lwip/stats.h"
-
 #include "iperf3_ctrl.h"
 #include "iperf3_app.h"
 #include "iperf3_multi.h"
@@ -496,14 +495,16 @@ void notified(sddf_channel ch)
         pkts_snapshotted = true;
     }
 
-    if (pkts_snapshotted && ctrl.sent_test_end && !pkts_reported) {
+    bool test_over = ctrl.sent_test_end || !ctrl.test_active;
+
+    if (pkts_snapshotted && !pkts_reported && test_over) {
         pkts_reported = true;
         sddf_printf("[pkts] client=%u tx_segs=%u\n", app_config.client_id,
                     (uint32_t)(lwip_stats.tcp.xmit - pkts_segs_start));
     }
 
-    /* Report aggregate (summed across all cores) when TEST_END has been sent */
-    if (bench_snapshotted && ctrl.sent_test_end && !bench_reported) {
+    /* Report aggregate (summed across all cores) once the test is over */
+    if (bench_snapshotted && !bench_reported && test_over) {
         microkit_notify(benchmark_config.stop_ch);
         bench_reported = true;
 

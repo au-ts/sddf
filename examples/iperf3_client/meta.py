@@ -224,12 +224,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, core_dict: dict,
     for i in client_indices:
         client_elf = copy_elf("iperf3_client", "iperf3_client", i)
         client_pd = ProtectionDomain(
-            f"client{i}", client_elf, priority=98, budget=20000,
+            f"client{i}", client_elf, priority=97, budget=20000,
             cpu=get_core(f"client{i}"), stack_size=0x1000000
         )
         copier_elf = copy_elf("network_copy", "network_copy", i)
         copier_pd = ProtectionDomain(
-            f"client{i}_net_copier", copier_elf, priority=97, budget=20000,
+            f"client{i}_net_copier", copier_elf, priority=98, budget=20000,
             cpu=get_core(f"client{i}_net_copier")
         )
         serial_system.add_client(client_pd)

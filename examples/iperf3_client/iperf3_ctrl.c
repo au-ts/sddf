@@ -534,10 +534,21 @@ static void iperf3_server_reset(iperf_ctrl_t *ctrl) {
     for (int s = 0; s < MAX_STREAMS; s++) {
         iperf3_stream_t *st = &ctrl->streams[s];
         if (st->pcb) {
+            /* All four callbacks must go, not just three. tcp_close() only
+             * starts the close - the pcb lives on in FIN_WAIT/LAST_ACK until
+             * the peer responds, and lwip keeps dispatching on it. A late ACK
+             * for data still unacked here would otherwise fire tcp_sent with
+             * the callback_arg we just nulled, and iperf3_stream_sent
+             * dereferences it immediately. */
             tcp_arg(st->pcb, NULL);
             tcp_recv(st->pcb, NULL);
+            tcp_sent(st->pcb, NULL);
             tcp_err(st->pcb, NULL);
-            tcp_close(st->pcb);
+            if (tcp_close(st->pcb) != ERR_OK) {
+                /* close can fail on ERR_MEM; abort rather than drop our only
+                 * reference to a pcb that is still live. */
+                tcp_abort(st->pcb);
+            }
             st->pcb = NULL;
         }
         /* init each stream */
