@@ -101,9 +101,8 @@ class sDDFTimer(sDDFDriverClass):
         )
         self.driver.add_irq(hpet_irq)
         # paddr=0xFED00000 is a x86 convention for HPET, though it may be different on some machines depending on their BIOS.
-        hpet_regs = MemoryRegion(
-            self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000, cached=False
         )
+        hpet_regs = MemoryRegion(self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000, cached=False)
         hpet_regs_map = Map(hpet_regs, 0x5000_0000, "rw")
         self.driver.add_map(hpet_regs_map)
 
