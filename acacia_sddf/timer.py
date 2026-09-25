@@ -1,25 +1,22 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+from typing import Optional
+
 from acacia import (
-    System,
-    Subsystem,
-    ProtectionDomain,
+    IRQ,
     Channel,
+    ConfigStruct,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
+    ProtectionDomain,
     SchedulingProperties,
-    ConfigStruct,
-    IRQ,
     SubsystemBuildError,
+    System,
 )
-import sys, os
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
-from .sddf import sDDFDriverClass, DeviceResourcesFactory, RegionResourceFactory
-from collections import defaultdict
-from typing import List, Dict, Type, Union, Optional
+
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .sddf import sDDFDriverClass
 
 TIMER_PROTOCOL_MAGIC = "sDDF" + chr(6)
 
@@ -101,6 +98,9 @@ class sDDFTimer(sDDFDriverClass):
         )
         self.driver.add_irq(hpet_irq)
         # paddr=0xFED00000 is a x86 convention for HPET, though it may be different on some machines depending on their BIOS.
+        hpet_regs = MemoryRegion(
+            self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000, cached=False
+        )
         hpet_regs = MemoryRegion(
             self.sdf, "hpet_regs", 0x1000, paddr=0xFED00000, cached=False
         )

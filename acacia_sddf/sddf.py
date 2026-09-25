@@ -79,7 +79,7 @@ class sDDFDriverClass(Subsystem):
         self.sddf_driver_config = matching_configs[0]
         self.create_dtb_resources()
 
-    def create_dtb_resources(self) -> ConfigStruct:
+    def create_dtb_resources(self):
         """
         Given the driver PD and the DTB+driver_config we were initialised with,
         create all regions, maps, and IRQs required. Creates a DeviceResources ConfigStruct
@@ -116,7 +116,9 @@ class sDDFDriverClass(Subsystem):
                             f"Region {region} with size={region.size} is not aligned to"
                             f"system page size!"
                         )
-                mr_sz = region.size if region.size is not None else r_sz
+                mr_sz = self.sdf.arch.roundup_to_page(
+                    region.size if region.size is not None else r_sz
+                )
                 d_paddr = self.dtb.get_reg_paddr(self.sdf.arch, self.dtb_node, r_addr)
                 d_reg_offset = r_addr % self.sdf.arch.default_page_size()
 
