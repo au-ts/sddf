@@ -1,10 +1,8 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-import os
-import sys
 from collections import defaultdict
-from typing import Optional, Union, List, Dict
+from typing import Dict, List, Optional
 
 from acacia import (
     Channel,
@@ -20,7 +18,7 @@ from acacia.irq import IrqIoapic
 from acacia.x86 import IOPort
 
 from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
-from .sddf import DeviceResourcesFactory, RegionResourceFactory, sDDFDriverClass
+from .sddf import RegionResourceFactory, sDDFDriverClass
 
 SERIAL_DEFAULT_BEGIN_STR = "Begin input\r\n"
 SERIAL_MAX_BEGIN_STR_LEN = 128
@@ -68,6 +66,10 @@ class sDDFSerial(sDDFDriverClass):
         )
         self.allow_rx = allow_rx
         self.data_size = data_size
+        if not sdf.arch.addr_is_page_aligned(data_size):
+            raise SubsystemBuildError(
+                "Serial data region must be aligned to page size!"
+            )
         self.queue_size = queue_size
         self.enable_color = enable_color
         self.baud_rate = baud_rate

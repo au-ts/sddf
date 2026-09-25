@@ -59,13 +59,13 @@ class __sDDFDriverManifest:
     """
 
     def __init__(self):
-        self.map: dict[type[sDDFDeviceClass], dict[str, sDDFDriverConfig]] = (
+        self.map: dict[type["sDDFDriverClass"], dict[str, sDDFDriverConfig]] = (
             defaultdict(dict)
         )
 
     def add_driver_config(
         self,
-        subsystem_type: type[sDDFDriverConfig],
+        subsystem_type: type["sDDFDriverClass"],
         driver_name: str,
         config: sDDFDriverConfig,
     ):
@@ -81,7 +81,7 @@ class __sDDFDriverManifest:
         return self.map[item]
 
     def get_configs_matching_compatible(
-        self, subsystem_type: type[sDDFDriverConfig], compat: str
+        self, subsystem_type: type["sDDFDriverClass"], compat: str
     ) -> list[sDDFDriverConfig]:
         return [c for c in self.map[subsystem_type].values() if compat in c.compatible]
 
