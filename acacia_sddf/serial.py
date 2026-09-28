@@ -325,7 +325,7 @@ class sDDFSerial(sDDFDriverClass):
         self.client_configs = client_configs
 
     def x86_resources(self):
-        self.add_x86_serial_port()
+        self.add_x86_com1()
 
     def generate_config_structs(self):
         # We've already made our structs, just return them as a list for the serialiser
@@ -456,7 +456,7 @@ class sDDFSerial(sDDFDriverClass):
         )
 
     # x86 Util
-    def add_x86_serial_port(self):
+    def add_x86_com1(self):
         # The serial device is not located on PCIe and the interrupts are
         # conventionally configured by firmware. The IRQ number can be read from
         # Linux or APCI tables.
