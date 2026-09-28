@@ -21,6 +21,7 @@ endif
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
+SDDF_TLSF_MALLOC := 1
 
 # Hack - need better way to configure which driver
 ifeq ($(strip $(NVME)),1)
