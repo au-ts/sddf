@@ -14,6 +14,8 @@
 #include <sel4/sel4_arch/constants.h>
 #include <sddf/util/vspace.h>
 
+#include <sddf/acpi/lib_sddf_uacpi.h>
+
 #include "acpi.h"
 
 uintptr_t remaining_untypeds_vaddr;
@@ -321,6 +323,12 @@ void load_acpi_tables()
 
 void init(void)
 {
+    assert(sddf_uacpi_init(0));
+
+
+    return;
+
+
     // Init the CNode specs that record all the untypeds passed from the capDL initialiser
     /* capDLBootInfo = (capDLBootInfo_t*)bootinfo_remaining_untypeds; */
     capDLBootInfo = bootinfo_post_capdl_untypeds;
