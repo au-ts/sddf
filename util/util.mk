@@ -24,6 +24,11 @@ ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
 					custom_libc/strlen.o custom_libc/strncmp.o custom_libc/memmove.o
 endif
 
+ifeq ($(strip $(SDDF_TLSF_MALLOC)),1)
+	CFLAGS += -I${SDDF}/include/sddf/util/tlsf
+	OBJS_LIBUTIL += tlsf/tlsf.o
+endif
+
 ifeq ($(ARCH),riscv64)
 	CFLAGS += -I${SDDF}/util/custom_libc/riscv64
 endif
@@ -31,7 +36,7 @@ endif
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
 BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
-${ALL_OBJS_LIBUTIL}: |util util/custom_libc
+${ALL_OBJS_LIBUTIL}: |util util/custom_libc util/tlsf
 
 libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
 	${RM} $@
@@ -62,6 +67,9 @@ util:
 	mkdir -p $@
 
 util/custom_libc:
+	mkdir -p $@
+
+util/tlsf:
 	mkdir -p $@
 
 clean::
