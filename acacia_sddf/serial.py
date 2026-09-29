@@ -53,6 +53,10 @@ class sDDFSerial(sDDFDriverClass):
                 virt_rx_prio = virt_tx_prio
             assert driver_prio > virt_rx_prio > 0
 
+        # Data size must be exponent of two
+        if data_size & (data_size - 1) != 0:
+            raise ValueError(f"Virt data size of {data_size} isn't an exponent of 2!")
+
         self.cpu = cpu
         driver = ProtectionDomain(
             sdf,
@@ -125,7 +129,7 @@ class sDDFSerial(sDDFDriverClass):
             driver_tx_queue_mr, Map.Permissions(r=True, w=True)
         )
         driver_tx_data_map = self.driver.create_automap(
-            driver_tx_data_mr, Map.Permissions(r=True, w=True)
+            driver_tx_data_mr, Map.Permissions(r=True, w=False)
         )
         virt_tx_queue_map = self.virt_tx.create_automap(
             driver_tx_queue_mr, Map.Permissions(r=True, w=True)
@@ -164,7 +168,7 @@ class sDDFSerial(sDDFDriverClass):
                 driver_rx_queue_mr, Map.Permissions(r=True, w=True)
             )
             driver_rx_data_map = self.driver.create_automap(
-                driver_rx_data_mr, Map.Permissions(r=True, w=True)
+                driver_rx_data_mr, Map.Permissions(r=True, w=False)
             )
             virt_rx_queue_map = self.virt_rx.create_automap(
                 driver_rx_queue_mr, Map.Permissions(r=True, w=True)
@@ -231,7 +235,7 @@ class sDDFSerial(sDDFDriverClass):
                 tx_queue_mr, Map.Permissions(r=True, w=True)
             )
             virt_tx_tx_data_map = self.virt_tx.create_automap(
-                tx_data_mr, Map.Permissions(r=True, w=True)
+                tx_data_mr, Map.Permissions(r=True, w=False)
             )
             c_tx_queue_map = c.create_automap(
                 tx_queue_mr, Map.Permissions(r=True, w=True)

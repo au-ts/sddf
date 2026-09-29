@@ -48,9 +48,16 @@ class sDDFI2C(sDDFDriverClass):
         cpu: int | None = None,
         virt_elf: str = "i2c_virt.elf",
         driver_elf: str = "i2c_driver.elf",
+        data_size: int = I2C_DATA_SZ,
     ):
         self.sdf = sdf
         self.cpu = cpu
+
+        # Data size must be exponent of two
+        if data_size & (data_size - 1) != 0:
+            raise ValueError(f"Virt data size of {data_size} isn't an exponent of 2!")
+        self.data_size = data_size
+
         driver = ProtectionDomain(
             self.sdf,
             "i2c_driver",
@@ -169,7 +176,9 @@ class sDDFI2C(sDDFDriverClass):
             c_resp_q_mr = MemoryRegion(
                 self.sdf, f"i2c_client_response_{c.name}", 0x1000
             )
-            c_data_mr = MemoryRegion(self.sdf, f"i2c_client_data_{c.name}", I2C_DATA_SZ)
+            c_data_mr = MemoryRegion(
+                self.sdf, f"i2c_client_data_{c.name}", self.data_size
+            )
 
             # Create maps for clients
             c_req_map = c.create_automap(c_req_q_mr, Map.Permissions(r=True, w=True))
