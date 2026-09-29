@@ -145,3 +145,14 @@ inline fun sddf_atoi(1 str)
 
     return sign * (0 - result);
 }
+
+inline fun memset(1 dest, 1 ch, 1 count)
+{
+    while (count != 0) {
+        !st8 dest, ch;
+        count = count - 1;
+        dest = dest + 1;
+    }
+
+    return 0;
+}
