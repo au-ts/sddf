@@ -66,16 +66,13 @@ seL4_Error get_untyped_at_paddr(cnode_specs_t *cnode_specs,
     // Divide untyped to smaller ones
     // TODO: figure out what's the maxinum and minimum bits here
     for (int bits = 63; bits >= 12; bits--) {
-        while (target_paddr - cnode_specs->caps[ut_idx].base_addr >= (1ULL << bits)) {
+        while (cnode_specs->caps[ut_idx].base_addr < target_paddr) {
+            uint64_t base = cnode_specs->caps[ut_idx].base_addr;
+            int align_bits = __builtin_ctzll(base);              // base alignment
+            int gap_bits = 63 - __builtin_clzll(target_paddr - base);  // floor(log2(gap))
+            int bits = MIN(align_bits, gap_bits);
             error = untyped_retype(cnode_specs, ut_idx, seL4_UntypedObject, bits, NULL);
-            if (error != seL4_NoError){
-                sddf_dprintf("Error: failed to divide an untyped(%d)[0x%lx-0x%lx] to a smaller untyped with size_bits=%d\n",
-                             ut_idx,
-                             cnode_specs->caps[ut_idx].base_addr,
-                             cnode_specs->caps[ut_idx].end_addr,
-                             bits);
-                return error;
-            }
+            if (error != seL4_NoError) return error;
         }
     }
 
