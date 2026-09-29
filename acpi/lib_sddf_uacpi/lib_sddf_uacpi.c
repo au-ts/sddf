@@ -7,7 +7,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
 #include <sddf/acpi/lib_sddf_uacpi.h>
+#include <sddf/util/arch_timestamp_counter.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/vspace.h>
 #include <sddf/util/cspace.h>
@@ -93,21 +95,25 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
     return (void *)(ACPI_DIRECT_MAP_BASE + addr);
 }
 
-void uacpi_kernel_unmap(void *addr, uacpi_size len)
-{
-    /* no-op */
-}
-
 void *uacpi_kernel_alloc(uacpi_size size)
 {
-    DEBUG_ACPI("called with size %lu\n", size);
     return tlsf_malloc(heap, size);
 }
 
 void uacpi_kernel_free(void *mem)
 {
-    DEBUG_ACPI("called\n");
     tlsf_free(heap, mem);
+}
+
+uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
+{
+    uint64_t freq = sddf_read_freq();
+    if (!freq) {
+        DEBUG_ACPI_ERR("TSC frequency unavailable, this function will return unimplemented to uACPI\n");
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    return sddf_read_counter() / freq;
 }
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
@@ -121,12 +127,40 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(acpi_rsdp_t));
     ut_cnode = init_args->ut_cnode;
 
-    DEBUG_ACPI("calling uacpi_initialize()\n");
-    uacpi_status status = uacpi_initialize(0);
+    DEBUG_ACPI("Initialising uACPI...\n");
+    /* We don't enter ACPI mode to avoid uACPI from requesting I/O Port mappings.
+     * This is sound because we don't care about any power management or embedded controller stuff. */
+    uint64_t flags = UACPI_FLAG_NO_ACPI_MODE;
+    uacpi_status status = uacpi_initialize(flags);
     if (status != UACPI_STATUS_OK) {
-        DEBUG_ACPI_ERR("Failed to initialise stage 1 of uACPI, error '%s'\n", uacpi_status_to_string(status));
+        DEBUG_ACPI_ERR("Failed to initialise uACPI, error '%s'\n", uacpi_status_to_string(status));
         return false;
     }
+    DEBUG_ACPI("uACPI initialised\n");
+
+    DEBUG_ACPI("Executing DSDT and SSDTs...\n");
+    status = uacpi_namespace_load();
+    if (status != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("Failed to parse and execute all DSDT and SSDT tables, error '%s'\n", uacpi_status_to_string(status));
+        return false;
+    }
+    DEBUG_ACPI("DSDT and SSDTs executed\n");
+
+    DEBUG_ACPI("Initialising objects in namespaces...\n");
+    status = uacpi_namespace_initialize();
+    if (status != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("Failed to initialise all objects in namespaces, error '%s'\n", uacpi_status_to_string(status));
+        return false;
+    }
+    DEBUG_ACPI("Objects in namespaces initialised\n");
+
+    DEBUG_ACPI("Setting interrupt model to I/O APIC...\n");
+    status = uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
+    if (status != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("Failed to set interrupt model to I/O APIC, error '%s'\n", uacpi_status_to_string(status));
+        return false;
+    }
+    DEBUG_ACPI("Interrupt model set to I/O APIC\n");
 
     return true;
 }
