@@ -1,17 +1,29 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys, os
 import argparse
-import struct
 import json
-import subprocess
+import os
 import shutil
-from typing import List, Tuple, Callable, Optional
-from acacia import System, ProtectionDomain, MemoryRegion, Channel, DeviceTreeBlob, Map, x86_64, SchedulingProperties
+import struct
+import subprocess
+import sys
+from typing import Callable, List, Optional, Tuple
+
+from acacia import (
+    Channel,
+    DeviceTreeBlob,
+    Map,
+    MemoryRegion,
+    ProtectionDomain,
+    SchedulingProperties,
+    System,
+    x86_64,
+)
+from acacia.irq import IrqIoapic
+from acacia.x86 import IOPort
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
-from acacia_sddf import BOARDS, sDDFEthernet, sDDFSerial, sDDFTimer
-
+from acacia_sddf import BOARDS, sDDFEthernet, sDDFSerial, sDDFTimer, sDDFLWIP
 
 """
 Below are classes to serialise into custom configuration for the benchmarking component.
@@ -226,50 +238,49 @@ def generate(
         # clock controller. We do not have a clock driver for this platform so the
         # ethernet driver does it directly.
         clock_controller = MemoryRegion(
-            sdf, "clock_controller", 0x10_000, paddr=0x17000000
+            sdf, "clock_controller", 0x10_000, paddr=0x17000000, cached=False
         )
         ethernet.driver.add_map(
-            Map(clock_controller, 0x3000000, perms="rw", cached=False)
+            Map(clock_controller, 0x3000000, "rw")
         )
     elif board.name == "rock3b":
         # For ethernet reset, we need to disable areset_gmac0 which is left high by u-boot
         clock_controller = MemoryRegion(
-            sdf, "clock_controller", 0x10_000, paddr=0xFDD20000
+            sdf, "clock_controller", 0x10_000, paddr=0xFDD20000, cached=False
         )
         ethernet.driver.add_map(
-            Map(clock_controller, 0x3000000, perms="rw", cached=False)
+            Map(clock_controller, 0x3000000, "rw")
         )
     elif board.name == "rpi4b_1gb":
         # Ethernet driver requires timer access to wait for reconfiguration
         timer.add_client(ethernet.driver)
 
-        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000)
-        ethernet.driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
+        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000, cached=False)
+        ethernet.driver.add_map(Map(mbox, 0x3000000, "rw"))
 
     if board.arch == x86_64:
-        hw_net_rings = SystemDescription.MemoryRegion(
-            sdf, "hw_net_rings", 65536, paddr=0x7A000000
+        hw_net_rings = MemoryRegion(
+            sdf, "hw_net_rings", 65536, paddr=0x7A000000, cached=False
         )
-        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
-        ethernet.driver.add_map(hw_net_rings_map)
+        ethernet.driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
 
-        virtio_net_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        virtio_net_regs = MemoryRegion(
+            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000, cached=False
         )
-        virtio_net_regs_map = SystemDescription.Map(
-            virtio_net_regs, 0x6000_0000, "rw", cached=False
+        virtio_net_regs_map = Map(
+            virtio_net_regs, 0x6000_0000, "rw"
         )
         ethernet.driver.add_map(virtio_net_regs_map)
 
-        virtio_net_irq = SystemDescription.IrqIoapic(
+        virtio_net_irq = IrqIoapic(
             ioapic_id=0, pin=11, vector=1, id=16
         )
         ethernet.driver.add_irq(virtio_net_irq)
 
-        pci_config_address_port = SystemDescription.IoPort(0xCF8, 4, 1)
+        pci_config_address_port = IOPort(0xCF8, 4, 1)
         ethernet.driver.add_ioport(pci_config_address_port)
 
-        pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
+        pci_config_data_port = IOPort(0xCFC, 4, 2)
         ethernet.driver.add_ioport(pci_config_data_port)
 
     client0_elf = copy_elf("echo", "echo", 0)
@@ -309,32 +320,19 @@ def generate(
     serial.add_client(client1)
     timer.add_client(client0)
     timer.add_client(client1)
-    net_system.add_client_with_copier(client0, client0_net_copier)
-    net_system.add_client_with_copier(client1, client1_net_copier)
+    ethernet.add_client(client0, copier=client0_net_copier)
+    ethernet.add_client(client1, copier=client1_net_copier)
 
-    client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
-    client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
-
-    # Echo server protection domains
-    child_pds = [
-        uart_driver,
-        serial_virt_tx,
-        ethernet.driver,
-        net_virt_tx,
-        net_virt_rx,
-        client0,
-        client0_net_copier,
-        client1,
-        client1_net_copier,
-        timer_driver,
-    ]
+    # add LWIPs. Don't need to store subsystem object, it registers with Acacia at init
+    sDDFLWIP(ethernet, client0)
+    sDDFLWIP(ethernet, client1)
 
     # Sort pds into cores, ensure all PDs have a core allocation
     pds_per_core = {}
-    for pd in child_pds:
+    for pd in sdf.pds:
         try:
             core = get_core(pd.name)
-        except:
+        except Exception:
             raise ValueError(
                 f"PD {pd.name} is missing from your core allocation configuration file!"
             )
@@ -353,15 +351,13 @@ def generate(
         # Create benchmark and idle PDs for each active core
         core_objs[i]["idle_elf"] = copy_elf("idle", "idle", core)
         core_objs[i]["idle_pd"] = ProtectionDomain(
-            f"bench_idle{core}", core_objs[i]["idle_elf"], priority=1, cpu=core
+            sdf, f"bench_idleself.{core}", core_objs[i]["idle_elf"], priority=1, cpu=core
         )
-        sdf.add_pd(core_objs[i]["idle_pd"])
 
         core_objs[i]["bench_elf"] = copy_elf("benchmark", "benchmark", core)
         core_objs[i]["bench_pd"] = ProtectionDomain(
-            f"bench{core}", core_objs[i]["bench_elf"], priority=254, cpu=core
+            sdf, f"bench{core}", core_objs[i]["bench_elf"], priority=254, cpu=core
         )
-        sdf.add_pd(core_objs[i]["bench_pd"])
 
         # Benchmark PD requires serial output
         serial.add_client(core_objs[i]["bench_pd"])
@@ -374,51 +370,62 @@ def generate(
 
         # Create benchmark to idle init channel
         core_objs[i]["init_ch"] = Channel(
-            core_objs[i]["idle_pd"], core_objs[i]["bench_pd"]
+            sdf,
+            Channel.End(core_objs[i]["idle_pd"]),
+            Channel.End(core_objs[i]["bench_pd"])
         )
-        sdf.add_channel(core_objs[i]["init_ch"])
 
         # Create benchmarking start and stop channels
         if i == 0:
             # First active core is notified by benchmarking client
-            core_objs[i]["start_ch"] = Channel(client0, core_objs[i]["bench_pd"])
-            core_objs[i]["stop_ch"] = Channel(client0, core_objs[i]["bench_pd"])
+            core_objs[i]["start_ch"] = Channel(
+                sdf,
+                Channel.End(client0, can_notify=True),
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+            )
+            core_objs[i]["stop_ch"] = Channel(
+                sdf,
+                Channel.End(client0, can_notify=True),
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+            )
         else:
             # Other cores are notified by benchmark PD on previous core
             core_objs[i]["start_ch"] = Channel(
-                core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"]
+                sdf,
+                Channel.End(core_objs[i - 1]["bench_pd"], can_notify=True),
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
             )
             core_objs[i]["stop_ch"] = Channel(
-                core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"]
+                sdf,
+                Channel.End(core_objs[i - 1]["bench_pd"], can_notify=True),
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
             )
-
-        sdf.add_channel(core_objs[i]["start_ch"])
-        sdf.add_channel(core_objs[i]["stop_ch"])
 
         # Add cycle counter memory region for idle to share counts with benchmarking client
         cycle_counters_mr = MemoryRegion(sdf, f"cycle_counters{core}", 0x1000)
-        core_objs[i]["idle_pd"].add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))
-        client0.add_map(Map(cycle_counters_mr, 0x20_000_000 + 0x1000 * i, perms="r"))
+        core_objs[i]["idle_pd"].add_map(Map(cycle_counters_mr, 0x5_000_000, "rw"))
+        client0.add_map(Map(cycle_counters_mr, 0x20_000_000 + 0x1000 * i, "r"))
 
         # Create configuration structures to be serialised
+        # TODO: replace end ID with explicit `ch_for_pd` call
         core_objs[i]["idle_config"] = BenchmarkIdleConfig(
-            0x5_000_000, core_objs[i]["init_ch"].pd_a_id
+            0x5_000_000, core_objs[i]["init_ch"].end_a.ch_id
         )
         if i == 0:
             # We first create a config for the benchmarking client
             bench_client_config = BenchmarkClientConfig(
-                core_objs[i]["start_ch"].pd_a_id,
-                core_objs[i]["stop_ch"].pd_a_id,
+                core_objs[i]["start_ch"].end_a.ch_id,
+                core_objs[i]["stop_ch"].end_a.ch_id,
                 list(((0x20_000_000 + 0x1000 * i) for i in range(num_cores))),
             )
         else:
             # Then we create the config for the benchmark PD on the previous core
             core_objs[i - 1]["bench_config"] = BenchmarkConfig(
-                core_objs[i - 1]["start_ch"].pd_b_id,
-                core_objs[i]["start_ch"].pd_a_id,
-                core_objs[i - 1]["stop_ch"].pd_b_id,
-                core_objs[i]["stop_ch"].pd_a_id,
-                core_objs[i - 1]["init_ch"].pd_b_id,
+                core_objs[i - 1]["start_ch"].end_b.ch_id,
+                core_objs[i]["start_ch"].edn_a.ch_id,
+                core_objs[i - 1]["stop_ch"].end_b.ch_id,
+                core_objs[i]["stop_ch"].end_a.ch_id,
+                core_objs[i - 1]["init_ch"].end_b.ch_id,
                 core_objs[i - 1]["core"],
                 False,
                 core_objs[i - 1]["children"],
@@ -427,11 +434,11 @@ def generate(
 
     # Finally create the last benchmark PD config
     core_objs[num_cores - 1]["bench_config"] = BenchmarkConfig(
-        core_objs[num_cores - 1]["start_ch"].pd_b_id,
+        core_objs[num_cores - 1]["start_ch"].end_b.ch_id,
         0,
-        core_objs[num_cores - 1]["stop_ch"].pd_b_id,
+        core_objs[num_cores - 1]["stop_ch"].end_b.ch_id,
         0,
-        core_objs[num_cores - 1]["init_ch"].pd_b_id,
+        core_objs[num_cores - 1]["init_ch"].end_b.ch_id,
         core_objs[num_cores - 1]["core"],
         True,
         core_objs[num_cores - 1]["children"],
@@ -443,6 +450,7 @@ def generate(
             "eth_driver.elf", "timer_client_config", "timer_client_ethernet.driver"
         )
 
+    # todo: replace all of these monsters with config structs
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
     update_elf_section(
@@ -470,8 +478,8 @@ def generate(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
         )
 
-    with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.render())
+    sdf.make_config_structs()
+    sdf.write_xml_file(f"{output_dir}/{sdf_file}")
 
 
 # ARM PMU event identifier dictionary:

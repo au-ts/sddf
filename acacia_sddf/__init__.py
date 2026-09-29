@@ -12,3 +12,4 @@ from .net import sDDFEthernet
 from .sddf import sDDFDriverClass
 from .serial import sDDFSerial
 from .timer import sDDFTimer
+from .ipstacks import sDDFLWIP

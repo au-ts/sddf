@@ -121,7 +121,7 @@ BOARDS: list[Board] = [
         serial=DriverDouble("arm,pl011", "pl011@9000000"),
         timer=DriverDouble("arm,armv8-timer", "timer"),
         blk=DriverDouble("", "virtio_mmio@a000200"),
-        ethernet=DriverDouble("", "virtio_mmio@a000000"),
+        ethernet=DriverDouble("virtio,mmio", "virtio_mmio@a000000"),
         i2c=None,
     ),
     Board(
@@ -130,7 +130,7 @@ BOARDS: list[Board] = [
         paddr_top=0xA_0000_000,
         serial=DriverDouble("ns16550a", "soc/serial@10000000"),
         timer=DriverDouble("google,goldfish-rtc", "soc/rtc@101000"),
-        ethernet=DriverDouble("", "soc/virtio_mmio@10001000"),
+        ethernet=DriverDouble("virtio,mmio", "soc/virtio_mmio@10001000"),
         blk=DriverDouble("", "soc/virtio_mmio@10002000"),
         partition=0,
         i2c=None,
