@@ -8,8 +8,55 @@
 #include <uacpi/uacpi.h>
 #include "logging.h"
 
-/* This file contains all the OS functions uACPI expects but we have not implemented. To reduce
- * clutter in lib_sddf_uacpi.c */
+/* This file contains all the OS functions uACPI expects but we have not implemented or the
+ * implementation is very minimal. To reduce clutter in lib_sddf_uacpi.c */
+
+/* Stubs for mutex and spinlock, this is sound as Microkit PDs are single threaded */
+static uint8_t mutex;
+static uint8_t spinlock;
+
+uacpi_handle uacpi_kernel_create_mutex(void)
+{
+    return &mutex;
+}
+
+void uacpi_kernel_free_mutex(uacpi_handle handle)
+{
+}
+
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
+{
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_release_mutex(uacpi_handle handle)
+{
+}
+
+uacpi_thread_id uacpi_kernel_get_thread_id(void)
+{
+    return 0;
+}
+
+uacpi_handle uacpi_kernel_create_spinlock(void)
+{
+    return &spinlock;
+}
+
+void uacpi_kernel_free_spinlock(uacpi_handle handle)
+{
+}
+
+uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle handle)
+{
+    return 0;
+}
+
+void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags cpu_flags)
+{
+}
+
+/* Unimplemented */
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handle *out_handle)
 {
@@ -121,11 +168,6 @@ void uacpi_kernel_sleep(uacpi_u64 msec)
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
 }
 
-void uacpi_kernel_free_mutex(uacpi_handle handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
 uacpi_handle uacpi_kernel_create_event(void)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
@@ -137,12 +179,6 @@ void uacpi_kernel_free_event(uacpi_handle handle)
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
 }
 
-uacpi_thread_id uacpi_kernel_get_thread_id(void)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_THREAD_ID_NONE;
-}
-
 uacpi_interrupt_state uacpi_kernel_disable_interrupts(void)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
@@ -150,17 +186,6 @@ uacpi_interrupt_state uacpi_kernel_disable_interrupts(void)
 }
 
 void uacpi_kernel_restore_interrupts(uacpi_interrupt_state state)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
-uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-void uacpi_kernel_release_mutex(uacpi_handle handle)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
 }
@@ -198,29 +223,6 @@ uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler ha
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
     return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_handle uacpi_kernel_create_spinlock(void)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-
-    return NULL;
-}
-
-void uacpi_kernel_free_spinlock(uacpi_handle handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
-uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return 0;
-}
-
-void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags cpu_flags)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
 }
 
 uacpi_status uacpi_kernel_schedule_work(uacpi_work_type work_type, uacpi_work_handler handle, uacpi_handle ctx)
