@@ -39,6 +39,7 @@ CFLAGS += \
 	-MD \
 	-mstrict-align \
 	-ffreestanding \
+	-std=gnu17 \
 	${OPTIMISATION} \
 	-Wall \
 	${CFLAGS_ARCH} \

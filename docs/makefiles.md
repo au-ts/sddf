@@ -42,7 +42,7 @@ Variables
 
 ### Set by Board snippet ###
 All the `...DRIV_DIR` variables give the name relative to
-`${SDDF}/drivers/`_deviceclass_
+`${SDDF}/drivers/_deviceclass_`.
 
 | Variable         | Purpose                                            |
 |:-----------------|:---------------------------------------------------|
@@ -72,23 +72,24 @@ All the `...DRIV_DIR` variables give the name relative to
 | `LDFLAGS`       | A start at the board-specific flags to `ld` |
 
 
-
-
-
 `common.mk` also generates a file that is named by the hash of toolchain, board,
 and `MICROKIT_SDK`, and adds it as a dependency to all target object files.
 This means that if any of these things change, everything will be rebuilt.
 
 ### Set by the Toolchain make snippet ###
 
-The Toolchain make snippet (for cang or gcc) sets the usual compiler names
-(`CC`, `LD`, `RANLIB` etc.
+The Toolchain make snippet (for clang or gcc) sets the usual compiler names
+(`CC`, `LD`, `RANLIB` etc).
 
 In addition it sets `ARCH` to either `riscv64` or `aarch64`; and sets up the
 CFLAGS to build and optimise for the board's CPU.
 
 CFLAGS includes an OPTIMISATION variable; this is set by default to `-O3 -g`,
 but can be overridden on the Make command line.
+
+We specify `-std=gnu17` as fixed C version, as it is both modern but also old
+enough to have broad compiler support (C23 support is still incomplete, and both
+GCC (pre-15) and Clang still default to C17 support).
 
 ### Driver Make Snippets ###
 

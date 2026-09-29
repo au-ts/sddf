@@ -10,7 +10,8 @@ The seL4 Device Driver Framework (sDDF) aims to provide interfaces and protocols
 for writing and porting device drivers to run as seL4 user level programs.
 
 The sDDF is currently under-going active research and development and is largely
-experimental software.
+experimental software. For more details, please see our [LionsOS Roadmap](
+https://lionsos.org/docs/status_and_roadmap/).
 
 We are working on developing the protocols and interfaces for various device
 classes such as:

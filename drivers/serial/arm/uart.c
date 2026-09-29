@@ -126,7 +126,7 @@ static void uart_setup(void)
     uart_regs->lcr_h |= PL011_LCR_FIFO_EN;
 
     /* Disable parity checking */
-    uart_regs->lcr_h |= PL011_LCR_PARTY_EN;
+    uart_regs->lcr_h &= ~PL011_LCR_PARTY_EN;
 
     /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
     if (config.rx_enabled) {

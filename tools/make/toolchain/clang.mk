@@ -40,6 +40,7 @@ CFLAGS_ARCH += -target $(TARGET)
 CFLAGS += \
 	-MD \
 	-ffreestanding \
+	-std=gnu17 \
 	${CFLAGS_ARCH} \
 	${OPTIMISATION} \
 	-Wall \
