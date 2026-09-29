@@ -51,8 +51,8 @@ class sDDFDriverClass(Subsystem):
         # make sure compatible matches!
         if dev_compatible not in (a_c := self.dtb.get_compatible(target_node)):
             raise OSError(
-                f"Target node {dev_dt_path} has compatible {a_c}... "
-                f"doesn't match expected {dev_compatible}!"
+                f"Target node {dev_dt_path} has compatible '{a_c}'... "
+                f"doesn't match expected options '{dev_compatible}'!"
             )
 
         # check if DTB node is "okay" if it has a status
