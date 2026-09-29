@@ -204,8 +204,32 @@ inline fun serial_enqueue(1 queue_handle, 1 character)
     return 0;
 }
 
-// TODO
-// inline fun serial_enqueue_local(1 queue_handle, 1 local_tail, 1 character)
+/**
+ * Enqueue a character locally into a queue. Update a local tail variable so the
+ * character is not visible to the consumer. This function should only be called
+ * by the PRODUCER of the queue.
+ *
+ * @param queue_handle queue to enqueue into.
+ * @param local_tail value of the tail to be used and incremented.
+ * @param character character to be enqueued.
+ *
+ * @return {-1, _} when queue is full, {0, local_tail} on success
+ * and the variable local_tail should be updated.
+ */
+inline fun {1, 1} serial_enqueue_local(1 queue_handle, 1 local_tail, 1 character)
+{
+    var is_full = serial_queue_full(queue_handle, local_tail);
+    if (is_full) {
+        return <-1, 0>;
+    }
+
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var pos = local_tail & (capacity - 1);
+    var data_region = serial_queue_get_data_region(queue_handle);
+    !st8 data_region + pos, character;
+
+    return <0, local_tail + 1>;
+}
 
 /**
  * Dequeue a character from a queue. Update the shared head so the removal of
@@ -242,7 +266,25 @@ inline fun {1, 1} serial_dequeue(1 queue_handle)
 
 // TODO
 // inline fun {1, 1} serial_dequeue_locals(1 queue_handle, 1 local_head)
-// inline fun serial_update_shared_tail(1 queue_handle, 1 local_tail)
+
+/**
+ * Update the value of the tail in the shared data structure to make locally
+ * enqueued data visible. This function should only be called by the PRODUCER of
+ * the queue.
+ *
+ * @param queue_handle queue to update.
+ * @param local_tail tail which points to the last character enqueued.
+ */
+inline fun serial_update_shared_tail(1 queue_handle, 1 local_tail)
+{
+    /* The store-release will synchronise with load-acquires by the CONSUMER of the queue. */
+    THREAD_MEMORY_RELEASE();
+    serial_queue_set_tail(queue_handle, local_tail);
+
+    return 0;
+}
+
+// TODO
 // inline fun serial_update_shared_head(1 queue_handle, 1 local_tail)
 // inline fun serial_queue_contiguous_length(1 queue_handle)
 // inline fun serial_queue_free(1 queue_handle)
