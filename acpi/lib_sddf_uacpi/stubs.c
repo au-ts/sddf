@@ -11,6 +11,11 @@
 /* This file contains all the OS functions uACPI expects but we have not implemented or the
  * implementation is very minimal. To reduce clutter in lib_sddf_uacpi.c */
 
+void uacpi_kernel_unmap(void *addr, uacpi_size len)
+{
+    /* no-op */
+}
+
 /* Stubs for mutex and spinlock, this is sound as Microkit PDs are single threaded */
 static uint8_t mutex;
 static uint8_t spinlock;
@@ -147,12 +152,6 @@ uacpi_status uacpi_kernel_io_write16(uacpi_handle handle, uacpi_size offset, uac
 }
 
 uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uacpi_u32 in_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
     return UACPI_STATUS_UNIMPLEMENTED;
