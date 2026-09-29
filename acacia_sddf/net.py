@@ -1,30 +1,27 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import secrets
+from dataclasses import dataclass
+from typing import Dict, List, Optional
+
 from acacia import (
-    System,
-    Subsystem,
-    ProtectionDomain,
     Channel,
+    ConfigStruct,
     Map,
     MemoryRegion,
-    DTBNode,
-    DeviceTreeBlob,
+    ProtectionDomain,
     SchedulingProperties,
-    ConfigStruct,
     SubsystemBuildError,
-)
-import secrets
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-from .driver_manifest import sDDFDriverManifest, sDDFDriverConfig, DTSIRQ, DTSRegion
-from .sddf import (
-    sDDFDriverClass,
-    DeviceResourcesFactory,
-    RegionResourceFactory,
-    DeviceRegionResourceFactory,
+    System,
 )
 
+from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .sddf import (
+    DeviceRegionResourceFactory,
+    RegionResourceFactory,
+    sDDFDriverClass,
+)
 
 NET_MAGIC = "sDDF" + chr(0x5)
 NET_BUFFER_SIZE = 2048
@@ -74,7 +71,7 @@ class sDDFEthernet(sDDFDriverClass):
         rx_dma_mr: Optional[MemoryRegion] = None,
         virt_tx_elf: str = "net_virt_tx.elf",
         virt_rx_elf: str = "net_virt_rx.elf",
-        driver_elf: str = "net_driver.elf",
+        driver_elf: str = "ethernet_driver.elf",
         # TODO: add automated vswitch handling?
         vswitch: Optional[ProtectionDomain] = None,
     ):
@@ -103,7 +100,7 @@ class sDDFEthernet(sDDFDriverClass):
 
         driver = ProtectionDomain(
             sdf,
-            "net_driver",
+            "ethernet_driver",
             driver_elf,
             scheduling=SchedulingProperties(driver_prio, budget=100, period=400),
             cpu=self.cpu,
@@ -125,19 +122,19 @@ class sDDFEthernet(sDDFDriverClass):
         self.virt_tx_config = None
         self.vswitch_config = None
 
-        # Driver <-> virt_rx / virt_tx connections.
+        # Driver-virt connections.
         self.driver_config_virt_rx = None
         self.driver_config_virt_tx = None
         self.virt_rx_driver_conn = None
         self.virt_tx_driver_conn = None
 
-        # Deferred pieces for virt_rx (driver/data/metadata + clients).
+        # Deferred pieces for virt_rx
         self.virt_rx_data_map = None
         self.virt_rx_meta_map = None
         self.virt_rx_client_protos = []
         self.virt_rx_num_clients = 0
 
-        # Deferred pieces for virt_tx (driver conn + clients).
+        # Deferred pieces for virt_tx
         self.virt_tx_client_protos = []
         self.virt_tx_num_clients = 0
 
@@ -168,8 +165,6 @@ class sDDFEthernet(sDDFDriverClass):
             scheduling=SchedulingProperties(virt_rx_prio),
             cpu=self.cpu,
         )
-
-    # ### public API ###
 
     def add_client(
         self,
@@ -270,7 +265,6 @@ class sDDFEthernet(sDDFDriverClass):
             )
         self.acl_rules.append((client0.name, client1.name, zero_to_one, one_to_zero))
 
-    # ### connection phase ###
 
     def connect_clients(self):
         if len(self.clients) == 0:
@@ -709,7 +703,6 @@ class sDDFEthernet(sDDFDriverClass):
         )
         return server_conn, client_conn
 
-    # ### deferred config assembly (needs assigned paddrs) ###
 
     def generate_config_structs(self):
         virt_rx_clients = [
@@ -757,7 +750,7 @@ class sDDFEthernet(sDDFDriverClass):
             "num_buffers": num_buffers,
             "id": ch_id,
         }
-        return ConfigStruct("net_connection_resource_t", fields=fields)
+        return ConfigStruct(fields, "net_connection_resource_t")
 
     def net_driver_config_factory(
         self, virt_rx_conn: ConfigStruct, virt_tx_conn: ConfigStruct
@@ -768,10 +761,10 @@ class sDDFEthernet(sDDFDriverClass):
             "virt_tx": virt_tx_conn,
         }
         return ConfigStruct(
+            fields,
             "net_driver_config_t",
             target_file=self.driver.prog_image,
             section_name="net_driver_config",
-            fields=fields,
         )
 
     def net_virt_rx_client_config_factory(
@@ -782,7 +775,7 @@ class sDDFEthernet(sDDFDriverClass):
             "mac_addrs": mac_addrs,
             "num_macs": num_macs,
         }
-        return ConfigStruct("net_virt_rx_client_config_t", fields=fields)
+        return ConfigStruct(fields, "net_virt_rx_client_config_t")
 
     def net_virt_rx_config_factory(
         self,
@@ -803,10 +796,10 @@ class sDDFEthernet(sDDFDriverClass):
             "num_clients": num_clients,
         }
         return ConfigStruct(
+            fields,
             "net_virt_rx_config_t",
             target_file=self.virt_rx.prog_image,
             section_name="net_virt_rx_config",
-            fields=fields,
         )
 
     def net_virt_tx_client_config_factory(
@@ -832,7 +825,7 @@ class sDDFEthernet(sDDFDriverClass):
             "regions": region_structs,
             "num_regions": num_regions,
         }
-        return ConfigStruct("net_virt_tx_client_config_t", fields=fields)
+        return ConfigStruct(fields, "net_virt_tx_client_config_t")
 
     def net_virt_tx_config_factory(
         self,
@@ -847,10 +840,10 @@ class sDDFEthernet(sDDFDriverClass):
             "num_clients": num_clients,
         }
         return ConfigStruct(
+            fields,
             "net_virt_tx_config_t",
             target_file=self.virt_tx.prog_image,
             section_name="net_virt_tx_config",
-            fields=fields,
         )
 
     def net_vswitch_port_config_factory(
@@ -863,7 +856,7 @@ class sDDFEthernet(sDDFDriverClass):
             "mac_addr": mac_addr,
             "acl": acl,
         }
-        return ConfigStruct("net_vswitch_port_config_t", fields=fields)
+        return ConfigStruct(fields, "net_vswitch_port_config_t")
 
     def net_vswitch_config_factory(
         self,
@@ -878,10 +871,10 @@ class sDDFEthernet(sDDFDriverClass):
             "buffer_metadata": RegionResourceFactory(buffer_meta_map),
         }
         return ConfigStruct(
+            fields,
             "net_vswitch_config_t",
             target_file=self.vswitch.prog_image,
             section_name="net_vswitch_config",
-            fields=fields,
         )
 
     def net_copy_config_factory(
@@ -901,10 +894,10 @@ class sDDFEthernet(sDDFDriverClass):
             "client_data": RegionResourceFactory(client_data_map),
         }
         return ConfigStruct(
+            fields,
             "net_copy_config_t",
             target_file=copier_pd.prog_image,
             section_name="net_copy_config",
-            fields=fields,
         )
 
     def net_client_config_factory(
@@ -939,10 +932,10 @@ class sDDFEthernet(sDDFDriverClass):
             "mac_addr": mac_addr,
         }
         return ConfigStruct(
+            fields,
             "net_client_config_t",
             target_file=client_pd.prog_image,
             section_name="net_client_config",
-            fields=fields,
         )
 
     # ### misc helpers ###
@@ -971,6 +964,18 @@ add_driver_config(
     sDDFDriverConfig(
         compatible="amlogic,meson-g12a-dwmac",
         regions=[DTSRegion("regs", "rw", 4096, 0)],
+        irqs=[DTSIRQ(0)],
+    ),
+)
+
+add_driver_config(
+    "virtio,mmio",
+    sDDFDriverConfig(
+        compatible="virtio,mmio",
+        regions=[
+            DTSRegion("regs", "rw", 4096, 0),
+            DTSRegion("hw_ring_buffer", size=65536, cached=True)
+        ],
         irqs=[DTSIRQ(0)],
     ),
 )
