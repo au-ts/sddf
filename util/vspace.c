@@ -82,7 +82,7 @@ bool map_memory_region(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t si
 {
     assert(PAGE_OFFSET(paddr) == PAGE_OFFSET(vaddr));
 
-    sddf_dprintf("map 0x%lx-0x%lx to 0x%lx\n", paddr, paddr + size, vaddr);
+    // sddf_dprintf("map 0x%lx-0x%lx to 0x%lx\n", paddr, paddr + size, vaddr);
     uintptr_t mapped_size = 0;
     uintptr_t paddr_start = ROUND_DOWN(paddr, PAGE_SIZE);
     uintptr_t vaddr_start = ROUND_DOWN(vaddr, PAGE_SIZE);
