@@ -22,6 +22,9 @@ static tlsf_t heap;
 
 static cnode_specs_t *ut_cnode;
 
+/* We map physical memory with vaddr as ACPI_DIRECT_MAP_BASE + requested paddr
+ * so that we don't have to unmap it and do cap clean ups, since we will tear
+ * everything down by the end anyways. */
 #define ACPI_DIRECT_MAP_BASE BIT(32)
 #define MAX_PADDR_MAPPED 1024
 static uint64_t paddr_mapped[MAX_PADDR_MAPPED];
@@ -105,14 +108,6 @@ void uacpi_kernel_free(void *mem)
 {
     DEBUG_ACPI("called\n");
     tlsf_free(heap, mem);
-}
-
-static uint8_t mutex;
-
-uacpi_handle uacpi_kernel_create_mutex(void)
-{
-    DEBUG_ACPI("called\n");
-    return &mutex;
 }
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
