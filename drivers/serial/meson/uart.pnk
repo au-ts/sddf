@@ -12,7 +12,7 @@
 #define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
 #define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
 
-#define RX_ENABLED             pnk_mem(1024)
+#define RX_ENABLED             pnk_mem(6)
 
 #define WFIFO_OFFSET        0
 #define RFIFO_OFFSET        4
