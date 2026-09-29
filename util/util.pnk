@@ -118,12 +118,12 @@ inline fun sddf_atoi(1 str)
     var sign = 1;
     var ch = 0;
     !ld8 ch, str;
-    var is_plus = ch == 43;
-    if (is_plus) {
+    /* ch == '+' */
+    if (ch == 43) {
         str = str + 1;
     } else {
-        var is_minus = ch == 45;
-        if (is_minus) {
+        /* ch == '-' */
+        if (ch == 45) {
             sign = -1;
             str = str + 1;
         }
