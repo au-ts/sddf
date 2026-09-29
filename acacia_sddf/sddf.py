@@ -111,7 +111,7 @@ class sDDFDriverClass(Subsystem):
                     if r_sz < region.size:
                         raise RuntimeError()  # todo
 
-                    if (region.size & (self.sdf.arch.default_page_size() - 1)) != 0:
+                    if not self.sdf.arch.addr_is_page_aligned(region.size):
                         raise RuntimeError(
                             f"Region {region} with size={region.size} is not aligned to"
                             f"system page size!"
@@ -120,7 +120,7 @@ class sDDFDriverClass(Subsystem):
                     region.size if region.size is not None else r_sz
                 )
                 d_paddr = self.dtb.get_reg_paddr(self.sdf.arch, self.dtb_node, r_addr)
-                d_reg_offset = r_addr % self.sdf.arch.default_page_size()
+                d_reg_offset = r_addr % self.sdf.arch.default_page_size_bytes()
 
                 # Check if this page is shared (i.e. a matching region is already existing).
                 # If regions overlap but don't have the same start, we do nothing and let microkit
