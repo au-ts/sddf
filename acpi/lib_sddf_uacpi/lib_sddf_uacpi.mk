@@ -27,11 +27,15 @@ LIB_SDDF_UACPI_SOURCES := $(wildcard $(UACPI_SRC_DIR)/*.c)
 # Remove UACPI_SRC_DIR prefix as we prefer the unprefixed form
 LIB_SDDF_UACPI_SOURCES := $(subst $(UACPI_SRC_DIR)/,,$(LIB_SDDF_UACPI_SOURCES))
 
-lib_sddf_uacpi.a: lib_sddf_uacpi_out/lib_sddf_uacpi.o $(addprefix lib_sddf_uacpi_out/, $(LIB_SDDF_UACPI_SOURCES:.c=.o))
+lib_sddf_uacpi.a: lib_sddf_uacpi_out/lib_sddf_uacpi.o lib_sddf_uacpi_out/stubs.o $(addprefix lib_sddf_uacpi_out/, $(LIB_SDDF_UACPI_SOURCES:.c=.o))
 	$(AR) crv $@ $^
 	$(RANLIB) $@
 
 lib_sddf_uacpi_out/lib_sddf_uacpi.o: $(LIB_SDDF_UACPI_DIR)/lib_sddf_uacpi.c | $(SDDF_LIBC_INCLUDE)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
+
+lib_sddf_uacpi_out/stubs.o: $(LIB_SDDF_UACPI_DIR)/stubs.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
 
