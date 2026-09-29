@@ -137,6 +137,7 @@ inline fun sddf_atoi(1 str)
             break;
         }
 
+        /* ch - '0' */
         var digit = ch - 48;
         result = result * 10;
         result = result - digit;
