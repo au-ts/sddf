@@ -12,7 +12,7 @@
 #define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
 #define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
 
-#define RX_ENABLED             pnk_mem(1024)
+#define RX_ENABLED             pnk_mem(6)
 
 #define PL011_DR            0   /* 0x000 Data Register */
 #define PL011_RSR_ECR       4   /* 0x004 Receive Status Register/Error Clear Register */

@@ -24,14 +24,14 @@ void init(void)
     pnk_mem[3] = config.tx.id;
     pnk_mem[4] = (uintptr_t)&rx_queue_handle;
     pnk_mem[5] = (uintptr_t)&tx_queue_handle;
-    pnk_mem[1024] = config.rx_enabled;
-    pnk_mem[1025] = REG_IO_WIDTH;
-    pnk_mem[1026] = REG_SHIFT;
-    pnk_mem[1027] = UART_DW_APB_REGISTERS;
+    pnk_mem[6] = config.rx_enabled;
+    pnk_mem[7] = REG_IO_WIDTH;
+    pnk_mem[8] = REG_SHIFT;
+    pnk_mem[9] = UART_DW_APB_REGISTERS;
 #if defined(CONFIG_PLAT_HIFIVE_P550)
-    pnk_mem[1028] = 1;
+    pnk_mem[10] = 1;
 #else
-    pnk_mem[1028] = 0;
+    pnk_mem[10] = 0;
 #endif /* CONFIG_PLAT_HIFIVE_P550 */
 
     cml_main();

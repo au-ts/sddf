@@ -12,11 +12,11 @@
 #define SERIAL_RX_QUEUE_HANDLE pnk_mem(4)
 #define SERIAL_TX_QUEUE_HANDLE pnk_mem(5)
 
-#define RX_ENABLED             pnk_mem(1024)
-#define REG_IO_WIDTH           pnk_mem(1025)
-#define REG_SHIFT              pnk_mem(1026)
-#define DW_APB_REGISTERS       pnk_mem(1027)
-#define PLAT_HIFIVE_P550       pnk_mem(1028)
+#define RX_ENABLED             pnk_mem(6)
+#define REG_IO_WIDTH           pnk_mem(7)
+#define REG_SHIFT              pnk_mem(8)
+#define DW_APB_REGISTERS       pnk_mem(9)
+#define PLAT_HIFIVE_P550       pnk_mem(10)
 
 /* These register offsets are given as their offset in terms of reg-io-width;
  * e.g. for reg-io-width of 4 (32 bit accesses) the true offset for 0x1 is 0x4.
