@@ -88,7 +88,7 @@ bool map_memory_region(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t si
     uintptr_t vaddr_start = ROUND_DOWN(vaddr, PAGE_SIZE);
     uintptr_t end_paddr = paddr + size;
     while (paddr_start + mapped_size < end_paddr) {
-        seL4_Error error = retype_and_map_frame(cnode_specs, paddr_start + mapped_size, vaddr_start + mapped_size, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_CanRead);
+        seL4_Error error = retype_and_map_frame(cnode_specs, paddr_start + mapped_size, vaddr_start + mapped_size, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_ReadWrite);
         if (error != seL4_NoError) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return false;
