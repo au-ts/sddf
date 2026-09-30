@@ -76,7 +76,19 @@ void ffifence_seq_cst(unsigned char *c, long clen, unsigned char *a, long alen)
 
 void fficustom_debug_print(unsigned char *c, long clen, unsigned char *a, long alen)
 {
-    const char *strings[] = { "VIRT_RX|LOG: switching to client %ld\n" };
+    const char *strings[] = {
+        "VIRT_RX|LOG: switching to client %ld\n",
+        "UART|LOG: received notification on unexpected channel: %ld\n",
+        "UART|ERROR: Uart device encountered an error with status register %ld\n",
+        "LSR had error bits set %lx\n",
+        "VIRT_RX|LOG: User entered an invalid digit %c\n",
+        "VIRT_RX|LOG: User requested to switch to an invalid client %ld\n",
+        "VIRT_RX|LOG: User entered too many (%ld < ",
+        "%ld) or invalid digit (",
+        "%c)\n",
+        "VIRT_RX|LOG: received notification on unexpected channel: %ld\n",
+        "VIRT_TX|LOG: Received notification from unknown channel %ld\n",
+    };
     if (0 <= clen && clen < (long)ARRAY_SIZE(strings)) {
         sddf_dprintf(strings[clen], alen);
     }

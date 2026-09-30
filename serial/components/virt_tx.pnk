@@ -186,7 +186,7 @@ fun tx_provide(1 ch)
     }
 
     if (active_client == SDDF_SERIAL_MAX_CLIENTS) {
-        debug_print(ch);
+        custom_debug_print(10, ch);
         return 0;
     }
 

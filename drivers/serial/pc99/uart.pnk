@@ -168,7 +168,7 @@ export fun notified(1 ch)
                 handle_irq();
                 sddf_deferred_irq_ack(IRQ_ID);
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }

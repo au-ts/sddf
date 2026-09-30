@@ -250,7 +250,7 @@ export fun notified(1 ch)
             if (ch == RX_CH) {
                 rx_return();
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }

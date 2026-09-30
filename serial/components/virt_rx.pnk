@@ -75,7 +75,7 @@ fun rx_return()
                             transferred = true;
                         }
                     } else {
-                        debug_print(res.1);
+                        custom_debug_print(4, res.1);
                     }
                     reset_state();
                 }
@@ -95,7 +95,7 @@ fun rx_return()
                             transferred = false;
                             custom_debug_print(0, input_number);
                         } else {
-                            debug_print(input_number);
+                            custom_debug_print(5, input_number);
                         }
                         reset_state();
                     }
@@ -111,6 +111,9 @@ fun rx_return()
                         !st8 next_client + next_client_index, res.1;
                         next_client_index = next_client_index + 1;
                     } else {
+                        custom_debug_print(6, next_client_index + 1);
+                        custom_debug_print(7, MAX_CLI_BASE_10);
+                        custom_debug_print(8, res.1);
                         reset_state();
                     }
                 }
@@ -142,7 +145,7 @@ export fun notified(1 ch)
     if (ch == ID) {
         rx_return();
     } else {
-        debug_print(ch);
+        custom_debug_print(9, ch);
     }
 
     return 0;
