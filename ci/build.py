@@ -27,7 +27,8 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
     example_dir = get_example_dir(test_config.example)
 
     if args.pancake:
-        pancake_args = ["PANCAKE_SERIAL_DRIVER=1"]
+        # TODO: simplify external flag for Pancake components
+        pancake_args = ["PANCAKE_SERIAL_DRIVER=1", "PANCAKE_SERIAL_VIRTUALISERS=1"]
     else:
         pancake_args = []
 

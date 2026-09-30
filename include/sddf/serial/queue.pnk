@@ -15,6 +15,9 @@
  * assumed caller.
  */
 
+// sizeof(serial_queue_handle_t)
+#define SERIAL_QUEUE_SIZE 24
+
 // helper functions
 inline fun serial_queue_get_tail(1 queue_handle)
 {

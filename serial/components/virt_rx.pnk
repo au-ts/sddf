@@ -1,0 +1,149 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define RX_QUEUE_HANDLE_DRV pnk_mem(0)
+#define RX_QUEUE_HANDLE_CLI pnk_mem(1)
+#define NEXT_CLIENT         pnk_mem(2)
+#define SWITCH_CHAR         pnk_mem(3)
+#define TERMINATE_NUM_CHAR  pnk_mem(4)
+#define NUM_CLIENTS         pnk_mem(5)
+#define ID                  pnk_mem(6)
+#define CLIENTS             pnk_mem(7)
+
+#define MAX_CLI_BASE_10 4
+#define NORMAL          0
+#define SWITCHED        1
+#define NUMBER          2
+
+var current_mode = NORMAL;
+var current_client = 0;
+var next_client_index = 0;
+
+fun reset_state()
+{
+    var next_client = NEXT_CLIENT;
+
+    memset(next_client, 0, MAX_CLI_BASE_10 + 1);
+    next_client_index = 0;
+    current_mode = NORMAL;
+
+    return 0;
+}
+
+fun rx_return()
+{
+    var rx_queue_handle_drv = RX_QUEUE_HANDLE_DRV;
+    var rx_queue_handle_cli = RX_QUEUE_HANDLE_CLI;
+    var next_client = NEXT_CLIENT;
+    var clients = CLIENTS;
+
+    var transferred = false;
+    var local_tail = serial_queue_get_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE);
+    while (true) {
+        var {1, 1} res = serial_dequeue(rx_queue_handle_drv);
+        if (res.0) {
+            break;
+        }
+
+        var current_mode_val = current_mode;
+        if (current_mode_val == NORMAL) {
+            var switch_char = SWITCH_CHAR;
+            if (res.1 == switch_char) {
+                current_mode = SWITCHED;
+            } else {
+                var {1, 1} res1 = serial_enqueue_local(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE, local_tail, res.1);
+                if (!res1.0) {
+                    local_tail = res1.1;
+                    transferred = true;
+                }
+            }
+        } else {
+            if (current_mode_val == SWITCHED) {
+                var isdigit = sddf_isdigit(res.1);
+                if (isdigit) {
+                    !st8 next_client + next_client_index, res.1;
+                    next_client_index = next_client_index + 1;
+                    current_mode = NUMBER;
+                } else {
+                    var switch_char = SWITCH_CHAR;
+                    if (res.1 == switch_char) {
+                        var {1, 1} res1 = serial_enqueue_local(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE, local_tail, res.1);
+                        if (!res1.0) {
+                            local_tail = res1.1;
+                            transferred = true;
+                        }
+                    } else {
+                        debug_print(res.1);
+                    }
+                    reset_state();
+                }
+            } else {
+                if (res.1 == TERMINATE_NUM_CHAR) {
+                    var input_number = sddf_atoi(next_client);
+                    if (input_number >= 0) {
+                        var num_clients = NUM_CLIENTS;
+                        if (input_number < num_clients) {
+                            if (transferred) {
+                                serial_update_shared_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE, local_tail);
+                                var id = serial_connection_resource_get_id(clients + current_client * SERIAL_CONNECTION_RESOURCE_SIZE);
+                                sddf_notify(id);
+                            }
+                            current_client = input_number;
+                            local_tail = serial_queue_get_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE);
+                            transferred = false;
+                            serial_virt_rx_switch_print(input_number);
+                        } else {
+                            debug_print(input_number);
+                        }
+                        reset_state();
+                    }
+                } else {
+                    var condition = false;
+                    if (next_client_index < MAX_CLI_BASE_10) {
+                        var isdigit = sddf_isdigit(res.1);
+                        if (isdigit) {
+                            condition = true;
+                        }
+                    }
+                    if (condition) {
+                        !st8 next_client + next_client_index, res.1;
+                        next_client_index = next_client_index + 1;
+                    } else {
+                        reset_state();
+                    }
+                }
+            }
+        }
+    }
+
+    serial_update_shared_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE, local_tail);
+    var tail = serial_queue_get_tail(rx_queue_handle_drv);
+    var is_full = serial_queue_full(rx_queue_handle_cli, tail);
+    if (!is_full) {
+        var require_signal = serial_require_consumer_signal(rx_queue_handle_drv);
+        if (require_signal) {
+            serial_cancel_consumer_signal(rx_queue_handle_drv);
+            sddf_notify(ID);
+        }
+    }
+
+    if (transferred) {
+        var id = serial_connection_resource_get_id(clients + current_client * SERIAL_CONNECTION_RESOURCE_SIZE);
+        sddf_notify(id);
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == ID) {
+        rx_return();
+    } else {
+        debug_print(ch);
+    }
+
+    return 0;
+}

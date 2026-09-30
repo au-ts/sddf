@@ -74,6 +74,12 @@ inline fun fence_seq_cst()
     return 0;
 }
 
+inline fun serial_virt_rx_switch_print(client)
+{
+    @serial_virt_rx_switch_print(0, client, 0, 0);
+    return 0;
+}
+
 inline fun sddf_isspace(1 ch)
 {
     return (
