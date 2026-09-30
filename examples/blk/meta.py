@@ -156,7 +156,7 @@ def generate(
     acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=211, stack_size=0x5000)
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
 
-    acpi_bootinfo_post_capdl_untypeds = MemoryRegion(sdf, "bootinfo_post_capdl_untypeds", 0x1000, prefill_bootinfo="post_capdl_untypeds")
+    acpi_bootinfo_post_capdl_untypeds = MemoryRegion(sdf, "bootinfo_post_capdl_untypeds", 0x1000, prefill_bootinfo="post_capdl_bootinfo")
     sdf.add_mr(acpi_bootinfo_post_capdl_untypeds)
     acpi_driver.add_map(Map(acpi_bootinfo_post_capdl_untypeds, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl_untypeds"))
 
