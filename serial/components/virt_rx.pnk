@@ -93,7 +93,7 @@ fun rx_return()
                             current_client = input_number;
                             local_tail = serial_queue_get_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE);
                             transferred = false;
-                            serial_virt_rx_switch_print(input_number);
+                            custom_debug_print(0, input_number);
                         } else {
                             debug_print(input_number);
                         }
