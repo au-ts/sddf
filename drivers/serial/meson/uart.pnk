@@ -192,7 +192,7 @@ fun handle_irq()
         }
 
         if (uart_sr & UART_INTR_ABNORMAL) {
-            debug_print(uart_sr);
+            custom_debug_print(2, uart_sr);
             uart_cr = uart_read_cr();
             uart_write_cr(uart_cr | AML_UART_CLEAR_ERR);
         }
@@ -220,7 +220,7 @@ export fun notified(1 ch)
 
                 rx_return();
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }

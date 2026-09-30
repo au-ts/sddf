@@ -336,7 +336,7 @@ fun handle_irq()
        read LSR for THRE/DR. */
     var line_status = uart_read_reg(UART_LSR);
     if (line_status & (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)) {
-        debug_print(line_status);
+        custom_debug_print(3, line_status);
     }
 
     /* IRQ ID is a priority-based *single* indication, not a bitvector */
@@ -366,7 +366,7 @@ export fun notified(1 ch)
             if (ch == RX_CH) {
                 rx_return();
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }

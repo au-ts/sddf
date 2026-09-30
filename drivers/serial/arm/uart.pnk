@@ -63,11 +63,6 @@
 #define PL011_IMSC_TX_INT           BIT(5)          /* Enable tx interrupt when FIFO drops below programmed threshold. */
 #define PL011_IMSC_RX_INT           BIT(4)          /* Enable rx interrupt when FIFO exceeds programmed threshold. */
 
-/* Masked Interrupt Status Register */
-#define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
-#define PL011_IMSC_TX_INT           BIT(5)          /* Tx interrupt when FIFO drops below programmed threshold. */
-#define PL011_IMSC_RX_INT           BIT(4)          /* Rx interrupt when FIFO exceeds programmed threshold. */
-
 inline fun uart_read_reg(1 offset)
 {
     var reg_addr = UART_REG_BASE + offset;
@@ -249,7 +244,7 @@ export fun notified(1 ch)
                 uart_write_imsc(imsc);
                 rx_return();
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }
