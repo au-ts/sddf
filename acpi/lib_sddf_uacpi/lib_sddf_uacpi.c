@@ -51,7 +51,7 @@ void uacpi_kernel_log(uacpi_log_level log_level, const uacpi_char *s)
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
 {
-    DEBUG_ACPI("called with addr 0x%lx, len 0x%lx\n", addr, len);
+    // DEBUG_ACPI("called with addr 0x%lx, len 0x%lx\n", addr, len);
 
     if (!len) {
         return NULL;
@@ -97,7 +97,11 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
 
 void *uacpi_kernel_alloc(uacpi_size size)
 {
-    return tlsf_malloc(heap, size);
+    void *p = tlsf_malloc(heap, size);
+    if (!p) {
+        DEBUG_ACPI_ERR("out of heap memory, consider increasing ACPI_HEAP_SIZE\n");
+    }
+    return p;
 }
 
 void uacpi_kernel_free(void *mem)
@@ -128,9 +132,9 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     ut_cnode = init_args->ut_cnode;
 
     DEBUG_ACPI("Initialising uACPI...\n");
-    /* We don't enter ACPI mode to avoid uACPI from requesting I/O Port mappings.
-     * This is sound because we don't care about any power management or embedded controller stuff. */
-    uint64_t flags = UACPI_FLAG_NO_ACPI_MODE;
+    /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table
+     * checksum is bad in case the firmware have a bug. */
+    uint64_t flags = 0;
     uacpi_status status = uacpi_initialize(flags);
     if (status != UACPI_STATUS_OK) {
         DEBUG_ACPI_ERR("Failed to initialise uACPI, error '%s'\n", uacpi_status_to_string(status));
@@ -141,7 +145,8 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     DEBUG_ACPI("Executing DSDT and SSDTs...\n");
     status = uacpi_namespace_load();
     if (status != UACPI_STATUS_OK) {
-        DEBUG_ACPI_ERR("Failed to parse and execute all DSDT and SSDT tables, error '%s'\n", uacpi_status_to_string(status));
+        DEBUG_ACPI_ERR("Failed to parse and execute all DSDT and SSDT tables, error '%s'\n",
+                       uacpi_status_to_string(status));
         return false;
     }
     DEBUG_ACPI("DSDT and SSDTs executed\n");
