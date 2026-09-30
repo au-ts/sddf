@@ -156,11 +156,38 @@ inline fun sddf_atoi(1 str)
 
 inline fun memset(1 dest, 1 ch, 1 count)
 {
+    var ret = dest;
+
     while (count != 0) {
         !st8 dest, ch;
         count = count - 1;
         dest = dest + 1;
     }
 
-    return 0;
+    return ret;
+}
+
+inline fun memcpy(1 dest, 1 src, 1 count)
+{
+    var ret = dest;
+
+    while (count != 0) {
+        var ch = 0;
+        !ld8 ch, src;
+        !st8 dest, ch;
+        count = count - 1;
+        src = src + 1;
+        dest = dest + 1;
+    }
+
+    return ret;
+}
+
+inline fun MIN(1 a, 1 b)
+{
+    if (a < b) {
+        return a;
+    }
+
+    return b;
 }

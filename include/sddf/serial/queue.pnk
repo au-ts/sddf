@@ -268,7 +268,7 @@ inline fun {1, 1} serial_dequeue(1 queue_handle)
 }
 
 // TODO
-// inline fun {1, 1} serial_dequeue_locals(1 queue_handle, 1 local_head)
+// inline fun {1, 1} serial_dequeue_local(1 queue_handle, 1 local_head)
 
 /**
  * Update the value of the tail in the shared data structure to make locally
@@ -287,16 +287,181 @@ inline fun serial_update_shared_tail(1 queue_handle, 1 local_tail)
     return 0;
 }
 
-// TODO
-// inline fun serial_update_shared_head(1 queue_handle, 1 local_tail)
-// inline fun serial_queue_contiguous_length(1 queue_handle)
-// inline fun serial_queue_free(1 queue_handle)
-// inline fun serial_queue_contiguous_free(1 queue_handle)
-// inline fun serial_queue_batch(1 queue_handle, 1 num, 1 src)
-// inline fun serial_transfer_all(1 free_queue_handle, 1 active_queue_handle)
-// inline fun serial_transfer_all_colour(1 free_queue_handle,
-//                                       1 active_queue_handle, 1 col_start,
-//                                       1 col_start_len, 1 col_end, 1 col_end_len)
+/**
+ * Update the value of the head in the shared data structure to make local
+ * dequeues visible. This function should only be called by the CONSUMER of the
+ * queue.
+ *
+ * @param queue_handle queue to update.
+ * @param local_head head which points to the next character to dequeue.
+ */
+inline fun serial_update_shared_head(1 queue_handle, 1 local_head)
+{
+    /* The store-release will synchronise with load-acquires by the PRODUCER of the queue. */
+    THREAD_MEMORY_RELEASE();
+    serial_queue_set_head(queue_handle, local_head);
+
+    return 0;
+}
+
+/**
+ * Return the number of bytes of data stored contiguously in the queue from the
+ * head index to either the tail index or the end of the data region. This
+ * function should only be called by the CONSUMER of the queue.
+ *
+ * @param queue_handle queue containing the data.
+ *
+ * @return Number of bytes stored contiguously in the queue.
+ */
+inline fun serial_queue_contiguous_length(1 queue_handle)
+{
+    var head = serial_queue_get_head(queue_handle);
+    var length = serial_queue_length_consumer(queue_handle);
+
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var res = MIN(capacity - (head & (capacity - 1)), length);
+    return res;
+}
+
+/**
+ * Return the number of free bytes remaining in the queue. This is the number of
+ * bytes that can be enqueued until the queue is full. This function should only
+ * be called by the PRODUCER of the queue.
+ *
+ * @param queue_handle queue to be filled with data.
+ *
+ * @return The amount of free space remaining in the queue.
+ */
+inline fun serial_queue_free(1 queue_handle)
+{
+    var length = serial_queue_length_producer(queue_handle);
+
+    var capacity = serial_queue_get_capacity(queue_handle);
+    return capacity - length;
+}
+
+/**
+ * Return the number of bytes that can be copied into the queue contiguously.
+ * This is the number of bytes that can be copied into the queue with a single
+ * call of memcpy. This function should only be called by the PRODUCER of the
+ * queue.
+ *
+ * @param queue_handle queue to be filled with data.
+ *
+ * @return The amount of contiguous free space remaining in the queue.
+ */
+inline fun serial_queue_contiguous_free(1 queue_handle)
+{
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var tail = serial_queue_get_tail(queue_handle);
+    var free = serial_queue_free(queue_handle);
+    var res = MIN(capacity - (tail & (capacity - 1)), free);
+    return res;
+}
+
+/**
+ * Enqueue a buffer of contiguous characters into a queue. This function should
+ * only be called by the PRODUCER of the queue.
+ *
+ * @param queue_handle queue to be filled with data.
+ * @param num number of characters to enqueue.
+ * @param src pointer to characters to be transferred.
+ *
+ * @return Number of characters actually enqueued.
+ */
+inline fun serial_enqueue_batch(1 queue_handle, 1 num, 1 src)
+{
+    var data_region = serial_queue_get_data_region(queue_handle);
+    var tail = serial_queue_get_tail(queue_handle);
+    var capacity = serial_queue_get_capacity(queue_handle);
+    var dst = data_region + (tail & (capacity - 1));
+    var avail = serial_queue_free(queue_handle);
+    var num_prewrap = 0;
+    var num_postwrap = 0;
+
+    num = MIN(num, avail);
+    num_prewrap = serial_queue_contiguous_free(queue_handle);
+    num_prewrap = MIN(num, num_prewrap);
+    num_postwrap = num - num_prewrap;
+
+    memcpy(dst, src, num_prewrap);
+    if (num_postwrap) {
+        memcpy(data_region, src + num_prewrap, num_postwrap);
+    }
+
+    tail = serial_queue_get_tail(queue_handle);
+    serial_update_shared_tail(queue_handle, tail + num);
+
+    return num;
+}
+
+/**
+ * Transfer all data from a consumer queue to a producer queue. Assumes there is
+ * enough free space in the free queue to fit all data in the active queue. This
+ * function should only be called by the CONSUMER of the active queue, and the
+ * PRODUCER of the free queue.
+ *
+ * @param free_queue_handle queue to produce into.
+ * @param active_queue_handle queue to consume.
+ */
+inline fun serial_transfer_all(1 free_queue_handle, 1 active_queue_handle)
+{
+    /* The caller is the consumer of the active queue */
+    var active_capacity = serial_queue_get_capacity(active_queue_handle);
+    var active_head = serial_queue_get_head(active_queue_handle);
+    var active_tail = serial_queue_get_tail(active_queue_handle);
+    THREAD_MEMORY_ACQUIRE();
+    var active_length = active_tail - active_head;
+
+    /* Copy in contiguous chunks */
+    while (active_length) {
+        var active_batch = MIN(active_capacity - (active_head & (active_capacity - 1)), active_length);
+        var active_data_region = serial_queue_get_data_region(active_queue_handle);
+        var src = active_data_region + (active_head & (active_capacity - 1));
+
+        var transferred = serial_enqueue_batch(free_queue_handle, active_batch, src);
+
+        active_head = active_head + active_batch;
+        serial_update_shared_head(active_queue_handle, active_head);
+        /* The load-acquire will be paired with the store-release
+         * in serial_enqueue() or serial_update_shared_tail().
+         */
+        active_tail = serial_queue_get_tail(active_queue_handle);
+        THREAD_MEMORY_ACQUIRE();
+        active_length = active_tail - active_head;
+    }
+
+    return 0;
+}
+
+/**
+ * Transfer all data from a consumer queue to a producer queue, adding colour codes
+ * before and after. Assumes there is enough free space in the free queue to fit
+ * all data in the active. This function should only be called by the CONSUMER
+ * of the active queue, and the PRODUCER of the free queue.
+ *
+ * @param free_queue_handle queue to produce into.
+ * @param active_queue_handle queue to consume.
+ * @param col_start colour code start string.
+ * @param col_start_len length of start string.
+ * @param col_end colour code end string.
+ * @param col_end_len length of end string.
+ */
+inline fun serial_transfer_all_colour(1 free_queue_handle,
+                                      1 active_queue_handle, 1 col_start,
+                                      1 col_start_len, 1 col_end, 1 col_end_len)
+{
+    /* Transfer col_start string */
+    var transferred = serial_enqueue_batch(free_queue_handle, col_start_len, col_start);
+
+    /* Transfer active data */
+    serial_transfer_all(free_queue_handle, active_queue_handle);
+
+    /* Transfer col_end string */
+    transferred = serial_enqueue_batch(free_queue_handle, col_end_len, col_end);
+
+    return 0;
+}
 
 /**
  * Indicate to consumer of the queue that producer requires signalling.
