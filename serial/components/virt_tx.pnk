@@ -1,0 +1,218 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define SDDF_SERIAL_MAX_CLIENTS 64
+#define TX_PENDING_MAX          (SDDF_SERIAL_MAX_CLIENTS + 1)
+#define COLOUR_BEGIN_LEN        5
+#define COLOUR_END_LEN          4
+
+#define TX_QUEUE_HANDLE_DRV        pnk_mem(0)
+#define TX_QUEUE_HANDLE_CLI        pnk_mem(1)
+#define TX_PENDING_CLIENTS_PENDING pnk_mem(2)
+#define TX_PENDING_QUEUE           pnk_mem(3)
+#define ENABLE_COLOUR              pnk_mem(4)
+#define COLOURS                    pnk_mem(5)
+#define COLOURS_ARRAY_SIZE         pnk_mem(6)
+#define COLOUR_END                 pnk_mem(7)
+#define NOTIFY_CLIENT              pnk_mem(8)
+#define ID                         pnk_mem(9)
+#define NUM_CLIENTS                pnk_mem(10)
+#define CLIENTS                    pnk_mem(11)
+
+var tx_pending_tail = 0;
+var tx_pending_head = 0;
+
+fun tx_pending_length()
+{
+    var ret = slow_remainder(TX_PENDING_MAX + tx_pending_tail - tx_pending_head, TX_PENDING_MAX);
+    return ret;
+}
+
+fun tx_pending_push(1 client)
+{
+    var clients_pending = TX_PENDING_CLIENTS_PENDING;
+    var queue = TX_PENDING_QUEUE;
+
+    /* Ensure client is not already pending */
+    var is_clients_pending = 0;
+    !ld8 is_clients_pending, clients_pending + client;
+    if (is_clients_pending) {
+        return 0;
+    }
+
+    /* Ensure the pending queue is not already full */
+
+    !st32 queue + tx_pending_tail * 4, client;
+    !st8 clients_pending + client, true;
+    tx_pending_tail = slow_remainder(tx_pending_tail + 1, TX_PENDING_MAX);
+
+    return 0;
+}
+
+fun tx_pending_pop()
+{
+    var clients_pending = TX_PENDING_CLIENTS_PENDING;
+    var queue = TX_PENDING_QUEUE;
+
+    /* This should only be called when length > 0 */
+
+    var client = 0;
+    !ld32 client, queue + tx_pending_head * 4;
+    !st8 clients_pending + client, false;
+    tx_pending_head = slow_remainder(tx_pending_head + 1, TX_PENDING_MAX);
+
+    return client;
+}
+
+fun process_tx_queue(1 client)
+{
+    var tx_queue_handle_drv = TX_QUEUE_HANDLE_DRV;
+    var tx_queue_handle_cli = TX_QUEUE_HANDLE_CLI;
+    var colours = COLOURS;
+    var colours_array_size = COLOURS_ARRAY_SIZE;
+    var colour_end = COLOUR_END;
+
+    var handle = tx_queue_handle_cli + client * SERIAL_QUEUE_SIZE;
+
+    var head = serial_queue_get_head(handle);
+    var is_empty = serial_queue_empty(handle, head);
+    if (is_empty) {
+        return false;
+    }
+
+    var length = serial_queue_length_consumer(handle);
+    var enable_colour = ENABLE_COLOUR;
+    if (enable_colour) {
+        var colours_index = slow_remainder(client, colours_array_size);
+        var client_colour = 0;
+        !ldw client_colour, colours + colours_index * @biw;
+        length = length + (COLOUR_BEGIN_LEN + COLOUR_END_LEN);
+    }
+
+    /* Not enough space to transmit string to virtualiser. Continue later */
+    var free = serial_queue_free(tx_queue_handle_drv);
+    if (length > free) {
+        /* Request signal from the driver when data has been consumed */
+        serial_request_consumer_signal(tx_queue_handle_drv);
+    }
+
+    /* Re-check free space in case signal was missed */
+    free = serial_queue_free(tx_queue_handle_drv);
+    if (length > free) {
+        tx_pending_push(client);
+        return false;
+    }
+
+    enable_colour = ENABLE_COLOUR;
+    if (enable_colour) {
+        var colours_index = slow_remainder(client, colours_array_size);
+        var client_colour = 0;
+        !ldw client_colour, colours + colours_index * @biw;
+        serial_transfer_all_colour(tx_queue_handle_drv, handle, client_colour, COLOUR_BEGIN_LEN, colour_end, COLOUR_END_LEN);
+    } else {
+        serial_transfer_all(tx_queue_handle_drv, handle);
+    }
+
+    return true;
+}
+
+fun tx_return()
+{
+    var notify_client = NOTIFY_CLIENT;
+    var id = ID;
+    var num_clients = NUM_CLIENTS;
+    var tx_queue_handle_cli = TX_QUEUE_HANDLE_CLI;
+    var clients = CLIENTS;
+
+    var num_pending_tx = tx_pending_length();
+    if (!num_pending_tx) {
+        return 0;
+    }
+
+    memset(notify_client, 0, SDDF_SERIAL_MAX_CLIENTS);
+    var transferred = false;
+    var req = 0;
+    while (req < num_pending_tx) {
+        var client = tx_pending_pop();
+        var res = process_tx_queue(client);
+        !st8 notify_client + client, res;
+        var is_notify_client = 0;
+        !ld8 is_notify_client, notify_client + client;
+        transferred = transferred | is_notify_client;
+        req = req + 1;
+    }
+
+    if (transferred) {
+        sddf_notify(id);
+    }
+
+    var client = 0;
+    while (client < num_clients) {
+        var is_notify_client = 0;
+        !ld8 is_notify_client, notify_client + client;
+        if (is_notify_client) {
+            var require_consumer_signal = serial_require_consumer_signal(tx_queue_handle_cli + client * SERIAL_QUEUE_SIZE);
+            if (require_consumer_signal) {
+                serial_cancel_consumer_signal(tx_queue_handle_cli + client * SERIAL_QUEUE_SIZE);
+                var conn_id = serial_virt_tx_client_config_get_id(clients + client * SERIAL_VIRT_TX_CLIENT_CONFIG_SIZE);
+                sddf_notify(conn_id);
+            }
+        }
+
+        client = client + 1;
+    }
+
+    return 0;
+}
+
+fun tx_provide(1 ch)
+{
+    var active_client = SDDF_SERIAL_MAX_CLIENTS;
+    var num_clients = NUM_CLIENTS;
+    var clients = CLIENTS;
+    var id = ID;
+    var tx_queue_handle_cli = TX_QUEUE_HANDLE_CLI;
+
+    var i = 0;
+    while (i < num_clients) {
+        var conn_id = serial_virt_tx_client_config_get_id(clients + i * SERIAL_VIRT_TX_CLIENT_CONFIG_SIZE);
+        if (ch == conn_id) {
+            active_client = i;
+            break;
+        }
+        i = i + 1;
+    }
+
+    if (active_client == SDDF_SERIAL_MAX_CLIENTS) {
+        debug_print(ch);
+        return 0;
+    }
+
+    var transferred = process_tx_queue(active_client);
+    if (transferred) {
+        sddf_notify(id);
+    }
+
+    if (transferred) {
+        var require_consumer_signal = serial_request_consumer_signal(tx_queue_handle_cli + active_client * SERIAL_QUEUE_SIZE);
+        if (require_consumer_signal) {
+            serial_cancel_consumer_signal(tx_queue_handle_cli + active_client * SERIAL_QUEUE_SIZE);
+            sddf_notify(ch);
+        }
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch)
+{
+    if (ch == ID) {
+        tx_return();
+    } else {
+        tx_provide(ch);
+    }
+
+    return 0;
+}
