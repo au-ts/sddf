@@ -22,3 +22,7 @@ zig-out/
 venv/
 __pycache__
 .*.sw*
+
+# CakeML compiler and microkit
+cake-x64-64/
+microkit-sdk-2.0.1/

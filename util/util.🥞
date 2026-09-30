@@ -1,0 +1,48 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/* Helper constants */
+#define MAX_INT32        4294967295
+#define MAX_INT16        65535
+#define MAX_INT8         255
+
+#define microkit_notify(channel)        \
+  @microkit_notify(0,channel,0,0);     \
+
+#define microkit_deferred_irq_ack(channel)      \
+  @microkit_deferred_irq_ack(0,channel,0,0);   \
+
+#define sddf_irq_ack(channel)    \
+  @sddf_irq_ack(0,channel,0,0);  \
+
+#define sddf_notify(channel)    \
+  @sddf_notify(0,channel,0,0);  \
+
+#define sddf_deferred_notify(channel)   \
+  @sddf_deferred_notify(0,channel,0,0); \
+
+#define cache_clean(start, end)  \
+  @cache_clean(start,0,end,0);   \
+
+#define cache_clean_and_invalidate(start, end)  \
+  @cache_clean_and_invalidate(start,0,end,0);
+
+/* Some helper macros */
+#define pnk_mem_ptr(idx)  (@base + (idx) * @biw)
+#define pnk_mem(idx)      (lds 1 pnk_mem_ptr(idx))
+
+#define get_idx_array(addr, idx)    lds 1 (addr + idx * @biw)
+
+#define THREAD_MEMORY_RELEASE()     \
+  @THREAD_MEMORY_RELEASE(0,0,0,0);  \
+
+#define THREAD_MEMORY_ACQUIRE()     \
+  @THREAD_MEMORY_ACQUIRE(0,0,0,0);  \
+
+#define seL4_SetMR(reg, value)      \
+  @seL4_SetMR(0,reg,0,value);       \
+
+#define debug_print(c, clen, a, alen)   \
+  @debug_print(c,clen,a,alen)

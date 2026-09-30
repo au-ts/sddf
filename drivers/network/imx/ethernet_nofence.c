@@ -121,7 +121,6 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
     d->stat = stat;
 }
 
@@ -169,8 +168,6 @@ static void rx_return(void)
         if (d->stat & RXD_EMPTY) {
             break;
         }
-
-        THREAD_MEMORY_ACQUIRE();
 
         net_buff_desc_t buffer = { d->addr, d->len };
         int err = net_enqueue_active(&rx_queue, buffer);
@@ -225,8 +222,6 @@ static void tx_return(void)
         if (d->stat & TXD_READY) {
             break;
         }
-
-        THREAD_MEMORY_ACQUIRE();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);

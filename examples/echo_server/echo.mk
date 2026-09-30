@@ -22,31 +22,32 @@ REPORT_FILE = report.txt
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
-# Toolchain triples have inconsistent naming, below tries to automatically resolve that
-ifeq ($(strip $(TOOLCHAIN)),)
-	# Get whether the common toolchain triples exist
-	TOOLCHAIN_ARCH_NONE_ELF := $(shell command -v $(ARCH)-none-elf-gcc 2> /dev/null)
-	TOOLCHAIN_ARCH_UNKNOWN_ELF := $(shell command -v $(ARCH)-unknown-elf-gcc 2> /dev/null)
-	# Then check if they are defined and select the appropriate one
-	ifdef TOOLCHAIN_ARCH_NONE_ELF
-		TOOLCHAIN := $(ARCH)-none-elf
-	else ifdef TOOLCHAIN_ARCH_UNKNOWN_ELF
-		TOOLCHAIN := $(ARCH)-unknown-elf
-	else
-$(error "Could not find a $(ARCH) cross-compiler")
-	endif
-endif
-TOOLCHAIN := $(TOOLCHAIN)
+SDDF_CUSTOM_LIBC := 1
 
-CC := $(TOOLCHAIN)-gcc
-# Usually, we use the linker directly. Since we're linking against the libc
-# for the echo server, we want to use the compiler driver so it can add its
-# knowledge of where the libc is located.
-LD := $(CC)
-AS := $(TOOLCHAIN)-as
-AR := $(TOOLCHAIN)-ar
-RANLIB := $(TOOLCHAIN)-ranlib
-OBJCOPY := $(TOOLCHAIN)-objcopy
+export BOARD_DIR
+export ARCH
+
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := clang
+endif
+
+ifeq ($(strip $(TOOLCHAIN)), clang)
+	CC := clang
+	LD := ld.lld
+	AR := llvm-ar
+	RANLIB := llvm-ranlib
+	OBJCOPY := llvm-objcopy
+$(info Using clang compiler toolchain)
+else
+	CC := $(TOOLCHAIN)-gcc
+	LD := $(TOOLCHAIN)-ld
+	AS := $(TOOLCHAIN)-as
+	AR := $(TOOLCHAIN)-ar
+	RANLIB := $(TOOLCHAIN)-ranlib
+	OBJCOPY := $(TOOLCHAIN)-objcopy
+$(info Using gcc compiler toolchain: $(TOOLCHAIN)-gcc)
+endif
+
 DTC := dtc
 PYTHON ?= python3
 
@@ -67,7 +68,7 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mq_evk maaxboard)
 	SERIAL_DRIV_DIR := imx
 	TIMER_DRV_DIR := imx
 	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), imx8mp_evk)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mp_evk imx8mp_iotgate),)
 	DRIV_DIR := dwmac-5.10a
 	SERIAL_DRIV_DIR := imx
 	TIMER_DRV_DIR := imx
@@ -119,30 +120,21 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
+	CFLAGS_ARCH := -mcpu=$(CPU)
+	TARGET := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
-endif
-
-# Echo server example relies on libc functionality, hence only works with GCC
-# instead of LLVM. See README for more details.
-# Additionally, on x86_64 debian/ubuntu the gcc-riscv64-unknown-elf package is distributed
-# without libc. Checks if `picolibc-riscv64-unknown-elf` is installed in that case, and uses it.
-LIBC := $(dir $(realpath $(shell $(CC) --print-file-name libc.a)))
-PICOLIBC := $(dir $(realpath $(shell $(CC) --print-file-name picolibc.specs)))
-ifneq ($(strip $(LIBC)),)
-	LDFLAGS_ARCH += -L$(LIBC)
-	LIBS_ARCH += -lc
-else ifneq ($(strip $(PICOLIBC)),)
-	CFLAGS_ARCH += -specs=picolibc.specs
+	CFLAGS_ARCH := -march=rv64imafdc
+	TARGET := riscv64-none-elf
 else
-	$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
+$(error Unsupported ARCH given)
 endif
 
-# Of note here is that we don't specify -nostdlib, as we want libc.
-# But we don't want crt0, so add -nostartfiles
+ifeq ($(strip $(TOOLCHAIN)), clang)
+	CFLAGS_ARCH += -target $(TARGET)
+endif
+
 CFLAGS := $(CFLAGS_ARCH) \
-	  -nostartfiles \
+	  -nostdlib \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
@@ -150,14 +142,17 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
-	  -I${ECHO_INCLUDE}/lwip \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
+	  -I$(ECHO_INCLUDE)/lwip \
+	  -I$(SDDF)/$(LWIPDIR)/include \
+	  -I$(SDDF)/$(LWIPDIR)/include/ipv4 \
+	  -I$(ECHO_SERVER)/include \
 	  -MD \
 	  -MP
 
-LDFLAGS := $(CFLAGS_ARCH) -nostartfiles -ffreestanding -L$(BOARD_DIR)/lib $(LDFLAGS_ARCH)
-LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group
+CFLAGS += -Wno-tautological-constant-out-of-range-compare # Suppress warning from lwIP
+
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 

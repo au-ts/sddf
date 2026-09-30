@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
+include pancake_config.mk
+
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif

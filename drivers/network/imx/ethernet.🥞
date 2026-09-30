@@ -1,0 +1,366 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define IRQ_CH                  pnk_mem(1)
+#define RX_CH                   pnk_mem(2)
+#define TX_CH                   pnk_mem(3)
+
+#define NET_RX_FREE             pnk_mem(4)
+#define NET_RX_ACTIVE           pnk_mem(5)
+#define NET_RX_CAPACITY         pnk_mem(6)
+#define NET_TX_FREE             pnk_mem(7)
+#define NET_TX_ACTIVE           pnk_mem(8)
+#define NET_TX_CAPACITY         pnk_mem(9)
+
+#define HW_RX_TAIL_SLOT         pnk_mem_ptr(10)
+#define HW_RX_HEAD_SLOT         pnk_mem_ptr(11)
+#define HW_RX_TAIL              pnk_mem(10)
+#define HW_RX_HEAD              pnk_mem(11)
+#define HW_RX_CAPACITY          pnk_mem(12)
+#define HW_RX_DESCR             pnk_mem(13)
+#define HW_RX_PTR               pnk_mem_ptr(10)
+
+#define HW_TX_TAIL_SLOT         pnk_mem_ptr(14)
+#define HW_TX_HEAD_SLOT         pnk_mem_ptr(15)
+#define HW_TX_TAIL              pnk_mem(14)
+#define HW_TX_HEAD              pnk_mem(15)
+#define HW_TX_CAPACITY          pnk_mem(16)
+#define HW_TX_DESCR             pnk_mem(17)
+#define HW_TX_PTR               pnk_mem_ptr(14)
+
+#define EIR_OFFSET              4
+#define RDAR_OFFSET             16
+#define TDAR_OFFSET             20
+
+/* Device constants */
+#define RXD_EMPTY               (1 << 15)
+#define WRAP                    (1 << 13)
+#define TXD_READY               (1 << 15)
+#define TXD_ADDCRC              (1 << 10)
+#define TXD_LAST                (1 << 11)
+#define RDAR_RDAR               (1 << 24)
+#define TDAR_TDAR               (1 << 24)
+
+#define NETIRQ_RXF              (1 << 25)
+#define NETIRQ_TXF              (1 << 27)
+#define NETIRQ_EBERR            (1 << 22)
+#define IRQ_MASK                (NETIRQ_RXF | NETIRQ_TXF | NETIRQ_EBERR)
+
+#define ETH_REG                 pnk_mem(0)
+
+
+var 1 irq_ch          = IRQ_CH;
+var 1 rx_ch           = RX_CH;
+var 1 tx_ch           = TX_CH;
+var 1 eth_reg         = ETH_REG;
+var 1 net_rx_free     = NET_RX_FREE;
+var 1 net_rx_active   = NET_RX_ACTIVE;
+var 1 net_rx_capacity = NET_RX_CAPACITY;
+var 1 net_tx_free     = NET_TX_FREE;
+var 1 net_tx_active   = NET_TX_ACTIVE;
+var 1 net_tx_capacity = NET_TX_CAPACITY;
+var 1 hw_rx_capacity  = HW_RX_CAPACITY;
+var 1 hw_tx_capacity  = HW_TX_CAPACITY;
+var 1 hw_rx_descr     = HW_RX_DESCR;
+var 1 hw_tx_descr     = HW_TX_DESCR;
+
+inline fun rx_hw_ring_empty() {
+  return (HW_RX_HEAD == HW_RX_TAIL);
+}
+
+inline fun tx_hw_ring_empty() {
+  return (HW_TX_HEAD == HW_TX_TAIL);
+}
+
+inline fun rx_hw_ring_full() {
+  return (HW_RX_TAIL - HW_RX_HEAD) == hw_rx_capacity;
+}
+
+inline fun tx_hw_ring_full() {
+  return (HW_TX_TAIL - HW_TX_HEAD) == hw_tx_capacity;
+}
+
+inline fun set_rdar()
+{
+  !st32 eth_reg + RDAR_OFFSET, RDAR_RDAR;
+  return 0;
+}
+
+inline fun set_tdar()
+{
+  !st32  eth_reg + TDAR_OFFSET, TDAR_TDAR;
+  return 0;
+}
+
+inline fun get_eir_status()
+{
+  var eir = 0;
+  !ld32 eir, eth_reg + EIR_OFFSET;
+  return eir;
+}
+
+inline fun get_eir()
+{
+  var 1 eir_full = get_eir_status();
+  return eir_full & IRQ_MASK;
+}
+
+inline fun set_eir(1 eir)
+{
+  !st32 eth_reg + EIR_OFFSET, eir;
+  return 0;
+}
+
+inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
+{
+  var descr_base = hw_rx_descr;
+  var descr = descr_base + idx * 8;
+
+  if (idx + 1 == hw_rx_capacity) {
+    stat = stat | WRAP;
+  }
+
+  !st32 descr + 4, phys;
+  !st16 descr, len;
+  THREAD_MEMORY_RELEASE()
+  !st16 descr + 2, stat;
+  return 0;
+}
+
+inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
+{
+  var descr_base = hw_tx_descr;
+  var descr = descr_base + idx * 8;
+
+  if (idx + 1 == hw_tx_capacity) {
+    stat = stat | WRAP;
+  }
+
+  !st32 descr + 4, phys;
+  !st16 descr, len;
+  THREAD_MEMORY_RELEASE()
+  !st16 descr + 2, stat;
+  return 0;
+}
+
+fun rx_provide()
+{
+  var reprocess = true;
+  var rx_free = net_rx_free;
+  var rx_queue_cap = net_rx_capacity;
+  var rx_hw_cap = hw_rx_capacity;
+
+  while (reprocess)
+  {
+    while (true)
+    {
+      var 1 full = rx_hw_ring_full();
+      if (full) { break; }
+      var 1 empty = net_queue_empty(rx_free, rx_queue_cap);
+      if (empty) { break; }
+
+      var {1,1} buffer = net_dequeue(rx_free, rx_queue_cap);
+
+      var rx_tail = HW_RX_TAIL;
+      var idx = rx_tail & (rx_hw_cap - 1);
+
+      var io_addr = buffer.0;
+      var stat = RXD_EMPTY;
+      rx_update_ring_slot(HW_RX_PTR, idx, io_addr, 0, stat);
+
+      st HW_RX_TAIL_SLOT, (rx_tail + 1);
+      set_rdar();
+    }
+
+    var 1 full = rx_hw_ring_full();
+    if (!full) {
+      net_request_signal(rx_free, rx_queue_cap);
+    } else {
+      net_cancel_signal(rx_free);
+    }
+    reprocess = false;
+
+    var 1 empty = net_queue_empty(rx_free, rx_queue_cap);
+    if ((!empty) && (!full)) {
+      net_cancel_signal(rx_free);
+      reprocess = true;
+    }
+  }
+  return 0;
+}
+
+fun tx_provide()
+{
+  var reprocess = true;
+  var tx_active = net_tx_active;
+  var tx_queue_cap = net_tx_capacity;
+  var tx_hw_cap = hw_tx_capacity;
+
+  while (reprocess)
+  {
+    while (true)
+    {
+      var 1 full = tx_hw_ring_full();
+      if (full) { break; }
+      var 1 empty = net_queue_empty(tx_active, tx_queue_cap);
+      if (empty) { break; }
+
+      var {1,1} buffer = net_dequeue(tx_active, tx_queue_cap);
+
+      var tx_tail = HW_TX_TAIL;
+      var idx = tx_tail & (tx_hw_cap - 1);
+
+      var io_addr = buffer.0;
+      var len = buffer.1;
+      var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+      tx_update_ring_slot(HW_TX_PTR, idx, io_addr, len, stat);
+
+      st HW_TX_TAIL_SLOT, (tx_tail + 1);
+      set_tdar();
+    }
+
+    net_request_signal(tx_active, tx_queue_cap);
+    reprocess = false;
+
+    var 1 full = tx_hw_ring_full();
+    var 1 empty = net_queue_empty(tx_active, tx_queue_cap);
+    if ((!empty) && (!full)) {
+      net_cancel_signal(tx_active);
+      reprocess = true;
+    }
+  }
+  return 0;
+}
+
+fun rx_return()
+{
+  var rx_active = net_rx_active;
+  var rx_descr = hw_rx_descr;
+  var rx_queue_cap = net_rx_capacity;
+  var rx_hw_cap = hw_rx_capacity;
+
+  var packets_transferred = false;
+
+  while (true)
+  {
+    var 1 empty = rx_hw_ring_empty();
+    if (empty) { break; }
+
+    var rx_head = HW_RX_HEAD;
+    var idx = rx_head & (rx_hw_cap - 1);
+
+    var dscr_addr = rx_descr + idx * 8;
+    var stat = 0;
+    !ld16 stat, dscr_addr + 2;
+    if (stat & RXD_EMPTY) { break; }
+
+    THREAD_MEMORY_ACQUIRE()
+
+    var len = 0;
+    !ld16 len, dscr_addr;
+    var io_addr = 0;
+    !ld32 io_addr, dscr_addr + 4;
+
+    net_enqueue(rx_active, io_addr, len, rx_queue_cap);
+    packets_transferred = true;
+
+    st HW_RX_HEAD_SLOT, (rx_head + 1);
+  }
+
+  var 1 to_signal = net_require_signal(rx_active, rx_queue_cap);
+  if (packets_transferred && to_signal) {
+    net_cancel_signal(rx_active);
+    microkit_notify(rx_ch)
+  }
+
+  return 0;
+}
+
+fun tx_return()
+{
+  var tx_free = net_tx_free;
+  var tx_descr = hw_tx_descr;
+  var tx_queue_cap = net_tx_capacity;
+  var tx_hw_cap = hw_tx_capacity;
+
+  var enqueued = false;
+
+  while (true)
+  {
+    var 1 empty = tx_hw_ring_empty();
+    if (empty) { break; }
+
+    var tx_head = HW_TX_HEAD;
+    var idx = tx_head & (tx_hw_cap - 1);
+
+    var dscr_addr = tx_descr + idx * 8;
+    var stat = 0;
+    !ld16 stat, dscr_addr + 2;
+    if (stat & TXD_READY) { break; }
+
+    THREAD_MEMORY_ACQUIRE()
+
+    var io_addr = 0;
+    !ld32 io_addr, dscr_addr + 4;
+    net_enqueue(tx_free, io_addr, 0, tx_queue_cap);
+
+    enqueued = true;
+    st HW_TX_HEAD_SLOT, (tx_head + 1);
+  }
+
+  var 1 to_signal = net_require_signal(tx_free, tx_queue_cap);
+  if (enqueued && to_signal) {
+    net_cancel_signal(tx_free);
+    microkit_notify(tx_ch)
+  }
+
+  return 0;
+}
+
+fun main() {
+  rx_provide();
+  tx_provide();
+  return 0;
+}
+
+fun handle_irq() {
+  var 1 eir_full = get_eir_status();
+  var eir = eir_full & IRQ_MASK;
+  set_eir(eir);
+
+  while (eir & IRQ_MASK)
+  {
+    if (eir & NETIRQ_TXF) {
+      tx_return();
+      tx_provide();
+    }
+    if (eir & NETIRQ_RXF) {
+      rx_return();
+      rx_provide();
+    }
+    if (eir & NETIRQ_EBERR) {
+      @assert(0,0,0,0);
+    }
+    eir_full = get_eir_status();
+    eir = eir_full & IRQ_MASK;
+    set_eir(eir);
+  }
+  return 0;
+}
+
+export fun notified(1 ch)
+{
+  if (ch == irq_ch) {
+    handle_irq();
+    microkit_deferred_irq_ack(ch)
+  }
+  if (ch == rx_ch) {
+    rx_provide();
+  }
+  if (ch == tx_ch) {
+    tx_provide();
+  }
+  return 0;
+}

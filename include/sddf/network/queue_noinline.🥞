@@ -1,0 +1,77 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define NET_BUFF_DESC_SIZE  (2*@biw)
+
+fun net_queue_empty(1 queue_ptr, 1 capacity)
+{
+  var tail = 0;
+  var head = 0;
+  !ld16 tail, queue_ptr;
+  !ld16 head, queue_ptr + 2;
+
+  return ((tail - head) == 0);
+}
+
+fun net_queue_full(1 queue_ptr, 1 capacity)
+{
+  var tail = 0;
+  var head = 0;
+  !ld16 tail, queue_ptr;
+  !ld16 head, queue_ptr + 2;
+
+  var full = (tail - head) == capacity;
+  return full;
+}
+
+fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
+{
+  var tail = 0;
+  !ld16 tail, queue_ptr;
+
+  var mod_tail = tail & (capacity - 1);
+  var buff_addr = queue_ptr + @biw + mod_tail * NET_BUFF_DESC_SIZE;
+  !stw buff_addr, io_addr;
+  !stw buff_addr + @biw, len;
+  tail = (tail + 1) & MAX_INT16;
+  !st16 queue_ptr, tail;
+  return 0;
+}
+
+fun net_dequeue(1 queue_ptr, 1 capacity)
+{
+  var head = 0;
+  !ld16 head, queue_ptr + 2;
+
+  var mod_head = head & (capacity - 1);
+  var buff_addr = queue_ptr + @biw + mod_head * NET_BUFF_DESC_SIZE;
+  var io_addr = 0;
+  var len = 0;
+  !ldw io_addr, buff_addr;
+  !ldw len, buff_addr + @biw;
+  head = (head + 1) & MAX_INT16;
+
+  !st16 queue_ptr + 2, head;
+  return <io_addr, len>;
+}
+
+fun net_request_signal(1 queue_ptr, 1 capacity)
+{
+  !st32 queue_ptr + 4, 0;
+  return 0;
+}
+
+fun net_cancel_signal(1 queue_ptr)
+{
+  !st32 queue_ptr + 4, 1;
+  return 0;
+}
+
+fun net_require_signal(1 queue_ptr, 1 capacity)
+{
+  var signalled = 0;
+  !ld32 signalled, queue_ptr + 4;
+  return !signalled;
+}
