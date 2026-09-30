@@ -37,7 +37,7 @@ serial/components:
 	mkdir -p $@
 
 clean::
-	rm -f serial_virt_[rt]x.[od]
+	rm -f serial/components/virt_[rt]x_pnk.[od] serial/components/virt_[rt]x_pnk.S serial/components/virt_[rt]x_pnk.pnk serial/components/virt_[rt]x_init_pnk.[od] serial/components/virt_[rt]x_pre.[od] serial/components/serial_virt_[rt]x.
 
 clobber:: clean
 	rm -f ${SERIAL_IMAGES}

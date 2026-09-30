@@ -34,9 +34,9 @@ serial/components:
 	mkdir -p $@
 
 clean::
-	rm -f serial_virt_[rt]x.[od] .serial_cflags-*
+	rm -f serial/components/serial_virt_[rt]x.[od] .serial_cflags-*
 
-clobber::
+clobber:: clean
 	rm -f ${SERIAL_IMAGES}
 
 -include serial/components/serial_virt_rx.d
