@@ -1,0 +1,17 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+// sizeof(serial_connection_resource_t)
+#define SERIAL_CONNECTION_RESOURCE_SIZE 40
+
+// offsetof(serial_connection_resource_t, id)
+#define SERIAL_CONNECTION_RESOURCE_ID_OFFSET 32
+
+inline fun serial_connection_resource_get_id(1 serial_connection_resource)
+{
+    var ret = 0;
+    !ld8 ret, serial_connection_resource + SERIAL_CONNECTION_RESOURCE_ID_OFFSET;
+    return ret;
+}

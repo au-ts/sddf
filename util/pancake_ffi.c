@@ -73,3 +73,8 @@ void ffifence_seq_cst(unsigned char *c, long clen, unsigned char *a, long alen)
 {
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
+
+void ffiserial_virt_rx_switch_print(unsigned char *c, long clen, unsigned char *a, long alen)
+{
+    sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", (int) clen);
+}
