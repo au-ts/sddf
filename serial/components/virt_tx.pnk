@@ -74,15 +74,15 @@ fun process_tx_queue(1 client)
     var colours_array_size = COLOURS_ARRAY_SIZE;
     var colour_end = COLOUR_END;
 
-    var handle = tx_queue_handle_cli + client * SERIAL_QUEUE_SIZE;
+    var handle_ = tx_queue_handle_cli + client * SERIAL_QUEUE_SIZE;
 
-    var head = serial_queue_get_head(handle);
-    var is_empty = serial_queue_empty(handle, head);
+    var head = serial_queue_get_head(handle_);
+    var is_empty = serial_queue_empty(handle_, head);
     if (is_empty) {
         return false;
     }
 
-    var length = serial_queue_length_consumer(handle);
+    var length = serial_queue_length_consumer(handle_);
     var enable_colour = ENABLE_COLOUR;
     if (enable_colour) {
         var colours_index = slow_remainder(client, colours_array_size);
@@ -110,9 +110,9 @@ fun process_tx_queue(1 client)
         var colours_index = slow_remainder(client, colours_array_size);
         var client_colour = 0;
         !ldw client_colour, colours + colours_index * @biw;
-        serial_transfer_all_colour(tx_queue_handle_drv, handle, client_colour, COLOUR_BEGIN_LEN, colour_end, COLOUR_END_LEN);
+        serial_transfer_all_colour(tx_queue_handle_drv, handle_, client_colour, COLOUR_BEGIN_LEN, colour_end, COLOUR_END_LEN);
     } else {
-        serial_transfer_all(tx_queue_handle_drv, handle);
+        serial_transfer_all(tx_queue_handle_drv, handle_);
     }
 
     return true;
