@@ -37,10 +37,13 @@ serial/components:
 	mkdir -p $@
 
 clean::
-	rm -f serial/components/virt_[rt]x_pnk.[od] serial/components/virt_[rt]x_pnk.S serial/components/virt_[rt]x_pnk.pnk serial/components/virt_[rt]x_init_pnk.[od] serial/components/virt_[rt]x_pre.[od] serial/components/serial_virt_[rt]x.
+	rm -f serial/components/virt_[rt]x_pnk.[od] serial/components/virt_[rt]x_pnk.S serial/components/virt_[rt]x_pnk.pnk serial/components/virt_[rt]x_init_pnk.[od] serial/components/virt_[rt]x_pre.[od] serial/components/serial_virt_[rt]x.o
 
 clobber:: clean
 	rm -f ${SERIAL_IMAGES}
+
+# don't delete intermediates
+.SECONDARY:
 
 -include serial/components/serial_virt_rx.d
 -include serial/components/serial_virt_tx.d
