@@ -191,3 +191,13 @@ inline fun MIN(1 a, 1 b)
 
     return b;
 }
+
+// implement the % operator for unsigned input integers
+inline fun slow_remainder(1 x, 1 y)
+{
+    while (x >= y) {
+        x = x - y;
+    }
+
+    return x;
+}
