@@ -74,9 +74,9 @@ inline fun fence_seq_cst()
     return 0;
 }
 
-inline fun serial_virt_rx_switch_print(client)
+inline fun custom_debug_print(index, value)
 {
-    @serial_virt_rx_switch_print(0, client, 0, 0);
+    @custom_debug_print(0, index, 0, value);
     return 0;
 }
 
