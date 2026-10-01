@@ -23,11 +23,14 @@ static alignas(8) char acpi_heap[ACPI_HEAP_SIZE];
 static tlsf_t heap;
 
 static shadow_cnode_t *post_capdl_shadow_cnode;
+static seL4_CPtr vspace_cptr;
 
 /* We map physical memory with vaddr as ACPI_DIRECT_MAP_BASE + requested paddr
  * so that we don't have to unmap it and do cap clean ups, since we will tear
- * everything down by the end anyways. */
-#define ACPI_DIRECT_MAP_BASE BIT(32)
+ * everything down by the end anyways.
+
+ * @billn improve by reserving this range in the linker? */
+#define ACPI_DIRECT_MAP_BASE BIT(30)
 #define MAX_PADDR_MAPPED 1024
 static uint64_t paddr_mapped[MAX_PADDR_MAPPED];
 static int num_p_mapped;
@@ -81,8 +84,8 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
                 return NULL;
             }
 
-            if (map_memory_region(post_capdl_shadow_cnode, 3, cur_paddr, PAGE_SIZE_4K, ACPI_DIRECT_MAP_BASE + cur_paddr,
-                                  seL4_ReadWrite, seL4_X86_Default_VMAttributes)) {
+            if (map_memory_region(post_capdl_shadow_cnode, vspace_cptr, cur_paddr, PAGE_SIZE_4K,
+                                  ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_Default_VMAttributes)) {
                 paddr_mapped[num_p_mapped] = cur_paddr;
                 num_p_mapped++;
             } else {
@@ -131,6 +134,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 
     memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(acpi_rsdp_t));
     post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
+    vspace_cptr = init_args->vspace_cptr;
 
     DEBUG_ACPI("Initialising uACPI...\n");
     /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table

@@ -55,6 +55,7 @@ typedef struct {
 } __attribute__((packed)) capDLBootInfo_t;
 
 #define CPTR_POST_CAPDL_CNODE  (microkit_cspace_root_slot_to_cptr(1))
+#define CPTR_SELF_VSPACE    (microkit_cspace_root_slot_to_cptr(2))
 // #define CPTR_VSPACE_PCI_DRIVER    (microkit_cspace_root_slot_to_cptr(2))
 // #define CPTR_PCI_RESOURCES        (microkit_cspace_root_slot_to_cptr(3))
 
@@ -121,7 +122,8 @@ void init(void)
     }
 
     sddf_uacpi_init_args_t init_args = (sddf_uacpi_init_args_t) { .rsdp_blob = &bootinfo_rsdp->content,
-                                                                  .post_capdl_shadow_cnode = &post_capdl_shadow_cnode };
+                                                                  .post_capdl_shadow_cnode = &post_capdl_shadow_cnode,
+                                                                  .vspace_cptr = CPTR_SELF_VSPACE };
 
     if (!sddf_uacpi_init(&init_args)) {
         DEBUG_DRIVER_ERR("Failed to initialise lib_sddf_uacpi\n");
