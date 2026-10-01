@@ -63,6 +63,23 @@ shadow_cap_t *shadow_cnode_get_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t 
     return &shadow_cnode->caps[cslot];
 }
 
+bool shadow_cnode_find_cap_slot_of_type(shadow_cnode_t *shadow_cnode, shadow_cap_type_t type, size_t *cslot)
+{
+    if (type >= CAP_TYPE_MAX || type == CAP_TYPE_NONE) {
+        LOG_ERR("invalid cap type %u given\n", type);
+        return false;
+    }
+
+    for (size_t i = 0; i < shadow_cnode->num_slots; i++) {
+        if (shadow_cnode->caps[i].type == type) {
+            *cslot = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool shadow_cnode_delete_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot)
 {
     if (cslot >= shadow_cnode->num_slots) {
