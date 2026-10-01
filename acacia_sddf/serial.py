@@ -168,13 +168,13 @@ class sDDFSerial(sDDFDriverClass):
                 driver_rx_queue_mr, Map.Permissions(r=True, w=True)
             )
             driver_rx_data_map = self.driver.create_automap(
-                driver_rx_data_mr, Map.Permissions(r=True, w=False)
+                driver_rx_data_mr, Map.Permissions(r=True, w=True)
             )
             virt_rx_queue_map = self.virt_rx.create_automap(
                 driver_rx_queue_mr, Map.Permissions(r=True, w=True)
             )
             virt_rx_data_map = self.virt_rx.create_automap(
-                driver_rx_data_mr, Map.Permissions(r=True, w=True)
+                driver_rx_data_mr, Map.Permissions(r=True, w=False)
             )
 
             driver_virt_rx_ch = Channel(
