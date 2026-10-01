@@ -60,17 +60,17 @@ void client_main(void)
     volatile uint8_t *data = (volatile uint8_t *)data_region;
 
     // Kick I2C bus before doing anything.
-    sddf_i2c_write(&libi2c_conf, 0x1, data, 1);
+    sddf_i2c_write(&libi2c_conf, 0x1, (void *)data, 1);
     delay_ms(100);
 
     // Initial: reset, then program registers.
-    memcpy((volatile uint8_t *)(data + 1), config, 2);
+    memcpy((void *)(data + 1), config, 2);
     data[0] = INA219_CONFIG_ADDR;
-    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, data, 3) == 0);
+    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, (void *)data, 3) == 0);
 
-    memcpy((volatile uint8_t *)(data + 1), calibration, 2);
+    memcpy((void *)(data + 1), calibration, 2);
     data[0] = INA219_CALIBRATION_ADDR;
-    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, data, 3) == 0);
+    assert(sddf_i2c_write(&libi2c_conf, INA219_ADDR, (void *)data, 3) == 0);
 
     // BRNG value for bus voltage range. Config reg bit 13
     uint8_t brng = ((config[1] & (0b100000)) >> 5) & 0x1;
@@ -78,16 +78,16 @@ void client_main(void)
     while (true) {
         // Read current, voltage and power
         uint16_t voltage, power, current;
-        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_BUS_V_ADDR, data, 2) == 0);
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_BUS_V_ADDR, (void *)data, 2) == 0);
 
         // Low 3 bits of voltage reg are control bits
         voltage = ((data[0] << 8) | data[1]) >> 3;
         // Range = 32V if brng=1, else 16V
         double voltage_human_readable = ((double)voltage / (0x1FFF)) * (16 * (1 + brng));
-        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_CURRENT_ADDR, data, 2) == 0);
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_CURRENT_ADDR, (void *)data, 2) == 0);
 
         current = (uint16_t)((data[0] << 8) | data[1]);
-        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_POWER_ADDR, data, 2) == 0);
+        assert(sddf_i2c_writeread(&libi2c_conf, INA219_ADDR, INA219_POWER_ADDR, (void *)data, 2) == 0);
         power = ((data[0] << 8) | data[1]);
 
         LOG_CLIENT("Measurement completed!\n");
