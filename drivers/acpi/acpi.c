@@ -126,6 +126,8 @@ void init(void)
         return;
     }
 
+    DEBUG_DRIVER("teardown success\n");
+
     return;
 }
 

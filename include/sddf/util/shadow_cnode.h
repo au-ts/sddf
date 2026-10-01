@@ -75,6 +75,8 @@ shadow_cap_t *shadow_cnode_get_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t 
 
 bool shadow_cnode_find_cap_slot_of_type(shadow_cnode_t *shadow_cnode, shadow_cap_type_t type, size_t *cslot);
 
+shadow_cap_t *shadow_cnode_get_caps_table(shadow_cnode_t *shadow_cnode, size_t *num_slots);
+
 bool shadow_cnode_delete_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot);
 
 seL4_CPtr shadow_cnode_cslot_to_cptr(shadow_cnode_t *shadow_cnode, size_t cslot);
