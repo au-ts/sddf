@@ -85,7 +85,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
             }
 
             if (map_memory_region(post_capdl_shadow_cnode, vspace_cptr, cur_paddr, PAGE_SIZE_4K,
-                                  ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_Default_VMAttributes)) {
+                                  ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
                 paddr_mapped[num_p_mapped] = cur_paddr;
                 num_p_mapped++;
             } else {
