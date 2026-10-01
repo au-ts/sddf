@@ -489,5 +489,26 @@ bool sddf_uacpi_retrieve_pci_resources(void)
 
 bool sddf_uacpi_teardown(void)
 {
+    memset(acpi_heap, 0, sizeof(acpi_heap));
+    memset(heap, 0, sizeof(heap));
+    memset(paddr_mapped, 0, sizeof(paddr_mapped));
+    num_p_mapped = 0;
+    memset(rsdp_buf, 0, sizeof(rsdp_buf));
+    memset(ecams, 0, sizeof(ecams));
+    num_ecams = 0;
+
+    size_t num_slots;
+    shadow_cap_t *caps = shadow_cnode_get_caps_table(post_capdl_shadow_cnode, &num_slots);
+    size_t num_io_port_caps_deleted = 0;
+    for (size_t io_port_cslot = 0; io_port_cslot < num_slots; io_port_cslot++) {
+        if (caps[io_port_cslot].type == CAP_TYPE_X86_IO_PORT) {
+            assert(seL4_CNode_Delete(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), io_port_cslot, 58)
+                   == seL4_NoError);
+            num_io_port_caps_deleted++;
+        }
+    }
+
+    DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
+
     return true;
 }

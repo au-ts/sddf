@@ -80,10 +80,20 @@ bool shadow_cnode_find_cap_slot_of_type(shadow_cnode_t *shadow_cnode, shadow_cap
     return false;
 }
 
+shadow_cap_t *shadow_cnode_get_caps_table(shadow_cnode_t *shadow_cnode, size_t *num_slots)
+{
+    *num_slots = shadow_cnode->num_slots;
+    return shadow_cnode->caps;
+}
+
 bool shadow_cnode_delete_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot)
 {
     if (cslot >= shadow_cnode->num_slots) {
         LOG_ERR("slot %lu is out of bound, max is %lu\n", cslot, shadow_cnode->num_slots);
+        return false;
+    }
+    if (shadow_cnode->caps[cslot].type == CAP_TYPE_NONE) {
+        LOG_ERR("slot %lu does not contain a cap\n", cslot);
         return false;
     }
 
