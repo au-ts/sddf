@@ -18,6 +18,8 @@
 
 #define SMALL_PAGE_OFFSET(addr) ((addr) & (BIT(seL4_PageBits) - 1))
 #define SMALL_PAGE_SIZE BIT(seL4_PageBits)
+#define LARGE_PAGE_OFFSET(addr) ((addr) & (BIT(seL4_LargePageBits) - 1))
+#define LARGE_PAGE_SIZE BIT(seL4_LargePageBits)
 
 static bool map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, seL4_CPtr frame_cptr, uintptr_t vaddr,
                       seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
@@ -85,10 +87,11 @@ static bool map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, seL4_
 }
 
 static bool retype_and_map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, uintptr_t vaddr,
-                                 seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
+                                 bool large_page, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
 {
     size_t retyped_cslot;
-    if (!shadow_cnode_retype_at_paddr(shadow_cnode, paddr, seL4_X86_4K, seL4_PageBits, &retyped_cslot)) {
+    if (!shadow_cnode_retype_at_paddr(shadow_cnode, paddr, large_page ? seL4_X86_LargePageObject : seL4_X86_4K,
+                                      seL4_PageBits, &retyped_cslot)) {
         LOG_ERR("failed to retype at paddr 0x%lx\n", paddr);
         return false;
     }
@@ -102,20 +105,38 @@ static bool retype_and_map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_
     return true;
 }
 
-bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size,
-                       uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
+bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size_bytes,
+                       bool large_page, uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
 {
-    if (SMALL_PAGE_OFFSET(paddr)) {
-        LOG_ERR("paddr 0x%lx must be small page aligned\n", paddr);
-        return false;
-    }
-    if (SMALL_PAGE_OFFSET(vaddr)) {
-        LOG_ERR("vaddr 0x%lx must be small page aligned\n", vaddr);
-        return false;
-    }
-    if (!size || SMALL_PAGE_OFFSET(size)) {
-        LOG_ERR("size 0x%lx must be small page aligned\n", size);
-        return false;
+    size_t page_size_bytes;
+    if (large_page) {
+        if (LARGE_PAGE_OFFSET(paddr)) {
+            LOG_ERR("paddr 0x%lx must be large page aligned\n", paddr);
+            return false;
+        }
+        if (LARGE_PAGE_OFFSET(vaddr)) {
+            LOG_ERR("vaddr 0x%lx must be large page aligned\n", vaddr);
+            return false;
+        }
+        if (!size_bytes || LARGE_PAGE_OFFSET(size_bytes)) {
+            LOG_ERR("size 0x%lx must be large page aligned\n", size_bytes);
+            return false;
+        }
+        page_size_bytes = LARGE_PAGE_SIZE;
+    } else {
+        if (SMALL_PAGE_OFFSET(paddr)) {
+            LOG_ERR("paddr 0x%lx must be small page aligned\n", paddr);
+            return false;
+        }
+        if (SMALL_PAGE_OFFSET(vaddr)) {
+            LOG_ERR("vaddr 0x%lx must be small page aligned\n", vaddr);
+            return false;
+        }
+        if (!size_bytes || SMALL_PAGE_OFFSET(size_bytes)) {
+            LOG_ERR("size 0x%lx must be small page aligned\n", size_bytes);
+            return false;
+        }
+        page_size_bytes = SMALL_PAGE_SIZE;
     }
     if (!seL4_CapRights_get_capAllowRead(rights) && !seL4_CapRights_get_capAllowWrite(rights)) {
         LOG_ERR("can't have a not read and not write mapping\n");
@@ -124,14 +145,14 @@ bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uint
 
     uint64_t curr_paddr = paddr;
     uint64_t curr_vaddr = vaddr;
-    uint64_t end_paddr = paddr + size;
+    uint64_t end_paddr = paddr + size_bytes;
     while (curr_paddr < end_paddr) {
-        if (!retype_and_map_frame(shadow_cnode, vspace_cptr, curr_paddr, curr_vaddr, rights, vm_attr)) {
+        if (!retype_and_map_frame(shadow_cnode, vspace_cptr, curr_paddr, curr_vaddr, large_page, rights, vm_attr)) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return false;
         }
-        curr_paddr += SMALL_PAGE_SIZE;
-        curr_vaddr += SMALL_PAGE_SIZE;
+        curr_paddr += page_size_bytes;
+        curr_vaddr += page_size_bytes;
     }
 
     return true;

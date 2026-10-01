@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/acpi.h>
+#include <uacpi/tables.h>
 #include <uacpi/utilities.h>
 #include <sddf/acpi/lib_sddf_uacpi.h>
 #include <sddf/util/arch_timestamp_counter.h>
@@ -40,6 +42,25 @@ static int num_p_mapped;
  * to copy it into a dummy "paddr" and serve it to uACPI from a buffer. */
 #define RSDP_PADDR (ACPI_DIRECT_MAP_BASE - PAGE_SIZE_4K)
 char rsdp_buf[PAGE_SIZE_4K];
+
+typedef struct {
+    void *vaddr;
+    uint64_t paddr;
+    size_t size_bytes;
+    uint16_t segment;
+    uint8_t start_bus;
+    uint8_t end_bus;
+} ecam_desc_t;
+
+#define MAX_NUM_ECAM 4
+static ecam_desc_t ecams[MAX_NUM_ECAM];
+static size_t num_ecams = 0;
+static uint64_t next_avail_ecam_vaddr = BIT(27);
+#define MAX_ECAM_VADDR ACPI_DIRECT_MAP_BASE
+
+typedef struct {
+    void *config_space_vaddr; // in one of the ECAM
+} pci_device_uacpi_handle_t;
 
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address)
 {
@@ -85,7 +106,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
                 return NULL;
             }
 
-            if (map_memory_region(post_capdl_shadow_cnode, vspace_cptr, cur_paddr, PAGE_SIZE_4K,
+            if (map_memory_region(post_capdl_shadow_cnode, vspace_cptr, cur_paddr, PAGE_SIZE_4K, false,
                                   ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
                 paddr_mapped[num_p_mapped] = cur_paddr;
                 num_p_mapped++;
@@ -152,7 +173,7 @@ uacpi_status uacpi_kernel_io_read8(uacpi_handle handle, uacpi_size offset, uacpi
     seL4_X86_IOPort_In8_t ret = seL4_X86_IOPort_In8(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, cslot),
                                                     base + offset);
     if (ret.error != seL4_NoError) {
-        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.result);
+        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.error);
         return UACPI_STATUS_DENIED;
     }
 
@@ -170,7 +191,7 @@ uacpi_status uacpi_kernel_io_read16(uacpi_handle handle, uacpi_size offset, uacp
     seL4_X86_IOPort_In16_t ret = seL4_X86_IOPort_In16(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, cslot),
                                                       base + offset);
     if (ret.error != seL4_NoError) {
-        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.result);
+        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.error);
         return UACPI_STATUS_DENIED;
     }
 
@@ -188,7 +209,7 @@ uacpi_status uacpi_kernel_io_read32(uacpi_handle handle, uacpi_size offset, uacp
     seL4_X86_IOPort_In32_t ret = seL4_X86_IOPort_In32(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, cslot),
                                                       base + offset);
     if (ret.error != seL4_NoError) {
-        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.result);
+        DEBUG_ACPI_ERR("seL4 error: %d\n", ret.error);
         return UACPI_STATUS_DENIED;
     }
 
@@ -258,6 +279,92 @@ void uacpi_kernel_io_unmap(uacpi_handle handle)
     assert(shadow_cnode_delete_cap_at_slot(post_capdl_shadow_cnode, (size_t)handle));
 }
 
+uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handle *out_handle)
+{
+    // @billn handle when firmware did not provide mcfg
+    int ecam_idx = 0;
+    for (; ecam_idx < num_ecams; ecam_idx++) {
+        if (address.segment == ecams[ecam_idx].segment && address.bus >= ecams[ecam_idx].start_bus
+            && address.bus <= ecams[ecam_idx].end_bus) {
+            break;
+        }
+    }
+
+    if (ecam_idx == MAX_NUM_ECAM) {
+        DEBUG_ACPI_ERR("failed to find matching ECAM for %u:%u.%u in PCI segment %u\n", address.bus, address.device,
+                       address.function, address.segment);
+        return UACPI_STATUS_NOT_FOUND;
+    }
+
+    // @billn this is a bit sus when start bus != 0
+    void *config_space_vaddr = (void *)((uintptr_t)(ecams[ecam_idx].vaddr)
+                                        + ((uint64_t)address.bus << 20 | (uint64_t)address.device << 15
+                                           | (uint64_t)address.function << 12));
+
+    pci_device_uacpi_handle_t *handle = tlsf_malloc(heap, sizeof(pci_device_uacpi_handle_t));
+    if (!handle) {
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    handle->config_space_vaddr = config_space_vaddr;
+    *out_handle = handle;
+
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_pci_device_close(uacpi_handle handle)
+{
+    tlsf_free(heap, handle);
+}
+
+uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset, uacpi_u8 *value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint8_t *reg = (uint8_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *value = *reg;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset, uacpi_u16 *value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint16_t *reg = (uint16_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *value = *reg;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset, uacpi_u32 *value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint32_t *reg = (uint32_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *value = *reg;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset, uacpi_u8 value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint8_t *reg = (uint8_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *reg = value;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset, uacpi_u16 value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint16_t *reg = (uint16_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *reg = value;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, uacpi_u32 value)
+{
+    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
+    volatile uint32_t *reg = (uint32_t *)((uintptr_t)handle->config_space_vaddr + offset);
+    *reg = value;
+    return UACPI_STATUS_OK;
+}
+
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
 {
     uint64_t freq = sddf_read_freq();
@@ -266,7 +373,7 @@ uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         return UACPI_STATUS_UNIMPLEMENTED;
     }
 
-    return sddf_read_counter() / freq;
+    return sddf_read_counter();
 }
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
@@ -277,7 +384,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
         return false;
     }
 
-    memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(acpi_rsdp_t));
+    memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
     post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
     vspace_cptr = init_args->vspace_cptr;
     x86_ioport_ctrl_cptr = init_args->x86_ioport_ctrl_cptr;
@@ -292,6 +399,61 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
         return false;
     }
     DEBUG_ACPI("uACPI initialised\n");
+
+    DEBUG_ACPI("Mapping ECAM(s) for firmware specific PCI initialisation\n");
+    uacpi_table mcfg_handle;
+    if (uacpi_table_find_by_signature(ACPI_MCFG_SIGNATURE, &mcfg_handle) != UACPI_STATUS_OK) {
+        DEBUG_ACPI("Firmware did not provide MCFG, falling back to legacy PIO\n");
+        assert(false); // @billn TODO
+    } else {
+        struct acpi_mcfg *mcfg = mcfg_handle.ptr;
+        uint64_t mcfg_size = mcfg_handle.hdr->length;
+        int mcfg_table_size = mcfg_size - sizeof(uint64_t) - sizeof(struct acpi_sdt_hdr);
+        assert(mcfg_table_size % sizeof(struct acpi_mcfg_allocation) == 0);
+        int num_mcfg_entries = mcfg_table_size / sizeof(struct acpi_mcfg_allocation);
+        for (int i = 0; i < num_mcfg_entries; i++) {
+            struct acpi_mcfg_allocation *entry = &mcfg->entries[i];
+            DEBUG_ACPI("MCFG entry %d: paddr 0x%lx, segment %u, bus %u..%u\n", i, entry->address, entry->segment,
+                       entry->start_bus, entry->end_bus);
+
+            if (i >= MAX_NUM_ECAM) {
+                DEBUG_ACPI_ERR("Not recording this ECAM\n");
+                continue;
+            }
+
+            ecams[num_ecams].start_bus = entry->start_bus;
+            ecams[num_ecams].end_bus = entry->end_bus;
+            ecams[num_ecams].segment = entry->segment;
+
+            /* Quirk: base address is for bus 0 of that segment, so if the start bus isn't zero
+             * we need to account for that.
+             * Each bus takes 1 MiB of ECAM space (32 devices × 8 functions × 4 KiB) */
+            uint64_t paddr_base = entry->address + ((uint64_t)entry->start_bus << 20);
+            size_t size_bytes = ((uint64_t)(entry->end_bus - entry->start_bus) + 1) << 20;
+
+            /* ECAM tends to be quite large so lets just use 2MiB page to avoid running out of room
+             * in our small CNode. */
+            size_bytes = ROUND_UP(size_bytes, BIT(seL4_LargePageBits));
+
+            ecams[num_ecams].size_bytes = size_bytes;
+
+            uint64_t ecam_vaddr = next_avail_ecam_vaddr;
+            if (ecam_vaddr + size_bytes > MAX_ECAM_VADDR) {
+                DEBUG_ACPI_ERR("Not enough vaddr range for ECAM %d\n", i);
+                return false;
+            }
+
+            if (!map_memory_region(post_capdl_shadow_cnode, vspace_cptr, paddr_base, size_bytes, true, ecam_vaddr,
+                                   seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+                DEBUG_ACPI_ERR("can't map ECAM %d at vaddr 0x%lx\n", i, ecam_vaddr);
+                return false;
+            }
+
+            ecams[num_ecams].vaddr = (void *)ecam_vaddr;
+            num_ecams++;
+            next_avail_ecam_vaddr += size_bytes;
+        }
+    }
 
     DEBUG_ACPI("Executing DSDT and SSDTs...\n");
     status = uacpi_namespace_load();
