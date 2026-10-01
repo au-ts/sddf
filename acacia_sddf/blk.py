@@ -50,6 +50,7 @@ class sDDFBlk(sDDFDriverClass):
         virt_prio: int,
         cpu: Optional[int] = None,
         # We leave this as configurable just in case...
+        # Used by the virt to read in the partition table
         driver_data_size: int = 10 * 0x1000,
         virt_elf: str = "blk_virt.elf",
         driver_elf: str = "blk_driver.elf",
