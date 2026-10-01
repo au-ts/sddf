@@ -34,6 +34,7 @@ typedef struct {
     uint64_t sel4bench_id; /* PMU event identifier - platform specific, but we limit our PMU usage to ARM */
 } bench_pmu_event_info_t;
 
+#if ENABLE_PMU_EVENTS
 /**
  * PMU event lookup table.
  */
@@ -75,6 +76,7 @@ static const bench_pmu_event_info_t pmu_event_table[] = {
     { "Stall backend (load)", SDDFBENCH_EVENT_STALL_BACKEND_LD },
     { "Stall backend (store)", SDDFBENCH_EVENT_STALL_BACKEND_ST },
 };
+#endif
 
 static char *child_name(uint8_t child_id)
 {
