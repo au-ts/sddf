@@ -34,15 +34,6 @@ typedef struct bootinfo_rsdp {
 
 #define RSDP_SIGNATURE "RSD PTR "
 
-typedef struct {
-    seL4_Word base_paddr;
-    seL4_Word watermark;
-    uint8_t size_bits;
-    uint8_t is_device;
-    uint16_t child_of;
-    uint8_t padding[4];
-} __attribute__((packed)) CapDlUntypedDesc_t;
-
 #define POST_CAPDL_CSLOT_IRQ_CONTROL 1
 #define POST_CAPDL_CSLOT_IOPORT_CONTROL 2
 #define POST_CAPDL_CSLOT_UNTYPEDS_START 3
@@ -50,8 +41,8 @@ typedef struct {
 typedef struct {
     seL4_Word irq_control;
     seL4_Word x86_ioport_control;
-    seL4_SlotRegion untypeds_range;
-    CapDlUntypedDesc_t untypeds_list[CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS];
+    seL4_SlotRegion ut_range;
+    seL4_UntypedDesc ut_list[CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS];
 } __attribute__((packed)) capDLBootInfo_t;
 
 #define CPTR_POST_CAPDL_CNODE  (microkit_cspace_root_slot_to_cptr(1))
@@ -97,19 +88,16 @@ void init(void)
         POST_CAPDL_CSLOT_IOPORT_CONTROL));
 
     DEBUG_DRIVER("UTs received:\n");
-    for (uint64_t i = bootinfo_post_capdl->untypeds_range.start; i < bootinfo_post_capdl->untypeds_range.end; i++) {
-        CapDlUntypedDesc_t *post_capdl_ut_desc =
-            &bootinfo_post_capdl->untypeds_list[i - bootinfo_post_capdl->untypeds_range.start];
+    for (uint64_t i = bootinfo_post_capdl->ut_range.start; i < bootinfo_post_capdl->ut_range.end; i++) {
+        seL4_UntypedDesc *post_capdl_ut_desc = &bootinfo_post_capdl->ut_list[i - bootinfo_post_capdl->ut_range.start];
 
-        // uint64_t ut_used_by_capdl = post_capdl_ut_desc->base_paddr != post_capdl_ut_desc->watermark ? 1 : 0;
-
-        uint64_t base_paddr = post_capdl_ut_desc->watermark;
-        uint64_t watermark = post_capdl_ut_desc->watermark;
-        uint64_t end_paddr = post_capdl_ut_desc->base_paddr + BIT(post_capdl_ut_desc->size_bits);
+        uint64_t base_paddr = post_capdl_ut_desc->paddr;
+        uint64_t watermark = post_capdl_ut_desc->paddr;
+        uint64_t end_paddr = post_capdl_ut_desc->paddr + BIT(post_capdl_ut_desc->sizeBits);
         shadow_cap_t shadow_ut_cap = SHADOW_CNODE_MAKE_CAP(CAP_TYPE_UT, base_paddr, end_paddr, PARENT_CSLOT_NONE, 0);
         shadow_ut_cap.as_ut = (shadow_ut_t) {
             .watermark = watermark,
-            .is_device = post_capdl_ut_desc->is_device,
+            .is_device = post_capdl_ut_desc->isDevice,
         };
 
         if (!shadow_cnode_insert_cap_at_slot(&post_capdl_shadow_cnode, &shadow_ut_cap, i)) {
@@ -117,8 +105,8 @@ void init(void)
             return;
         }
 
-        DEBUG_DRIVER("CSlot: 0x%lx, base: 0x%lx, watermark-end: 0x%lx-0x%lx: device? %d\n", i, base_paddr, watermark,
-                     end_paddr, shadow_ut_cap.as_ut.is_device);
+        DEBUG_DRIVER("CSlot: 0x%lx, base: 0x%lx, end: 0x%lx, device? %d\n", i, base_paddr, end_paddr,
+                     shadow_ut_cap.as_ut.is_device);
     }
 
     sddf_uacpi_init_args_t init_args = (sddf_uacpi_init_args_t) {
