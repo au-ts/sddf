@@ -27,6 +27,7 @@ typedef struct {
     acpi_rsdp_t *rsdp_blob;
     shadow_cnode_t *post_capdl_shadow_cnode;
     seL4_CPtr vspace_cptr;
+    seL4_CPtr x86_ioport_ctrl_cptr;
 } sddf_uacpi_init_args_t;
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args);

@@ -15,15 +15,15 @@
 #define LOG_ERR(fmt, ...) \
     sddf_dprintf("SHADOW CNODE %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
-bool shadow_cnode_insert_cap_at_slot(shadow_cnode_t *shadow_cnode, shadow_cap_t *cap, size_t slot)
+bool shadow_cnode_insert_cap_at_slot(shadow_cnode_t *shadow_cnode, shadow_cap_t *cap, size_t cslot)
 {
-    if (slot >= shadow_cnode->num_slots) {
-        LOG_ERR("slot %lu is out of bound, max is %lu\n", slot, shadow_cnode->num_slots);
+    if (cslot >= shadow_cnode->num_slots) {
+        LOG_ERR("slot %lu is out of bound, max is %lu\n", cslot, shadow_cnode->num_slots);
         return false;
     }
 
-    if (shadow_cnode->caps[slot].type != CAP_TYPE_NONE) {
-        LOG_ERR("slot %lu is taken\n", slot);
+    if (shadow_cnode->caps[cslot].type != CAP_TYPE_NONE) {
+        LOG_ERR("slot %lu is taken\n", cslot);
         return false;
     }
 
@@ -32,7 +32,7 @@ bool shadow_cnode_insert_cap_at_slot(shadow_cnode_t *shadow_cnode, shadow_cap_t 
         return false;
     }
 
-    memcpy(&shadow_cnode->caps[slot], cap, sizeof(shadow_cap_t));
+    memcpy(&shadow_cnode->caps[cslot], cap, sizeof(shadow_cap_t));
     return true;
 }
 
@@ -51,6 +51,27 @@ bool shadow_cnode_find_free_slot(shadow_cnode_t *shadow_cnode, size_t *ret)
 seL4_CPtr shadow_cnode_cslot_to_cptr(shadow_cnode_t *shadow_cnode, size_t cslot)
 {
     return shadow_cnode->cnode_cptr + cslot;
+}
+
+shadow_cap_t *shadow_cnode_get_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot)
+{
+    if (cslot >= shadow_cnode->num_slots) {
+        LOG_ERR("slot %lu is out of bound, max is %lu\n", cslot, shadow_cnode->num_slots);
+        return NULL;
+    }
+
+    return &shadow_cnode->caps[cslot];
+}
+
+bool shadow_cnode_delete_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot)
+{
+    if (cslot >= shadow_cnode->num_slots) {
+        LOG_ERR("slot %lu is out of bound, max is %lu\n", cslot, shadow_cnode->num_slots);
+        return false;
+    }
+
+    memset(&shadow_cnode->caps[cslot], 0, sizeof(shadow_cap_t));
+    return true;
 }
 
 bool shadow_cnode_init(shadow_cnode_t *shadow_cnode, uint8_t size_bits, seL4_CPtr cnode_cptr)
