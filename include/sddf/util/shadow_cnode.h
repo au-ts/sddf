@@ -26,6 +26,7 @@ typedef enum {
     CAP_TYPE_LARGE_PAGE,
     CAP_TYPE_PAGE_TABLE,
     CAP_TYPE_IRQ_CONTROL,
+    CAP_TYPE_X86_IO_PORT,
     CAP_TYPE_X86_IO_PORT_CONTROL,
     CAP_TYPE_MAX,
 } shadow_cap_type_t;
@@ -66,9 +67,13 @@ typedef struct {
 
 bool shadow_cnode_init(shadow_cnode_t *shadow_cnode, uint8_t size_bits, seL4_CPtr cnode_cptr);
 
-bool shadow_cnode_insert_cap_at_slot(shadow_cnode_t *shadow_cnode, shadow_cap_t *cap, size_t slot);
+bool shadow_cnode_insert_cap_at_slot(shadow_cnode_t *shadow_cnode, shadow_cap_t *cap, size_t cslot);
 
 bool shadow_cnode_find_free_slot(shadow_cnode_t *shadow_cnode, size_t *ret);
+
+shadow_cap_t *shadow_cnode_get_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot);
+
+bool shadow_cnode_delete_cap_at_slot(shadow_cnode_t *shadow_cnode, size_t cslot);
 
 seL4_CPtr shadow_cnode_cslot_to_cptr(shadow_cnode_t *shadow_cnode, size_t cslot);
 
