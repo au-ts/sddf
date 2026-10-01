@@ -101,7 +101,7 @@ BOARDS: list[Board] = [
         paddr_top=0x60000000,
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@c8100000/serial@4c0"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@c1100000/watchdog@98d0"),
-        ethernet=DriverDouble("", "soc/ethernet@c9410000"),
+        ethernet=DriverDouble("amlogic,meson-g12a-dwmac", "soc/ethernet@c9410000"),
         baud_rate=115200,
     ),
     Board(
@@ -111,7 +111,7 @@ BOARDS: list[Board] = [
         i2c=DriverDouble("amlogic,meson-axg-i2c", "soc/bus@ffd00000/i2c@1d000"),
         serial=DriverDouble("amlogic,meson-gx-uart", "soc/bus@ff800000/serial@3000"),
         timer=DriverDouble("amlogic,meson-gxbb-wdt", "soc/bus@ffd00000/watchdog@f0d0"),
-        ethernet=DriverDouble("amlogic,meson-gx-uart", "soc/ethernet@ff3f0000"),
+        ethernet=DriverDouble("amlogic,meson-g12a-dwmac", "soc/ethernet@ff3f0000"),
         baud_rate=115200,
     ),
     Board(
@@ -121,7 +121,7 @@ BOARDS: list[Board] = [
         serial=DriverDouble("arm,pl011", "pl011@9000000"),
         timer=DriverDouble("arm,armv8-timer", "timer"),
         blk=DriverDouble("", "virtio_mmio@a000200"),
-        ethernet=DriverDouble("", "virtio_mmio@a000000"),
+        ethernet=DriverDouble("virtio,mmio", "virtio_mmio@a000000"),
         i2c=None,
     ),
     Board(
@@ -130,7 +130,7 @@ BOARDS: list[Board] = [
         paddr_top=0xA_0000_000,
         serial=DriverDouble("ns16550a", "soc/serial@10000000"),
         timer=DriverDouble("google,goldfish-rtc", "soc/rtc@101000"),
-        ethernet=DriverDouble("", "soc/virtio_mmio@10001000"),
+        ethernet=DriverDouble("virtio,mmio", "soc/virtio_mmio@10001000"),
         blk=DriverDouble("", "soc/virtio_mmio@10002000"),
         partition=0,
         i2c=None,

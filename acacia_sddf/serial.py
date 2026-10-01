@@ -98,6 +98,14 @@ class sDDFSerial(sDDFDriverClass):
             virt_rx_prio if virt_rx_prio else -1, virt_tx_prio
         )
 
+        # Allow clients to override priority checks if unavoidable ... e.g. benchmark client.
+        self.client_priority_exemptions = []
+
+    def add_client(self, client: ProtectionDomain, override_prio_check=False):
+        if override_prio_check:
+            self.client_priority_exemptions.append(client)
+        super().add_client(client)
+
     def construct_infrastructure(self, virt_rx_prio: int, virt_tx_prio: int):
         self.virt_tx = ProtectionDomain(
             self.sdf,
@@ -212,16 +220,17 @@ class sDDFSerial(sDDFDriverClass):
         client_configs = []
 
         for c in self.clients:
-            if c.priority >= self.virt_tx.priority:
-                raise SubsystemBuildError(
-                    f"Client {c} has a priority higher than virt_tx's "
-                    f"({self.virt_tx.priority})!"
-                )
-            if self.virt_rx and c.priority >= self.virt_rx.priority:
-                raise SubsystemBuildError(
-                    f"Client {c} has a priority higher than virt_rx's "
-                    f"({self.virt_rx.priority})!"
-                )
+            if c not in self.client_priority_exemptions:
+                if c.priority >= self.virt_tx.priority:
+                    raise SubsystemBuildError(
+                        f"Client {c} has a priority higher than virt_tx's "
+                        f"({self.virt_tx.priority})!"
+                    )
+                if self.virt_rx and c.priority >= self.virt_rx.priority:
+                    raise SubsystemBuildError(
+                        f"Client {c} has a priority higher than virt_rx's "
+                        f"({self.virt_rx.priority})!"
+                    )
 
             # TX connection: virt_tx -> client
             tx_queue_mr = MemoryRegion(
