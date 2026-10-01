@@ -12,7 +12,7 @@
 #include <sddf/util/arch_timestamp_counter.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/vspace.h>
-#include <sddf/util/cspace.h>
+#include <sddf/util/shadow_cnode.h>
 #include <sddf/util/tlsf/tlsf.h>
 #include "logging.h"
 
@@ -22,7 +22,7 @@
 static alignas(8) char acpi_heap[ACPI_HEAP_SIZE];
 static tlsf_t heap;
 
-static cnode_specs_t *ut_cnode;
+static shadow_cnode_t *post_capdl_shadow_cnode;
 
 /* We map physical memory with vaddr as ACPI_DIRECT_MAP_BASE + requested paddr
  * so that we don't have to unmap it and do cap clean ups, since we will tear
@@ -81,7 +81,8 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
                 return NULL;
             }
 
-            if (map_memory_region(ut_cnode, cur_paddr, PAGE_SIZE_4K, ACPI_DIRECT_MAP_BASE + cur_paddr)) {
+            if (map_memory_region(post_capdl_shadow_cnode, 3, cur_paddr, PAGE_SIZE_4K, ACPI_DIRECT_MAP_BASE + cur_paddr,
+                                  seL4_ReadWrite, seL4_X86_Default_VMAttributes)) {
                 paddr_mapped[num_p_mapped] = cur_paddr;
                 num_p_mapped++;
             } else {
@@ -129,7 +130,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     }
 
     memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(acpi_rsdp_t));
-    ut_cnode = init_args->ut_cnode;
+    post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
 
     DEBUG_ACPI("Initialising uACPI...\n");
     /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table
