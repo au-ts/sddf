@@ -289,16 +289,15 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
         }
     }
 
-    if (ecam_idx == MAX_NUM_ECAM) {
+    if (ecam_idx == num_ecams) {
         DEBUG_ACPI_ERR("failed to find matching ECAM for %u:%u.%u in PCI segment %u\n", address.bus, address.device,
                        address.function, address.segment);
         return UACPI_STATUS_NOT_FOUND;
     }
 
-    // @billn this is a bit sus when start bus != 0
     void *config_space_vaddr = (void *)((uintptr_t)(ecams[ecam_idx].vaddr)
-                                        + ((uint64_t)address.bus << 20 | (uint64_t)address.device << 15
-                                           | (uint64_t)address.function << 12));
+                                        + ((uint64_t)(address.bus - ecams[ecam_idx].start_bus) << 20
+                                           | (uint64_t)address.device << 15 | (uint64_t)address.function << 12));
 
     pci_device_uacpi_handle_t *handle = tlsf_malloc(heap, sizeof(pci_device_uacpi_handle_t));
     if (!handle) {
@@ -368,11 +367,83 @@ uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
 {
     uint64_t freq = sddf_read_freq();
     if (!freq) {
-        DEBUG_ACPI_ERR("TSC frequency unavailable, this function will return unimplemented to uACPI\n");
-        return UACPI_STATUS_UNIMPLEMENTED;
+        DEBUG_ACPI_ERR("TSC frequency unavailable\n");
+        // @billn a bit dodgy
+        return sddf_read_counter();
+    }
+    return ticks_to_ns(sddf_read_counter(), freq);
+}
+
+static void delay_for_ns(uint64_t ns)
+{
+    uint64_t freq = sddf_read_freq();
+    if (!freq) {
+        DEBUG_ACPI_ERR("TSC frequency unavailable\n");
+        return;
     }
 
-    return ticks_to_ns(sddf_read_counter(), freq);
+    uint64_t curr_ns = ticks_to_ns(sddf_read_counter(), freq);
+    uint64_t target_ns = curr_ns + ns;
+    while (curr_ns < target_ns) {
+        seL4_Yield();
+        curr_ns = ticks_to_ns(sddf_read_counter(), freq);
+    };
+}
+
+void uacpi_kernel_stall(uacpi_u8 usec)
+{
+    delay_for_ns((uint64_t)usec * NS_IN_US);
+}
+
+void uacpi_kernel_sleep(uacpi_u64 msec)
+{
+    delay_for_ns((uint64_t)msec * NS_IN_MS);
+}
+
+uacpi_handle uacpi_kernel_create_event(void)
+{
+    uint64_t *ev = tlsf_malloc(heap, sizeof(uint64_t));
+    if (ev) {
+        *ev = 0;
+    }
+    return ev;
+}
+
+void uacpi_kernel_free_event(uacpi_handle handle)
+{
+    tlsf_free(heap, handle);
+}
+
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout)
+{
+    DEBUG_ACPI("timeout 0x%x\n", timeout);
+
+    *((uint64_t *)handle) -= 1;
+    return UACPI_TRUE;
+}
+
+void uacpi_kernel_signal_event(uacpi_handle handle)
+{
+    *((uint64_t *)handle) += 1;
+}
+
+void uacpi_kernel_reset_event(uacpi_handle handle)
+{
+    *((uint64_t *)handle) = 0;
+}
+
+uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
+                                                    uacpi_handle *out_irq_handle)
+{
+    DEBUG_ACPI("installing GSI %u\n", irq);
+    // @billn todo
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handle, uacpi_handle irq_handle)
+{
+    // @billn todo
+    return UACPI_STATUS_OK;
 }
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
@@ -414,7 +485,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     } else {
         struct acpi_mcfg *mcfg = mcfg_handle.ptr;
         uint64_t mcfg_size = mcfg_handle.hdr->length;
-        int mcfg_table_size = mcfg_size - sizeof(uint64_t) - sizeof(struct acpi_sdt_hdr);
+        size_t mcfg_table_size = mcfg_size - sizeof(uint64_t) - sizeof(struct acpi_sdt_hdr);
         assert(mcfg_table_size % sizeof(struct acpi_mcfg_allocation) == 0);
         int num_mcfg_entries = mcfg_table_size / sizeof(struct acpi_mcfg_allocation);
         for (int i = 0; i < num_mcfg_entries; i++) {
@@ -427,6 +498,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
                 continue;
             }
 
+            ecams[num_ecams].paddr = entry->address;
             ecams[num_ecams].start_bus = entry->start_bus;
             ecams[num_ecams].end_bus = entry->end_bus;
             ecams[num_ecams].segment = entry->segment;
@@ -434,30 +506,28 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
             /* Quirk: base address is for bus 0 of that segment, so if the start bus isn't zero
              * we need to account for that.
              * Each bus takes 1 MiB of ECAM space (32 devices × 8 functions × 4 KiB) */
-            uint64_t paddr_base = entry->address + ((uint64_t)entry->start_bus << 20);
-            size_t size_bytes = ((uint64_t)(entry->end_bus - entry->start_bus) + 1) << 20;
+            uint64_t ecam_start = entry->address + ((uint64_t)entry->start_bus << 20);
+            uint64_t ecam_end = entry->address + (((uint64_t)entry->end_bus + 1) << 20);
+            uint64_t map_base = ROUND_DOWN(ecam_start, BIT(seL4_LargePageBits));
+            size_t map_size = ROUND_UP(ecam_end, BIT(seL4_LargePageBits)) - map_base;
 
-            /* ECAM tends to be quite large so lets just use 2MiB page to avoid running out of room
-             * in our small CNode. */
-            size_bytes = ROUND_UP(size_bytes, BIT(seL4_LargePageBits));
-
-            ecams[num_ecams].size_bytes = size_bytes;
+            ecams[num_ecams].size_bytes = ecam_end - ecam_start;
 
             uint64_t ecam_vaddr = next_avail_ecam_vaddr;
-            if (ecam_vaddr + size_bytes > MAX_ECAM_VADDR) {
+            if (ecam_vaddr + map_size > MAX_ECAM_VADDR) {
                 DEBUG_ACPI_ERR("Not enough vaddr range for ECAM %d\n", i);
                 return false;
             }
 
-            if (!map_memory_region(post_capdl_shadow_cnode, vspace_cptr, paddr_base, size_bytes, true, ecam_vaddr,
+            if (!map_memory_region(post_capdl_shadow_cnode, vspace_cptr, map_base, map_size, true, ecam_vaddr,
                                    seL4_ReadWrite, seL4_X86_CacheDisabled)) {
                 DEBUG_ACPI_ERR("can't map ECAM %d at vaddr 0x%lx\n", i, ecam_vaddr);
                 return false;
             }
 
-            ecams[num_ecams].vaddr = (void *)ecam_vaddr;
+            ecams[num_ecams].vaddr = (void *)(ecam_vaddr + (ecam_start - map_base));
             num_ecams++;
-            next_avail_ecam_vaddr += size_bytes;
+            next_avail_ecam_vaddr += map_size;
         }
         assert(uacpi_table_unref(&mcfg_handle) == UACPI_STATUS_OK);
     }
@@ -479,6 +549,9 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     }
     DEBUG_ACPI("Interrupt model set to I/O APIC\n");
 
+    // assert(uacpi_namespace_initialize() == UACPI_STATUS_OK);
+
+    // DEBUG_ACPI("Namespace initialised\n");
     return true;
 }
 
@@ -489,8 +562,11 @@ bool sddf_uacpi_retrieve_pci_resources(void)
 
 bool sddf_uacpi_teardown(void)
 {
+    // No need to call uacpi_state_reset() because we tear everything down
+    // anyways.
+
     memset(acpi_heap, 0, sizeof(acpi_heap));
-    memset(heap, 0, sizeof(heap));
+    heap = NULL;
     memset(paddr_mapped, 0, sizeof(paddr_mapped));
     num_p_mapped = 0;
     memset(rsdp_buf, 0, sizeof(rsdp_buf));
@@ -504,9 +580,12 @@ bool sddf_uacpi_teardown(void)
         if (caps[io_port_cslot].type == CAP_TYPE_X86_IO_PORT) {
             assert(seL4_CNode_Delete(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), io_port_cslot, 58)
                    == seL4_NoError);
+            assert(shadow_cnode_delete_cap_at_slot(post_capdl_shadow_cnode, io_port_cslot));
             num_io_port_caps_deleted++;
         }
     }
+
+    // todo, need to pass og capdl ut range in init, then loop n revoke
 
     DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
 
