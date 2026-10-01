@@ -10,7 +10,7 @@
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
 DRIVER_PNK = \
-	${UTIL}/util.pnk \
+	${SDDF}/util/util.pnk \
 	${SDDF}/include/sddf/serial/queue.pnk \
 	${SERIAL_DRIVER_DIR}/uart.pnk
 
