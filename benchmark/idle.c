@@ -20,7 +20,7 @@ struct bench *b;
 
 static inline uint64_t read_cycle_count()
 {
-    uint64_t cycle_count;
+    uint64_t cycle_count = 0;
 #if defined(CONFIG_ARCH_ARM)
     SEL4BENCH_READ_CCNT(cycle_count);
 #elif defined(CONFIG_ARCH_RISCV)
