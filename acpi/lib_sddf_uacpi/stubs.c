@@ -63,53 +63,6 @@ void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags cpu_flags
 
 /* Unimplemented */
 
-uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handle *out_handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-void uacpi_kernel_pci_device_close(uacpi_handle handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
-uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset, uacpi_u8 *value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset, uacpi_u16 *value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset, uacpi_u32 *value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset, uacpi_u8 value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset, uacpi_u16 value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, uacpi_u32 value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
 void uacpi_kernel_stall(uacpi_u8 usec)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");

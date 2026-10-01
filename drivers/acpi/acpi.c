@@ -29,7 +29,7 @@
 
 typedef struct bootinfo_rsdp {
     seL4_BootInfoHeader header;
-    acpi_rsdp_t content;
+    lib_sddf_uacpi_rsdp_t content;
 } __attribute__((packed)) bootinfo_rsdp_t;
 
 #define RSDP_SIGNATURE "RSD PTR "
@@ -63,8 +63,9 @@ void init(void)
         return;
     }
 
-    if (bootinfo_rsdp->header.len - sizeof(seL4_BootInfoHeader) != sizeof(acpi_rsdp_t)) {
-        DEBUG_DRIVER_ERR("bootinfo_rsdp->header.len = %lu != %zu\n", bootinfo_rsdp->header.len, sizeof(acpi_rsdp_t));
+    if (bootinfo_rsdp->header.len - sizeof(seL4_BootInfoHeader) != sizeof(lib_sddf_uacpi_rsdp_t)) {
+        DEBUG_DRIVER_ERR("bootinfo_rsdp->header.len = %lu != %zu\n", bootinfo_rsdp->header.len,
+                         sizeof(lib_sddf_uacpi_rsdp_t));
         return;
     }
 
