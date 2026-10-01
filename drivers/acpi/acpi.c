@@ -114,11 +114,15 @@ void init(void)
         .rsdp_blob = &bootinfo_rsdp->content,
         .post_capdl_shadow_cnode = &post_capdl_shadow_cnode,
         .vspace_cptr = CPTR_SELF_VSPACE,
-        .x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(&post_capdl_shadow_cnode, POST_CAPDL_CSLOT_IOPORT_CONTROL)
     };
 
     if (!sddf_uacpi_init(&init_args)) {
         DEBUG_DRIVER_ERR("Failed to initialise lib_sddf_uacpi\n");
+        return;
+    }
+
+    if (!sddf_uacpi_teardown()) {
+        DEBUG_DRIVER_ERR("Failed to teardown lib_sddf_uacpi\n");
         return;
     }
 

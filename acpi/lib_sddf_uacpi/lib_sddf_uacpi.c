@@ -77,8 +77,6 @@ void uacpi_kernel_log(uacpi_log_level log_level, const uacpi_char *s)
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
 {
-    // DEBUG_ACPI("called with addr 0x%lx, len 0x%lx\n", addr, len);
-
     if (!len) {
         return NULL;
     }
@@ -388,7 +386,14 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
     post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
     vspace_cptr = init_args->vspace_cptr;
-    x86_ioport_ctrl_cptr = init_args->x86_ioport_ctrl_cptr;
+
+    size_t x86_ioport_ctrl_cslot;
+    if (!shadow_cnode_find_cap_slot_of_type(post_capdl_shadow_cnode, CAP_TYPE_X86_IO_PORT_CONTROL,
+                                            &x86_ioport_ctrl_cslot)) {
+        DEBUG_ACPI_ERR("capDL initialiser did not grant I/O Port control cap\n");
+        return false;
+    }
+    x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, x86_ioport_ctrl_cslot);
 
     DEBUG_ACPI("Initialising uACPI...\n");
     /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table
@@ -477,7 +482,12 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     return true;
 }
 
-bool sddf_uacpi_deinit(void)
+bool sddf_uacpi_retrieve_pci_resources(void)
+{
+    return false;
+}
+
+bool sddf_uacpi_teardown(void)
 {
     return true;
 }
