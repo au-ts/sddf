@@ -110,53 +110,6 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, ua
     return UACPI_STATUS_UNIMPLEMENTED;
 }
 
-uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len, uacpi_handle *out_handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-void uacpi_kernel_io_unmap(uacpi_handle handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
-uacpi_status uacpi_kernel_io_read8(uacpi_handle handle, uacpi_size offset, uacpi_u8 *out_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_io_read16(uacpi_handle handle, uacpi_size offset, uacpi_u16 *out_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_io_read32(uacpi_handle handle, uacpi_size offset, uacpi_u32 *out_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_io_write8(uacpi_handle handle, uacpi_size offset, uacpi_u8 in_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_io_write16(uacpi_handle handle, uacpi_size offset, uacpi_u16 in_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uacpi_u32 in_value)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
 void uacpi_kernel_stall(uacpi_u8 usec)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
