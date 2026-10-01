@@ -6,8 +6,8 @@
   description = "A flake for building sDDF";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.35.0";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.35.1";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;
@@ -59,7 +59,7 @@
 
           clang-complete = (pkgs.symlinkJoin {
             name = "clang-complete";
-            paths = llvm.clang-unwrapped.all;
+            paths = [ llvm.clang-unwrapped.out llvm.clang-unwrapped.lib llvm.clang-unwrapped.python ];
             meta.mainProgram = "clang";
 
             # Clang searches up from the directory where it sits to find its built-in
