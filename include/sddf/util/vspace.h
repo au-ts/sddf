@@ -12,7 +12,7 @@
 
 /* Map a memory region at the given physical address and size to the given virtual address.
  * The mapping rights and attributes are given by the caller.
- * The physical and virtual addresses, and size must be aligned on a small page boundary.
+ * The physical and virtual addresses, and size must be aligned on the page boundary.
  * This may fail if there is no or not enough UTs that can satisfy the allocation. */
-bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size,
-                       uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr);
+bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size_bytes,
+                       bool large_page, uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr);

@@ -11,7 +11,7 @@
 #include <sddf/util/shadow_cnode.h>
 
 /* Root System Descriptor Pointer */
-typedef struct acpi_rsdp {
+typedef struct lib_sddf_uacpi_rsdp {
     char         signature[8];
     uint8_t      checksum;
     char         oem_id[6];
@@ -21,10 +21,10 @@ typedef struct acpi_rsdp {
     uint64_t     xsdt_address;
     uint8_t      extended_checksum;
     char         reserved[3];
-} __attribute__((packed)) acpi_rsdp_t;
+} __attribute__((packed)) lib_sddf_uacpi_rsdp_t;
 
 typedef struct {
-    acpi_rsdp_t *rsdp_blob;
+    lib_sddf_uacpi_rsdp_t *rsdp_blob;
     shadow_cnode_t *post_capdl_shadow_cnode;
     seL4_CPtr vspace_cptr;
     seL4_CPtr x86_ioport_ctrl_cptr;
