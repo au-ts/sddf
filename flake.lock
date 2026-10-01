@@ -3,11 +3,11 @@
     "acacia": {
       "flake": false,
       "locked": {
-        "lastModified": 1790823914,
+        "lastModified": 1790835699,
         "narHash": "sha256-ie/4giTm6BX+vZGQ6DT51QlsJ494MYHHWsEPBeBn6nk=",
         "owner": "au-ts",
         "repo": "microkit_acacia",
-        "rev": "ce9dc91074385f45e91b8a0fc22b028917cd0145",
+        "rev": "d9ab356b8f652b626551ef58b274f7c23278a242",
         "type": "github"
       },
       "original": {
