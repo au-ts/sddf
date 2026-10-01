@@ -61,6 +61,30 @@ void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags cpu_flags
 {
 }
 
+/* Dummy event and IRQ, we don't care about the ACPI events machinery like thermal, power button, lid close etc
+ * so this is all ok. */
+static uint8_t event;
+
+uacpi_handle uacpi_kernel_create_event(void)
+{
+    return &event;
+}
+
+void uacpi_kernel_free_event(uacpi_handle handle)
+{
+}
+
+uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
+                                                    uacpi_handle *out_irq_handle)
+{
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handle, uacpi_handle irq_handle)
+{
+    return UACPI_STATUS_OK;
+}
+
 /* Unimplemented */
 
 void uacpi_kernel_stall(uacpi_u8 usec)
@@ -69,17 +93,6 @@ void uacpi_kernel_stall(uacpi_u8 usec)
 }
 
 void uacpi_kernel_sleep(uacpi_u64 msec)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-}
-
-uacpi_handle uacpi_kernel_create_event(void)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return NULL;
-}
-
-void uacpi_kernel_free_event(uacpi_handle handle)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
 }
@@ -112,19 +125,6 @@ void uacpi_kernel_reset_event(uacpi_handle handle)
 }
 
 uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *firmware_req)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
-                                                    uacpi_handle *out_irq_handle)
-{
-    DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
-    return UACPI_STATUS_UNIMPLEMENTED;
-}
-
-uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handle, uacpi_handle irq_handle)
 {
     DEBUG_ACPI(COLOUR_RED "unimplemented" COLOUR_RESET "\n");
     return UACPI_STATUS_UNIMPLEMENTED;

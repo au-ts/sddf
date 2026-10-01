@@ -16,6 +16,7 @@
 #include <sddf/util/vspace.h>
 #include <sddf/util/shadow_cnode.h>
 #include <sddf/util/tlsf/tlsf.h>
+#include <sddf/timer/timer_common.h>
 #include "logging.h"
 
 #define PAGE_SIZE_4K 0x1000
@@ -373,7 +374,7 @@ uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         return UACPI_STATUS_UNIMPLEMENTED;
     }
 
-    return sddf_read_counter();
+    return ticks_to_ns(sddf_read_counter(), freq);
 }
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
@@ -453,6 +454,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
             num_ecams++;
             next_avail_ecam_vaddr += size_bytes;
         }
+        assert(uacpi_table_unref(&mcfg_handle) == UACPI_STATUS_OK);
     }
 
     DEBUG_ACPI("Executing DSDT and SSDTs...\n");
@@ -463,14 +465,6 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
         return false;
     }
     DEBUG_ACPI("DSDT and SSDTs executed\n");
-
-    DEBUG_ACPI("Initialising objects in namespaces...\n");
-    status = uacpi_namespace_initialize();
-    if (status != UACPI_STATUS_OK) {
-        DEBUG_ACPI_ERR("Failed to initialise all objects in namespaces, error '%s'\n", uacpi_status_to_string(status));
-        return false;
-    }
-    DEBUG_ACPI("Objects in namespaces initialised\n");
 
     DEBUG_ACPI("Setting interrupt model to I/O APIC...\n");
     status = uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
