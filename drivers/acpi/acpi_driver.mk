@@ -16,10 +16,10 @@ LIB_SDDF_UACPI_DIR := $(ACPI_DIR)/../../acpi/lib_sddf_uacpi
 
 include $(LIB_SDDF_UACPI_DIR)/lib_sddf_uacpi.mk
 
-acpi_driver.elf: acpi/acpi.o acpi/interpreter.o lib_sddf_uacpi.a
+acpi_driver.elf: acpi/acpi.o lib_sddf_uacpi.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-acpi/%.o: ${ACPI_DIR}/%.c ${ACPI_DIR}/interpreter.o ${CHECK_FLAGS_BOARD_MD5} |acpi $(SDDF_LIBC_INCLUDE)
+acpi/%.o: ${ACPI_DIR}/%.c ${CHECK_FLAGS_BOARD_MD5} |acpi $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -o $@ -c $^
 
 acpi:

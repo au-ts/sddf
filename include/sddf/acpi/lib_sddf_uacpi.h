@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <sddf/util/cspace.h>
+#include <sddf/util/shadow_cnode.h>
 
 /* Root System Descriptor Pointer */
 typedef struct acpi_rsdp {
@@ -25,7 +25,7 @@ typedef struct acpi_rsdp {
 
 typedef struct {
     acpi_rsdp_t *rsdp_blob;
-    cnode_specs_t *ut_cnode;
+    shadow_cnode_t *post_capdl_shadow_cnode;
 } sddf_uacpi_init_args_t;
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args);
