@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "acacia": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790823914,
+        "narHash": "sha256-ie/4giTm6BX+vZGQ6DT51QlsJ494MYHHWsEPBeBn6nk=",
+        "owner": "au-ts",
+        "repo": "microkit_acacia",
+        "rev": "ce9dc91074385f45e91b8a0fc22b028917cd0145",
+        "type": "github"
+      },
+      "original": {
+        "owner": "au-ts",
+        "ref": "nix",
+        "repo": "microkit_acacia",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -68,6 +85,7 @@
     },
     "root": {
       "inputs": {
+        "acacia": "acacia",
         "nixpkgs": "nixpkgs",
         "sdfgen": "sdfgen",
         "systems-ci": "systems-ci"
