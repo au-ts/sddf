@@ -11,7 +11,7 @@
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;
-    acacia.url = "github:au-ts/microkit_acacia/nix";
+    acacia.url = "github:au-ts/microkit_acacia";
     acacia.flake = false;
   };
 
