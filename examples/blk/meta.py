@@ -45,59 +45,6 @@ def update_elf_section(
     )
 
 
-class AcpiTablesConfig:
-    def __init__(
-        self,
-        max_total_size: int,
-    ):
-        self.max_total_size = max_total_size
-        self.patched_tables_end = 0
-        self.alignment = 0x1000
-        self.max_num_acpi_tables = 20 # This needs to be synced with MAX_NUM_ACPI_TABLES in acpi.h
-        self.num_tables = 0
-        self.acpi_table_bytes = bytearray()
-        self.acpi_table_pointers = [0] * self.max_num_acpi_tables
-
-    # TODO: add the checks
-    def add_acpi_table(self, acpi_file):
-        acpi_file = "/Users/terrybai/tmp/acpi_vb105/vb105_acpi/" + acpi_file + ".dat"
-        print(acpi_file)
-        assert os.path.isfile(acpi_file)
-        with open(acpi_file, "rb") as data_file:
-            byte_list = list(data_file.read())
-
-            if len(byte_list) + len(self.acpi_table_bytes) < self.max_total_size:
-                self.acpi_table_pointers[self.num_tables] = len(self.acpi_table_bytes)
-                self.acpi_table_bytes.extend(byte_list)
-                self.patched_tables_end = len(self.acpi_table_bytes)
-                self.num_tables += 1
-
-        trailing_len = len(self.acpi_table_bytes) % self.alignment
-        if trailing_len != 0:
-            padding_len = self.alignment - trailing_len
-            if padding_len + len(self.acpi_table_bytes) < self.max_total_size:
-                self.acpi_table_bytes.extend(b"\x00" * padding_len)
-
-    def tables_serialise(self):
-        pack_str = "<" + "B" * len(self.acpi_table_bytes)
-
-        return struct.pack(
-            pack_str,
-            *self.acpi_table_bytes
-        )
-
-    def summary_serialise(self):
-        pack_str = "<" + "Q" * self.max_num_acpi_tables + "QQII"
-
-        return struct.pack(
-            pack_str,
-            *self.acpi_table_pointers,
-            self.patched_tables_end,
-            self.max_total_size,
-            self.alignment,
-            self.num_tables,
-        )
-
 def generate(
     sdf_file: str,
     output_dir: str,
@@ -154,57 +101,38 @@ def generate(
     blk_system.add_client(client, partition=partition)
 
     acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=211, stack_size=0x5000)
-    pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
 
-    acpi_bootinfo_post_capdl_untypeds = MemoryRegion(sdf, "bootinfo_post_capdl_untypeds", 0x1000, prefill_bootinfo="post_capdl_bootinfo")
-    sdf.add_mr(acpi_bootinfo_post_capdl_untypeds)
-    acpi_driver.add_map(Map(acpi_bootinfo_post_capdl_untypeds, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl_untypeds"))
+    acpi_post_capdl_bootinfo_mr = MemoryRegion(sdf, "acpi_post_capdl_bootinfo", 0x200000, prefill_bootinfo="post_capdl_bootinfo")
+    sdf.add_mr(acpi_post_capdl_bootinfo_mr)
+    acpi_driver.add_map(Map(acpi_post_capdl_bootinfo_mr, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl"))
 
-    acpi_bootinfo_rsdp = MemoryRegion(sdf, "bootinfo_rsdp", 0x1000, prefill_bootinfo="x86_acpi_rsdp")
-    sdf.add_mr(acpi_bootinfo_rsdp)
-    acpi_driver.add_map(Map(acpi_bootinfo_rsdp, 0x2001000, "r", setvar_vaddr="bootinfo_rsdp"))
+    acpi_bootinfo_rsdp_mr = MemoryRegion(sdf, "bootinfo_rsdp", 0x1000, prefill_bootinfo="x86_acpi_rsdp")
+    sdf.add_mr(acpi_bootinfo_rsdp_mr)
+    acpi_driver.add_map(Map(acpi_bootinfo_rsdp_mr, 0x2200000, "r", setvar_vaddr="bootinfo_rsdp"))
 
-    acpi_tables_config = AcpiTablesConfig(0x500000)
-    # acpi_tables_config.add_acpi_table("mcfg")
-    # acpi_tables_config.add_acpi_table("dsdt")
-    # for i in range(1, 18):
-    #     acpi_tables_config.add_acpi_table("ssdt" + str(i))
+    acpi_post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=9)
+    sdf.add_cnode(acpi_post_capdl_cnode)
+    acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=acpi_post_capdl_cnode, dest_cspace_slot=1))
 
-    # acpi_driver.add_boot_info(BootInfo("remaining_untypeds"))
-    # acpi_driver.add_boot_info(BootInfo("rsdp"))
+    # pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
 
-    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 9)
-    sdf.add_cnode(cnode_remaining_untypeds)
-    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
-    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
+    # acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
 
-    cnode_pci_resources = CNode("pci_resources", False, 9)
-    sdf.add_cnode(cnode_pci_resources)
-    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
+    # cnode_pci_resources = CNode("pci_resources", False, 9)
+    # sdf.add_cnode(cnode_pci_resources)
+    # acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
+    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
 
-    mr_aml_object_pool = MemoryRegion(sdf, "aml_object_pool", 0x100000)
-    sdf.add_mr(mr_aml_object_pool)
-    acpi_driver.add_map(Map(mr_aml_object_pool, 0x30000000, "rw"))
+    # mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x40000)
+    # sdf.add_mr(mr_pci_resources)
+    # acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+    # pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
 
-    mr_aml_state_stack = MemoryRegion(sdf, "aml_state_stack", 0x10000)
-    sdf.add_mr(mr_aml_state_stack)
-    acpi_driver.add_map(Map(mr_aml_state_stack, 0x50000000, "rw"))
+    # sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
 
-    mr_acpi_tables_copy = MemoryRegion(sdf, "acpi_tables_copy", 0x50000)
-    sdf.add_mr(mr_acpi_tables_copy)
-    acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
-
-    mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x40000)
-    sdf.add_mr(mr_pci_resources)
-    acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
-    pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
-
-    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
-
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 2))
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 3))
-    sdf.add_channel(Channel(pci_driver, blk_driver, a_id=1, b_id=10))
+    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 2))
+    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 3))
+    # sdf.add_channel(Channel(pci_driver, blk_driver, a_id=1, b_id=10))
 
     if nvme:
         # Queue descriptors accessed via DMA so we map these regions as uncached.
@@ -348,7 +276,7 @@ def generate(
 
     serial_system.add_client(client)
 
-    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver, pci_driver]
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver]
     if need_timer:
         pds += [timer_driver]
     for pd in pds:
@@ -364,10 +292,6 @@ def generate(
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
-
-    with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
-        f.write(acpi_tables_config.summary_serialise())
-    update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
 
 
 if __name__ == "__main__":
