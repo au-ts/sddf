@@ -177,7 +177,8 @@ def update_elf_section(
     if data_number != None:
         data_name += str(data_number)
     data_name += ".data"
-    assert os.path.isfile(data_name)
+    if not os.path.isfile(data_name):
+        raise FileNotFoundError(f"{data_name} cannot be found!")
     assert (
         subprocess.run(
             [
@@ -360,7 +361,7 @@ def generate(
         )
 
         # Benchmark PD requires serial output
-        serial.add_client(core_objs[i]["bench_pd"])
+        serial.add_client(core_objs[i]["bench_pd"], override_prio_check=True)
 
         # Create formatted list of children for benchmark PD
         core_objs[i]["children"] = []
@@ -457,6 +458,9 @@ def generate(
         client0_elf, "benchmark_client_config", "benchmark_client_config"
     )
 
+    # Below expects config structs to exist, so make them
+    sdf.make_config_structs()
+
     for i in range(num_cores):
         core = core_objs[i]["core"]
         update_elf_section(
@@ -478,7 +482,6 @@ def generate(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
         )
 
-    sdf.make_config_structs()
     sdf.write_xml_file(f"{output_dir}/{sdf_file}")
 
 
