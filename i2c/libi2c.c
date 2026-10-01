@@ -70,7 +70,6 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
 
     // Create header command
     i2c_cmd_t header;
-    i2c_err_t error = I2C_ERR_OK;
     header.flag_mask = I2C_FLAG_HEAD;
     header.payload.i2c_header.batch_len = num_batches;
     header.payload.i2c_header.address = address;
@@ -103,7 +102,6 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
             // No need to clean up if we fail. We just surrender pending requests
             // and exit.
             LOG_LIBI2C_ERR("__i2c_dispatch failed to enqueue request!\n");
-            error = -1;
             i2c_request_abort(*conf->handle);
             return -1;
         }
