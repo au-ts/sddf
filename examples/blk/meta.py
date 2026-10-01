@@ -113,6 +113,7 @@ def generate(
     acpi_post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=9)
     sdf.add_cnode(acpi_post_capdl_cnode)
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=acpi_post_capdl_cnode, dest_cspace_slot=1))
+    acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))
 
     # pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
 
