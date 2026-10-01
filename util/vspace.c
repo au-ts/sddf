@@ -4,96 +4,134 @@
 #include <sddf/util/printf.h>
 #include <sel4/sel4_arch/mapping.h>
 
+// #define CONFIG_DEBUG_VSPACE
 
-seL4_Error map_frame(cnode_specs_t *ut_cnode_specs, seL4_CPtr frame_cap, seL4_CPtr vspace, uintptr_t vaddr, seL4_CapRights_t rights)
+#if defined(CONFIG_DEBUG_VSPACE)
+#define LOG_VSPACE(fmt, ...) \
+    sddf_dprintf("VSPACE UTIL %s:%d|INFO: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define LOG_VSPACE(fmt, ...) do {} while (0)
+#endif
+
+#define LOG_ERR(fmt, ...) \
+    sddf_dprintf("VSPACE UTIL %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+#define SMALL_PAGE_OFFSET(addr) ((addr) & (BIT(seL4_PageBits) - 1))
+#define SMALL_PAGE_SIZE BIT(seL4_PageBits)
+
+static bool map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, seL4_CPtr frame_cptr, uintptr_t vaddr,
+                      seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
 {
-    seL4_Error err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+    seL4_Error err = seL4_X86_Page_Map(frame_cptr, vspace_cptr, vaddr, rights, vm_attr);
+    if (err == seL4_NoError) {
+        LOG_VSPACE("mapped at vaddr 0x%lx\n", vaddr);
+        return true;
+    }
 
     for (int i = 0; i < 4 && err == seL4_FailedLookup; i++) {
         seL4_Word failed = seL4_MappingFailedLookupLevel();
-        uint32_t retyped_cptr_idx;
+        size_t retyped_cslot;
 
         switch (failed) {
-            case SEL4_MAPPING_LOOKUP_NO_PT: {
-                err = untyped_retype(ut_cnode_specs, ut_cnode_specs->active_ut_idx, seL4_X86_PageTableObject, 0, &retyped_cptr_idx);
-                if (err != seL4_NoError) {
-                    return err;
-                }
-                err = seL4_X86_PageTable_Map(IDX_TO_CPTR(ut_cnode_specs, retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
-                break;
+        case SEL4_MAPPING_LOOKUP_NO_PT: {
+            if (!shadow_cnode_retype(shadow_cnode, seL4_X86_PageTableObject, 0, &retyped_cslot)) {
+                LOG_ERR("Can't create last level paging object\n");
+                return false;
             }
-            case SEL4_MAPPING_LOOKUP_NO_PD: {
-                err = untyped_retype(ut_cnode_specs, ut_cnode_specs->active_ut_idx, seL4_X86_PageDirectoryObject, 0, &retyped_cptr_idx);
-                if (err != seL4_NoError) {
-                    return err;
-                }
-                err = seL4_X86_PageDirectory_Map(IDX_TO_CPTR(ut_cnode_specs, retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
-                break;
+            err = seL4_X86_PageTable_Map(shadow_cnode_cslot_to_cptr(shadow_cnode, retyped_cslot), vspace_cptr, vaddr,
+                                         seL4_X86_Default_VMAttributes);
+            if (err != seL4_NoError) {
+                LOG_ERR("Can't map last level paging object\n");
+                return false;
             }
-            case SEL4_MAPPING_LOOKUP_NO_PDPT: {
-                err = untyped_retype(ut_cnode_specs, ut_cnode_specs->active_ut_idx, seL4_X86_PDPTObject, 0, &retyped_cptr_idx);
-                if (err != seL4_NoError) {
-                    return err;
-                }
-                err = seL4_X86_PDPT_Map(IDX_TO_CPTR(ut_cnode_specs, retyped_cptr_idx), vspace, vaddr, seL4_X86_Default_VMAttributes);
-                break;
+            break;
+        }
+        case SEL4_MAPPING_LOOKUP_NO_PD: {
+            if (!shadow_cnode_retype(shadow_cnode, seL4_X86_PageDirectoryObject, 0, &retyped_cslot)) {
+                LOG_ERR("Can't create second-last level paging object\n");
+                return false;
             }
+            err = seL4_X86_PageDirectory_Map(shadow_cnode_cslot_to_cptr(shadow_cnode, retyped_cslot), vspace_cptr,
+                                             vaddr, seL4_X86_Default_VMAttributes);
+            if (err != seL4_NoError) {
+                LOG_ERR("Can't map second-last level paging object\n");
+                return false;
+            }
+            break;
+        }
+        case SEL4_MAPPING_LOOKUP_NO_PDPT: {
+            if (!shadow_cnode_retype(shadow_cnode, seL4_X86_PDPTObject, 0, &retyped_cslot)) {
+                LOG_ERR("Can't create third-last level paging object\n");
+                return false;
+            }
+            err = seL4_X86_PDPT_Map(shadow_cnode_cslot_to_cptr(shadow_cnode, retyped_cslot), vspace_cptr, vaddr,
+                                    seL4_X86_Default_VMAttributes);
+            if (err != seL4_NoError) {
+                LOG_ERR("Can't map third-last level paging object\n");
+                return false;
+            }
+            break;
+        }
         }
 
+        err = seL4_X86_Page_Map(frame_cptr, vspace_cptr, vaddr, rights, vm_attr);
         if (err == seL4_NoError) {
-            err = seL4_X86_Page_Map(frame_cap, vspace, vaddr, rights, seL4_X86_Default_VMAttributes);
+            LOG_VSPACE("mapped at vaddr 0x%lx\n", vaddr);
+            return true;
         }
     }
 
-    return err;
+    return false;
 }
 
-
-seL4_Error retype_and_map_frame(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights)
+static bool retype_and_map_frame(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, uintptr_t vaddr,
+                                 seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
 {
-    uint32_t retyped_cptr_idx;
-    // TODO: round_down for large pages and check if it's a page type
-    if (page_type == seL4_X86_4K) {
-        paddr = ROUND_DOWN(paddr, 1UL << seL4_PageBits);
-        vaddr = ROUND_DOWN(vaddr, 1UL << seL4_PageBits);
-    } else if (page_type == seL4_X86_LargePageObject) {
-        paddr = ROUND_DOWN(paddr, 1UL << seL4_LargePageBits);
-        vaddr = ROUND_DOWN(vaddr, 1UL << seL4_LargePageBits);
-    }
-    seL4_Error error = retype_at_paddr(cnode_specs, paddr, page_type, 0, &retyped_cptr_idx);
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to retype at paddr 0x%lx\n", paddr);
-        return error;
+    size_t retyped_cslot;
+    if (!shadow_cnode_retype_at_paddr(shadow_cnode, paddr, seL4_X86_4K, seL4_PageBits, &retyped_cslot)) {
+        LOG_ERR("failed to retype at paddr 0x%lx\n", paddr);
+        return false;
     }
 
-    /* sddf_dprintf("retyped and try mapping at vaddr: 0x%lx with ut idx: %u, 0x%lx\n", vaddr, retyped_cptr_idx, IDX_TO_CPTR(retyped_cptr_idx)); */
-    error = map_frame(cnode_specs, IDX_TO_CPTR(cnode_specs, retyped_cptr_idx), vspace, vaddr, rights);
-    if (error != seL4_NoError) {
-        sddf_dprintf("Error: failed to map frame at vaddr: 0x%lx, err - %u\n", vaddr, error);
-        return error;
+    if (!map_frame(shadow_cnode, vspace_cptr, shadow_cnode_cslot_to_cptr(shadow_cnode, retyped_cslot), vaddr, rights,
+                   vm_attr)) {
+        LOG_ERR("failed to map frame at vaddr: 0x%lx\n", vaddr);
+        return false;
     }
 
-    return seL4_NoError;
+    return true;
 }
 
-
-// TODO: add permissions
-bool map_memory_region(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t size, uintptr_t vaddr)
+bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size,
+                       uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr)
 {
-    assert(PAGE_OFFSET(paddr) == PAGE_OFFSET(vaddr));
+    if (SMALL_PAGE_OFFSET(paddr)) {
+        LOG_ERR("paddr 0x%lx must be small page aligned\n", paddr);
+        return false;
+    }
+    if (SMALL_PAGE_OFFSET(vaddr)) {
+        LOG_ERR("vaddr 0x%lx must be small page aligned\n", vaddr);
+        return false;
+    }
+    if (!size || SMALL_PAGE_OFFSET(size)) {
+        LOG_ERR("size 0x%lx must be small page aligned\n", size);
+        return false;
+    }
+    if (!seL4_CapRights_get_capAllowRead(rights) && !seL4_CapRights_get_capAllowWrite(rights)) {
+        LOG_ERR("can't have a not read and not write mapping\n");
+        return false;
+    }
 
-    // sddf_dprintf("map 0x%lx-0x%lx to 0x%lx\n", paddr, paddr + size, vaddr);
-    uintptr_t mapped_size = 0;
-    uintptr_t paddr_start = ROUND_DOWN(paddr, PAGE_SIZE);
-    uintptr_t vaddr_start = ROUND_DOWN(vaddr, PAGE_SIZE);
-    uintptr_t end_paddr = paddr + size;
-    while (paddr_start + mapped_size < end_paddr) {
-        seL4_Error error = retype_and_map_frame(cnode_specs, paddr_start + mapped_size, vaddr_start + mapped_size, seL4_CapInitThreadVSpace, seL4_X86_4K, seL4_ReadWrite);
-        if (error != seL4_NoError) {
+    uint64_t curr_paddr = paddr;
+    uint64_t curr_vaddr = vaddr;
+    uint64_t end_paddr = paddr + size;
+    while (curr_paddr < end_paddr) {
+        if (!retype_and_map_frame(shadow_cnode, vspace_cptr, curr_paddr, curr_vaddr, rights, vm_attr)) {
             sddf_dprintf("Error: failed to retype or map a frame.\n");
             return false;
         }
-        mapped_size += PAGE_SIZE;
+        curr_paddr += SMALL_PAGE_SIZE;
+        curr_vaddr += SMALL_PAGE_SIZE;
     }
 
     return true;

@@ -1,12 +1,18 @@
+/*
+ * Copyright 2026, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <sddf/util/cspace.h>
+#include <sddf/util/shadow_cnode.h>
 
-#define PAGE_OFFSET(vaddr) (vaddr & 0xFFF)
-#define PAGE_SIZE GET_OBJECT_SIZE(seL4_X86_4K, 0)
-
-bool map_memory_region(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t size, uintptr_t vaddr);
-seL4_Error retype_and_map_frame(cnode_specs_t *cnode_specs, uintptr_t paddr, uintptr_t vaddr, seL4_CPtr vspace, seL4_Word page_type, seL4_CapRights_t rights);
+/* Map a memory region at the given physical address and size to the given virtual address.
+ * The mapping rights and attributes are given by the caller.
+ * The physical and virtual addresses, and size must be aligned on a small page boundary.
+ * This may fail if there is no or not enough UTs that can satisfy the allocation. */
+bool map_memory_region(shadow_cnode_t *shadow_cnode, seL4_CPtr vspace_cptr, uintptr_t paddr, size_t size,
+                       uintptr_t vaddr, seL4_CapRights_t rights, seL4_X86_VMAttributes vm_attr);
