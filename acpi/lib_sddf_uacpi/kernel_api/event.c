@@ -19,19 +19,22 @@
 #include <sddf/timer/timer_common.h>
 #include "../logging.h"
 
+#define IOAPIC_LEVEL_TRIGGER 1
+#define IOAPIC_EDGE_TRIGGER 0
+#define IOAPIC_ACTIVE_LOW 1
+#define IOAPIC_ACTIVE_HIGH 0
+
 extern tlsf_t heap;
 extern shadow_cnode_t *post_capdl_shadow_cnode;
 
-uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
-{
-    uint64_t freq = sddf_read_freq();
-    if (!freq) {
-        DEBUG_ACPI_ERR("TSC frequency unavailable\n");
-        // @billn a bit dodgy
-        return sddf_read_counter();
-    }
-    return ticks_to_ns(sddf_read_counter(), freq);
-}
+typedef struct {
+    size_t irq_cslot;
+    size_t ntfn_cslot;
+    uacpi_interrupt_handler uacpi_callback;
+    uacpi_handle uacpi_ctx;
+} irq_handle_t;
+
+irq_handle_t *sci_handle = NULL;
 
 static void delay_for_ns(uint64_t ns)
 {
@@ -49,14 +52,41 @@ static void delay_for_ns(uint64_t ns)
     };
 }
 
+static void irq_poll(void)
+{
+    if (sci_handle) {
+        seL4_Word badge = 0;
+        seL4_Poll(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, sci_handle->ntfn_cslot), &badge);
+
+        if (badge) {
+            DEBUG_ACPI("irq received\n");
+            sci_handle->uacpi_callback(sci_handle->uacpi_ctx);
+            seL4_IRQHandler_Ack(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, sci_handle->irq_cslot));
+        }
+    }
+}
+
+uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
+{
+    uint64_t freq = sddf_read_freq();
+    if (!freq) {
+        DEBUG_ACPI_ERR("TSC frequency unavailable\n");
+        // @billn a bit dodgy
+        return sddf_read_counter();
+    }
+    return ticks_to_ns(sddf_read_counter(), freq);
+}
+
 void uacpi_kernel_stall(uacpi_u8 usec)
 {
     delay_for_ns((uint64_t)usec * NS_IN_US);
+    irq_poll();
 }
 
 void uacpi_kernel_sleep(uacpi_u64 msec)
 {
     delay_for_ns((uint64_t)msec * NS_IN_MS);
+    irq_poll();
 }
 
 uacpi_handle uacpi_kernel_create_event(void)
@@ -75,15 +105,21 @@ void uacpi_kernel_free_event(uacpi_handle handle)
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout)
 {
-    /* We don't care about the timeout since Microkit PD code are un-preemptible even
-     * with a pending IRQ at the bound notification, except by the kernel's scheduler.
-     * so if the event isn't ready then just bail. */
+    uint64_t *ev = handle;
+    uint64_t now = uacpi_kernel_get_nanoseconds_since_boot();
+    uint64_t deadline = (timeout == 0xFFFF) ? UINT64_MAX : now + (uint64_t)timeout * NS_IN_MS;
 
-    if (*((uint64_t *)handle) > 0) {
-        *((uint64_t *)handle) -= 1;
-        return UACPI_TRUE;
+    for (;;) {
+        irq_poll();
+        if (*ev) {
+            (*ev)--;
+            return UACPI_TRUE;
+        }
+        if (uacpi_kernel_get_nanoseconds_since_boot() >= deadline) {
+            return UACPI_FALSE;
+        }
+        seL4_Yield();
     }
-    return UACPI_FALSE;
 }
 
 void uacpi_kernel_signal_event(uacpi_handle handle)
@@ -96,18 +132,15 @@ void uacpi_kernel_reset_event(uacpi_handle handle)
     *((uint64_t *)handle) = 0;
 }
 
-typedef struct {
-    size_t irq_cslot;
-    size_t ntfn_cslot;
-    uacpi_interrupt_handler uacpi_callback;
-    uacpi_handle uacpi_ctx;
-} irq_handle_t;
-
-irq_handle_t *sci_handle = NULL;
-
+/* Currently assumes a single SCI, so calling this multiple time will fail. */
 uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
                                                     uacpi_handle *out_irq_handle)
 {
+    if (sci_handle) {
+        DEBUG_ACPI_ERR("SCI already installed\n");
+        return UACPI_STATUS_ALREADY_EXISTS;
+    }
+
     DEBUG_ACPI("attempting to install GSI %u\n", irq);
 
     /* Gotta map the Global System Interrupt to what I/O APIC chip and pin it is wired to. */
@@ -131,12 +164,54 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    size_t ioapic_sequence = 0;
-    bool irq_cap_created = false;
+    /* The MADT table have variable sized entries...
+     * First scan, find if the motherboard have any quirks relating to this GSI specifically */
+    seL4_Word level = IOAPIC_LEVEL_TRIGGER;
+    seL4_Word polarity = IOAPIC_ACTIVE_LOW;
+    seL4_Word vector = 1;
 
-    /* The MADT table have variable sized entries... */
     struct acpi_madt *madt = madt_handle.ptr;
     size_t cur_madt_offset = offsetof(struct acpi_madt, entries);
+    while (cur_madt_offset < madt->hdr.length) {
+        size_t cur_entry_vaddr = madt_handle.virt_addr + cur_madt_offset;
+        struct acpi_entry_hdr *cur_entry_hdr = (struct acpi_entry_hdr *)cur_entry_vaddr;
+        if (cur_entry_hdr->type == ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE) {
+            if (cur_entry_hdr->length != sizeof(struct acpi_madt_interrupt_source_override)) {
+                DEBUG_ACPI_ERR("found an ISO entry with a bad length %u != %zu, skipping!\n", cur_entry_hdr->length,
+                               sizeof(struct acpi_madt_interrupt_source_override));
+                goto skip_entry_1;
+            }
+
+            struct acpi_madt_interrupt_source_override iso_entry;
+            memcpy(&iso_entry, cur_entry_hdr, sizeof(iso_entry));
+
+            DEBUG_ACPI("found ISO bus %u, source %u, GSI %u, flags 0x%x\n", iso_entry.bus, iso_entry.source,
+                       iso_entry.gsi, iso_entry.flags);
+
+            if (irq == iso_entry.gsi && iso_entry.flags) {
+                DEBUG_ACPI("SCI is quirky, applying quirks\n");
+
+                if ((iso_entry.flags & ACPI_MADT_TRIGGERING_MASK) != ACPI_MADT_TRIGGERING_CONFORMING) {
+                    level = (iso_entry.flags & ACPI_MADT_TRIGGERING_LEVEL) == ACPI_MADT_TRIGGERING_LEVEL
+                              ? IOAPIC_LEVEL_TRIGGER
+                              : IOAPIC_EDGE_TRIGGER;
+                }
+
+                if ((iso_entry.flags & ACPI_MADT_POLARITY_MASK) != ACPI_MADT_POLARITY_CONFORMING) {
+                    polarity = (iso_entry.flags & ACPI_MADT_POLARITY_ACTIVE_LOW) == ACPI_MADT_POLARITY_ACTIVE_LOW
+                                 ? IOAPIC_ACTIVE_LOW
+                                 : IOAPIC_ACTIVE_HIGH;
+                }
+            }
+        }
+
+    skip_entry_1:
+        cur_madt_offset += cur_entry_hdr->length;
+    }
+
+    size_t ioapic_sequence = 0;
+    bool irq_cap_created = false;
+    cur_madt_offset = offsetof(struct acpi_madt, entries);
     while (cur_madt_offset < madt->hdr.length) {
         size_t cur_entry_vaddr = madt_handle.virt_addr + cur_madt_offset;
         struct acpi_entry_hdr *cur_entry_hdr = (struct acpi_entry_hdr *)cur_entry_vaddr;
@@ -144,21 +219,27 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
             if (cur_entry_hdr->length != sizeof(struct acpi_madt_ioapic)) {
                 DEBUG_ACPI_ERR("found an I/O APIC entry with a bad length %u != %zu, skipping!\n",
                                cur_entry_hdr->length, sizeof(struct acpi_madt_ioapic));
-                goto skip_entry;
+                goto skip_entry_2;
             }
 
             struct acpi_madt_ioapic ioapic_entry;
             memcpy(&ioapic_entry, cur_entry_hdr, sizeof(ioapic_entry));
 
+            DEBUG_ACPI("found IOAPIC id %u, sequence %zu, GSI base %u\n", ioapic_entry.id, ioapic_sequence,
+                       ioapic_entry.gsi_base);
+
+            if (irq < ioapic_entry.gsi_base) {
+                ioapic_sequence++;
+                goto skip_entry_2;
+            }
             size_t pin_maybe = irq - ioapic_entry.gsi_base;
-            DEBUG_ACPI("found IOAPIC id %u, sequence %zu, GSI base %u, pin maybe %zu\n", ioapic_entry.id,
-                       ioapic_sequence, ioapic_entry.gsi_base, pin_maybe);
 
             /* There is no way to query how many pins that the I/O APIC actually support, since that information
              * is from the I/O APIC register, and seL4 doesn't expose this information, nor allow you to map the
              * registers (this would be dangerous anyways). So we just trial and error: */
+
             if (seL4_IRQControl_GetIOAPIC(irq_ctrl_cptr, shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0),
-                                          new_irq_cslot, 58, ioapic_sequence, pin_maybe, 1, 1, 0)
+                                          new_irq_cslot, 58, ioapic_sequence, pin_maybe, level, polarity, vector)
                 == seL4_NoError) {
 
                 assert(shadow_cnode_insert_cap_at_slot(
@@ -171,7 +252,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
             ioapic_sequence++;
         }
 
-    skip_entry:
+    skip_entry_2:
         cur_madt_offset += cur_entry_hdr->length;
     }
 
@@ -191,8 +272,24 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
+    size_t badged_nftn_cslot;
+    if (!shadow_cnode_find_free_slot(post_capdl_shadow_cnode, &badged_nftn_cslot)) {
+        DEBUG_ACPI_ERR("no space in CNode\n");
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    if (seL4_CNode_Mint(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), badged_nftn_cslot, 58,
+                        shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), new_nftn_cslot, 58, seL4_ReadWrite, 1)
+        != seL4_NoError) {
+        DEBUG_ACPI_ERR("can't mint ntfn with badge\n");
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    assert(shadow_cnode_insert_cap_at_slot(post_capdl_shadow_cnode, &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_NTFN, 0, 0, 0, 0),
+                                           badged_nftn_cslot));
+
     seL4_CPtr irq_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, new_irq_cslot);
-    seL4_CPtr ntfn_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, new_nftn_cslot);
+    seL4_CPtr ntfn_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, badged_nftn_cslot);
     if (seL4_IRQHandler_SetNotification(irq_cptr, ntfn_cptr) != seL4_NoError) {
         DEBUG_ACPI_ERR("Failed to bind IRQ to notification\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -210,14 +307,15 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     }
 
     handle->irq_cslot = new_irq_cslot;
-    handle->ntfn_cslot = new_nftn_cslot;
+    handle->ntfn_cslot = badged_nftn_cslot;
     handle->uacpi_callback = irq_handle;
     handle->uacpi_ctx = ctx;
 
-    DEBUG_ACPI("IRQHandler cap at CSlot %zu created for GSI %u, notification CSlot %zu\n", new_irq_cslot, irq,
-               new_nftn_cslot);
+    DEBUG_ACPI("IRQHandler cap at CSlot %zu created for GSI %u, badged notification CSlot %zu\n", new_irq_cslot, irq,
+               badged_nftn_cslot);
 
     *out_irq_handle = handle;
+    sci_handle = handle;
 
     return UACPI_STATUS_OK;
 }
