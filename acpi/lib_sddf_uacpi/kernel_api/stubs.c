@@ -17,12 +17,13 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len)
 }
 
 /* Stubs for mutex and spinlock, this is sound as Microkit PDs are single threaded */
-static uint8_t mutex;
-static uint8_t spinlock;
+static uint64_t dummy_mutex = 0;
+static uint64_t dummy_spinlock = 0;
 
 uacpi_handle uacpi_kernel_create_mutex(void)
 {
-    return &mutex;
+    dummy_mutex++;
+    return (uacpi_handle)dummy_mutex;
 }
 
 void uacpi_kernel_free_mutex(uacpi_handle handle)
@@ -40,12 +41,13 @@ void uacpi_kernel_release_mutex(uacpi_handle handle)
 
 uacpi_thread_id uacpi_kernel_get_thread_id(void)
 {
-    return 0;
+    return (uacpi_thread_id)1;
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void)
 {
-    return &spinlock;
+    dummy_spinlock++;
+    return (uacpi_handle)dummy_spinlock;
 }
 
 void uacpi_kernel_free_spinlock(uacpi_handle handle)

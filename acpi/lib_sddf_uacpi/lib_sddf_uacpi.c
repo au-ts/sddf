@@ -9,6 +9,7 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/acpi.h>
 #include <uacpi/tables.h>
+#include <uacpi/context.h>
 #include <uacpi/utilities.h>
 #include <sddf/acpi/lib_sddf_uacpi.h>
 #include <sddf/util/arch_timestamp_counter.h>
@@ -326,9 +327,10 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     }
     DEBUG_ACPI("Interrupt model set to I/O APIC\n");
 
-    // assert(uacpi_namespace_initialize() == UACPI_STATUS_OK);
+    DEBUG_ACPI("Initialising namespaces...\n");
+    assert(uacpi_namespace_initialize() == UACPI_STATUS_OK);
 
-    // DEBUG_ACPI("Namespace initialised\n");
+    DEBUG_ACPI("Namespace initialised\n");
     return true;
 }
 
