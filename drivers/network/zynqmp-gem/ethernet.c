@@ -363,9 +363,7 @@ static void eth_setup(void)
     eth->dmacr = dmacr;
 
     /* 5. Initialise buffer descriptors */
-    /* RX descriptors are initialised by rx_provide() before NIC is enabled */
-
-    /* TX descriptors must started as SW owned */
+    /* Rx and TX descriptors must started as SW owned */
     for (uint32_t i = 0; i < tx.capacity; i++) {
         volatile struct descriptor *d = &(tx.descr[i]);
         d->addr = 0;
@@ -375,6 +373,21 @@ static void eth_setup(void)
             d->stat |= TXD_WRAP;
         }
     }
+
+    for (uint32_t i = 0; i < rx.capacity; i++) {
+        volatile struct descriptor *d = &(rx.descr[i]);
+        d->addr = RXD_OWN; /* SW owns initially */
+        d->stat = 0;
+        d->addr_hi = 0;
+        if (i == tx.capacity - 1) {
+            d->addr |= RXD_WRAP;
+        }
+    }
+
+    /* Ensure all writes to the descriptor are ordered before we restart the
+     * receiver.
+     */
+    wwmb();
 
     /* 6. Configure buffer descriptor queue addresses
      * Upper address registers are cleared assuming 32-bit addresses.
