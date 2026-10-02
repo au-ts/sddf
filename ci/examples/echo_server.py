@@ -43,8 +43,9 @@ def backend_fn(test_config: common.TestConfig, loader_img: Path) -> HardwareBack
 
 async def test(backend: HardwareBackend, test_config: common.TestConfig):
     timeout = 20
-    if test_config.board.startswith("rpi4b"):
+    if test_config.board.startswith("rpi4b") or test_config.board == "maaxboard":
         # See https://github.com/au-ts/sddf/issues/698 for details
+        # See https://github.com/au-ts/sddf/issues/781 for details
         timeout = 30
 
     async with asyncio.timeout(timeout):
