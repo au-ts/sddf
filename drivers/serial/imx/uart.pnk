@@ -225,7 +225,7 @@ fun handle_irq()
         }
 
         if (uart_sr1 & UART_SR1_ABNORMAL) {
-            debug_print(uart_sr1);
+            custom_debug_print(2, uart_sr1);
             uart_sr1 = uart_read_sr1();
             uart_write_sr1(uart_sr1 | UART_SR1_ABNORMAL);
         }
@@ -254,7 +254,7 @@ export fun notified(1 ch)
 
                 rx_return();
             } else {
-                debug_print(ch);
+                custom_debug_print(1, ch);
             }
         }
     }

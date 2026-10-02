@@ -67,12 +67,18 @@ CFLAGS += \
 ${IMAGES}: libsddf_util_debug.a
 
 include ${SDDF}/util/util.mk
+
 ifeq ($(PANCAKE_SERIAL_DRIVER),1)
 include ${UART_DRIVER}/serial_driver_pnk.mk
 else
 include ${UART_DRIVER}/serial_driver.mk
 endif
+
+ifeq ($(PANCAKE_SERIAL_VIRTUALISERS),1)
+include ${SERIAL_COMPONENTS}/serial_components_pnk.mk
+else
 include ${SERIAL_COMPONENTS}/serial_components.mk
+endif
 
 client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

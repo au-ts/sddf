@@ -13,6 +13,7 @@
 #define pnk_mem_ptr(idx)  (@base + (idx) * @biw)
 #define pnk_mem(idx)      (lds 1 pnk_mem_ptr(idx))
 #define bitwise_not(n)    ((n) ^ -1)
+#define negative(n)       (0 - (n))
 
 /* Macros for FFI calls */
 #define debug_print(value) \
@@ -71,4 +72,132 @@ inline fun fence_seq_cst()
 {
     @fence_seq_cst(0, 0, 0, 0);
     return 0;
+}
+
+inline fun custom_debug_print(index, value)
+{
+    @custom_debug_print(0, index, 0, value);
+    return 0;
+}
+
+inline fun sddf_isspace(1 ch)
+{
+    return (
+        /* ch == ' ' */
+        ch == 32 ||
+        /* ch == '\f' */
+        ch == 12 ||
+        /* ch == '\n' */
+        ch == 10 ||
+        /* ch == '\r' */
+        ch == 13 ||
+        /* ch == \t' */
+        ch == 9 ||
+        /* ch == '\v' */
+        ch == 11
+    );
+}
+
+inline fun sddf_isdigit(1 ch)
+{
+    return (
+        /* ch >= '0' */
+        ch >=+ 48 &&
+        /* ch <= '9' */
+        ch <=+ 57
+    );
+}
+
+inline fun sddf_atoi(1 str)
+{
+    while (true) {
+        var ch = 0;
+        !ld8 ch, str;
+
+        var is_space = sddf_isspace(ch);
+        if (!is_space) {
+            break;
+        }
+
+        str = str + 1;
+    }
+
+    var sign = 1;
+    var ch = 0;
+    !ld8 ch, str;
+    /* ch == '+' */
+    if (ch == 43) {
+        str = str + 1;
+    } else {
+        /* ch == '-' */
+        if (ch == 45) {
+            sign = -1;
+            str = str + 1;
+        }
+    }
+
+    var result = 0;
+    while (true) {
+        !ld8 ch, str;
+        var is_digit = sddf_isdigit(ch);
+        if (!is_digit) {
+            break;
+        }
+
+        /* ch - '0' */
+        var digit = ch - 48;
+        result = result * 10;
+        result = result - digit;
+        str = str + 1;
+    }
+
+    return sign * negative(result);
+}
+
+inline fun memset(1 dest, 1 ch, 1 count)
+{
+    var ret = dest;
+
+    while (count != 0) {
+        !st8 dest, ch;
+        count = count - 1;
+        dest = dest + 1;
+    }
+
+    return ret;
+}
+
+inline fun memcpy(1 dest, 1 src, 1 count)
+{
+    var ret = dest;
+
+    while (count != 0) {
+        var ch = 0;
+        !ld8 ch, src;
+        !st8 dest, ch;
+        count = count - 1;
+        src = src + 1;
+        dest = dest + 1;
+    }
+
+    return ret;
+}
+
+inline fun MIN(1 a, 1 b)
+{
+    if (a < b) {
+        return a;
+    }
+
+    return b;
+}
+
+// implement the % operator for unsigned input integers
+inline fun slow_remainder(1 x, 1 y)
+{
+    while (x >= y) {
+        x = x - y;
+    }
+
+    return x;
 }

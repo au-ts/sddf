@@ -19,3 +19,8 @@ PANCAKE_FLAGS += \
 	--pancake \
 	--target=$(PANCAKE_TARGET) \
 	--main_return=true
+
+ifeq ($(PANCAKE),1)
+	PANCAKE_SERIAL_DRIVER := 1
+	PANCAKE_SERIAL_VIRTUALISERS := 1
+endif
