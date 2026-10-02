@@ -97,29 +97,29 @@ client.elf: client.o libsddf_util.a
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) \
-		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		$(METAPROGRAM) --board $(MICROKIT_BOARD) \
 		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 else
 	$(PYTHON) \
-		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		$(METAPROGRAM) --board $(MICROKIT_BOARD) \
 		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer} \
 		$${NVME:+--nvme}
 endif
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=blk_driver_timer_client_config.data blk_driver.elf
 endif
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
-	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
-	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
-	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
+	$(OBJCOPY) --update-section .blk_driver_config=blk_driver_blk_driver_config.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_virt_config=blk_virt_blk_virt_config.data blk_virt.elf
+	$(OBJCOPY) --update-section .blk_client_config=client_blk_client_config.data client.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx_serial_virt_tx_config.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=client_serial_client_config.data client.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
