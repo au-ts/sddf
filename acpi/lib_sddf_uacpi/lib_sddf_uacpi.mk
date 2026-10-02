@@ -16,18 +16,22 @@
 # Assumes libsddf_util_debug.a is in ${LIBS} and built with SDDF_TLSF_MALLOC=1.
 
 LIB_SDDF_UACPI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+KERNEL_API_DIR := $(LIB_SDDF_UACPI_DIR)/kernel_api
 
 UACPI_DIR := $(SDDF)/acpi/uacpi
 UACPI_SRC_DIR := $(UACPI_DIR)/source
 UACPI_INC_DIR := $(UACPI_DIR)/include
 
 # uACPI uses CMake and Meson so we need to manually include the sources
-LIB_SDDF_UACPI_SOURCES := $(wildcard $(UACPI_SRC_DIR)/*.c)
+UACPI_SOURCES := $(wildcard $(UACPI_SRC_DIR)/*.c)
 
 # Remove UACPI_SRC_DIR prefix as we prefer the unprefixed form
-LIB_SDDF_UACPI_SOURCES := $(subst $(UACPI_SRC_DIR)/,,$(LIB_SDDF_UACPI_SOURCES))
+UACPI_SOURCES := $(subst $(UACPI_SRC_DIR)/,,$(UACPI_SOURCES))
 
-lib_sddf_uacpi.a: lib_sddf_uacpi_out/lib_sddf_uacpi.o lib_sddf_uacpi_out/stubs.o $(addprefix lib_sddf_uacpi_out/, $(LIB_SDDF_UACPI_SOURCES:.c=.o))
+# Implementation of the OS layer for uACPI
+KERNEL_API_SOURCES := event.c ioport.c stubs.c
+
+lib_sddf_uacpi.a: lib_sddf_uacpi_out/lib_sddf_uacpi.o $(addprefix lib_sddf_uacpi_out/kernel_api/, $(KERNEL_API_SOURCES:.c=.o)) $(addprefix lib_sddf_uacpi_out/uacpi/, $(UACPI_SOURCES:.c=.o))
 	$(AR) crv $@ $^
 	$(RANLIB) $@
 
@@ -35,13 +39,17 @@ lib_sddf_uacpi_out/lib_sddf_uacpi.o: $(LIB_SDDF_UACPI_DIR)/lib_sddf_uacpi.c | $(
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
 
-lib_sddf_uacpi_out/stubs.o: $(LIB_SDDF_UACPI_DIR)/stubs.c | $(SDDF_LIBC_INCLUDE)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
-
-$(foreach f,$(LIB_SDDF_UACPI_SOURCES), \
+$(foreach f,$(UACPI_SOURCES), \
 	$(eval \
-		lib_sddf_uacpi_out/$(f:.c=.o): $(UACPI_SRC_DIR)/$(f); \
+		lib_sddf_uacpi_out/uacpi/$(f:.c=.o): $(UACPI_SRC_DIR)/$(f); \
+			mkdir -p $$(dir $$@); \
+			$$(CC) $$(CFLAGS) -I$$(UACPI_INC_DIR) -c -o $$@ $$< \
+	) \
+)
+
+$(foreach f,$(KERNEL_API_SOURCES), \
+	$(eval \
+		lib_sddf_uacpi_out/kernel_api/$(f:.c=.o): $(KERNEL_API_DIR)/$(f); \
 			mkdir -p $$(dir $$@); \
 			$$(CC) $$(CFLAGS) -I$$(UACPI_INC_DIR) -c -o $$@ $$< \
 	) \

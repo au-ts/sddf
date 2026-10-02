@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <uacpi/uacpi.h>
-#include "logging.h"
+#include "../logging.h"
 
 /* This file contains all the OS functions uACPI expects but we have not implemented or the
  * implementation is very minimal. To reduce clutter in lib_sddf_uacpi.c */
