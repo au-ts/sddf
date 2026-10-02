@@ -363,7 +363,7 @@ static void eth_setup(void)
     eth->dmacr = dmacr;
 
     /* 5. Initialise buffer descriptors */
-    /* Rx and TX descriptors must started as SW owned */
+    /* Rx and TX descriptors must start as SW owned */
     for (uint32_t i = 0; i < tx.capacity; i++) {
         volatile struct descriptor *d = &(tx.descr[i]);
         d->addr = 0;
