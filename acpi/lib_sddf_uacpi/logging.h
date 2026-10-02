@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#pragma once
+
 #include <sddf/util/printf.h>
 
 #define COLOUR_RED     "\x1b[31m"
