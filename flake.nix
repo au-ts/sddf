@@ -11,6 +11,8 @@
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;
+    acacia.url = "github:au-ts/microkit_acacia";
+    acacia.flake = false;
   };
 
   outputs =
@@ -18,6 +20,7 @@
       nixpkgs,
       sdfgen,
       systems-ci,
+      acacia,
       ...
     }:
     let
@@ -47,6 +50,10 @@
           };
 
           ts_ci = pkgs.callPackage "${systems-ci}/ts_ci/package.nix" {
+            python3Packages = pkgs.python312Packages;
+          };
+
+          mk_acacia = pkgs.callPackage "${acacia}/package.nix" {
             python3Packages = pkgs.python312Packages;
           };
 
@@ -81,6 +88,7 @@
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen
             ts_ci
+            mk_acacia
           ]);
         in
         {
