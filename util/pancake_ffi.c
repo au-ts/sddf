@@ -76,5 +76,5 @@ void ffifence_seq_cst(unsigned char *c, long clen, unsigned char *a, long alen)
 
 void ffiserial_virt_rx_switch_print(unsigned char *c, long clen, unsigned char *a, long alen)
 {
-    sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", (int) clen);
+    sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", (int)clen);
 }
