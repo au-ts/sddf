@@ -173,6 +173,8 @@ static shadow_cap_type_t sel4_obj_type_to_shadow_cap_type(seL4_Word object_type)
     switch (object_type) {
     case seL4_UntypedObject:
         return CAP_TYPE_UT;
+    case seL4_NotificationObject:
+        return CAP_TYPE_NTFN;
     case seL4_X86_4K:
         return CAP_TYPE_SMALL_PAGE;
     case seL4_X86_LargePageObject:
