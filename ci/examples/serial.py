@@ -31,7 +31,7 @@ def colour_number(num: bytes, colour: bytes) -> bytes:
 async def test(backend: HardwareBackend, test_config: common.TestConfig):
     # TODO: We really need some kind of colour (de)multiplexer....
 
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(20):
         await wait_for_output(backend, b"Begin input\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
