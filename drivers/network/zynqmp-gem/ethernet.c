@@ -409,9 +409,8 @@ static void eth_setup(void)
     /* 7. Enable RX/TX interrupts */
     eth->ier = ZYNQ_INT_RXC | ZYNQ_INT_TXC;
 
-    /* 8. Enable MDIO and transmitter (receiver enabled later after buffer init) */
-    eth->nwctrl |= ZYNQ_GEM_NWCTRL_MDEN_MASK;
-    eth->nwctrl |= ZYNQ_GEM_NWCTRL_TXEN_MASK;
+    /* 8. Enable MDIO, transmitter and receiver */
+    eth->nwctrl |= ZYNQ_GEM_NWCTRL_MDEN_MASK | ZYNQ_GEM_NWCTRL_TXEN_MASK | ZYNQ_GEM_NWCTRL_RXEN_MASK;
 }
 
 void init(void)
@@ -434,9 +433,6 @@ void init(void)
 
     rx_provide();
     tx_provide();
-
-    /* Now that buffers are in the descriptor ring, enable the receiver */
-    eth->nwctrl |= ZYNQ_GEM_NWCTRL_RXEN_MASK;
 }
 
 void notified(microkit_channel ch)
