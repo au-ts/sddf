@@ -180,7 +180,7 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
-#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
+#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2) || defined(CONFIG_PLAT_ROCKPRO64)
             cntl |= DESC_TXCTRL_TXCIC;
 #endif
             update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
@@ -285,10 +285,10 @@ static void eth_setup(void)
     eth_mac->macaddr0lo = l;
     eth_mac->macaddr0hi = h;
 
-#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
+#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2) || defined(CONFIG_PLAT_ROCKPRO64)
     /*
      * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has a 4KB RX FIFO and a 2KB TX FIFO
-     * and uses a 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
+     * and uses a 32-bit AHB bus. Odroid-C2 and rockpro64 has the same hardware configuration.
      * We use the maximum allowed TxPBL value here (128 = 16 * 8),
      * in which [2048 - (128 + 3) * (32 / 8) = 1524 > packet size] to avoid dead-lock.
      * The RxPBL value here is also the maximum value (256 = 32 * 8).
