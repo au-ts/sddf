@@ -11,7 +11,7 @@ PLATFORM := rk3399
 I2C_DRIV_DIR := ${PLATFORM}
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_dwmac-5.10a.elf
-#TIMER_DRIV_DIR := arm
+TIMER_DRIV_DIR := rk3399
 UART_DRIV_DIR := ns16550a
 
 CPU := cortex-a53
