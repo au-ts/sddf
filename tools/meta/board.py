@@ -170,6 +170,7 @@ BOARDS: List[Board] = [
         # https://github.com/u-boot/u-boot/blob/v2024.10/configs/rockpro64-rk3399_defconfig#L77
         baud_rate=1500000,
         timer="rktimer@ff850000",
+        ethernet="ethernet@fe300000",
     ),
     Board(
         name="rpi4b_1gb",

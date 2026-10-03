@@ -64,6 +64,7 @@ The following platforms are supported:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * rock3b
+* rockpro64
 * star64
 * x86_64_generic (only QEMU right now)
 

@@ -1,7 +1,8 @@
 {
     "compatible": [
         "amlogic,meson-gxbb-dwmac",
-        "amlogic,meson-g12a-dwmac"
+        "amlogic,meson-g12a-dwmac",
+        "rockchip,rk3399-gmac"
     ],
     "resources": {
         "regions": [
