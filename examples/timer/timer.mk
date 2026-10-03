@@ -19,23 +19,24 @@ IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
 SUPPORTED_BOARDS := \
-		    imx8mm_evk \
-		    imx8mp_evk \
-		    imx8mq_evk \
-		    imx8mp_iotgate \
-			kria_k26 \
-		    maaxboard \
-		    odroidc2 \
-		    odroidc4 \
-		    qemu_virt_aarch64 \
-		    qemu_virt_riscv64 \
-		    rock3b \
-		    rpi4b_1gb \
-		    serengeti \
-		    star64 \
-		    zcu102 \
-		    x86_64_generic \
-		    x86_64_generic_vtx
+            imx8mm_evk \
+            imx8mp_evk \
+            imx8mq_evk \
+            imx8mp_iotgate \
+            kria_k26 \
+            maaxboard \
+            odroidc2 \
+            odroidc4 \
+            qemu_virt_aarch64 \
+            qemu_virt_riscv64 \
+            rock3b \
+            rockpro64 \
+            rpi4b_1gb \
+            serengeti \
+            star64 \
+            zcu102 \
+            x86_64_generic \
+            x86_64_generic_vtx
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
