@@ -18,6 +18,7 @@ Files:
     examples/echo_server/core_config/single_core.json
     examples/echo_server/core_config/two_core.json
     examples/echo_server/core_config/four_core.json
+    examples/echo_server/core_config/six_core.json
     examples/gpu/build.zig.zon
     drivers/blk/mmc/imx/config.json
     drivers/blk/virtio/config.json
