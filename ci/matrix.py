@@ -165,6 +165,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "rock3b",
+            "rockpro64",
             "rpi4b_1gb",
             "star64",
             "serengeti",
