@@ -44,10 +44,11 @@ typedef struct {
  * 3. Insufficient normal UTs to make paging objects for mapping memory.
  * 4. Out of bookkeeping memory in uacpi_kernel_map(). This can happen when
  *    uACPI tries to map too much physical memory. Fix: increase MAX_PADDR_MAPPED.
- * 5. Out of CSlot, can happen when mapping too much memory or I/O Ports.
+ * 5. Out of CSlot, can happen when mapping too much memory.
  *    Fix: increase post capDL CNode size bits.
  * 6. x86: overlapping I/O Port mappings between the capDL initialiser and
- *    uACPI. Fix: see 2.
+ *    uACPI, lib_sddf_uacpi will reserve the entire I/O Port range
+ *    while it is active. Fix: see #2.
  * */
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args);
 
