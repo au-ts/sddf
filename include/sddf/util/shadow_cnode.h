@@ -13,7 +13,7 @@
 
 /* A utility library for managing CNode. */
 
-#define MAX_SHADOW_CNODE_SIZE_BITS 9u /* 2**9 = 512 slots */
+#define MAX_SHADOW_CNODE_SIZE_BITS 11u /* 2**11 = 2048 slots */
 
 /* The kernel does not expose a consistent enum for cap type, unlike object which have seL4_ObjectType and
  * seL4_seL4ArchObjectType so we need to have this.

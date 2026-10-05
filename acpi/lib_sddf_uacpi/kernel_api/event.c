@@ -18,23 +18,14 @@
 #include <sddf/util/tlsf/tlsf.h>
 #include <sddf/timer/timer_common.h>
 #include "../logging.h"
+#include "../types.h"
 
 #define IOAPIC_LEVEL_TRIGGER 1
 #define IOAPIC_EDGE_TRIGGER 0
 #define IOAPIC_ACTIVE_LOW 1
 #define IOAPIC_ACTIVE_HIGH 0
 
-extern tlsf_t heap;
-extern shadow_cnode_t *post_capdl_shadow_cnode;
-
-typedef struct {
-    size_t irq_cslot;
-    size_t ntfn_cslot;
-    uacpi_interrupt_handler uacpi_callback;
-    uacpi_handle uacpi_ctx;
-} irq_handle_t;
-
-irq_handle_t *sci_handle = NULL;
+extern lib_sddf_uacpi_state_t lib_state;
 
 static void delay_for_ns(uint64_t ns)
 {
@@ -54,14 +45,16 @@ static void delay_for_ns(uint64_t ns)
 
 static void irq_poll(void)
 {
-    if (sci_handle) {
+    if (lib_state.sci_handle) {
         seL4_Word badge = 0;
-        seL4_Poll(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, sci_handle->ntfn_cslot), &badge);
+        seL4_Poll(shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, lib_state.sci_handle->ntfn_cslot),
+                  &badge);
 
         if (badge) {
             DEBUG_ACPI("irq received\n");
-            sci_handle->uacpi_callback(sci_handle->uacpi_ctx);
-            seL4_IRQHandler_Ack(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, sci_handle->irq_cslot));
+            lib_state.sci_handle->uacpi_callback(lib_state.sci_handle->uacpi_ctx);
+            seL4_IRQHandler_Ack(
+                shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, lib_state.sci_handle->irq_cslot));
         }
     }
 }
@@ -91,7 +84,7 @@ void uacpi_kernel_sleep(uacpi_u64 msec)
 
 uacpi_handle uacpi_kernel_create_event(void)
 {
-    uint64_t *ev = tlsf_malloc(heap, sizeof(uint64_t));
+    uint64_t *ev = tlsf_malloc(lib_state.acpi_heap, sizeof(uint64_t));
     if (ev) {
         *ev = 0;
     }
@@ -100,7 +93,7 @@ uacpi_handle uacpi_kernel_create_event(void)
 
 void uacpi_kernel_free_event(uacpi_handle handle)
 {
-    tlsf_free(heap, handle);
+    tlsf_free(lib_state.acpi_heap, handle);
 }
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout)
@@ -136,7 +129,7 @@ void uacpi_kernel_reset_event(uacpi_handle handle)
 uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
                                                     uacpi_handle *out_irq_handle)
 {
-    if (sci_handle) {
+    if (lib_state.sci_handle) {
         DEBUG_ACPI_ERR("SCI already installed\n");
         return UACPI_STATUS_ALREADY_EXISTS;
     }
@@ -152,14 +145,15 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     }
 
     size_t irq_control_cslot;
-    if (!shadow_cnode_find_cap_slot_of_type(post_capdl_shadow_cnode, CAP_TYPE_IRQ_CONTROL, &irq_control_cslot)) {
+    if (!shadow_cnode_find_cap_slot_of_type(lib_state.post_capdl_shadow_cnode, CAP_TYPE_IRQ_CONTROL,
+                                            &irq_control_cslot)) {
         DEBUG_ACPI_ERR("cannot find IRQ control cap in shadow CNode\n");
         return UACPI_STATUS_DENIED;
     }
-    seL4_CPtr irq_ctrl_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, irq_control_cslot);
+    seL4_CPtr irq_ctrl_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, irq_control_cslot);
 
     size_t new_irq_cslot;
-    if (!shadow_cnode_find_free_slot(post_capdl_shadow_cnode, &new_irq_cslot)) {
+    if (!shadow_cnode_find_free_slot(lib_state.post_capdl_shadow_cnode, &new_irq_cslot)) {
         DEBUG_ACPI_ERR("no space in CNode\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
@@ -238,12 +232,14 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
              * is from the I/O APIC register, and seL4 doesn't expose this information, nor allow you to map the
              * registers (this would be dangerous anyways). So we just trial and error: */
 
-            if (seL4_IRQControl_GetIOAPIC(irq_ctrl_cptr, shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0),
+            if (seL4_IRQControl_GetIOAPIC(irq_ctrl_cptr,
+                                          shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0),
                                           new_irq_cslot, 58, ioapic_sequence, pin_maybe, level, polarity, vector)
                 == seL4_NoError) {
 
-                assert(shadow_cnode_insert_cap_at_slot(
-                    post_capdl_shadow_cnode, &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_IRQ, 0, 0, 0, 0), new_irq_cslot));
+                assert(shadow_cnode_insert_cap_at_slot(lib_state.post_capdl_shadow_cnode,
+                                                       &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_IRQ, 0, 0, 0, 0),
+                                                       new_irq_cslot));
                 DEBUG_ACPI("IRQ cap created at this IOAPIC\n");
                 irq_cap_created = true;
                 break;
@@ -267,29 +263,30 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     }
 
     size_t new_nftn_cslot;
-    if (!shadow_cnode_retype(post_capdl_shadow_cnode, seL4_NotificationObject, 0, &new_nftn_cslot)) {
+    if (!shadow_cnode_retype(lib_state.post_capdl_shadow_cnode, seL4_NotificationObject, 0, &new_nftn_cslot)) {
         DEBUG_ACPI_ERR("Failed to create notification object\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
     size_t badged_nftn_cslot;
-    if (!shadow_cnode_find_free_slot(post_capdl_shadow_cnode, &badged_nftn_cslot)) {
+    if (!shadow_cnode_find_free_slot(lib_state.post_capdl_shadow_cnode, &badged_nftn_cslot)) {
         DEBUG_ACPI_ERR("no space in CNode\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    if (seL4_CNode_Mint(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), badged_nftn_cslot, 58,
-                        shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), new_nftn_cslot, 58, seL4_ReadWrite, 1)
+    if (seL4_CNode_Mint(shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0), badged_nftn_cslot, 58,
+                        shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0), new_nftn_cslot, 58,
+                        seL4_ReadWrite, 1)
         != seL4_NoError) {
         DEBUG_ACPI_ERR("can't mint ntfn with badge\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    assert(shadow_cnode_insert_cap_at_slot(post_capdl_shadow_cnode, &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_NTFN, 0, 0, 0, 0),
-                                           badged_nftn_cslot));
+    assert(shadow_cnode_insert_cap_at_slot(lib_state.post_capdl_shadow_cnode,
+                                           &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_NTFN, 0, 0, 0, 0), badged_nftn_cslot));
 
-    seL4_CPtr irq_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, new_irq_cslot);
-    seL4_CPtr ntfn_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, badged_nftn_cslot);
+    seL4_CPtr irq_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, new_irq_cslot);
+    seL4_CPtr ntfn_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, badged_nftn_cslot);
     if (seL4_IRQHandler_SetNotification(irq_cptr, ntfn_cptr) != seL4_NoError) {
         DEBUG_ACPI_ERR("Failed to bind IRQ to notification\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -300,7 +297,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
         return UACPI_STATUS_DENIED;
     }
 
-    irq_handle_t *handle = tlsf_malloc(heap, sizeof(irq_handle_t));
+    irq_handle_t *handle = tlsf_malloc(lib_state.acpi_heap, sizeof(irq_handle_t));
     if (!handle) {
         DEBUG_ACPI_ERR("out of memory\n");
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -315,7 +312,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
                badged_nftn_cslot);
 
     *out_irq_handle = handle;
-    sci_handle = handle;
+    lib_state.sci_handle = handle;
 
     return UACPI_STATUS_OK;
 }

@@ -102,7 +102,7 @@ def generate(
 
     acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=211, stack_size=0x5000)
 
-    acpi_post_capdl_bootinfo_mr = MemoryRegion(sdf, "acpi_post_capdl_bootinfo", 0x200000, prefill_bootinfo="post_capdl_bootinfo")
+    acpi_post_capdl_bootinfo_mr = MemoryRegion(sdf, "acpi_post_capdl_bootinfo", 0x1000, prefill_bootinfo="post_capdl_bootinfo")
     sdf.add_mr(acpi_post_capdl_bootinfo_mr)
     acpi_driver.add_map(Map(acpi_post_capdl_bootinfo_mr, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl"))
 
@@ -110,7 +110,7 @@ def generate(
     sdf.add_mr(acpi_bootinfo_rsdp_mr)
     acpi_driver.add_map(Map(acpi_bootinfo_rsdp_mr, 0x2200000, "r", setvar_vaddr="bootinfo_rsdp"))
 
-    acpi_post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=9)
+    acpi_post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=11)
     sdf.add_cnode(acpi_post_capdl_cnode)
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=acpi_post_capdl_cnode, dest_cspace_slot=1))
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))

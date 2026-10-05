@@ -19,54 +19,12 @@
 #include <sddf/util/tlsf/tlsf.h>
 #include <sddf/timer/timer_common.h>
 #include "logging.h"
+#include "types.h"
 
-#define PAGE_SIZE_4K BIT(seL4_PageBits)
-
-#define ACPI_HEAP_SIZE 0x400000
-static alignas(8) char acpi_heap[ACPI_HEAP_SIZE];
-tlsf_t heap;
-
-shadow_cnode_t *post_capdl_shadow_cnode;
-static seL4_CPtr vspace_cptr;
-seL4_CPtr x86_ioport_ctrl_cptr;
-
-/* We map physical memory with vaddr as ACPI_DIRECT_MAP_BASE + requested paddr
- * so that we don't have to unmap it and do cap clean ups, since we will tear
- * everything down by the end anyways.
-
- * @billn improve by reserving this range in the linker? */
-#define ACPI_DIRECT_MAP_BASE BIT(30)
-#define MAX_PADDR_MAPPED 1024
-static uint64_t paddr_mapped[MAX_PADDR_MAPPED];
-static int num_p_mapped;
-
-/* Annoyingly, seL4 give us the RSDP blob rather than the paddr, so we need
- * to copy it into a dummy "paddr" and serve it to uACPI from a buffer. */
-#define RSDP_PADDR (ACPI_DIRECT_MAP_BASE - PAGE_SIZE_4K)
-char rsdp_buf[PAGE_SIZE_4K];
-
-typedef struct {
-    void *vaddr;
-    uint64_t paddr;
-    size_t size_bytes;
-    uint16_t segment;
-    uint8_t start_bus;
-    uint8_t end_bus;
-} ecam_desc_t;
-
-#define MAX_NUM_ECAM 4
-static ecam_desc_t ecams[MAX_NUM_ECAM];
-static size_t num_ecams = 0;
-static uint64_t next_avail_ecam_vaddr = BIT(27);
-#define MAX_ECAM_VADDR ACPI_DIRECT_MAP_BASE
-
-typedef struct {
-    void *config_space_vaddr; // in one of the ECAM
-} pci_device_uacpi_handle_t;
+alignas(8) lib_sddf_uacpi_state_t lib_state;
 
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address)
 {
-    DEBUG_ACPI("called\n");
     *out_rsdp_address = RSDP_PADDR;
     return UACPI_STATUS_OK;
 }
@@ -83,7 +41,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
     }
 
     if (addr == RSDP_PADDR && len < PAGE_SIZE_4K) {
-        return rsdp_buf;
+        return &lib_state.rsdp_buf;
     }
 
     uint64_t cur_paddr = ROUND_DOWN(addr, PAGE_SIZE_4K);
@@ -92,8 +50,8 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
     while (cur_paddr < target_paddr_end) {
         int i = 0;
         bool mapped = false;
-        while (i < num_p_mapped) {
-            if (paddr_mapped[i] == cur_paddr) {
+        while (i < lib_state.num_p_mapped) {
+            if (lib_state.paddr_mapped[i] == cur_paddr) {
                 mapped = true;
                 break;
             }
@@ -101,15 +59,15 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
         }
 
         if (!mapped) {
-            if (num_p_mapped == MAX_PADDR_MAPPED) {
+            if (lib_state.num_p_mapped == MAX_PADDR_MAPPED) {
                 DEBUG_ACPI_ERR("ran out of bookkeeping\n");
                 return NULL;
             }
 
-            if (map_memory_region(post_capdl_shadow_cnode, vspace_cptr, cur_paddr, PAGE_SIZE_4K, false,
-                                  ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
-                paddr_mapped[num_p_mapped] = cur_paddr;
-                num_p_mapped++;
+            if (map_memory_region(lib_state.post_capdl_shadow_cnode, lib_state.vspace_cptr, cur_paddr, PAGE_SIZE_4K,
+                                  false, ACPI_DIRECT_MAP_BASE + cur_paddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+                lib_state.paddr_mapped[lib_state.num_p_mapped] = cur_paddr;
+                lib_state.num_p_mapped++;
             } else {
                 return NULL;
             }
@@ -123,7 +81,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
 
 void *uacpi_kernel_alloc(uacpi_size size)
 {
-    void *p = tlsf_malloc(heap, size);
+    void *p = tlsf_malloc(lib_state.acpi_heap, size);
     if (!p) {
         DEBUG_ACPI_ERR("out of heap memory, consider increasing ACPI_HEAP_SIZE\n");
     }
@@ -132,31 +90,31 @@ void *uacpi_kernel_alloc(uacpi_size size)
 
 void uacpi_kernel_free(void *mem)
 {
-    tlsf_free(heap, mem);
+    tlsf_free(lib_state.acpi_heap, mem);
 }
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handle *out_handle)
 {
     // @billn handle when firmware did not provide mcfg
     int ecam_idx = 0;
-    for (; ecam_idx < num_ecams; ecam_idx++) {
-        if (address.segment == ecams[ecam_idx].segment && address.bus >= ecams[ecam_idx].start_bus
-            && address.bus <= ecams[ecam_idx].end_bus) {
+    for (; ecam_idx < lib_state.num_ecams; ecam_idx++) {
+        if (address.segment == lib_state.ecams[ecam_idx].segment && address.bus >= lib_state.ecams[ecam_idx].start_bus
+            && address.bus <= lib_state.ecams[ecam_idx].end_bus) {
             break;
         }
     }
 
-    if (ecam_idx == num_ecams) {
+    if (ecam_idx == lib_state.num_ecams) {
         DEBUG_ACPI_ERR("failed to find matching ECAM for %u:%u.%u in PCI segment %u\n", address.bus, address.device,
                        address.function, address.segment);
         return UACPI_STATUS_NOT_FOUND;
     }
 
-    void *config_space_vaddr = (void *)((uintptr_t)(ecams[ecam_idx].vaddr)
-                                        + ((uint64_t)(address.bus - ecams[ecam_idx].start_bus) << 20
+    void *config_space_vaddr = (void *)((uintptr_t)(lib_state.ecams[ecam_idx].vaddr)
+                                        + ((uint64_t)(address.bus - lib_state.ecams[ecam_idx].start_bus) << 20
                                            | (uint64_t)address.device << 15 | (uint64_t)address.function << 12));
 
-    pci_device_uacpi_handle_t *handle = tlsf_malloc(heap, sizeof(pci_device_uacpi_handle_t));
+    pci_device_uacpi_handle_t *handle = tlsf_malloc(lib_state.acpi_heap, sizeof(pci_device_uacpi_handle_t));
     if (!handle) {
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
@@ -169,7 +127,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
 
 void uacpi_kernel_pci_device_close(uacpi_handle handle)
 {
-    tlsf_free(heap, handle);
+    tlsf_free(lib_state.acpi_heap, handle);
 }
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset, uacpi_u8 *value)
@@ -222,23 +180,28 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, ua
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 {
-    heap = tlsf_create_with_pool(acpi_heap, ACPI_HEAP_SIZE);
-    if (!heap) {
+    memset(&lib_state, 0, sizeof(lib_state));
+
+    lib_state.acpi_heap = tlsf_create_with_pool(lib_state.acpi_heap_buf, ACPI_HEAP_SIZE);
+    if (!lib_state.acpi_heap) {
         DEBUG_ACPI_ERR("Failed to initialise heap\n");
         return false;
     }
 
-    memcpy(rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
-    post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
-    vspace_cptr = init_args->vspace_cptr;
+    lib_state.vspace_cptr = init_args->vspace_cptr;
+    lib_state.next_avail_ecam_vaddr = BIT(27);
+
+    memcpy(lib_state.rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
+    lib_state.post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
 
     size_t x86_ioport_ctrl_cslot;
-    if (!shadow_cnode_find_cap_slot_of_type(post_capdl_shadow_cnode, CAP_TYPE_X86_IO_PORT_CONTROL,
+    if (!shadow_cnode_find_cap_slot_of_type(lib_state.post_capdl_shadow_cnode, CAP_TYPE_X86_IO_PORT_CONTROL,
                                             &x86_ioport_ctrl_cslot)) {
         DEBUG_ACPI_ERR("capDL initialiser did not grant I/O Port control cap\n");
         return false;
     }
-    x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, x86_ioport_ctrl_cslot);
+    lib_state.x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode,
+                                                                x86_ioport_ctrl_cslot);
 
     DEBUG_ACPI("Initialising uACPI...\n");
     /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table
@@ -276,10 +239,10 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
                 continue;
             }
 
-            ecams[num_ecams].paddr = entry->address;
-            ecams[num_ecams].start_bus = entry->start_bus;
-            ecams[num_ecams].end_bus = entry->end_bus;
-            ecams[num_ecams].segment = entry->segment;
+            lib_state.ecams[lib_state.num_ecams].paddr = entry->address;
+            lib_state.ecams[lib_state.num_ecams].start_bus = entry->start_bus;
+            lib_state.ecams[lib_state.num_ecams].end_bus = entry->end_bus;
+            lib_state.ecams[lib_state.num_ecams].segment = entry->segment;
 
             /* Quirk: base address is for bus 0 of that segment, so if the start bus isn't zero
              * we need to account for that.
@@ -289,23 +252,23 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
             uint64_t map_base = ROUND_DOWN(ecam_start, BIT(seL4_LargePageBits));
             size_t map_size = ROUND_UP(ecam_end, BIT(seL4_LargePageBits)) - map_base;
 
-            ecams[num_ecams].size_bytes = ecam_end - ecam_start;
+            lib_state.ecams[lib_state.num_ecams].size_bytes = ecam_end - ecam_start;
 
-            uint64_t ecam_vaddr = next_avail_ecam_vaddr;
+            uint64_t ecam_vaddr = lib_state.next_avail_ecam_vaddr;
             if (ecam_vaddr + map_size > MAX_ECAM_VADDR) {
                 DEBUG_ACPI_ERR("Not enough vaddr range for ECAM %d\n", i);
                 return false;
             }
 
-            if (!map_memory_region(post_capdl_shadow_cnode, vspace_cptr, map_base, map_size, true, ecam_vaddr,
-                                   seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+            if (!map_memory_region(lib_state.post_capdl_shadow_cnode, lib_state.vspace_cptr, map_base, map_size, true,
+                                   ecam_vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
                 DEBUG_ACPI_ERR("can't map ECAM %d at vaddr 0x%lx\n", i, ecam_vaddr);
                 return false;
             }
 
-            ecams[num_ecams].vaddr = (void *)(ecam_vaddr + (ecam_start - map_base));
-            num_ecams++;
-            next_avail_ecam_vaddr += map_size;
+            lib_state.ecams[lib_state.num_ecams].vaddr = (void *)(ecam_vaddr + (ecam_start - map_base));
+            lib_state.num_ecams++;
+            lib_state.next_avail_ecam_vaddr += map_size;
         }
         assert(uacpi_table_unref(&mcfg_handle) == UACPI_STATUS_OK);
     }
@@ -344,22 +307,15 @@ bool sddf_uacpi_teardown(void)
     // No need to call uacpi_state_reset() because we tear everything down
     // anyways.
 
-    memset(acpi_heap, 0, sizeof(acpi_heap));
-    heap = NULL;
-    memset(paddr_mapped, 0, sizeof(paddr_mapped));
-    num_p_mapped = 0;
-    memset(rsdp_buf, 0, sizeof(rsdp_buf));
-    memset(ecams, 0, sizeof(ecams));
-    num_ecams = 0;
-
     size_t num_slots;
-    shadow_cap_t *caps = shadow_cnode_get_caps_table(post_capdl_shadow_cnode, &num_slots);
+    shadow_cap_t *caps = shadow_cnode_get_caps_table(lib_state.post_capdl_shadow_cnode, &num_slots);
     size_t num_io_port_caps_deleted = 0;
     for (size_t io_port_cslot = 0; io_port_cslot < num_slots; io_port_cslot++) {
         if (caps[io_port_cslot].type == CAP_TYPE_X86_IO_PORT) {
-            assert(seL4_CNode_Delete(shadow_cnode_cslot_to_cptr(post_capdl_shadow_cnode, 0), io_port_cslot, 58)
-                   == seL4_NoError);
-            assert(shadow_cnode_delete_cap_at_slot(post_capdl_shadow_cnode, io_port_cslot));
+            assert(
+                seL4_CNode_Delete(shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0), io_port_cslot, 58)
+                == seL4_NoError);
+            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, io_port_cslot));
             num_io_port_caps_deleted++;
         }
     }
@@ -368,5 +324,6 @@ bool sddf_uacpi_teardown(void)
 
     DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
 
+    memset(&lib_state, 0, sizeof(lib_state));
     return true;
 }
