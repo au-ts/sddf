@@ -53,7 +53,7 @@ typedef struct {
 capDLBootInfo_t *bootinfo_post_capdl;
 bootinfo_rsdp_t *bootinfo_rsdp;
 
-#define SHADOW_CNODE_SIZE_BITS 9 // from metaprogram
+#define SHADOW_CNODE_SIZE_BITS 11 // from metaprogram
 static shadow_cnode_t post_capdl_shadow_cnode;
 
 void init(void)
