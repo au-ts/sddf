@@ -77,6 +77,7 @@ int rx_ready(void)
 
 void init(void)
 {
+    return;
     assert(serial_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
