@@ -26,7 +26,7 @@ def build_make(args: argparse.Namespace, test_config: common.TestConfig):
     build_dir = common.example_build_path(test_config)
     example_dir = get_example_dir(test_config.example)
 
-    if args.pancake:
+    if test_config.language == "pancake":
         pancake_args = ["PANCAKE_SERIAL_DRIVER=1"]
     else:
         pancake_args = []
@@ -126,6 +126,7 @@ if __name__ == "__main__":
                 board=options["boards"],
                 config=options["configs"],
                 build_system=options["build_systems"],
+                language=options["languages"],
                 test_fn=[None],
                 backend_fn=[None],
                 no_output_timeout_s=[None],
@@ -142,9 +143,6 @@ if __name__ == "__main__":
         "--no-clean",
         action="store_true",
         help="Do not remove any pre-existing CI build directory before building",
-    )
-    parser.add_argument(
-        "--pancake", action="store_true", help="Use Pancake implementations"
     )
 
     filters = parser.add_argument_group(title="filters")
@@ -172,6 +170,11 @@ if __name__ == "__main__":
         "--only-qemu",
         action=argparse.BooleanOptionalAction,
         help="select only QEMU tests",
+    )
+    filters.add_argument(
+        "--languages",
+        default={"c"},
+        action=ArgparseActionList,
     )
 
     args = parser.parse_args()

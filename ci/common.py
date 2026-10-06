@@ -36,6 +36,7 @@ def example_build_path(test_config: TestConfig):
         / "examples"
         / test_config.example
         / test_config.build_system
+        / test_config.language
         / test_config.board
         / test_config.config
     )
@@ -107,6 +108,7 @@ class TestConfig(TestCase):
     board: str
     config: str
     build_system: str
+    language: str
 
     test_fn: TestFunction
     backend_fn: BackendFunction
@@ -177,6 +179,7 @@ def subset_test_cases(
                 (test.build_system in filters.build_systems),
                 (implies(filters.only_qemu is True, test.is_qemu())),
                 (implies(filters.only_qemu is False, not test.is_qemu())),
+                (test.language in filters.languages),
             ]
         )
 
@@ -207,6 +210,11 @@ def run_tests(tests: list[TestConfig]) -> None:
         "--only-qemu",
         action=argparse.BooleanOptionalAction,
         help="select only QEMU tests",
+    )
+    filters.add_argument(
+        "--languages",
+        default={"c"},
+        action=ArgparseActionList,
     )
 
     add_runner_arguments(parser)
