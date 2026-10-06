@@ -73,9 +73,9 @@ def generate(
         sdf, uart_node, serial_driver, serial_virt_tx, enable_color=False
     )
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
-        serial_driver.add_ioport(serial_port)
+    # if board.arch == SystemDescription.Arch.X86_64:
+    #     serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
+    #     serial_driver.add_ioport(serial_port)
 
     blk_driver = ProtectionDomain(
         "blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000
@@ -237,11 +237,11 @@ def generate(
 
     if board.arch == SystemDescription.Arch.X86_64:
         # IO ports
-        pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
-        blk_driver.add_ioport(pci_config_addr_port)
+        # pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
+        # blk_driver.add_ioport(pci_config_addr_port)
 
-        pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
-        blk_driver.add_ioport(pci_config_data_port)
+        # pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
+        # blk_driver.add_ioport(pci_config_data_port)
 
         # x86 virtio regions
         if not nvme:
