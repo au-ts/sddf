@@ -93,91 +93,6 @@ void uacpi_kernel_free(void *mem)
     tlsf_free(lib_state.acpi_heap, mem);
 }
 
-uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handle *out_handle)
-{
-    // @billn handle when firmware did not provide mcfg
-    int ecam_idx = 0;
-    for (; ecam_idx < lib_state.num_ecams; ecam_idx++) {
-        if (address.segment == lib_state.ecams[ecam_idx].segment && address.bus >= lib_state.ecams[ecam_idx].start_bus
-            && address.bus <= lib_state.ecams[ecam_idx].end_bus) {
-            break;
-        }
-    }
-
-    if (ecam_idx == lib_state.num_ecams) {
-        DEBUG_ACPI_ERR("failed to find matching ECAM for %u:%u.%u in PCI segment %u\n", address.bus, address.device,
-                       address.function, address.segment);
-        return UACPI_STATUS_NOT_FOUND;
-    }
-
-    void *config_space_vaddr = (void *)((uintptr_t)(lib_state.ecams[ecam_idx].vaddr)
-                                        + ((uint64_t)(address.bus - lib_state.ecams[ecam_idx].start_bus) << 20
-                                           | (uint64_t)address.device << 15 | (uint64_t)address.function << 12));
-
-    pci_device_uacpi_handle_t *handle = tlsf_malloc(lib_state.acpi_heap, sizeof(pci_device_uacpi_handle_t));
-    if (!handle) {
-        return UACPI_STATUS_OUT_OF_MEMORY;
-    }
-
-    handle->config_space_vaddr = config_space_vaddr;
-    *out_handle = handle;
-
-    return UACPI_STATUS_OK;
-}
-
-void uacpi_kernel_pci_device_close(uacpi_handle handle)
-{
-    tlsf_free(lib_state.acpi_heap, handle);
-}
-
-uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset, uacpi_u8 *value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint8_t *reg = (uint8_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *value = *reg;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset, uacpi_u16 *value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint16_t *reg = (uint16_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *value = *reg;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset, uacpi_u32 *value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint32_t *reg = (uint32_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *value = *reg;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset, uacpi_u8 value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint8_t *reg = (uint8_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *reg = value;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset, uacpi_u16 value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint16_t *reg = (uint16_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *reg = value;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, uacpi_u32 value)
-{
-    pci_device_uacpi_handle_t *handle = (pci_device_uacpi_handle_t *)device;
-    volatile uint32_t *reg = (uint32_t *)((uintptr_t)handle->config_space_vaddr + offset);
-    *reg = value;
-    return UACPI_STATUS_OK;
-}
-
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 {
     DEBUG_ACPI("Initialising uACPI...\n");
@@ -192,7 +107,6 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 
     lib_state.cnode_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0);
     lib_state.vspace_cptr = init_args->vspace_cptr;
-    lib_state.next_avail_ecam_vaddr = BIT(27);
 
     memcpy(lib_state.rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
 
@@ -235,7 +149,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     }
     DEBUG_ACPI("uACPI initialised\n");
 
-    DEBUG_ACPI("Mapping ECAM(s) for firmware specific PCI initialisation\n");
+    DEBUG_ACPI("Enumerating ECAM(s) for firmware specific PCI initialisation\n");
     uacpi_table mcfg_handle;
     if (uacpi_table_find_by_signature(ACPI_MCFG_SIGNATURE, &mcfg_handle) != UACPI_STATUS_OK) {
         DEBUG_ACPI("Firmware did not provide MCFG, falling back to legacy PIO for PCI access\n");
@@ -264,32 +178,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
             lib_state.ecams[lib_state.num_ecams].start_bus = entry->start_bus;
             lib_state.ecams[lib_state.num_ecams].end_bus = entry->end_bus;
             lib_state.ecams[lib_state.num_ecams].segment = entry->segment;
-
-            /* Quirk: base address is for bus 0 of that segment, so if the start bus isn't zero
-             * we need to account for that.
-             * Each bus takes 1 MiB of ECAM space (32 devices × 8 functions × 4 KiB) */
-            uint64_t ecam_start = entry->address + ((uint64_t)entry->start_bus << 20);
-            uint64_t ecam_end = entry->address + (((uint64_t)entry->end_bus + 1) << 20);
-            uint64_t map_base = ROUND_DOWN(ecam_start, BIT(seL4_LargePageBits));
-            size_t map_size = ROUND_UP(ecam_end, BIT(seL4_LargePageBits)) - map_base;
-
-            lib_state.ecams[lib_state.num_ecams].size_bytes = ecam_end - ecam_start;
-
-            uint64_t ecam_vaddr = lib_state.next_avail_ecam_vaddr;
-            if (ecam_vaddr + map_size > MAX_ECAM_VADDR) {
-                DEBUG_ACPI_ERR("Not enough vaddr range for ECAM %d\n", i);
-                return false;
-            }
-
-            if (!map_memory_region(lib_state.post_capdl_shadow_cnode, lib_state.vspace_cptr, map_base, map_size, true,
-                                   ecam_vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
-                DEBUG_ACPI_ERR("can't map ECAM %d at vaddr 0x%lx\n", i, ecam_vaddr);
-                return false;
-            }
-
-            lib_state.ecams[lib_state.num_ecams].vaddr = (void *)(ecam_vaddr + (ecam_start - map_base));
             lib_state.num_ecams++;
-            lib_state.next_avail_ecam_vaddr += map_size;
         }
         assert(uacpi_table_unref(&mcfg_handle) == UACPI_STATUS_OK);
     }
@@ -325,23 +214,41 @@ bool sddf_uacpi_retrieve_pci_resources(void)
 
 bool sddf_uacpi_teardown(void)
 {
-    // No need to call uacpi_state_reset() because we tear everything down
-    // anyways.
+    uacpi_state_reset();
 
     size_t num_slots;
     shadow_cap_t *caps = shadow_cnode_get_caps_table(lib_state.post_capdl_shadow_cnode, &num_slots);
     size_t num_io_port_caps_deleted = 0;
-    for (size_t io_port_cslot = 0; io_port_cslot < num_slots; io_port_cslot++) {
-        if (caps[io_port_cslot].type == CAP_TYPE_X86_IO_PORT) {
-            assert(seL4_CNode_Delete(lib_state.cnode_cptr, io_port_cslot, 58) == seL4_NoError);
-            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, io_port_cslot));
+    size_t num_irq_caps_deleted = 0;
+    size_t num_ut_caps_revoked = 0;
+    size_t num_ut_caps_deleted = 0;
+
+    for (size_t cslot = 0; cslot < num_slots; cslot++) {
+        if (caps[cslot].type == CAP_TYPE_X86_IO_PORT) {
+            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
+            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
             num_io_port_caps_deleted++;
+        } else if (caps[cslot].type == CAP_TYPE_IRQ) {
+            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
+            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
+            num_irq_caps_deleted++;
+        } else if (caps[cslot].type == CAP_TYPE_UT) {
+            if (caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
+                assert(seL4_CNode_Revoke(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
+                num_ut_caps_revoked++;
+            } else {
+                num_ut_caps_deleted++;
+            }
+            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
         }
     }
 
-    // todo, need to pass og capdl ut range in init, then loop n revoke
-
     DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
+    DEBUG_ACPI("Deleted %lu IRQ caps\n", num_irq_caps_deleted);
+    DEBUG_ACPI("Revoked %lu UT caps, which resulted in deleting %lu child UT caps\n", num_ut_caps_revoked,
+               num_ut_caps_deleted);
+
+    // @billn todo, reset the shadow cnode into original state.
 
     memset(&lib_state, 0, sizeof(lib_state));
     return true;
