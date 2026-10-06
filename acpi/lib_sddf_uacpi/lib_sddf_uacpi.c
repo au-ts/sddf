@@ -180,7 +180,9 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset, ua
 
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 {
+    DEBUG_ACPI("Initialising uACPI...\n");
     memset(&lib_state, 0, sizeof(lib_state));
+    lib_state.post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
 
     lib_state.acpi_heap = tlsf_create_with_pool(lib_state.acpi_heap_buf, ACPI_HEAP_SIZE);
     if (!lib_state.acpi_heap) {
@@ -188,11 +190,11 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
         return false;
     }
 
+    lib_state.cnode_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0);
     lib_state.vspace_cptr = init_args->vspace_cptr;
     lib_state.next_avail_ecam_vaddr = BIT(27);
 
     memcpy(lib_state.rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
-    lib_state.post_capdl_shadow_cnode = init_args->post_capdl_shadow_cnode;
 
     size_t x86_ioport_ctrl_cslot;
     if (!shadow_cnode_find_cap_slot_of_type(lib_state.post_capdl_shadow_cnode, CAP_TYPE_X86_IO_PORT_CONTROL,
@@ -200,10 +202,29 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
         DEBUG_ACPI_ERR("capDL initialiser did not grant I/O Port control cap\n");
         return false;
     }
-    lib_state.x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode,
+    seL4_CPtr x86_ioport_ctrl_cptr = shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode,
                                                                 x86_ioport_ctrl_cslot);
 
-    DEBUG_ACPI("Initialising uACPI...\n");
+    size_t x86_ioport_master_cslot;
+    if (!shadow_cnode_find_free_slot(lib_state.post_capdl_shadow_cnode, &x86_ioport_master_cslot)) {
+        DEBUG_ACPI_ERR("out of CSlot\n");
+        return false;
+    }
+
+    if (seL4_X86_IOPortControl_Issue(x86_ioport_ctrl_cptr, 0, UINT16_MAX, lib_state.cnode_cptr, x86_ioport_master_cslot,
+                                     58)
+        != seL4_NoError) {
+        DEBUG_ACPI_ERR("can't create io port master cap.\n");
+        return false;
+    }
+
+    assert(shadow_cnode_insert_cap_at_slot(
+        lib_state.post_capdl_shadow_cnode,
+        &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_X86_IO_PORT, 0, UINT16_MAX, x86_ioport_ctrl_cslot, 0),
+        x86_ioport_master_cslot));
+
+    lib_state.x86_ioport_master_cslot = x86_ioport_master_cslot;
+
     /* Default settings for uACPI: enter ACPI mode on the platform, and don't error out if a table
      * checksum is bad in case the firmware have a bug. */
     uint64_t flags = 0;
@@ -217,8 +238,8 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     DEBUG_ACPI("Mapping ECAM(s) for firmware specific PCI initialisation\n");
     uacpi_table mcfg_handle;
     if (uacpi_table_find_by_signature(ACPI_MCFG_SIGNATURE, &mcfg_handle) != UACPI_STATUS_OK) {
-        DEBUG_ACPI("Firmware did not provide MCFG, falling back to legacy PIO\n");
-        assert(false); // @billn TODO
+        DEBUG_ACPI("Firmware did not provide MCFG, falling back to legacy PIO for PCI access\n");
+        assert(false); // @billn actually implement
     } else {
         struct acpi_mcfg *mcfg = mcfg_handle.ptr;
         uint64_t mcfg_size = mcfg_handle.hdr->length;
@@ -312,9 +333,7 @@ bool sddf_uacpi_teardown(void)
     size_t num_io_port_caps_deleted = 0;
     for (size_t io_port_cslot = 0; io_port_cslot < num_slots; io_port_cslot++) {
         if (caps[io_port_cslot].type == CAP_TYPE_X86_IO_PORT) {
-            assert(
-                seL4_CNode_Delete(shadow_cnode_cslot_to_cptr(lib_state.post_capdl_shadow_cnode, 0), io_port_cslot, 58)
-                == seL4_NoError);
+            assert(seL4_CNode_Delete(lib_state.cnode_cptr, io_port_cslot, 58) == seL4_NoError);
             assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, io_port_cslot));
             num_io_port_caps_deleted++;
         }
