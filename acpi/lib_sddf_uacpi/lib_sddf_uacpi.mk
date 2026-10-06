@@ -29,7 +29,7 @@ UACPI_SOURCES := $(wildcard $(UACPI_SRC_DIR)/*.c)
 UACPI_SOURCES := $(subst $(UACPI_SRC_DIR)/,,$(UACPI_SOURCES))
 
 # Implementation of the OS layer for uACPI
-KERNEL_API_SOURCES := event.c ioport.c stubs.c
+KERNEL_API_SOURCES := event.c ioport.c stubs.c pci.c
 
 lib_sddf_uacpi.a: lib_sddf_uacpi_out/lib_sddf_uacpi.o $(addprefix lib_sddf_uacpi_out/kernel_api/, $(KERNEL_API_SOURCES:.c=.o)) $(addprefix lib_sddf_uacpi_out/uacpi/, $(UACPI_SOURCES:.c=.o))
 	$(AR) crv $@ $^

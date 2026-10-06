@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <sddf/util/shadow_cnode.h>
 #include <sddf/util/tlsf/tlsf.h>
 
 #define PAGE_SIZE_4K BIT(seL4_PageBits)
@@ -15,12 +16,13 @@
 
 #define ACPI_DIRECT_MAP_BASE BIT(30)
 
+/* This is a bit suspicious, brittle and annoying, since seL4 doesn't give us
+ * the actual paddr, stuff will break if the firmware put other tables and important things
+ * in this paddr range. */
 #define RSDP_PADDR (ACPI_DIRECT_MAP_BASE - PAGE_SIZE_4K)
 
 typedef struct {
-    void *vaddr;
     uint64_t paddr;
-    size_t size_bytes;
     uint16_t segment;
     uint8_t start_bus;
     uint8_t end_bus;
@@ -64,7 +66,6 @@ typedef struct {
 
     lib_sddf_uacpi_ecam_desc_t ecams[MAX_NUM_ECAM];
     size_t num_ecams;
-    uint64_t next_avail_ecam_vaddr;
 
     irq_handle_t *sci_handle;
 } lib_sddf_uacpi_state_t;
