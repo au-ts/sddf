@@ -12,16 +12,16 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 
 SUPPORTED_BOARDS := \
-		    imx8mm_evk \
-		    imx8mp_evk \
+			imx8mm_evk \
+			imx8mp_evk \
 			imx8mq_evk \
-		    imx8mp_iotgate \
+			imx8mp_iotgate \
 			kria_k26 \
 			maaxboard \
 			odroidc2 \
 			odroidc4 \
 			qemu_virt_aarch64 \
-		    qemu_virt_riscv64 \
+			qemu_virt_riscv64 \
 			rock3b \
 			rockpro64 \
 			star64 \
