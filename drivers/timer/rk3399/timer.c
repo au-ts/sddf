@@ -23,7 +23,6 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 /* 24 MHz frequency. */
 #define RK3399_TIMER_FREQUENCY ((uint64_t)24000000)
-#define NANO_INVERSE NS_IN_S
 
 typedef struct {
     uint32_t load_count0;
