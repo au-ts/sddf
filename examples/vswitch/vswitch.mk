@@ -11,15 +11,15 @@
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 SUPPORTED_BOARDS := \
-		    imx8mm_evk \
-		    imx8mp_evk \
+			imx8mm_evk \
+			imx8mp_evk \
 			imx8mq_evk \
-		    imx8mp_iotgate \
+			imx8mp_iotgate \
 			maaxboard \
 			odroidc2 \
 			odroidc4 \
 			qemu_virt_aarch64 \
-		    qemu_virt_riscv64 \
+			qemu_virt_riscv64 \
 			rock3b \
 			rockpro64 \
 			star64 \
@@ -92,12 +92,12 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	cp network_copy.elf network_copy3.elf
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
+		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
+		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		--output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
