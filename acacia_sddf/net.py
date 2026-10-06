@@ -35,6 +35,41 @@ def _next_power_of_two(n: int) -> int:
     return 1 << ((n - 1).bit_length())
 
 
+class sDDFMAC:
+    def __init__(self, mac: str | List[int]):
+        if type(mac) is str:
+            self.mac_str = mac
+        elif type(mac) is list:
+            for n in mac:
+                if n < 0 or n > 255:
+                    raise ValueError("MAC bytes cannot be wider than 0xff!")
+            self.mac_str = ":".join([hex(t).split("0x")[1] for t in mac])
+
+    @property
+    def mac_ints(self) -> List[int]:
+        return self._parse_mac_addr(self.mac_str)
+
+    def _parse_mac_addr(self, mac_str: str) -> List[int]:
+        parts = mac_str.split(":")
+        if len(parts) != 6:
+            raise RuntimeError(f"Invalid MAC address: {mac_str}")
+        try:
+            return [int(p, 16) for p in parts]
+        except ValueError:
+            raise RuntimeError(f"Invalid MAC address: {mac_str}")
+
+    def as_config_struct(self) -> ConfigStruct:
+        return ConfigStruct({"addr": self.mac_ints}, type_name="mac_addr_t")
+
+    def __repr__(self) -> str:
+        return f"<sDDFMAC {self.mac_str}>"
+
+    def __eq__(self, other: object) -> bool:
+        if type(other) != sDDFMAC:
+            return False
+        return self.mac_str == other.mac_str
+
+
 @dataclass(frozen=True)
 class NetClientOptions:
     rx: bool = True
@@ -42,7 +77,7 @@ class NetClientOptions:
     tx: bool = True
     tx_buffers: int = 512
     vswitch: bool = False
-    mac_addr: Optional[str] = None
+    mac_addr: Optional[sDDFMAC] = None
 
 
 @dataclass
@@ -53,7 +88,7 @@ class NetClientInfo:
     tx_buffers: int = 512
     tx_data: Optional[MemoryRegion] = None
     vswitch: bool = False
-    mac_addr: Optional[List[int]] = None
+    mac_addr: Optional[sDDFMAC] = None
 
 
 class sDDFEthernet(sDDFDriverClass):
@@ -69,9 +104,9 @@ class sDDFEthernet(sDDFDriverClass):
         cpu: Optional[int] = None,
         rx_buffers: int = 512,
         rx_dma_mr: Optional[MemoryRegion] = None,
-        virt_tx_elf: str = "net_virt_tx.elf",
-        virt_rx_elf: str = "net_virt_rx.elf",
-        driver_elf: str = "ethernet_driver.elf",
+        virt_tx_elf: str = "network_virt_tx.elf",
+        virt_rx_elf: str = "network_virt_rx.elf",
+        driver_elf: str = "eth_driver.elf",
         # TODO: add automated vswitch handling?
         vswitch: Optional[ProtectionDomain] = None,
     ):
@@ -86,9 +121,7 @@ class sDDFEthernet(sDDFDriverClass):
 
         if rx_dma_mr is not None:
             if rx_dma_mr.paddr is None:
-                raise SubsystemBuildError(
-                    "rx dma region must have a physical address!"
-                )
+                raise SubsystemBuildError("rx dma region must have a physical address!")
             if not _is_power_of_two(rx_buffers):
                 raise SubsystemBuildError(
                     f"number of rx buffers ({rx_buffers}) must be a power of two!"
@@ -106,7 +139,7 @@ class sDDFEthernet(sDDFDriverClass):
             cpu=self.cpu,
         )
         super().__init__(
-            sdf, driver, "net", dev_compatible, dev_dt_path, magic=NET_MAGIC
+            sdf, driver, "net", dev_compatible, dev_dt_path, magic="sDDF" + chr(1)
         )
 
         # Parallel to self.clients (from the Subsystem base class).
@@ -146,7 +179,9 @@ class sDDFEthernet(sDDFDriverClass):
 
         self.acl_rules = []
 
-        self.construct_infrastructure(virt_tx_prio, virt_rx_prio, virt_tx_elf, virt_rx_elf)
+        self.construct_infrastructure(
+            virt_tx_prio, virt_rx_prio, virt_tx_elf, virt_rx_elf
+        )
 
     def construct_infrastructure(
         self, virt_tx_prio: int, virt_rx_prio: int, virt_tx_elf: str, virt_rx_elf: str
@@ -210,14 +245,10 @@ class sDDFEthernet(sDDFDriverClass):
                 f"is not a power of two"
             )
 
-        parsed_mac = None
         if mac_addr is not None:
-            parsed_mac = self._parse_mac_addr(mac_addr)
             for existing in self.client_info:
-                if existing.mac_addr == parsed_mac:
-                    raise SubsystemBuildError(
-                        f"MAC address {mac_addr} already in use"
-                    )
+                if existing.mac_addr == mac_addr:
+                    raise SubsystemBuildError(f"MAC address {mac_addr} already in use")
 
         for existing in self.clients:
             if existing.name == client.name:
@@ -246,7 +277,7 @@ class sDDFEthernet(sDDFDriverClass):
         info.rx = rx
         info.tx = tx
         info.vswitch = vswitch_client
-        info.mac_addr = parsed_mac
+        info.mac_addr = mac_addr
 
     def add_acl_rule(
         self,
@@ -264,7 +295,6 @@ class sDDFEthernet(sDDFDriverClass):
                 "Cannot add an ACL rule between a client and itself"
             )
         self.acl_rules.append((client0.name, client1.name, zero_to_one, one_to_zero))
-
 
     def connect_clients(self):
         if len(self.clients) == 0:
@@ -300,7 +330,7 @@ class sDDFEthernet(sDDFDriverClass):
                         "rx_conn": vswitch_rx_conn,
                         "tx_conn": vswitch_tx_conn,
                         "tx_data_map": vswitch_tx_data_map,
-                        "mac_addr": info.mac_addr,
+                        "mac_addr": info.mac_addr.as_config_struct(),
                         "acl": 0,
                     }
                 )
@@ -332,7 +362,9 @@ class sDDFEthernet(sDDFDriverClass):
             )
 
         if self.vswitch is not None:
-            self.vswitch_rx_connect(rx_dma_mr, num_vswitch_client_buffers + self.rx_buffers)
+            self.vswitch_rx_connect(
+                rx_dma_mr, num_vswitch_client_buffers + self.rx_buffers
+            )
             self.vswitch_tx_connect(num_vswitch_client_buffers)
 
             # The final (virtualiser) port: mac is ignored.
@@ -349,7 +381,8 @@ class sDDFEthernet(sDDFDriverClass):
 
             self._apply_acl_rules()
             ports = [
-                self.net_vswitch_port_config_factory(**d) for d in self.vswitch_port_data
+                self.net_vswitch_port_config_factory(**d)
+                for d in self.vswitch_port_data
             ]
             self.vswitch_config = self.net_vswitch_config_factory(
                 ports, self.vswitch_num_ports, self.vswitch_meta_map
@@ -406,9 +439,7 @@ class sDDFEthernet(sDDFDriverClass):
         return self.rx_dma_mr
 
     def tx_connect_driver(self):
-        num_buffers = sum(
-            i.tx_buffers for i in self.client_info if i.tx
-        )
+        num_buffers = sum(i.tx_buffers for i in self.client_info if i.tx)
         driver_conn, virt_tx_conn = self.create_connection(
             self.driver, self.virt_tx, num_buffers, server_pp=False
         )
@@ -552,7 +583,9 @@ class sDDFEthernet(sDDFDriverClass):
         # The vswitch appears to the Rx virtualiser as a client with the MACs of
         # all its vswitch clients.
         vswitch_macs = [info.mac_addr for info in self.client_info if info.vswitch]
-        self.virt_rx_client_protos.append((virt_rx_conn, vswitch_macs, len(vswitch_macs)))
+        self.virt_rx_client_protos.append(
+            (virt_rx_conn, vswitch_macs, len(vswitch_macs))
+        )
         self.virt_rx_num_clients += 1
 
         # Reference-count metadata region for the vswitch.
@@ -568,11 +601,7 @@ class sDDFEthernet(sDDFDriverClass):
         for i, _ in enumerate(self.clients):
             if self.client_info[i].vswitch:
                 for j, copier in enumerate(self.copiers):
-                    if (
-                        copier is not None
-                        and self.client_info[j].vswitch
-                        and i != j
-                    ):
+                    if copier is not None and self.client_info[j].vswitch and i != j:
                         tx_mr = self.client_info[i].tx_data
                         copier_map = copier.create_automap(tx_mr, "r")
                         self.copy_config_data[j]["rx_data"][i] = copier_map
@@ -599,29 +628,21 @@ class sDDFEthernet(sDDFDriverClass):
         self.virt_port["rx"] = vswitch_tx_conn
 
     # ### MAC address helpers ###
-
-    def _parse_mac_addr(self, mac_str: str) -> List[int]:
-        parts = mac_str.split(":")
-        if len(parts) != 6:
-            raise SubsystemBuildError(f"Invalid MAC address: {mac_str}")
-        try:
-            return [int(p, 16) for p in parts]
-        except ValueError:
-            raise SubsystemBuildError(f"Invalid MAC address: {mac_str}")
-
-    def _random_mac(self) -> List[int]:
+    def _random_mac(self) -> sDDFMAC:
         mac = [secrets.randbits(8) for _ in range(6)]
         # Set the locally administered bit.
         mac[0] |= 1 << 1
         # Ensure it is an individual (unicast) address.
         mac[0] &= 0b11111110
-        return mac
+        return sDDFMAC(mac)
 
     def _generate_mac_addrs(self):
         for info in self.client_info:
             if info.mac_addr is None:
                 mac = self._random_mac()
-                while mac in [e.mac_addr for e in self.client_info if e.mac_addr is not None]:
+                while mac in [
+                    e.mac_addr for e in self.client_info if e.mac_addr is not None
+                ]:
                     mac = self._random_mac()
                 info.mac_addr = mac
 
@@ -703,7 +724,6 @@ class sDDFEthernet(sDDFDriverClass):
         )
         return server_conn, client_conn
 
-
     def generate_config_structs(self):
         virt_rx_clients = [
             self.net_virt_rx_client_config_factory(*proto)
@@ -768,11 +788,11 @@ class sDDFEthernet(sDDFDriverClass):
         )
 
     def net_virt_rx_client_config_factory(
-        self, conn: ConfigStruct, mac_addrs: List[List[int]], num_macs: int
+        self, conn: ConfigStruct, mac_addrs: List[sDDFMAC], num_macs: int
     ) -> ConfigStruct:
         fields = {
             "conn": conn,
-            "mac_addrs": mac_addrs,
+            "mac_addrs": [m.as_config_struct() for m in mac_addrs],
             "num_macs": num_macs,
         }
         return ConfigStruct(fields, "net_virt_rx_client_config_t")
@@ -811,13 +831,13 @@ class sDDFEthernet(sDDFDriverClass):
         for data_map, num_buffers in regions:
             region_structs.append(
                 ConfigStruct(
-                    "net_virt_tx_data_region_t",
-                    fields={
+                    {
                         "data": DeviceRegionResourceFactory(
                             RegionResourceFactory(data_map), data_map.mr.paddr
                         ),
                         "num_buffers": num_buffers,
                     },
+                    "net_virt_tx_data_region_t",
                 )
             )
         fields = {
@@ -853,7 +873,7 @@ class sDDFEthernet(sDDFDriverClass):
             "rx": rx_conn,
             "tx": tx_conn,
             "tx_data": RegionResourceFactory(tx_data_map),
-            "mac_addr": mac_addr,
+            "mac_addr": mac_addr.as_config_struct(),
             "acl": acl,
         }
         return ConfigStruct(fields, "net_vswitch_port_config_t")
@@ -908,7 +928,7 @@ class sDDFEthernet(sDDFDriverClass):
         rx_data_map: Optional[Map],
         tx_conn: Optional[ConfigStruct],
         tx_data_map: Optional[Map],
-        mac_addr: List[int],
+        mac_addr: sDDFMAC,
     ) -> ConfigStruct:
         # Inactive directions are zeroed so the C struct remains complete.
         rx_conn = rx_conn if rx_conn is not None else ConfigStruct({}, empty=True)
@@ -929,7 +949,7 @@ class sDDFEthernet(sDDFDriverClass):
             "rx_data": rx_data,
             "tx": tx_conn,
             "tx_data": tx_data,
-            "mac_addr": mac_addr,
+            "mac_addr": mac_addr.as_config_struct(),
         }
         return ConfigStruct(
             fields,
@@ -956,8 +976,10 @@ class sDDFEthernet(sDDFDriverClass):
         # Nothing needed for now?
         ...
 
+
 def add_driver_config(driver_name: str, config: sDDFDriverConfig):
     sDDFDriverManifest().add_driver_config(sDDFEthernet, driver_name, config)
+
 
 add_driver_config(
     "meson",
@@ -974,7 +996,7 @@ add_driver_config(
         compatible="virtio,mmio",
         regions=[
             DTSRegion("regs", "rw", 4096, 0),
-            DTSRegion("hw_ring_buffer", size=65536, cached=True)
+            DTSRegion("hw_ring_buffer", size=65536, cached=True),
         ],
         irqs=[DTSIRQ(0)],
     ),

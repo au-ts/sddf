@@ -8,12 +8,9 @@ from .sddf import RegionResourceFactory
 
 PBUF_STRUCT_SIZE = 56
 
+
 class sDDFLWIP(Subsystem):
-    def __init__(
-        self,
-        net: sDDFEthernet,
-        target_pd: ProtectionDomain
-    ):
+    def __init__(self, net: sDDFEthernet, target_pd: ProtectionDomain):
         # Sanity: must be same system
         assert target_pd.sdf is net.sdf
 
@@ -23,7 +20,10 @@ class sDDFLWIP(Subsystem):
         # Disable client list, since we assume that we take our only PD now.
         super().__init__(net.sdf, f"lwip_{target_pd.name}", clients_allowed=False)
 
-    def connect_clients(self):
+        # Automatically call
+        self.add_build_hook(self.create_pbuf_pool)
+
+    def create_pbuf_pool(self):
         # We use connect clients to defer allocating a vaddr for the map until after
         # the metaprogram is finished doing config.
         pbuf_pool_mr_sz = self.num_pbufs * PBUF_STRUCT_SIZE
@@ -42,9 +42,10 @@ class sDDFLWIP(Subsystem):
                 {
                     "magic": "sDDF" + chr(0x8),
                     "pbuf_pool": RegionResourceFactory(self.pbuf_map),
-                    "num_pbufs": self.num_pbufs
+                    "num_pbufs": self.num_pbufs,
                 },
                 target_file=self.pd.prog_image,
-                section_name="lib_sddf_lwip_config"
+                section_name="lib_sddf_lwip_config",
+                type_name="lib_sddf_lwip_config_t",
             )
         ]

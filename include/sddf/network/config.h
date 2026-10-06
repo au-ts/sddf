@@ -14,7 +14,7 @@
 
 #define SDDF_NET_MAX_CLIENTS 64
 
-#define SDDF_NET_MAGIC_LEN 5
+#define SDDF_NET_MAGIC_LEN 6
 static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };
 
 typedef struct net_connection_resource {

@@ -175,7 +175,10 @@ def update_elf_section(
 ):
     assert os.path.isfile(elf_name)
     if data_number != None:
-        data_name += str(data_number)
+        # In Acacia, data files are named {prog_name}_{configstruct_name}.data.
+        # Number comes after prog name.
+        data_name = f"{elf_name.split(".elf")[0].split(section_name)[0]}_{section_name}"
+        # data_name += str(data_number)
     data_name += ".data"
     if not os.path.isfile(data_name):
         raise FileNotFoundError(f"{data_name} cannot be found!")
@@ -201,10 +204,7 @@ def generate(
 ):
 
     timer = sDDFTimer(
-        sdf,
-        board.timer.compatible,
-        board.timer.node_path,
-        cpu=get_core("timer_driver")
+        sdf, board.timer.compatible, board.timer.node_path, cpu=get_core("timer_driver")
     )
     serial = sDDFSerial(
         sdf,
@@ -225,13 +225,14 @@ def generate(
         driver_prio=101,
         virt_tx_prio=100,
         virt_rx_prio=99,
-        cpu=get_core("ethernet_driver"), # Assign everything to driver prio initially
+        cpu=get_core("ethernet_driver"),  # Assign everything to driver prio initially
     )
 
     # Reassign components to whatever CPU is specified for benchmark
     for pd, core in (
         (ethernet.virt_rx, get_core("net_virt_rx")),
-        (ethernet.virt_tx, get_core("net_virt_tx"))):
+        (ethernet.virt_tx, get_core("net_virt_tx")),
+    ):
         pd.cpu = core
 
     if board.name == "star64":
@@ -241,17 +242,13 @@ def generate(
         clock_controller = MemoryRegion(
             sdf, "clock_controller", 0x10_000, paddr=0x17000000, cached=False
         )
-        ethernet.driver.add_map(
-            Map(clock_controller, 0x3000000, "rw")
-        )
+        ethernet.driver.add_map(Map(clock_controller, 0x3000000, "rw"))
     elif board.name == "rock3b":
         # For ethernet reset, we need to disable areset_gmac0 which is left high by u-boot
         clock_controller = MemoryRegion(
             sdf, "clock_controller", 0x10_000, paddr=0xFDD20000, cached=False
         )
-        ethernet.driver.add_map(
-            Map(clock_controller, 0x3000000, "rw")
-        )
+        ethernet.driver.add_map(Map(clock_controller, 0x3000000, "rw"))
     elif board.name == "rpi4b_1gb":
         # Ethernet driver requires timer access to wait for reconfiguration
         timer.add_client(ethernet.driver)
@@ -268,14 +265,10 @@ def generate(
         virtio_net_regs = MemoryRegion(
             sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000, cached=False
         )
-        virtio_net_regs_map = Map(
-            virtio_net_regs, 0x6000_0000, "rw"
-        )
+        virtio_net_regs_map = Map(virtio_net_regs, 0x6000_0000, "rw")
         ethernet.driver.add_map(virtio_net_regs_map)
 
-        virtio_net_irq = IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=16
-        )
+        virtio_net_irq = IrqIoapic(ioapic_id=0, pin=11, vector=1, id=16)
         ethernet.driver.add_irq(virtio_net_irq)
 
         pci_config_address_port = IOPort(0xCF8, 4, 1)
@@ -290,7 +283,7 @@ def generate(
         "client0",
         client0_elf,
         scheduling=SchedulingProperties(priority=97, budget=20000),
-        cpu=get_core("client0")
+        cpu=get_core("client0"),
     )
     client1_elf = copy_elf("echo", "echo", 1)
     client1 = ProtectionDomain(
@@ -298,7 +291,7 @@ def generate(
         "client1",
         client1_elf,
         scheduling=SchedulingProperties(priority=97, budget=20000),
-        cpu=get_core("client1")
+        cpu=get_core("client1"),
     )
     client1_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
     client0_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
@@ -352,7 +345,11 @@ def generate(
         # Create benchmark and idle PDs for each active core
         core_objs[i]["idle_elf"] = copy_elf("idle", "idle", core)
         core_objs[i]["idle_pd"] = ProtectionDomain(
-            sdf, f"bench_idleself.{core}", core_objs[i]["idle_elf"], priority=1, cpu=core
+            sdf,
+            f"bench_idleself.{core}",
+            core_objs[i]["idle_elf"],
+            priority=1,
+            cpu=core,
         )
 
         core_objs[i]["bench_elf"] = copy_elf("benchmark", "benchmark", core)
@@ -373,7 +370,7 @@ def generate(
         core_objs[i]["init_ch"] = Channel(
             sdf,
             Channel.End(core_objs[i]["idle_pd"]),
-            Channel.End(core_objs[i]["bench_pd"])
+            Channel.End(core_objs[i]["bench_pd"]),
         )
 
         # Create benchmarking start and stop channels
@@ -382,24 +379,24 @@ def generate(
             core_objs[i]["start_ch"] = Channel(
                 sdf,
                 Channel.End(client0, can_notify=True),
-                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True),
             )
             core_objs[i]["stop_ch"] = Channel(
                 sdf,
                 Channel.End(client0, can_notify=True),
-                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True),
             )
         else:
             # Other cores are notified by benchmark PD on previous core
             core_objs[i]["start_ch"] = Channel(
                 sdf,
                 Channel.End(core_objs[i - 1]["bench_pd"], can_notify=True),
-                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True),
             )
             core_objs[i]["stop_ch"] = Channel(
                 sdf,
                 Channel.End(core_objs[i - 1]["bench_pd"], can_notify=True),
-                Channel.End(core_objs[i]["bench_pd"], can_notify=True)
+                Channel.End(core_objs[i]["bench_pd"], can_notify=True),
             )
 
         # Add cycle counter memory region for idle to share counts with benchmarking client
@@ -470,13 +467,13 @@ def generate(
             core,
         )
 
-        with open(f"{output_dir}/benchmark_config{core}.data", "wb+") as f:
+        with open(f"{output_dir}/benchmark{core}_benchmark_config.data", "wb+") as f:
             f.write(core_objs[i]["bench_config"].serialise())
         update_elf_section(
             core_objs[i]["bench_elf"], "benchmark_config", "benchmark_config", core
         )
 
-        with open(f"{output_dir}/benchmark_idle_config{core}.data", "wb+") as f:
+        with open(f"{output_dir}/idle{core}_benchmark_config.data", "wb+") as f:
             f.write(core_objs[i]["idle_config"].serialise())
         update_elf_section(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
@@ -535,7 +532,10 @@ if __name__ == "__main__":
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    dtb = DeviceTreeBlob(args.dtb)
+    if board.arch != x86_64:
+        dtb = DeviceTreeBlob(args.dtb)
+    else:
+        dtb = None
     sdf = System(board.arch, board.paddr_top, dtb)
 
     global obj_copy
@@ -544,7 +544,6 @@ if __name__ == "__main__":
     with open(args.smp, "r") as core_alloc:
         core_dict = json.load(core_alloc)
     get_core = lambda name: core_dict[name]
-
 
     if args.bench_pmu_events:
         pmu_events = args.bench_pmu_events.split(",")
