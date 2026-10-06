@@ -43,20 +43,22 @@ typedef struct {
 typedef struct {
     char acpi_heap_buf[ACPI_HEAP_SIZE];
     /* Annoyingly, seL4 give us the RSDP blob rather than the paddr, so we need
-    * to copy it into a dummy "paddr" and serve it to uACPI from a buffer. */
+     * to copy it into a dummy "paddr" and serve it to uACPI from a buffer. */
     char rsdp_buf[PAGE_SIZE_4K];
 
     tlsf_t acpi_heap;
 
     shadow_cnode_t *post_capdl_shadow_cnode;
+    seL4_CPtr cnode_cptr;
     seL4_CPtr vspace_cptr;
-    seL4_CPtr x86_ioport_ctrl_cptr;
+    /* "Master" just means this cap can read and write to any io port */
+    seL4_CPtr x86_ioport_master_cslot;
 
     /* We map physical memory with vaddr as ACPI_DIRECT_MAP_BASE + requested paddr
-    * so that we don't have to unmap it and do cap clean ups, since we will tear
-    * everything down by the end anyways.
+     * so that we don't have to unmap it and do cap clean ups, since we will tear
+     * everything down by the end anyways.
 
-    * @billn improve by reserving this range in the linker? */
+     * @billn improve by reserving this range in the linker? */
     uint64_t paddr_mapped[MAX_PADDR_MAPPED];
     size_t num_p_mapped;
 
