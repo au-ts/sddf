@@ -13,7 +13,7 @@
 SERIAL_IMAGES:= serial_virt_rx.elf serial_virt_tx.elf
 SERIAL_COMPONENT_OBJ := $(addprefix serial/components/, serial_virt_tx.o serial_virt_rx.o)
 
-CFLAGS_serial := -I ${SDDF}/include
+CFLAGS_serial := -I ${SDDF}/include -I ${SDDF}/serial/components/include
 
 CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum | sed 's/ *-//')
 
@@ -24,7 +24,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 ${SERIAL_COMPONENT_OBJ}: |serial/components $(SDDF_LIBC_INCLUDE)
 ${SERIAL_COMPONENT_OBJ}: ${CHECK_SERIAL_FLAGS_MD5}
 
-serial/components/serial_virt_%.o: ${SDDF}/serial/components/virt_%.c | $(SDDF_LIBC_INCLUDE)
+serial/components/serial_virt_%.o: ${SDDF}/serial/components/virt_%.c |serial/components $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
 %.elf: serial/components/%.o libsddf_util_debug.a
@@ -34,9 +34,9 @@ serial/components:
 	mkdir -p $@
 
 clean::
-	rm -f serial_virt_[rt]x.[od] .serial_cflags-*
+	rm -f serial/components/serial_virt_[rt]x.[od] .serial_cflags-*
 
-clobber::
+clobber:: clean
 	rm -f ${SERIAL_IMAGES}
 
 -include serial/components/serial_virt_rx.d

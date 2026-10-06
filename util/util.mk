@@ -69,6 +69,7 @@ clean::
 
 clobber:: clean
 	${RM} -f libsddf_util.a libsddf_util_debug.a
+	rmdir util/custom_libc
 	rmdir util
 
 -include ${ALL_OBJS_LIBUTIL:.o=.d}

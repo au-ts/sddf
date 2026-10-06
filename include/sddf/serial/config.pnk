@@ -1,0 +1,30 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+// sizeof(serial_connection_resource_t)
+#define SERIAL_CONNECTION_RESOURCE_SIZE 40
+
+// offsetof(serial_connection_resource_t, id)
+#define SERIAL_CONNECTION_RESOURCE_ID_OFFSET 32
+
+inline fun serial_connection_resource_get_id(1 serial_connection_resource)
+{
+    var ret = 0;
+    !ld8 ret, serial_connection_resource + SERIAL_CONNECTION_RESOURCE_ID_OFFSET;
+    return ret;
+}
+
+// sizeof(serial_virt_tx_client_config_t)
+#define SERIAL_VIRT_TX_CLIENT_CONFIG_SIZE 104
+
+// oofsetof(serial_virt_tx_client_config_t, conn)
+#define SERIAL_VIRT_TX_CLIENT_CONFIG_CONN_OFFSET 0
+
+inline fun serial_virt_tx_client_config_get_id(1 serial_virt_tx_client_config)
+{
+    var ret = 0;
+    !ld8 ret, serial_virt_tx_client_config + SERIAL_VIRT_TX_CLIENT_CONFIG_CONN_OFFSET + SERIAL_CONNECTION_RESOURCE_ID_OFFSET;
+    return ret;
+}
