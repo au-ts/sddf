@@ -33,6 +33,7 @@ def generate_example_test_cases(
             board=example_matrix["boards"],
             config=example_matrix["configs"],
             build_system=example_matrix["build_systems"],
+            language=example_matrix["languages"],
             test_fn=[test_fn],
             backend_fn=[backend_fn],
             no_output_timeout_s=[no_output_timeout_s],
@@ -49,6 +50,7 @@ def generate_example_test_cases(
                 build_system=listify(
                     exclude.get("build_system", example_matrix["build_systems"])
                 ),
+                language=listify(exclude.get("language", example_matrix["languages"])),
                 test_fn=[test_fn],
                 backend_fn=[backend_fn],
                 no_output_timeout_s=[no_output_timeout_s],
@@ -69,12 +71,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_riscv64",
             "x86_64_generic",
         ],
+        "languages": ["c", "pancake"],
         "tests_exclude": [],
     },
     "i2c": {
         "configs": ["debug", "release"],
         "build_systems": ["make"],
         "boards": ["odroidc4"],
+        "languages": ["c", "pancake"],
         "tests_exclude": [],
     },
     # Use i2c bus scan for all devices that don't have an I2C test board
@@ -83,12 +87,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release"],
         "build_systems": ["make"],
         "boards": ["serengeti"],
+        "languages": ["c", "pancake"],
         "tests_exclude": [],
     },
     "ina219": {
         "configs": ["debug", "release"],
         "build_systems": ["make"],
         "boards": ["serengeti"],
+        "languages": ["c", "pancake"],
         "tests_exclude": [],
     },
     "echo_server": {
@@ -111,6 +117,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
+        "languages": ["c", "pancake"],
         "tests_exclude": [
             # not in machine queue
             {"board": "imx8mp_evk"},
@@ -142,7 +149,10 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
+        "languages": ["c", "pancake"],
         "tests_exclude": [
+            # see https://github.com/au-ts/sddf/issues/804 for details
+            {"board": "serengeti", "language": "pancake"},
             # not in machine queue
             {"board": "cheshire"},
             {"board": "imx8mp_evk"},
@@ -172,6 +182,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
+        "languages": ["c", "pancake"],
         "tests_exclude": [
             # does not print anything in release mode, so we don't depend on serial
             {"config": "release"},
@@ -200,6 +211,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
+        "languages": ["c", "pancake"],
         "tests_exclude": [
             # not in machine queue
             {"board": "imx8mp_evk"},
