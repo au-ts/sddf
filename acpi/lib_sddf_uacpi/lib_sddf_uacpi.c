@@ -224,23 +224,39 @@ bool sddf_uacpi_teardown(void)
     size_t num_ut_caps_deleted = 0;
 
     for (size_t cslot = 0; cslot < num_slots; cslot++) {
-        if (caps[cslot].type == CAP_TYPE_X86_IO_PORT) {
-            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
-            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
+        switch (caps[cslot].type) {
+        case CAP_TYPE_CNODE_SELF:
+        case CAP_TYPE_IRQ_CONTROL:
+        case CAP_TYPE_X86_IO_PORT_CONTROL:
+            continue;
+        case CAP_TYPE_X86_IO_PORT:
             num_io_port_caps_deleted++;
-        } else if (caps[cslot].type == CAP_TYPE_IRQ) {
-            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
-            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
+            break;
+        case CAP_TYPE_IRQ:
             num_irq_caps_deleted++;
-        } else if (caps[cslot].type == CAP_TYPE_UT) {
+            break;
+        case CAP_TYPE_UT:
             if (caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
-                assert(seL4_CNode_Revoke(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
+                seL4_Error err = seL4_CNode_Revoke(lib_state.cnode_cptr, cslot, 58);
+                assert(err == seL4_NoError);
                 num_ut_caps_revoked++;
             } else {
                 num_ut_caps_deleted++;
             }
-            assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
+            break;
+        default:
+            continue;
         }
+
+        if (caps[cslot].type != CAP_TYPE_UT) {
+            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
+        }
+
+        if (caps[cslot].type == CAP_TYPE_UT && caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
+            continue;
+        }
+
+        assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
     }
 
     DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
