@@ -149,6 +149,7 @@ BOARDS: list[Board] = [
         arch=aarch64,
         paddr_top=0xF7000000,
         serial=DriverDouble("snps,dw-apb-uart", "serial@ff1a0000"),
+        timer=DriverDouble("rockchip,rk3399-timer", "rktimer@ff850000"),
         # https://github.com/u-boot/u-boot/blob/v2024.10/configs/rockpro64-rk3399_defconfig#L77
         baud_rate=1500000,
     ),

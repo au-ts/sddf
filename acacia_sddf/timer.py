@@ -193,3 +193,13 @@ add_driver_config(
         irqs=[DTSIRQ(0), DTSIRQ(1)],
     ),
 )
+
+# rk3399
+add_driver_config(
+    "rk3399",
+    sDDFDriverConfig(
+        compatible="rockchip,rk3399-timer",
+        regions=[DTSRegion("regs", dt_idx=0)],
+        irqs=[DTSIRQ(0)],
+    ),
+)
