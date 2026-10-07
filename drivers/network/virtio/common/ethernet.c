@@ -72,6 +72,10 @@ uint32_t rx_descriptors[RX_COUNT_MAX];
 ialloc_t tx_ialloc_desc;
 uint32_t tx_descriptors[TX_COUNT_MAX];
 
+#if defined(CONFIG_ARCH_X86_64)
+static bool pci_ready;
+#endif
+
 static inline bool virtio_avail_full(struct virtq *virtq, ialloc_t *ialloc)
 {
     return ialloc->size >= virtq->num;
@@ -402,10 +406,12 @@ static void eth_setup(void)
 
 void init(void)
 {
+#if defined(CONFIG_ARCH_X86_64)
     if (!pci_ready) {
         sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
         return;
     }
+#endif
 
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
@@ -450,6 +456,7 @@ void init(void)
 
 void notified(sddf_channel ch)
 {
+#if defined(CONFIG_ARCH_X86_64)
     if (ch == 10) {
         pci_ready = true;
         init();
@@ -459,6 +466,7 @@ void notified(sddf_channel ch)
         sddf_dprintf("PCI driver has not set things up. Waiting for signaling\n");
         return;
     }
+#endif
 
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
