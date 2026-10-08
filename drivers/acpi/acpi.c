@@ -13,9 +13,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/shadow_cnode.h>
 
-#include "acpi.h"
-
-#define CONFIG_DEBUG_DRIVER
+// #define CONFIG_DEBUG_DRIVER
 
 #if defined(CONFIG_DEBUG_DRIVER)
 #define DEBUG_DRIVER(fmt, ...) \
@@ -56,6 +54,8 @@ bootinfo_rsdp_t *bootinfo_rsdp;
 #define SHADOW_CNODE_SIZE_BITS 11 // from metaprogram
 static shadow_cnode_t post_capdl_shadow_cnode;
 
+static acpi_handover_t acpi_handover;
+
 void init(void)
 {
     if (bootinfo_rsdp->header.id != SEL4_BOOTINFO_HEADER_X86_ACPI_RSDP) {
@@ -88,7 +88,7 @@ void init(void)
         &post_capdl_shadow_cnode, &SHADOW_CNODE_MAKE_CAP(CAP_TYPE_X86_IO_PORT_CONTROL, 0, 0, PARENT_CSLOT_NONE, 0),
         POST_CAPDL_CSLOT_IOPORT_CONTROL));
 
-    // DEBUG_DRIVER("UTs received:\n");
+    DEBUG_DRIVER("UTs received from capDL initialiser:\n");
     for (uint64_t i = bootinfo_post_capdl->ut_range.start; i < bootinfo_post_capdl->ut_range.end; i++) {
         seL4_UntypedDesc *post_capdl_ut_desc = &bootinfo_post_capdl->ut_list[i - bootinfo_post_capdl->ut_range.start];
 
@@ -106,8 +106,8 @@ void init(void)
             return;
         }
 
-        // DEBUG_DRIVER("CSlot: 0x%lx, base: 0x%lx, end: 0x%lx, device? %d\n", i, base_paddr, end_paddr,
-        //              shadow_ut_cap.as_ut.is_device);
+        DEBUG_DRIVER("CSlot: 0x%lx, base: 0x%lx, end: 0x%lx, device? %d\n", i, base_paddr, end_paddr,
+                     shadow_ut_cap.as_ut.is_device);
     }
 
     sddf_uacpi_init_args_t init_args = (sddf_uacpi_init_args_t) {
@@ -118,6 +118,11 @@ void init(void)
 
     if (!sddf_uacpi_init(&init_args)) {
         DEBUG_DRIVER_ERR("Failed to initialise lib_sddf_uacpi\n");
+        return;
+    }
+
+    if (!sddf_uacpi_retrieve_information(&acpi_handover)) {
+        DEBUG_DRIVER_ERR("Failed to retrieve ACPI information\n");
         return;
     }
 

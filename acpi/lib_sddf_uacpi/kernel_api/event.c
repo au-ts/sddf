@@ -125,7 +125,9 @@ void uacpi_kernel_reset_event(uacpi_handle handle)
     *((uint64_t *)handle) = 0;
 }
 
-/* Currently assumes a single SCI, so calling this multiple time will fail. */
+/* Currently assumes a single SCI, so calling this multiple time will fail.
+ * @billn a bit ugly, and is it actually needed? I did not see any SCI being raised
+ * on 3 different machines at init time. */
 uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler irq_handle, uacpi_handle ctx,
                                                     uacpi_handle *out_irq_handle)
 {

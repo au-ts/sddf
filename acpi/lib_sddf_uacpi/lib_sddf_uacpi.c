@@ -10,6 +10,7 @@
 #include <uacpi/acpi.h>
 #include <uacpi/tables.h>
 #include <uacpi/context.h>
+#include <uacpi/resources.h>
 #include <uacpi/utilities.h>
 #include <sddf/acpi/lib_sddf_uacpi.h>
 #include <sddf/util/arch_timestamp_counter.h>
@@ -110,6 +111,7 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
 
     memcpy(lib_state.rsdp_buf, init_args->rsdp_blob, sizeof(struct acpi_rsdp));
 
+    /* Create a "super" ioport cap that allow uACPI to read and write to any ioport range. */
     size_t x86_ioport_ctrl_cslot;
     if (!shadow_cnode_find_cap_slot_of_type(lib_state.post_capdl_shadow_cnode, CAP_TYPE_X86_IO_PORT_CONTROL,
                                             &x86_ioport_ctrl_cslot)) {
@@ -207,11 +209,6 @@ bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args)
     return true;
 }
 
-bool sddf_uacpi_retrieve_pci_resources(void)
-{
-    return false;
-}
-
 bool sddf_uacpi_teardown(void)
 {
     uacpi_state_reset();
@@ -263,8 +260,6 @@ bool sddf_uacpi_teardown(void)
     DEBUG_ACPI("Deleted %lu IRQ caps\n", num_irq_caps_deleted);
     DEBUG_ACPI("Revoked %lu UT caps, which resulted in deleting %lu child UT caps\n", num_ut_caps_revoked,
                num_ut_caps_deleted);
-
-    // @billn todo, reset the shadow cnode into original state.
 
     memset(&lib_state, 0, sizeof(lib_state));
     return true;
