@@ -180,7 +180,7 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
-#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2) || defined(CONFIG_PLAT_ROCKPRO64)
+#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
             cntl |= DESC_TXCTRL_TXCIC;
 #endif
             update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
