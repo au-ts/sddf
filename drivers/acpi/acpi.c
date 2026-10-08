@@ -139,3 +139,10 @@ void init(void)
 void notified(microkit_channel ch)
 {
 }
+
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    /* This is intentionally empty, when the PCI driver ppcall into the ACPI driver to
+     * block for handover, if the handover is complete then this will return. */
+    return microkit_msginfo_new(0, 0);
+}
