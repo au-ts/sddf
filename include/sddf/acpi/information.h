@@ -82,6 +82,16 @@ typedef struct {
     uint8_t active_low;
 } madt_iso_entry_t;
 
+/* "High Precision Event Timer" details */
+typedef struct {
+    uint64_t paddr;
+    /* "The minimum clock ticks can be set without lost
+     * interrupts while the counter is programmed to operate in
+     * periodic mode". We don't use periodic mode in our HPET
+     * driver so this is moot but useful for the future. */
+    uint16_t min_clk_tick;
+} hpet_entry_t;
+
 /* PCI MCFG */
 typedef struct {
     uint64_t paddr;
@@ -100,6 +110,11 @@ typedef struct {
     host_bridge_t host_bridges[ACPI_MAX_NUM_HOST_BRIDGES];
     size_t num_host_bridges;
 
+    /* Entries from firmware-provided MCFG table for mapping PCI segment and start
+     * bus to ECAM paddr. */
+    mcfg_entry_t mcfg_entries[ACPI_MAX_NUM_MCFG_ENTRIES];
+    size_t num_mcfg_entries;
+
     /* Information about ISA devices that the metaprgram requested for */
     isa_dev_desc_t isa_devices[ACPI_MAX_NUM_ISA_DEVICES];
     size_t num_isa_devices;
@@ -112,13 +127,8 @@ typedef struct {
     size_t num_madt_ioapics;
 
     /* From HPET table */
-    uint64_t hpet_paddr;
-    uint64_t hpet_len_bytes;
-
-    /* Entries from firmware-provided MCFG table for mapping PCI segment and start
-     * bus to ECAM paddr. */
-    mcfg_entry_t mcfg_entries[ACPI_MAX_NUM_MCFG_ENTRIES];
-    size_t num_mcfg_entries;
+    hpet_entry_t hpet;
+    uint8_t hpet_available;
 
     /* From "Fixed ACPI Description Table" (FADT) */
     uint8_t system_supports_msi;

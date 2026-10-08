@@ -22,5 +22,8 @@
 #define DEBUG_ACPI(fmt, ...) do {} while (0)
 #endif
 
+#define DEBUG_ACPI_WARN(fmt, ...) \
+    sddf_dprintf("LIB ACPI %s:%d|WARN: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
 #define DEBUG_ACPI_ERR(fmt, ...) \
     sddf_dprintf("LIB ACPI %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)

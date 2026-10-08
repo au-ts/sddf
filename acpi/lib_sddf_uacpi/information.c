@@ -17,6 +17,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/shadow_cnode.h>
 #include "logging.h"
+#include "types.h"
+
+extern lib_sddf_uacpi_state_t lib_state;
 
 /* Below 1 MiB is legacy: VGA (0xa0000-0xbffff), option ROMs and BIOS shadow (0xc0000-0xfffff) */
 #define PCI_ALLOC_MIN_MEM  0x100000ULL
@@ -239,7 +242,20 @@ static uacpi_iteration_decision prt_cb(void *ctx, uacpi_namespace_node *node, ua
 
         DEBUG_ACPI("  slot 0x%x, pin %u, gsi %u\n", address, pin, gsi);
 
-        // todo later make prt entry
+        size_t *num_prt_entry = &handover->host_bridges[handover->num_host_bridges].num_prt_entry;
+        if (*num_prt_entry == ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE) {
+            DEBUG_ACPI_ERR("num_prt_entry exceed ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE, consider increasing\n");
+            break;
+        }
+        prt_entry_t *prt_entry = &handover->host_bridges[handover->num_host_bridges].prt_entries[*num_prt_entry];
+        memcpy(&prt_entry->path, &path, sizeof(path));
+        prt_entry->slot = address;
+        prt_entry->pin = pin;
+        prt_entry->level_triggered = 1;
+        prt_entry->active_low = 1;
+        prt_entry->gsi = gsi;
+
+        (*num_prt_entry)++;
     }
 
 prt_bail:
@@ -291,17 +307,201 @@ static uacpi_iteration_decision pci_host_bridge_cb(void *cookie, uacpi_namespace
     return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
+static uacpi_iteration_decision madt_cb(void *cookie, struct acpi_entry_hdr *subtable)
+{
+    switch (subtable->type) {
+    case ACPI_MADT_ENTRY_TYPE_IOAPIC: {
+        struct acpi_madt_ioapic *madt_ioapic = (struct acpi_madt_ioapic *)subtable;
+
+        if (handover->num_madt_ioapics == CONFIG_MAX_NUM_IOAPIC) {
+            DEBUG_ACPI_WARN("Your system have more I/O APICs than what seL4 is configured to support\n");
+            DEBUG_ACPI_WARN("Skipping I/O APIC with ID %hhu, GSI base %u\n", madt_ioapic->id, madt_ioapic->gsi_base);
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        }
+
+        DEBUG_ACPI("Recorded I/O APIC #%zu with GSI base %u\n", handover->num_madt_ioapics, madt_ioapic->gsi_base);
+
+        handover->madt_ioapic_gsi_bases[handover->num_madt_ioapics] = madt_ioapic->gsi_base;
+        handover->num_madt_ioapics++;
+        break;
+    }
+    case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE: {
+
+        struct acpi_madt_interrupt_source_override *madt_iso = (struct acpi_madt_interrupt_source_override *)subtable;
+
+        if (handover->num_madt_iso_entries == ACPI_MAX_NUM_MADT_ISO_ENTRIES) {
+            DEBUG_ACPI_WARN("Skipping ISO GSI base %u, consider increasing ACPI_MAX_NUM_MADT_ISO_ENTRIES\n",
+                            madt_iso->gsi);
+            return UACPI_ITERATION_DECISION_BREAK;
+        }
+
+        madt_iso_entry_t *iso_entry = &handover->madt_iso_entries[handover->num_madt_iso_entries];
+        iso_entry->bus = madt_iso->bus;
+        iso_entry->source = madt_iso->source;
+        iso_entry->gsi = madt_iso->gsi;
+
+        if ((madt_iso->flags & ACPI_MADT_TRIGGERING_MASK) != ACPI_MADT_TRIGGERING_CONFORMING) {
+            iso_entry->level_triggered = (madt_iso->flags & ACPI_MADT_TRIGGERING_LEVEL) == ACPI_MADT_TRIGGERING_LEVEL
+                                           ? 1
+                                           : 0;
+        } else {
+            iso_entry->level_triggered = 0;
+        }
+
+        if ((madt_iso->flags & ACPI_MADT_POLARITY_MASK) != ACPI_MADT_POLARITY_CONFORMING) {
+            iso_entry->active_low = (madt_iso->flags & ACPI_MADT_POLARITY_ACTIVE_LOW) == ACPI_MADT_POLARITY_ACTIVE_LOW
+                                      ? 1
+                                      : 0;
+        } else {
+            iso_entry->active_low = 0;
+        }
+
+        DEBUG_ACPI("Recorded ISO entry, bus %u, source %u, GSI %u, level trig %u, active low %u\n", iso_entry->bus,
+                   iso_entry->source, iso_entry->gsi, iso_entry->level_triggered, iso_entry->active_low);
+
+        handover->num_madt_iso_entries++;
+        break;
+    }
+    }
+
+    return UACPI_ITERATION_DECISION_CONTINUE;
+}
+
+static bool retrieve_madt_information(void)
+{
+    uacpi_table madt_handle;
+    if (uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt_handle) != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("can't find MADT\n");
+        return false;
+    }
+
+    if (uacpi_for_each_subtable(madt_handle.hdr, sizeof(struct acpi_madt), madt_cb, NULL) != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("can't walk MADT \n");
+        return false;
+    }
+
+    if (uacpi_table_unref(&madt_handle) != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("failed to free MADT handle\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool retrieve_hpet_information(void)
+{
+    uacpi_table hpet_handle;
+    if (uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet_handle) == UACPI_STATUS_OK) {
+        if (hpet_handle.hdr->length < sizeof(struct acpi_hpet)) {
+            DEBUG_ACPI_ERR("bad HPET table length %u < expected %zu\n", hpet_handle.hdr->length,
+                           sizeof(struct acpi_hpet));
+            return false;
+        }
+
+        struct acpi_hpet *acpi_hpet = (struct acpi_hpet *)hpet_handle.ptr;
+        handover->hpet.paddr = acpi_hpet->address.address;
+        handover->hpet.min_clk_tick = acpi_hpet->min_clock_tick;
+        handover->hpet_available = true;
+
+        DEBUG_ACPI("Recorded HPET at 0x%lx, min clk tick %hu\n", handover->hpet.paddr, handover->hpet.min_clk_tick);
+
+        if (uacpi_table_unref(&hpet_handle) != UACPI_STATUS_OK) {
+            DEBUG_ACPI_ERR("failed to free HPET handle\n");
+            return false;
+        }
+    } else {
+        DEBUG_ACPI_WARN("Firmware did not provide HPET\n");
+    }
+
+    return true;
+}
+
+static void retrieve_mcfg_information(void)
+{
+    if (!lib_state.num_ecams) {
+        DEBUG_ACPI_WARN("Firmware did not expose MCFG table, so no ECAMs available\n");
+        return;
+    }
+
+    for (int i = 0; i < lib_state.num_ecams; i++) {
+        if (i == ACPI_MAX_NUM_MCFG_ENTRIES) {
+            DEBUG_ACPI_ERR(
+                "skipping MCFG entry for segment %u, start bus %u. Consider increasing ACPI_MAX_NUM_MCFG_ENTRIES",
+                lib_state.ecams[i].segment, lib_state.ecams[i].start_bus);
+            continue;
+        }
+
+        handover->mcfg_entries[i].start_bus = lib_state.ecams[i].start_bus;
+        handover->mcfg_entries[i].end_bus = lib_state.ecams[i].end_bus;
+        handover->mcfg_entries[i].segment = lib_state.ecams[i].segment;
+        handover->mcfg_entries[i].paddr = lib_state.ecams[i].paddr;
+
+        handover->num_mcfg_entries++;
+    }
+}
+
+static bool retrieve_fadt_information(void)
+{
+    struct acpi_fadt *fadt;
+    if (uacpi_table_fadt(&fadt) != UACPI_STATUS_OK) {
+        DEBUG_ACPI_ERR("can't fetch FADT from uACPI\n");
+        return false;
+    }
+
+    handover->system_supports_msi = fadt->iapc_boot_arch & ACPI_IA_PC_NO_MSI ? 0 : 1;
+    if (handover->system_supports_msi) {
+        DEBUG_ACPI("System supports MSI\n");
+    } else {
+        DEBUG_ACPI("System DOES NOT supports MSI\n");
+    }
+
+    return true;
+}
+
 bool sddf_uacpi_retrieve_information(acpi_handover_t *acpi_handover)
 {
     handover = acpi_handover;
     memset(handover, 0, sizeof(acpi_handover_t));
 
+    DEBUG_ACPI("Recording PCI information...\n");
     /* For each PCIe host bridge, call pci_host_bridge_cb() */
     if (uacpi_find_devices("PNP0A03", pci_host_bridge_cb, NULL) != UACPI_STATUS_OK) {
         DEBUG_ACPI_ERR("failed to enumerate PCI bridges\n");
         return false;
     }
+    DEBUG_ACPI("PCI information recorded\n");
+    DEBUG_ACPI("==============================================\n");
+
+    DEBUG_ACPI("Recording MCFG information...\n");
+    retrieve_mcfg_information();
+    DEBUG_ACPI("MCFG information recorded\n");
+    DEBUG_ACPI("==============================================\n");
+
+    // @billn todo isa
+
+    DEBUG_ACPI("Recording MADT information...\n");
+    if (!retrieve_madt_information()) {
+        return false;
+    }
+    DEBUG_ACPI("MADT information recorded\n");
+    DEBUG_ACPI("==============================================\n");
+
+    DEBUG_ACPI("Recording HPET information...\n");
+    if (!retrieve_hpet_information()) {
+        return false;
+    }
+    DEBUG_ACPI("HPET information recorded\n");
+    DEBUG_ACPI("==============================================\n");
+
+    DEBUG_ACPI("Recording FADT information...\n");
+    if (!retrieve_fadt_information()) {
+        return false;
+    }
+    DEBUG_ACPI("FADT information recorded\n");
+    DEBUG_ACPI("==============================================\n");
 
     handover->magic = ACPI_HANDOVER_MAGIC;
+    DEBUG_ACPI("All ACPI handover information recorded\n");
+
     return true;
 }
