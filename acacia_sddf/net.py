@@ -16,7 +16,13 @@ from acacia import (
     System,
 )
 
-from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .driver_manifest import (
+    DTSIRQ,
+    DTSRegion,
+    register_sddf_subsystem,
+    sDDFDriverConfig,
+    sDDFDriverManifest,
+)
 from .sddf import (
     DeviceRegionResourceFactory,
     RegionResourceFactory,
@@ -977,27 +983,5 @@ class sDDFEthernet(sDDFDriverClass):
         ...
 
 
-def add_driver_config(driver_name: str, config: sDDFDriverConfig):
-    sDDFDriverManifest().add_driver_config(sDDFEthernet, driver_name, config)
-
-
-add_driver_config(
-    "meson",
-    sDDFDriverConfig(
-        compatible="amlogic,meson-g12a-dwmac",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-add_driver_config(
-    "virtio,mmio",
-    sDDFDriverConfig(
-        compatible="virtio,mmio",
-        regions=[
-            DTSRegion("regs", "rw", 4096, 0),
-            DTSRegion("hw_ring_buffer", size=65536, cached=True),
-        ],
-        irqs=[DTSIRQ(0)],
-    ),
-)
+# Register this class with all drivers in network dir
+register_sddf_subsystem("network", sDDFEthernet)
