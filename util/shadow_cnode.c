@@ -324,165 +324,42 @@ bool shadow_cnode_retype(shadow_cnode_t *shadow_cnode, seL4_Word object_type, se
     return untyped_retype(shadow_cnode, candidate_ut_cslot, object_type, obj_bits, retyped_cslot);
 }
 
-// // seL4_Error pass_ut_with_range(cnode_specs_t *dst_cnode_specs,
-// //                               cnode_specs_t *src_cnode_specs,
-// //                               uintptr_t min_addr,
-// //                               uintptr_t max_addr)
-// // {
-// //     if (min_addr >= max_addr) {
-// //         return seL4_NoError;
-// //     }
+static char *shadow_cap_type_to_string(shadow_cap_type_t type)
+{
+    switch (type) {
+    case CAP_TYPE_NONE:
+        return "none";
+    case CAP_TYPE_CNODE_SELF:
+        return "CNode self";
+    case CAP_TYPE_UT:
+        return "Untyped";
+    case CAP_TYPE_NTFN:
+        return "Notification";
+    case CAP_TYPE_SMALL_PAGE:
+        return "Small Page";
+    case CAP_TYPE_LARGE_PAGE:
+        return "Large Page";
+    case CAP_TYPE_PAGE_TABLE:
+        return "Page Table";
+    case CAP_TYPE_IRQ:
+        return "IRQ";
+    case CAP_TYPE_IRQ_CONTROL:
+        return "IRQ Control";
+    case CAP_TYPE_X86_IO_PORT:
+        return "X86 IO Port";
+    case CAP_TYPE_X86_IO_PORT_CONTROL:
+        return "X86 IO Port Control";
+    default:
+        return "unknown";
+    }
+}
 
-// //     uint32_t target_ut_idx;
-// //     seL4_Error error = get_untyped_at_paddr(src_cnode_specs, min_addr, &target_ut_idx);
-// //     if (error != seL4_NoError) {
-// //         sddf_dprintf("Error: failed to found the untyped containing physical address: 0x%lx\n", min_addr);
-// //         return error;
-// //     }
-
-// //     seL4_Word max_align_size_bits = 0;
-// //     while (max_align_size_bits < 64) {
-// //         uint8_t offset_bit = (src_cnode_specs->caps[target_ut_idx].base_addr >> max_align_size_bits) & 0x1;
-// //         if (offset_bit) break;
-// //         max_align_size_bits += 1;
-// //     }
-// //     /* seL4_Word max_align_size = (1ULL << max_align_size_bits); */
-
-// //     seL4_Word avai_mem_size = src_cnode_specs->caps[target_ut_idx].end_addr - min_addr;
-// //     seL4_Word avai_mem_size_bits = max_size_bits(avai_mem_size);
-// //     seL4_Word max_target_size_bits = max_size_bits(max_addr - min_addr);
-// //     seL4_Word new_ut_size_bits = MIN(MIN(avai_mem_size_bits, max_target_size_bits), max_align_size_bits);
-// //     seL4_Word new_ut_size = (1ULL << new_ut_size_bits);
-
-// //     uint32_t retyped_cptr_idx;
-// //     /* sddf_dprintf("Try passing the ut min_addr: 0x%lx, max_addr: 0x%lx\n", min_addr, max_addr); */
-// //     error = untyped_retype(src_cnode_specs, target_ut_idx, seL4_UntypedObject, new_ut_size_bits, &retyped_cptr_idx);
-// //     if (error != seL4_NoError) {
-// //         sddf_dprintf("Error: failed to retype an untyped [0x%lx-0x%lx] from an untyped(%d)[0x%lx-0x%lx]\n",
-// //                      min_addr,
-// //                      min_addr + new_ut_size,
-// //                      target_ut_idx,
-// //                      src_cnode_specs->caps[target_ut_idx].base_addr,
-// //                      src_cnode_specs->caps[target_ut_idx].end_addr);
-// //         return error;
-// //     }
-
-// //     // TODO: remove hardcoded value
-// //     // depth = guardSize + radixSize = 50 + 8 for CNode 'remaining_untypeds'
-// //     error = seL4_CNode_Copy(dst_cnode_specs->cptr, dst_cnode_specs->end, 58, src_cnode_specs->cptr, retyped_cptr_idx, 58, seL4_ReadWrite);
-// //     if (error != seL4_NoError) {
-// //         sddf_dprintf("Error: failed to copy a capability\n");
-// //         return error;
-// //     }
-// //     /* sddf_dprintf("pass ut to slot %d in destination CNode from slot %d in src\n", dst_cnode_specs->end, target_ut_idx); */
-
-// //     dst_cnode_specs->caps[dst_cnode_specs->end].base_addr = min_addr;
-// //     dst_cnode_specs->caps[dst_cnode_specs->end].end_addr = min_addr + new_ut_size;
-// //     dst_cnode_specs->end++;
-
-// //     if (min_addr + new_ut_size < max_addr) {
-// //         pass_ut_with_range(dst_cnode_specs, src_cnode_specs, min_addr + new_ut_size, max_addr);
-// //     }
-// //     return seL4_NoError;
-// // }
-
-// void clear_cnode_specs_entry(cnode_specs_t *cnode_specs, uint32_t ut_idx)
-// {
-//     cnode_specs->caps[ut_idx].base_addr = 0;
-//     cnode_specs->caps[ut_idx].end_addr = 0;
-//     cnode_specs->caps[ut_idx].is_device = 0;
-//     cnode_specs->caps[ut_idx].object_type = 0;
-//     cnode_specs->caps[ut_idx].parent = 0;
-//     cnode_specs->caps[ut_idx].child = 0;
-// }
-
-// bool update_cnode_specs_after_revoke(cnode_specs_t *cnode_specs,
-//                                      uint32_t ut_idx)
-// {
-//     if (cnode_specs->caps[ut_idx].child) {
-//         uint32_t child_ut_idx = cnode_specs->caps[ut_idx].child;
-//         uintptr_t base_addr = 0;
-//         uintptr_t end_addr = 0;
-//         while (child_ut_idx != 0) {
-//             bool success = update_cnode_specs_after_revoke(cnode_specs, child_ut_idx);
-//             if (!success) {
-//                 return success;
-//             }
-//             if (base_addr == end_addr) {
-//                 base_addr = cnode_specs->caps[child_ut_idx].base_addr;
-//                 end_addr = cnode_specs->caps[child_ut_idx].end_addr;
-//                 clear_cnode_specs_entry(cnode_specs, child_ut_idx);
-//             } else if (end_addr == cnode_specs->caps[child_ut_idx].base_addr) {
-//                 end_addr = cnode_specs->caps[child_ut_idx].end_addr;
-//                 clear_cnode_specs_entry(cnode_specs, child_ut_idx);
-//             } else {
-//                 sddf_dprintf("Error: something wrong during re-collecting untypeds\n");
-//                 return false;
-//             }
-
-//             uint32_t child_cleared_idx = child_ut_idx;
-//             child_ut_idx = cnode_specs->caps[child_ut_idx].next;
-//             cnode_specs->caps[child_cleared_idx].next = 0;
-//         }
-
-//         if (end_addr != cnode_specs->caps[ut_idx].base_addr) {
-//             sddf_dprintf("Error: something wrong during re-collecting untypeds\n");
-//             return false;
-//         }
-//         cnode_specs->caps[ut_idx].base_addr = base_addr;
-//         cnode_specs->caps[ut_idx].child = 0;
-//     }
-//     return true;
-// }
-
-// void update_active_ut_idx(cnode_specs_t *cnode_specs)
-// {
-//     // TODO: find a proper untyped for PT objects, not the first one is used by capDL initialiser
-//     uint32_t non_dev_mem_id = 0;
-//     uint32_t i;
-//     for (i = cnode_specs->start; i < cnode_specs->end; i++) {
-//         if (cnode_specs->caps[i].is_device == false && cnode_specs->caps[i].object_type == seL4_UntypedObject) {
-//             if (non_dev_mem_id == 5) {
-//                 cnode_specs->active_ut_idx = i;
-//                 break;
-//             }
-//             non_dev_mem_id++;
-//         }
-//     }
-//     if (i < cnode_specs->end) {
-//         sddf_dprintf("Found an untyped for kernel objects: ut idx: 0x%x, paddr: 0x%lx\n", cnode_specs->active_ut_idx, cnode_specs->caps[i].base_addr);
-//     } else {
-//         sddf_dprintf("[Error] failed to find an available untyped for kernel objects allocation\n");
-//     }
-// }
-
-// // DANGER: can destroy objects created by capDL initialiser!
-// // seL4_Error cnode_untypeds_revoke(cnode_specs_t *cnode_specs)
-// // {
-// //     for (uint32_t i = cnode_specs->end - 1; i >= cnode_specs->start; i--) {
-// //         uint32_t parent_ut_idx = i;
-// //         while (cnode_specs->caps[parent_ut_idx].parent) {
-// //             parent_ut_idx = cnode_specs->caps[parent_ut_idx].parent;
-// //         }
-
-// //         // Revoke if this cap has been divided into small ones
-// //         if (parent_ut_idx != i) {
-// //             // TODO: proper way to calculate `depth`
-// //             seL4_Error error = seL4_CNode_Revoke(cnode_specs->cptr, parent_ut_idx, 58);
-// //             if (error != seL4_NoError) {
-// //                 return error;
-// //             }
-
-// //             bool success = update_cnode_specs_after_revoke(cnode_specs, parent_ut_idx);
-// //             if (!success) {
-// //                 return seL4_IllegalOperation;
-// //             }
-// //         }
-
-// //         if (cnode_specs->caps[i].end_addr == 0) {
-// //             cnode_specs->end = i;
-// //         }
-// //     }
-
-// //     return seL4_NoError;
-// // }
+void shadow_cnode_pretty_print(shadow_cnode_t *shadow_cnode)
+{
+    for (size_t cslot = 0; cslot < shadow_cnode->num_slots; cslot++) {
+        shadow_cap_type_t type = shadow_cnode->caps[cslot].type;
+        if (type != CAP_TYPE_NONE) {
+            sddf_dprintf("CSlot %lu, type '%s'\n", cslot, shadow_cap_type_to_string(type));
+        }
+    }
+}
