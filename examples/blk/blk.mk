@@ -59,7 +59,7 @@ SDDF_CUSTOM_LIBC := 1
 include ${SDDF}/tools/make/board/common.mk
 
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf acpi_driver.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf acpi_driver.elf pci_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \

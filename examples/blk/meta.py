@@ -115,7 +115,7 @@ def generate(
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=acpi_post_capdl_cnode, dest_cspace_slot=1))
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))
 
-    # pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
+    pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
 
     # acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
 
@@ -129,7 +129,7 @@ def generate(
     # acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
     # pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
 
-    # sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
+    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0, pp_b=True))
 
     # pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 2))
     # pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 3))
@@ -277,7 +277,7 @@ def generate(
 
     serial_system.add_client(client)
 
-    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver]
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver, pci_driver]
     if need_timer:
         pds += [timer_driver]
     for pd in pds:
