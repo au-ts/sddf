@@ -198,8 +198,8 @@ static uacpi_iteration_decision prt_cb(void *ctx, uacpi_namespace_node *node, ua
                 goto prt_bail;
             }
 
-            uint8_t dev = adr >> 16;
-            uint8_t fn = adr & 0xffff;
+            uint64_t dev = adr >> 16;
+            uint64_t fn = adr & 0xffff;
 
             if (dev >= 32 || fn >= 8) {
                 DEBUG_ACPI_ERR("malformed _ADR 0x%lx\n", adr);
@@ -211,11 +211,11 @@ static uacpi_iteration_decision prt_cb(void *ctx, uacpi_namespace_node *node, ua
                 goto prt_bail;
             }
 
-            DEBUG_ACPI("  hop: _ADR 0x%lx (dev 0x%02hhx fn %hhu)\n", adr, dev, fn);
+            DEBUG_ACPI("  hop: _ADR 0x%lx (dev 0x%lx fn %lu)\n", adr, dev, fn);
             path.devfn[path.depth] = (dev << 3) | fn;
             path.depth++;
 
-            curr = uacpi_namespace_node_parent(node);
+            curr = uacpi_namespace_node_parent(curr);
         }
 
         /* We promised in information.h that the path is top (host bridge) down, but we
@@ -332,7 +332,7 @@ static uacpi_iteration_decision madt_cb(void *cookie, struct acpi_entry_hdr *sub
         if (handover->num_madt_iso_entries == ACPI_MAX_NUM_MADT_ISO_ENTRIES) {
             DEBUG_ACPI_WARN("Skipping ISO GSI base %u, consider increasing ACPI_MAX_NUM_MADT_ISO_ENTRIES\n",
                             madt_iso->gsi);
-            return UACPI_ITERATION_DECISION_BREAK;
+            return UACPI_ITERATION_DECISION_CONTINUE;
         }
 
         madt_iso_entry_t *iso_entry = &handover->madt_iso_entries[handover->num_madt_iso_entries];
@@ -395,7 +395,7 @@ static bool retrieve_hpet_information(void)
         if (hpet_handle.hdr->length < sizeof(struct acpi_hpet)) {
             DEBUG_ACPI_ERR("bad HPET table length %u < expected %zu\n", hpet_handle.hdr->length,
                            sizeof(struct acpi_hpet));
-            return false;
+            goto hpet_fail;
         }
 
         struct acpi_hpet *acpi_hpet = (struct acpi_hpet *)hpet_handle.ptr;
@@ -405,6 +405,7 @@ static bool retrieve_hpet_information(void)
 
         DEBUG_ACPI("Recorded HPET at 0x%lx, min clk tick %hu\n", handover->hpet.paddr, handover->hpet.min_clk_tick);
 
+    hpet_fail:
         if (uacpi_table_unref(&hpet_handle) != UACPI_STATUS_OK) {
             DEBUG_ACPI_ERR("failed to free HPET handle\n");
             return false;
@@ -424,7 +425,7 @@ static void retrieve_mcfg_information(void)
     }
 
     for (int i = 0; i < lib_state.num_ecams; i++) {
-        if (i == ACPI_MAX_NUM_MCFG_ENTRIES) {
+        if (i >= ACPI_MAX_NUM_MCFG_ENTRIES) {
             DEBUG_ACPI_ERR(
                 "skipping MCFG entry for segment %u, start bus %u. Consider increasing ACPI_MAX_NUM_MCFG_ENTRIES",
                 lib_state.ecams[i].segment, lib_state.ecams[i].start_bus);
@@ -435,6 +436,10 @@ static void retrieve_mcfg_information(void)
         handover->mcfg_entries[i].end_bus = lib_state.ecams[i].end_bus;
         handover->mcfg_entries[i].segment = lib_state.ecams[i].segment;
         handover->mcfg_entries[i].paddr = lib_state.ecams[i].paddr;
+
+        DEBUG_ACPI("segment: %u, start bus 0x%hx, end bus 0x%hx, paddr 0x%lx\n", handover->mcfg_entries[i].start_bus,
+                   handover->mcfg_entries[i].end_bus, handover->mcfg_entries[i].segment,
+                   handover->mcfg_entries[i].paddr);
 
         handover->num_mcfg_entries++;
     }
