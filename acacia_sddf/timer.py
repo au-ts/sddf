@@ -15,7 +15,7 @@ from acacia import (
     System,
 )
 
-from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .driver_manifest import register_sddf_subsystem
 from .sddf import sDDFDriverClass
 
 TIMER_PROTOCOL_MAGIC = "sDDF" + chr(6)
@@ -105,101 +105,5 @@ class sDDFTimer(sDDFDriverClass):
         self.driver.add_map(hpet_regs_map)
 
 
-# Driver configs
-def add_driver_config(driver_name: str, config: sDDFDriverConfig):
-    sDDFDriverManifest().add_driver_config(sDDFTimer, driver_name, config)
-
-
-# pulp
-add_driver_config(
-    "apb_timer",
-    sDDFDriverConfig(
-        compatible="pulp,apb_timer",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1), DTSIRQ(2), DTSIRQ(3)],
-    ),
-)
-# armv8
-add_driver_config(
-    "arm", sDDFDriverConfig(compatible="arm,armv8-timer", regions=[], irqs=[DTSIRQ(1)])
-)
-
-# bcm2835
-add_driver_config(
-    "bcm2835",
-    sDDFDriverConfig(
-        compatible="brcm,bcm2835-system-timer",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(1)],
-    ),
-)
-
-# cdns
-add_driver_config(
-    "cdns",
-    sDDFDriverConfig(
-        compatible="cdns,ttc",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# goldfish
-add_driver_config(
-    "goldfish",
-    sDDFDriverConfig(
-        compatible="google,goldfish-rtc",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# imx8
-add_driver_config(
-    "imx",
-    sDDFDriverConfig(
-        compatible=["fsl,imx8mm-gpt", "fsl,imx8mq-gpt", "fsl,imx8mp-gpt"],
-        regions=[DTSRegion("regs", "rw", 65536, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# jh7110
-add_driver_config(
-    "jh7110",
-    sDDFDriverConfig(
-        compatible="starfive,jh7110-timer",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# meson_gxbb
-add_driver_config(
-    "meson",
-    sDDFDriverConfig(
-        compatible="amlogic,meson-gxbb-wdt",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# rk3568
-add_driver_config(
-    "rk3568",
-    sDDFDriverConfig(
-        compatible="rockchip,rk3568-timer",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# rk3399
-add_driver_config(
-    "rk3399",
-    sDDFDriverConfig(
-        compatible="rockchip,rk3399-timer",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
+# Tell driver manifest we exist and that drivers in the timer tree are usable for us.
+register_sddf_subsystem("timer", sDDFTimer)

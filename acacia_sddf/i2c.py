@@ -1,7 +1,6 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from collections import defaultdict
 from dataclasses import dataclass
 
 from acacia import (
@@ -15,7 +14,7 @@ from acacia import (
     System,
 )
 
-from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
 
 I2C_DATA_SZ = 0x1000
@@ -350,30 +349,5 @@ class sDDFI2C(sDDFDriverClass):
         )
 
 
-# Driver configs
-i2c_driver_configs: dict[str, list[sDDFDriverConfig]] = defaultdict(list)
-
-
-def add_driver_config(driver_name: str, config: sDDFDriverConfig):
-    sDDFDriverManifest().add_driver_config(sDDFI2C, driver_name, config)
-
-
-# meson
-add_driver_config(
-    "meson",
-    sDDFDriverConfig(
-        compatible="amlogic,meson-axg-i2c",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0), DTSIRQ(1)],
-    ),
-)
-
-# opentitan
-add_driver_config(
-    "opentitan",
-    sDDFDriverConfig(
-        compatible="eth,i2c",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(4), DTSIRQ(0), DTSIRQ(1), DTSIRQ(7), DTSIRQ(9)],
-    ),
-)
+# Tell driver manifest we exist and that drivers in the i2c tree are usable for us.
+register_sddf_subsystem("i2c", sDDFI2C)

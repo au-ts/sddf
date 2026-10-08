@@ -1,7 +1,6 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from collections import defaultdict
 from typing import Dict, List, Optional
 
 from acacia import (
@@ -17,7 +16,7 @@ from acacia import (
 from acacia.irq import IrqIoapic
 from acacia.x86 import IOPort
 
-from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
 
 SERIAL_DEFAULT_BEGIN_STR = "Begin input\r\n"
@@ -468,77 +467,5 @@ class sDDFSerial(sDDFDriverClass):
         self.driver.add_irq(IrqIoapic(0, 4, 0, id=1))
 
 
-# Driver configs
-serial_driver_configs: Dict[str, List[sDDFDriverConfig]] = defaultdict(list)
-
-
-def add_driver_config(driver_name: str, config: sDDFDriverConfig):
-    sDDFDriverManifest().add_driver_config(sDDFSerial, driver_name, config)
-
-
-add_driver_config(
-    "meson",
-    sDDFDriverConfig(
-        compatible=["amlogic,meson-gx-uart", "amlogic,meson-ao-uart"],
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-add_driver_config(
-    "pl011",
-    sDDFDriverConfig(
-        compatible="arm,pl011",
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-add_driver_config(
-    "imx",
-    sDDFDriverConfig(
-        compatible=["fsl,imx8mq-uart", "fsl,imx8mm-uart", "fsl,imx8mp-uart"],
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# ns16550a
-add_driver_config(
-    "ns16550a",
-    sDDFDriverConfig(
-        compatible=[
-            "starfive,jh7110-uart",
-            "ns16550a",
-            "brcm,bcm2835-aux-uart",
-            "snps,dw-apb-uart",
-        ],
-        regions=[DTSRegion("regs", "rw", 4096, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# virtio
-add_driver_config(
-    "virtio",
-    sDDFDriverConfig(
-        compatible="virtio,mmio",
-        regions=[
-            DTSRegion("regs", "rw", 4096, 0),
-            DTSRegion("hw_ring_buffer", size=65536),
-            DTSRegion("virtio_rx_buf", size=4096),
-            DTSRegion("virtio_tx_buf", size=4096),
-        ],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# xlnx
-add_driver_config(
-    "xlnx",
-    sDDFDriverConfig(
-        compatible="xlnx,zynqmp-uart",
-        regions=[DTSRegion("regs", dt_idx=0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
+# Tell driver manifest we exist and that drivers in the serial tree are usable for us.
+register_sddf_subsystem("serial", sDDFSerial)
