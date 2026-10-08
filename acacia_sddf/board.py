@@ -50,7 +50,7 @@ BOARDS: list[Board] = [
             "fsl,imx8mm-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
         ),
         timer=DriverDouble("fsl,imx8mm-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
     ),
     Board(
         name="imx8mp_evk",
@@ -60,7 +60,7 @@ BOARDS: list[Board] = [
             "fsl,imx8mp-uart", "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
         ),
         timer=DriverDouble("fsl,imx8mp-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30bf0000"),
+        ethernet=DriverDouble("nxp,imx8mp-dwmac-eqos", "soc@0/bus@30800000/ethernet@30bf0000"),
     ),
     Board(
         name="imx8mp_iotgate",
@@ -68,7 +68,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mp-uart", "soc@0/bus@30800000/serial@30890000"),
         timer=DriverDouble("fsl,imx8mp-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30bf0000"),
+        ethernet=DriverDouble("nxp,imx8mp-dwmac-eqos", "soc@0/bus@30800000/ethernet@30bf0000"),
     ),
     Board(
         name="imx8mq_evk",
@@ -76,7 +76,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
     ),
     Board(
         name="kria_k26",
@@ -84,6 +84,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         timer=DriverDouble("cdns,ttc", "axi/timer@ff140000"),
         serial=DriverDouble("xlnx,zynqmp-uart", "axi/serial@ff010000"),
+        ethernet=DriverDouble("xlnx,zynqmp-gem","axi/ethernet@ff0e0000")
     ),
     Board(
         name="maaxboard",
@@ -91,7 +92,7 @@ BOARDS: list[Board] = [
         paddr_top=0x70000000,
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
-        ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
         blk=DriverDouble("", "soc@0/bus@30800000/mmc@30b40000"),
         partition=2,
     ),
@@ -183,6 +184,7 @@ BOARDS: list[Board] = [
         paddr_top=0x80000000,
         timer=DriverDouble("cdns,ttc", "axi/timer@ff140000"),
         serial=DriverDouble("xlnx,zynqmp-uart", "axi/serial@ff000000"),
+        ethernet=DriverDouble("xlnx,zynqmp-gem","axi/ethernet@ff0e0000")
     ),
     Board(
         name="x86_64_generic",
