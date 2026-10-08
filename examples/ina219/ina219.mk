@@ -74,14 +74,15 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .device_resources=i2c_driver_device_resources.data i2c_driver.elf
-	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver.data i2c_driver.elf
-	$(OBJCOPY) --update-section .i2c_virt_config=i2c_virt.data i2c_virt.elf
-	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_ina.data client_ina.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_ina.data client_ina.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_ina.data client_ina.elf
+	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver_i2c_driver_config.data i2c_driver.elf
+	$(OBJCOPY) --update-section .i2c_virt_config=i2c_virt_i2c_virt_config.data i2c_virt.elf
+	$(OBJCOPY) --update-section .i2c_client_config=client_ina_i2c_client_config.data client_ina.elf
+	$(OBJCOPY) --update-section .timer_client_config=client_ina_timer_client_config.data client_ina.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx_serial_virt_tx_config.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=client_ina_serial_client_config.data client_ina.elf
+
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
