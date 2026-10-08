@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <sddf/acpi/information.h>
 #include <sddf/util/shadow_cnode.h>
 
 /* Root System Descriptor Pointer */
@@ -51,6 +52,8 @@ typedef struct {
  *    while it is active. Fix: see #2.
  * */
 bool sddf_uacpi_init(sddf_uacpi_init_args_t *init_args);
+
+bool sddf_uacpi_retrieve_information(acpi_handover_t *acpi_handover);
 
 /* Deinitialise all data structures relating to uACPI and revoke all caps
  * that where granted to it, resetting the CNode and its caps to the state
