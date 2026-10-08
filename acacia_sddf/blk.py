@@ -15,7 +15,7 @@ from acacia import (
     System,
 )
 
-from .driver_manifest import DTSIRQ, DTSRegion, sDDFDriverConfig, sDDFDriverManifest
+from .driver_manifest import register_sddf_subsystem
 from .sddf import (
     DeviceRegionResourceFactory,
     RegionResourceFactory,
@@ -440,30 +440,5 @@ class sDDFBlk(sDDFDriverClass):
         )
 
 
-# Driver configs
-def add_driver_config(driver_name: str, config: sDDFDriverConfig):
-    sDDFDriverManifest().add_driver_config(sDDFBlk, driver_name, config)
-
-
-add_driver_config(
-    "imx",
-    sDDFDriverConfig(
-        compatible=["fsl,imx8mq-usdhc", "fsl,imx7d-usdhc"],
-        regions=[DTSRegion("regs", "rw", 65536, 0)],
-        irqs=[DTSIRQ(0)],
-    ),
-)
-
-# virtio
-add_driver_config(
-    "virtio",
-    sDDFDriverConfig(
-        compatible=["virtio,mmio"],
-        regions=[
-            DTSRegion("regs", "rw", 4096, 0),
-            DTSRegion("virtio_headers", size=65536),
-            DTSRegion("virtio_metadata", size=2097152),
-        ],
-        irqs=[DTSIRQ(0)],
-    ),
-)
+# Tell driver manifest we exist and that drivers in the blk tree are usable for us.
+register_sddf_subsystem("blk", sDDFBlk)
