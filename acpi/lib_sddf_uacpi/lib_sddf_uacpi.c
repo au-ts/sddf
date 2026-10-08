@@ -215,51 +215,28 @@ bool sddf_uacpi_teardown(void)
 
     size_t num_slots;
     shadow_cap_t *caps = shadow_cnode_get_caps_table(lib_state.post_capdl_shadow_cnode, &num_slots);
-    size_t num_io_port_caps_deleted = 0;
-    size_t num_irq_caps_deleted = 0;
-    size_t num_ut_caps_revoked = 0;
-    size_t num_ut_caps_deleted = 0;
 
     for (size_t cslot = 0; cslot < num_slots; cslot++) {
         switch (caps[cslot].type) {
+        case CAP_TYPE_NONE:
         case CAP_TYPE_CNODE_SELF:
         case CAP_TYPE_IRQ_CONTROL:
         case CAP_TYPE_X86_IO_PORT_CONTROL:
             continue;
-        case CAP_TYPE_X86_IO_PORT:
-            num_io_port_caps_deleted++;
-            break;
-        case CAP_TYPE_IRQ:
-            num_irq_caps_deleted++;
-            break;
         case CAP_TYPE_UT:
             if (caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
                 seL4_Error err = seL4_CNode_Revoke(lib_state.cnode_cptr, cslot, 58);
                 assert(err == seL4_NoError);
-                num_ut_caps_revoked++;
-            } else {
-                num_ut_caps_deleted++;
+                continue;
             }
             break;
         default:
-            continue;
+            break;
         }
 
-        if (caps[cslot].type != CAP_TYPE_UT) {
-            assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
-        }
-
-        if (caps[cslot].type == CAP_TYPE_UT && caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
-            continue;
-        }
-
+        assert(seL4_CNode_Delete(lib_state.cnode_cptr, cslot, 58) == seL4_NoError);
         assert(shadow_cnode_delete_cap_at_slot(lib_state.post_capdl_shadow_cnode, cslot));
     }
-
-    DEBUG_ACPI("Deleted %lu I/O Port caps\n", num_io_port_caps_deleted);
-    DEBUG_ACPI("Deleted %lu IRQ caps\n", num_irq_caps_deleted);
-    DEBUG_ACPI("Revoked %lu UT caps, which resulted in deleting %lu child UT caps\n", num_ut_caps_revoked,
-               num_ut_caps_deleted);
 
     memset(&lib_state, 0, sizeof(lib_state));
     return true;

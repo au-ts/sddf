@@ -131,6 +131,8 @@ void init(void)
         return;
     }
 
+    memcpy(&acpi_handover.post_acpi_shadow_cnode, &post_capdl_shadow_cnode, sizeof(shadow_cnode_t));
+
     return;
 }
 
