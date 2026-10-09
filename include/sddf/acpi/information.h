@@ -33,7 +33,7 @@ typedef enum {
 typedef struct {
     uint8_t kind;
     uint64_t base;
-    uint64_t end; /* inclusive */
+    uint64_t end_inclusive;
 } crs_entry_t;
 
 /* "PCI Routing Table" */

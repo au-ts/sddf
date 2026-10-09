@@ -32,7 +32,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address)
 
 void uacpi_kernel_log(uacpi_log_level log_level, const uacpi_char *s)
 {
-    sddf_dprintf(COLOUR_GREEN "uACPI: %s" COLOUR_RESET, s);
+    sddf_dprintf("uACPI: %s", s);
 }
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)

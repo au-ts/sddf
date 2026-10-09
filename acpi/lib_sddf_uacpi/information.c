@@ -144,7 +144,7 @@ static uacpi_iteration_decision crs_cb(void *ctx, uacpi_resource *res)
 
     crs_entry_t *cur_crs_entry = &handover->host_bridges[handover->num_host_bridges].crs_entries[*num_crs_entry];
     cur_crs_entry->base = min;
-    cur_crs_entry->end = max;
+    cur_crs_entry->end_inclusive = max;
 
     switch (common_desc->type) {
     case UACPI_RANGE_MEMORY:
@@ -437,8 +437,8 @@ static void retrieve_mcfg_information(void)
         handover->mcfg_entries[i].segment = lib_state.ecams[i].segment;
         handover->mcfg_entries[i].paddr = lib_state.ecams[i].paddr;
 
-        DEBUG_ACPI("segment: %u, start bus 0x%hx, end bus 0x%hx, paddr 0x%lx\n", handover->mcfg_entries[i].start_bus,
-                   handover->mcfg_entries[i].end_bus, handover->mcfg_entries[i].segment,
+        DEBUG_ACPI("segment: %u, start bus 0x%hx, end bus 0x%hx, paddr 0x%lx\n", handover->mcfg_entries[i].segment,
+                   handover->mcfg_entries[i].start_bus, handover->mcfg_entries[i].end_bus,
                    handover->mcfg_entries[i].paddr);
 
         handover->num_mcfg_entries++;

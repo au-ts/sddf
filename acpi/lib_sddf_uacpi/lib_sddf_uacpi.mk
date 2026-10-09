@@ -42,11 +42,11 @@ lib_sddf_uacpi.a: \
 
 lib_sddf_uacpi_out/lib_sddf_uacpi.o: $(LIB_SDDF_UACPI_DIR)/lib_sddf_uacpi.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
+	$(CC) $(CFLAGS) -Wno-unused-but-set-variable -I$(UACPI_INC_DIR) -c -o $@ $<
 
 lib_sddf_uacpi_out/information.o: $(LIB_SDDF_UACPI_DIR)/information.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(UACPI_INC_DIR) -c -o $@ $<
+	$(CC) $(CFLAGS) -Wno-unused-but-set-variable -I$(UACPI_INC_DIR) -c -o $@ $<
 
 $(foreach f,$(UACPI_SOURCES), \
 	$(eval \
