@@ -13,7 +13,7 @@
 #define COLOUR_BLUE    "\x1b[34m"
 #define COLOUR_RESET   "\x1b[0m"
 
-#define CONFIG_DEBUG_ACPI
+// #define CONFIG_DEBUG_ACPI
 
 #if defined(CONFIG_DEBUG_ACPI)
 #define DEBUG_ACPI(fmt, ...) \
