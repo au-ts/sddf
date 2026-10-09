@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/acpi/information.h>
+
 // #include <sddf/resources/device.h>
 // #include <sel4/sel4_arch/mapping.h>
 
@@ -798,13 +800,16 @@
 #define DEBUG_DRIVER_ERR(fmt, ...) \
     sddf_dprintf("PCI DRIVER %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
+#define ACPI_DRIVER_CH 0
+acpi_handover_t *post_acpi_handover;
 
 void init(void)
 {
     DEBUG_DRIVER("Blocking on ACPI driver handover\n");
-    microkit_msginfo msginfo = seL4_MessageInfo_new(0, 0, 0, 0);
-    microkit_ppcall(0, msginfo);
-    DEBUG_DRIVER("ACPI driver handed over\n");
+    microkit_msginfo msginfo = microkit_msginfo_new(0, 0);
+    microkit_ppcall(ACPI_DRIVER_CH, msginfo);
+    DEBUG_DRIVER("ACPI driver handover complete\n");
+
 
 }
 

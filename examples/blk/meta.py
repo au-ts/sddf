@@ -100,34 +100,35 @@ def generate(
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
-    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=211, stack_size=0x5000)
-
+    # capDL initialiser will fill this MR with details about what was handed over
     acpi_post_capdl_bootinfo_mr = MemoryRegion(sdf, "acpi_post_capdl_bootinfo", 0x1000, prefill_bootinfo="post_capdl_bootinfo")
     sdf.add_mr(acpi_post_capdl_bootinfo_mr)
-    acpi_driver.add_map(Map(acpi_post_capdl_bootinfo_mr, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl"))
 
+    # Same but for the ACPI Root Sys Desc Pointer
     acpi_bootinfo_rsdp_mr = MemoryRegion(sdf, "bootinfo_rsdp", 0x1000, prefill_bootinfo="x86_acpi_rsdp")
     sdf.add_mr(acpi_bootinfo_rsdp_mr)
-    acpi_driver.add_map(Map(acpi_bootinfo_rsdp_mr, 0x2200000, "r", setvar_vaddr="bootinfo_rsdp"))
 
-    acpi_post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=11)
-    sdf.add_cnode(acpi_post_capdl_cnode)
-    acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=acpi_post_capdl_cnode, dest_cspace_slot=1))
+    # ACPI driver will fill this MR with what it learned for the PCIe driver
+    post_acpi_handover_mr = MemoryRegion(sdf, "post_acpi_handover", 0x200000)
+    sdf.add_mr(post_acpi_handover_mr)
+
+    # The actual UT and control caps will be in this distinct CNode that is linked from the root CNode,
+    # size bits 11 for 4096 slots, because the ACPI and PCIe drivers will need some room to create
+    # more caps for mapping memory, io ports, interrupts etc
+    post_capdl_cnode = CNode("acpi_post_capdl", receive_initialiser_caps=True, size_bits=11)
+    sdf.add_cnode(post_capdl_cnode)
+
+    acpi_driver = ProtectionDomain("acpi_driver", "acpi_driver.elf", priority=211, stack_size=0x5000)
+    acpi_driver.add_map(Map(acpi_post_capdl_bootinfo_mr, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl"))
+    acpi_driver.add_map(Map(acpi_bootinfo_rsdp_mr, 0x2200000, "r", setvar_vaddr="bootinfo_rsdp"))
+    acpi_driver.add_map(Map(post_acpi_handover_mr, 0x2400000, "rw", setvar_vaddr="post_acpi_handover"))
+    acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))
 
     pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
-
-    # acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
-
-    # cnode_pci_resources = CNode("pci_resources", False, 9)
-    # sdf.add_cnode(cnode_pci_resources)
-    # acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
-    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
-
-    # mr_pci_resources = MemoryRegion(sdf, "pci_resources", 0x40000)
-    # sdf.add_mr(mr_pci_resources)
-    # acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
-    # pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+    pci_driver.add_map(Map(post_acpi_handover_mr, 0x2000000, "rw", setvar_vaddr="post_acpi_handover"))
+    pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
+    pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=pci_driver, cnode=None, dest_cspace_slot=2))
 
     sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0, pp_b=True))
 
