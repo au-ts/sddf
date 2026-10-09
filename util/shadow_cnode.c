@@ -324,7 +324,7 @@ bool shadow_cnode_retype(shadow_cnode_t *shadow_cnode, seL4_Word object_type, se
     return untyped_retype(shadow_cnode, candidate_ut_cslot, object_type, obj_bits, retyped_cslot);
 }
 
-static char *shadow_cap_type_to_string(shadow_cap_type_t type)
+const char *shadow_cap_type_to_string(shadow_cap_type_t type)
 {
     switch (type) {
     case CAP_TYPE_NONE:
@@ -351,15 +351,5 @@ static char *shadow_cap_type_to_string(shadow_cap_type_t type)
         return "X86 IO Port Control";
     default:
         return "unknown";
-    }
-}
-
-void shadow_cnode_pretty_print(shadow_cnode_t *shadow_cnode)
-{
-    for (size_t cslot = 0; cslot < shadow_cnode->num_slots; cslot++) {
-        shadow_cap_type_t type = shadow_cnode->caps[cslot].type;
-        if (type != CAP_TYPE_NONE) {
-            sddf_dprintf("CSlot %lu, type '%s'\n", cslot, shadow_cap_type_to_string(type));
-        }
     }
 }

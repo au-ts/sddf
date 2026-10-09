@@ -96,4 +96,4 @@ bool shadow_cnode_retype_at_paddr(shadow_cnode_t *shadow_cnode, seL4_Word target
 bool shadow_cnode_retype(shadow_cnode_t *shadow_cnode, seL4_Word object_type, seL4_Word size_bits,
                          size_t *retyped_cslot);
 
-void shadow_cnode_pretty_print(shadow_cnode_t *shadow_cnode);
+const char *shadow_cap_type_to_string(shadow_cap_type_t type);
