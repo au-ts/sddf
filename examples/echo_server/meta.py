@@ -443,11 +443,6 @@ def generate(
         pmu_event_ids,
     )
 
-    if board.name == "rpi4b_1gb":
-        update_elf_section(
-            "eth_driver.elf", "timer_client_config", "timer_client_ethernet.driver"
-        )
-
     # todo: replace all of these monsters with config structs
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
@@ -456,7 +451,18 @@ def generate(
     )
 
     # Below expects config structs to exist, so make them
-    sdf.make_config_structs()
+    sdf.make_config_structs(dump=True)
+
+    # Patch in timer for rpi4b
+    if board.name == "rpi4b_1gb":
+        update_elf_section(
+            ethernet.driver.prog_image,
+            "timer_client_config",
+            "eth_driver_timer_client_config",
+        )
+    update_elf_section(
+        client0_elf, "benchmark_client_config", "benchmark_client_config"
+    )
 
     for i in range(num_cores):
         core = core_objs[i]["core"]
