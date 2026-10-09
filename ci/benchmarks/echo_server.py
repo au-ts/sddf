@@ -139,6 +139,7 @@ TEST_CASES = matrix.generate_example_test_cases(
             # meson driver
             "odroidc4",
         ],
+        "languages": ["c"],
         "tests_exclude": [],
     },
     test_fn=test,
