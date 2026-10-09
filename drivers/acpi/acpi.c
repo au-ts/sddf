@@ -45,8 +45,6 @@ typedef struct {
 
 #define CPTR_POST_CAPDL_CNODE  (microkit_cspace_root_slot_to_cptr(1))
 #define CPTR_SELF_VSPACE    (microkit_cspace_root_slot_to_cptr(2))
-// #define CPTR_VSPACE_PCI_DRIVER    (microkit_cspace_root_slot_to_cptr(2))
-// #define CPTR_PCI_RESOURCES        (microkit_cspace_root_slot_to_cptr(3))
 
 capDLBootInfo_t *bootinfo_post_capdl;
 bootinfo_rsdp_t *bootinfo_rsdp;
@@ -54,7 +52,7 @@ bootinfo_rsdp_t *bootinfo_rsdp;
 #define SHADOW_CNODE_SIZE_BITS 11 // from metaprogram
 static shadow_cnode_t post_capdl_shadow_cnode;
 
-static acpi_handover_t acpi_handover;
+acpi_handover_t *post_acpi_handover;
 
 void init(void)
 {
@@ -121,7 +119,7 @@ void init(void)
         return;
     }
 
-    if (!sddf_uacpi_retrieve_information(&acpi_handover)) {
+    if (!sddf_uacpi_retrieve_information(post_acpi_handover)) {
         DEBUG_DRIVER_ERR("Failed to retrieve ACPI information\n");
         return;
     }
@@ -131,7 +129,9 @@ void init(void)
         return;
     }
 
-    memcpy(&acpi_handover.post_acpi_shadow_cnode, &post_capdl_shadow_cnode, sizeof(shadow_cnode_t));
+    memcpy(&post_acpi_handover->post_acpi_shadow_cnode, &post_capdl_shadow_cnode, sizeof(shadow_cnode_t));
+
+    /* @billn delete post cnode cap from acpi cnode? */
 
     return;
 }
@@ -142,7 +142,7 @@ void notified(microkit_channel ch)
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    /* This is intentionally empty, when the PCI driver ppcall into the ACPI driver to
+    /* This is intentionally empty, when the PCIe driver ppcall into the ACPI driver to
      * block for handover, if the handover is complete then this will return. */
     return microkit_msginfo_new(0, 0);
 }
