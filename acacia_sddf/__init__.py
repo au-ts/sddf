@@ -8,6 +8,8 @@ from .driver_manifest import (
     register_sddf_subsystem,
 )
 from .i2c import sDDFI2C
+from .net import sDDFEthernet
 from .sddf import sDDFDriverClass
 from .serial import sDDFSerial
 from .timer import sDDFTimer
+from .ipstacks import sDDFLWIP
