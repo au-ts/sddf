@@ -58,14 +58,18 @@ The following platforms are supported:
 * imx8mp_evk
 * imx8mp_iotgate
 * imx8mq_evk
+* kria_k26
 * maaxboard
 * odroidc2
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * rock3b
+* rockpro64
+* rpi4b_1gb
 * star64
 * x86_64_generic (only QEMU right now)
+* zcu102
 
 To compile the system image, run:
 

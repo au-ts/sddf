@@ -85,7 +85,10 @@ def generate(
         "serial_virt_tx.elf",
         priority=99,
     )
-    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
+    baud_rate = board.baud_rate
+    serial_system = Sddf.Serial(
+        sdf, uart_node, uart_driver, serial_virt_tx, baud_rate=baud_rate
+    )
 
     if board.arch == SystemDescription.Arch.X86_64:
         serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
