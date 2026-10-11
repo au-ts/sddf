@@ -152,7 +152,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "languages": ["c", "pancake"],
         "tests_exclude": [
             # see https://github.com/au-ts/sddf/issues/804 for details
-            {"board": "serengeti", "config": "debug", "language": "pancake"},
+            {"board": "serengeti", "config": "debug"},
             # not in machine queue
             {"board": "cheshire"},
             {"board": "imx8mp_evk"},
