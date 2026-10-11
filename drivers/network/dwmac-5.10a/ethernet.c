@@ -28,6 +28,9 @@ uintptr_t resets = 0x3000000;
 uintptr_t resets = 0x3000000;
 #define RK3568_CRU_SOFTRST 0x400
 #define RK3568_CRU_SOFTRST_CON13 0x34
+#define RK3568_CRU_SOFTRST_CON14 0x38
+#define RK3568_GMAC0_PADDR 0xfe2a0000
+#define RK3568_GMAC1_PADDR 0xfe010000
 #endif /* CONFIG_PLAT_RK3568 */
 
 #define RX_COUNT 256
@@ -482,11 +485,22 @@ void init(void)
 #endif /* CONFIG_PLAT_STAR64 */
 
 #ifdef CONFIG_PLAT_RK3568
-    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + RK3568_CRU_SOFTRST + RK3568_CRU_SOFTRST_CON13);
+    uintptr_t softrst_con;
+    uint32_t softrst_bit;
+    if (device_resources.regions[0].io_addr == RK3568_GMAC1_PADDR) {
+        softrst_con = RK3568_CRU_SOFTRST_CON14;
+        softrst_bit = 12;
+    } else {
+        assert(device_resources.regions[0].io_addr == RK3568_GMAC0_PADDR);
+        softrst_con = RK3568_CRU_SOFTRST_CON13;
+        softrst_bit = 7;
+    }
+
+    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + RK3568_CRU_SOFTRST + softrst_con);
     uint32_t reset_val = *reset_eth;
-    /* Bit 23 is WE to bit 7 and bit 7 is aresetn_gmac0 */
-    reset_val &= ~BIT(7);
-    reset_val |= BIT(23);
+    /* softrst_bit is arestn_gmac0 or arestn_gmac1, upper half of register is WE */
+    reset_val &= ~BIT(softrst_bit);
+    reset_val |= BIT(softrst_bit + 16);
     *reset_eth = reset_val;
 #endif /* CONFIG_PLAT_RK3568 */
 
