@@ -97,7 +97,7 @@ typedef struct {
     uint64_t paddr;
     uint16_t segment;
     uint8_t start_bus;
-    uint8_t end_bus;
+    uint8_t end_bus_inclusive;
 } mcfg_entry_t;
 
 typedef struct {

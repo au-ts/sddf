@@ -74,7 +74,7 @@ void dump_acpi_info(acpi_handover_t *post_acpi_handover)
     for (size_t i = 0; i < post_acpi_handover->num_mcfg_entries; i++) {
         mcfg_entry_t *mcfg_entry = &post_acpi_handover->mcfg_entries[i];
         DEBUG_DRIVER("\tsegment %u, start bus %hu, end bus %hu, paddr 0x%lx\n", mcfg_entry->segment,
-                     mcfg_entry->start_bus, mcfg_entry->end_bus, mcfg_entry->paddr);
+                     mcfg_entry->start_bus, mcfg_entry->end_bus_inclusive, mcfg_entry->paddr);
     }
 
     DEBUG_DRIVER("Requested ISA devices:\n");

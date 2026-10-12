@@ -7,8 +7,9 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/util/printf.h>
 #include <sddf/acpi/handover.h>
+#include <sddf/util/printf.h>
+#include <sddf/util/vspace.h>
 
 // #include <sddf/resources/device.h>
 // #include <sel4/sel4_arch/mapping.h>
@@ -790,15 +791,64 @@
 
 #include "internal.h"
 
-static bool initialised = false;
+#define CPTR_POST_ACPI_CNODE  (microkit_cspace_root_slot_to_cptr(1))
+#define CPTR_SELF_VSPACE    (microkit_cspace_root_slot_to_cptr(2))
+
+/* In the PCI B:D.F address, device is 5 bits, function is 3 bits. Then each device have a 4K
+ * configuration space. */
+#define PCIE_SIZE_BYTES_PER_BUS (BIT(5) * BIT(3) * 0x1000)
 
 #define ACPI_DRIVER_CH 0
 acpi_handover_t *post_acpi_handover;
 
-// static bool map_ecams(void)
-// {
+typedef struct {
+    void *vaddr;
+    mcfg_entry_t desc;
+} ecam_t;
 
-// }
+typedef struct {
+    bool initialised;
+
+    uint64_t vaddr_watermark;
+
+    ecam_t ecams[ACPI_MAX_NUM_MCFG_ENTRIES];
+    size_t num_ecams;
+} pci_drv_state_t;
+
+static pci_drv_state_t drv_state;
+
+static bool map_ecams(pci_drv_state_t *driver_state, acpi_handover_t *handover)
+{
+    assert(handover->num_mcfg_entries <= ACPI_MAX_NUM_MCFG_ENTRIES);
+    for (size_t i = 0; i < handover->num_mcfg_entries; i++) {
+        mcfg_entry_t *mcfg_entry = &handover->mcfg_entries[i];
+        uint64_t ecam_size_bytes = ((mcfg_entry->end_bus_inclusive + 1) - mcfg_entry->start_bus)
+                                 * PCIE_SIZE_BYTES_PER_BUS;
+        ecam_size_bytes = ROUND_UP(ecam_size_bytes, BIT(seL4_LargePageBits));
+
+        void *vaddr = (void *)driver_state->vaddr_watermark;
+
+        DEBUG_DRIVER("mapping ECAM for segment %u, start bus %u, end bus %u, paddr 0x%lx, at vaddr 0x%lx, with size "
+                     "bytes 0x%lx\n",
+                     mcfg_entry->segment, mcfg_entry->start_bus, mcfg_entry->end_bus_inclusive, mcfg_entry->paddr,
+                     (uintptr_t)vaddr, ecam_size_bytes);
+
+        if (!map_memory_region(&handover->shadow_cnode, CPTR_SELF_VSPACE, mcfg_entry->paddr, ecam_size_bytes, true,
+                               (uintptr_t)vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+            DEBUG_DRIVER_ERR("mapping unsuccessful\n");
+            return false;
+        }
+
+        driver_state->ecams[i].vaddr = vaddr;
+        memcpy(&driver_state->ecams[i].desc, mcfg_entry, sizeof(mcfg_entry_t));
+    }
+
+    DEBUG_DRIVER("All ECAMs mapped\n");
+    driver_state->num_ecams = handover->num_mcfg_entries;
+    return true;
+}
+
+// static bus_to_ecam_idx()
 
 static void bus_scan(void)
 {
@@ -809,6 +859,9 @@ static void bus_scan(void)
 
 void init(void)
 {
+    memset(&drv_state, 0, sizeof(drv_state));
+    drv_state.vaddr_watermark = BIT(32);
+
     DEBUG_DRIVER("Blocking on ACPI driver handover\n");
     microkit_msginfo msginfo = microkit_msginfo_new(0, 0);
     microkit_ppcall(ACPI_DRIVER_CH, msginfo);
@@ -821,10 +874,12 @@ void init(void)
 
 #ifdef CONFIG_DEBUG_DRIVER
     dump_acpi_info(post_acpi_handover);
-    bus_scan();
 #endif
 
-    initialised = true;
+    map_ecams(&drv_state, post_acpi_handover);
+    bus_scan();
+
+    drv_state.initialised = true;
 }
 
 void notified(microkit_channel ch)
@@ -833,7 +888,7 @@ void notified(microkit_channel ch)
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    if (!initialised) {
+    if (!drv_state.initialised) {
         return microkit_msginfo_new(0, 0);
     }
     return microkit_msginfo_new(0, 0);
