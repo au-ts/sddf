@@ -107,26 +107,23 @@ static uacpi_iteration_decision crs_cb(void *ctx, uacpi_resource *res)
         return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
-    if (common_desc->type == UACPI_RANGE_BUS) {
-        DEBUG_ACPI("CRS bus entry 0x%lx..0x%lx\n", min, max);
-        return UACPI_ITERATION_DECISION_CONTINUE;
-    }
-
-    if (!addr_len) {
-        return UACPI_ITERATION_DECISION_CONTINUE;
-        /* Only care about memory aperatures that are above the legacy stuff */
-    } else if (common_desc->type != UACPI_RANGE_MEMORY) {
-        return UACPI_ITERATION_DECISION_CONTINUE;
-    } else if (max < PCI_ALLOC_MIN_MEM) {
-        return UACPI_ITERATION_DECISION_CONTINUE;
-    } else if (common_desc->direction == UACPI_CONSUMER) {
-        /* Skip "consumer" ranges: those are used by the host bridge itself (e.g. its own
+    if (common_desc->type == UACPI_RANGE_MEMORY) {
+        if (!addr_len) {
+            return UACPI_ITERATION_DECISION_CONTINUE;
+            /* Only care about memory aperatures that are above the legacy stuff */
+        } else if (common_desc->type != UACPI_RANGE_MEMORY) {
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        } else if (max < PCI_ALLOC_MIN_MEM) {
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        } else if (common_desc->direction == UACPI_CONSUMER) {
+            /* Skip "consumer" ranges: those are used by the host bridge itself (e.g. its own
          * registers). We only want "producer" ranges, which it forwards to devices below it. */
-        return UACPI_ITERATION_DECISION_CONTINUE;
-    } else if ((max + 1) - min != addr_len) {
-        DEBUG_ACPI_ERR("Firmware bug, bad CRS: (max + 1) - min != addr_len, (%lu + 1) - %lu != %lu, continuing\n", max,
-                       min, addr_len);
-        return UACPI_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        } else if ((max + 1) - min != addr_len) {
+            DEBUG_ACPI_ERR("Firmware bug, bad CRS: (max + 1) - min != addr_len, (%lu + 1) - %lu != %lu, continuing\n",
+                           max, min, addr_len);
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        }
     }
 
     size_t *num_crs_entry = &handover->host_bridges[handover->num_host_bridges].num_crs_entries;
