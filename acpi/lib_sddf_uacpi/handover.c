@@ -433,7 +433,7 @@ static void retrieve_mcfg_information(void)
         }
 
         handover->mcfg_entries[i].start_bus = lib_state.ecams[i].start_bus;
-        handover->mcfg_entries[i].end_bus = lib_state.ecams[i].end_bus;
+        handover->mcfg_entries[i].end_bus_inclusive = lib_state.ecams[i].end_bus;
         handover->mcfg_entries[i].segment = lib_state.ecams[i].segment;
         handover->mcfg_entries[i].paddr = lib_state.ecams[i].paddr;
 
