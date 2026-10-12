@@ -36,24 +36,27 @@ async def test(backend: HardwareBackend, test_config: common.TestConfig):
         await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
 
+        # the point of the iteration is to stress test the serial example
         for i in range(100):
-            for c in range(2):
+            for client_no in [0, 1]:
                 await wait_for_output(backend, ANSI_RESET)
 
-                await send_input(backend, f"\x1c{c}\r".encode())
+                await send_input(backend, f"\x1c{client_no}\r".encode())
                 # TODO: ???
                 if test_config.config == "debug":
                     await expect_output(
-                        backend, f"VIRT_RX|LOG: switching to client {c}\r\n".encode()
+                        backend,
+                        f"VIRT_RX|LOG: switching to client {client_no}\r\n".encode(),
                     )
 
                 await send_input(backend, b"1234567890")
                 await expect_output(
-                    backend, colour_number(b"1234567890", [ANSI_RED, ANSI_GREEN][c])
+                    backend,
+                    colour_number(b"1234567890", [ANSI_RED, ANSI_GREEN][client_no]),
                 )
                 await wait_for_output(
                     backend,
-                    f"client{c} has received {(i + 1) * 10} characters so far!\r\n".encode(),
+                    f"client{client_no} has received {(i + 1) * 10} characters so far!\r\n".encode(),
                 )
 
 
