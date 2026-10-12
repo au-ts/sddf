@@ -227,6 +227,7 @@ bool sddf_uacpi_teardown(void)
             if (caps[cslot].parent_cslot == PARENT_CSLOT_NONE) {
                 seL4_Error err = seL4_CNode_Revoke(lib_state.cnode_cptr, cslot, 58);
                 assert(err == seL4_NoError);
+                caps[cslot].as_ut.watermark = caps[cslot].base_paddr;
                 continue;
             }
             break;
