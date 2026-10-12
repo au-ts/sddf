@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <sddf/acpi/information.h>
+#include <sddf/acpi/handover.h>
 #include <sddf/util/shadow_cnode.h>
 
 /* Root System Descriptor Pointer */

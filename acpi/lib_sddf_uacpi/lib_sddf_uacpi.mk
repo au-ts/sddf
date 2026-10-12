@@ -33,7 +33,7 @@ KERNEL_API_SOURCES := event.c ioport.c stubs.c pci.c
 
 lib_sddf_uacpi.a: \
 	lib_sddf_uacpi_out/lib_sddf_uacpi.o \
-	lib_sddf_uacpi_out/information.o \
+	lib_sddf_uacpi_out/handover.o \
 	$(addprefix lib_sddf_uacpi_out/kernel_api/, $(KERNEL_API_SOURCES:.c=.o)) \
 	$(addprefix lib_sddf_uacpi_out/uacpi/, $(UACPI_SOURCES:.c=.o))
 
@@ -44,7 +44,7 @@ lib_sddf_uacpi_out/lib_sddf_uacpi.o: $(LIB_SDDF_UACPI_DIR)/lib_sddf_uacpi.c | $(
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wno-unused-but-set-variable -I$(UACPI_INC_DIR) -c -o $@ $<
 
-lib_sddf_uacpi_out/information.o: $(LIB_SDDF_UACPI_DIR)/information.c | $(SDDF_LIBC_INCLUDE)
+lib_sddf_uacpi_out/handover.o: $(LIB_SDDF_UACPI_DIR)/handover.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wno-unused-but-set-variable -I$(UACPI_INC_DIR) -c -o $@ $<
 

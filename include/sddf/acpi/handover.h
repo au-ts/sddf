@@ -15,7 +15,7 @@
 
 #define ACPI_MAX_NUM_HOST_BRIDGES 1
 #define ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE 8
-#define ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE 512
+#define ACPI_MAX_NUM_PRT_ENTRIES_PER_HOST_BRIDGE 512
 #define ACPI_MAX_NUM_ISA_DEVICES 4
 #define ACPI_MAX_NUM_MADT_ISO_ENTRIES 16
 #define ACPI_MAX_NUM_MCFG_ENTRIES 4
@@ -28,13 +28,13 @@ typedef enum {
     CRS_KIND_MEMORY = 1,
     CRS_KIND_IO,
     CRS_KIND_BUS,
-} crs_entry_kind_t;
+} range_kind_t;
 
 typedef struct {
     uint8_t kind;
     uint64_t base;
     uint64_t end_inclusive;
-} crs_entry_t;
+} resource_range_t;
 
 /* "PCI Routing Table" */
 #define ACPI_MAX_PCI_PATH_DEPTH 4
@@ -44,8 +44,8 @@ typedef struct {
 } pci_path_t;
 
 typedef struct {
-    pci_path_t path;
-    uint8_t slot;
+    pci_path_t bridge_path; /* Path to bridge that owns the device. */
+    uint8_t dev;
     uint8_t pin; /* 0 = INTA */
     uint8_t level_triggered;
     uint8_t active_low;
@@ -55,18 +55,18 @@ typedef struct {
 /* PCI Host Bridge description */
 typedef struct {
     uint64_t segment;
-    uint64_t start_bus;
-    crs_entry_t crs_entries[ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE];
-    size_t num_crs_entry;
-    prt_entry_t prt_entries[ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE];
-    size_t num_prt_entry;
+    uint64_t root_bus;
+    resource_range_t crs_entries[ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE];
+    size_t num_crs_entries;
+    prt_entry_t prt_entries[ACPI_MAX_NUM_PRT_ENTRIES_PER_HOST_BRIDGE];
+    size_t num_prt_entries;
 } host_bridge_t;
 
 /* ISA (non-PCI) device description */
 typedef struct {
     char acpi_hid[ACPI_HID_LEN];
     uint8_t instance;
-    crs_entry_t crs;
+    resource_range_t crs;
     uint8_t has_irq;
     uint8_t level_triggered;
     uint8_t active_low;
@@ -76,7 +76,7 @@ typedef struct {
 /* "Multiple APIC Description Table" (MADT) entries */
 typedef struct {
     uint8_t bus;
-    uint8_t source;
+    uint8_t isa_irq;
     uint32_t gsi;
     uint8_t level_triggered;
     uint8_t active_low;
@@ -90,7 +90,7 @@ typedef struct {
      * periodic mode". We don't use periodic mode in our HPET
      * driver so this is moot but useful for the future. */
     uint16_t min_clk_tick;
-} hpet_entry_t;
+} hpet_info_t;
 
 /* PCI MCFG */
 typedef struct {
@@ -104,7 +104,7 @@ typedef struct {
     uint32_t magic;
 
     /* Untypeds and control caps details */
-    shadow_cnode_t post_acpi_shadow_cnode;
+    shadow_cnode_t shadow_cnode;
 
     /* PCI information */
     host_bridge_t host_bridges[ACPI_MAX_NUM_HOST_BRIDGES];
@@ -127,8 +127,8 @@ typedef struct {
     size_t num_madt_ioapics;
 
     /* From HPET table */
-    hpet_entry_t hpet;
-    uint8_t hpet_available;
+    hpet_info_t hpet;
+    uint8_t has_hpet;
 
     /* From "Fixed ACPI Description Table" (FADT) */
     uint8_t system_supports_msi;

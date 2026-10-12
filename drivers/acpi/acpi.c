@@ -129,7 +129,7 @@ void init(void)
         return;
     }
 
-    memcpy(&post_acpi_handover->post_acpi_shadow_cnode, &post_capdl_shadow_cnode, sizeof(shadow_cnode_t));
+    memcpy(&post_acpi_handover->shadow_cnode, &post_capdl_shadow_cnode, sizeof(shadow_cnode_t));
 
     /* @billn delete post cnode cap from acpi cnode? */
 

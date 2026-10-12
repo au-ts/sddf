@@ -13,7 +13,7 @@
 #include <uacpi/resources.h>
 #include <uacpi/utilities.h>
 #include <sddf/acpi/lib_sddf_uacpi.h>
-#include <sddf/acpi/information.h>
+#include <sddf/acpi/handover.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/shadow_cnode.h>
 #include "logging.h"
@@ -129,7 +129,7 @@ static uacpi_iteration_decision crs_cb(void *ctx, uacpi_resource *res)
         return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
-    size_t *num_crs_entry = &handover->host_bridges[handover->num_host_bridges].num_crs_entry;
+    size_t *num_crs_entry = &handover->host_bridges[handover->num_host_bridges].num_crs_entries;
     if (*num_crs_entry == ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE) {
         DEBUG_ACPI_ERR("Max number of CRS entry reached for host bridge %zu, consider increasing "
                        "ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE\n",
@@ -142,7 +142,7 @@ static uacpi_iteration_decision crs_cb(void *ctx, uacpi_resource *res)
                crs_resource_type_to_string(res->type), address_common_type_to_string(common_desc->type), granularity,
                min, max, transl_off, addr_len, attr);
 
-    crs_entry_t *cur_crs_entry = &handover->host_bridges[handover->num_host_bridges].crs_entries[*num_crs_entry];
+    resource_range_t *cur_crs_entry = &handover->host_bridges[handover->num_host_bridges].crs_entries[*num_crs_entry];
     cur_crs_entry->base = min;
     cur_crs_entry->end_inclusive = max;
 
@@ -242,14 +242,14 @@ static uacpi_iteration_decision prt_cb(void *ctx, uacpi_namespace_node *node, ua
 
         DEBUG_ACPI("  slot 0x%x, pin %u, gsi %u\n", address, pin, gsi);
 
-        size_t *num_prt_entry = &handover->host_bridges[handover->num_host_bridges].num_prt_entry;
-        if (*num_prt_entry == ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE) {
+        size_t *num_prt_entry = &handover->host_bridges[handover->num_host_bridges].num_prt_entries;
+        if (*num_prt_entry == ACPI_MAX_NUM_PRT_ENTRIES_PER_HOST_BRIDGE) {
             DEBUG_ACPI_ERR("num_prt_entry exceed ACPI_MAX_NUM_PRT_PER_HOST_BRIDGE, consider increasing\n");
             break;
         }
         prt_entry_t *prt_entry = &handover->host_bridges[handover->num_host_bridges].prt_entries[*num_prt_entry];
-        memcpy(&prt_entry->path, &path, sizeof(path));
-        prt_entry->slot = address;
+        memcpy(&prt_entry->bridge_path, &path, sizeof(path));
+        prt_entry->dev = address;
         prt_entry->pin = pin;
         prt_entry->level_triggered = 1;
         prt_entry->active_low = 1;
@@ -302,7 +302,7 @@ static uacpi_iteration_decision pci_host_bridge_cb(void *cookie, uacpi_namespace
     uacpi_namespace_for_each_child(node, prt_cb, NULL, UACPI_OBJECT_DEVICE_BIT, UACPI_MAX_DEPTH_ANY, node);
 
     handover->host_bridges[handover->num_host_bridges].segment = segment;
-    handover->host_bridges[handover->num_host_bridges].start_bus = start_bus;
+    handover->host_bridges[handover->num_host_bridges].root_bus = start_bus;
     handover->num_host_bridges++;
     return UACPI_ITERATION_DECISION_CONTINUE;
 }
@@ -337,7 +337,7 @@ static uacpi_iteration_decision madt_cb(void *cookie, struct acpi_entry_hdr *sub
 
         madt_iso_entry_t *iso_entry = &handover->madt_iso_entries[handover->num_madt_iso_entries];
         iso_entry->bus = madt_iso->bus;
-        iso_entry->source = madt_iso->source;
+        iso_entry->isa_irq = madt_iso->source;
         iso_entry->gsi = madt_iso->gsi;
 
         if ((madt_iso->flags & ACPI_MADT_TRIGGERING_MASK) != ACPI_MADT_TRIGGERING_CONFORMING) {
@@ -401,7 +401,7 @@ static bool retrieve_hpet_information(void)
         struct acpi_hpet *acpi_hpet = (struct acpi_hpet *)hpet_handle.ptr;
         handover->hpet.paddr = acpi_hpet->address.address;
         handover->hpet.min_clk_tick = acpi_hpet->min_clock_tick;
-        handover->hpet_available = true;
+        handover->has_hpet = true;
 
         DEBUG_ACPI("Recorded HPET at 0x%lx, min clk tick %hu\n", handover->hpet.paddr, handover->hpet.min_clk_tick);
 

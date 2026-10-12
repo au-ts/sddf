@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
-#include <sddf/acpi/information.h>
+#include <sddf/acpi/handover.h>
 
 // #include <sddf/resources/device.h>
 // #include <sel4/sel4_arch/mapping.h>
@@ -805,7 +805,7 @@ static bool initialised = false;
 #define ACPI_DRIVER_CH 0
 acpi_handover_t *post_acpi_handover;
 
-static const char *crs_kind_to_string(crs_entry_kind_t kind)
+static const char *crs_kind_to_string(range_kind_t kind)
 {
     switch (kind) {
     case CRS_KIND_MEMORY:
@@ -825,7 +825,7 @@ static void dump_acpi_info(void)
 
     DEBUG_DRIVER("Shadow CNode:\n");
     size_t num_slots = 0;
-    shadow_cap_t *caps = shadow_cnode_get_caps_table(&post_acpi_handover->post_acpi_shadow_cnode, &num_slots);
+    shadow_cap_t *caps = shadow_cnode_get_caps_table(&post_acpi_handover->shadow_cnode, &num_slots);
     for (size_t cslot = 0; cslot < num_slots; cslot++) {
         if (caps[cslot].type != CAP_TYPE_NONE) {
             DEBUG_DRIVER("\tSlot %lu: type '%s', base 0x%lx, end 0x%lx\n", cslot,
@@ -836,27 +836,27 @@ static void dump_acpi_info(void)
     DEBUG_DRIVER("PCI Host Bridges:\n");
     for (size_t i = 0; i < post_acpi_handover->num_host_bridges; i++) {
         host_bridge_t *pci_hb = &post_acpi_handover->host_bridges[i];
-        DEBUG_DRIVER("\t%lu: segment %lu, start bus %lu\n", i, pci_hb->segment, pci_hb->start_bus);
+        DEBUG_DRIVER("\t%lu: segment %lu, start bus %lu\n", i, pci_hb->segment, pci_hb->root_bus);
 
         DEBUG_DRIVER("\t\tCRS entries:\n");
-        for (size_t c = 0; c < pci_hb->num_crs_entry; c++) {
-            crs_entry_t *crs = &pci_hb->crs_entries[c];
+        for (size_t c = 0; c < pci_hb->num_crs_entries; c++) {
+            resource_range_t *crs = &pci_hb->crs_entries[c];
             DEBUG_DRIVER("\t\t\tkind '%s', base 0x%lx, end 0x%lx\n", crs_kind_to_string(crs->kind), crs->base,
                          crs->end_inclusive);
         }
 
         DEBUG_DRIVER("\t\tPRT entries:\n");
-        for (size_t p = 0; p < pci_hb->num_prt_entry; p++) {
+        for (size_t p = 0; p < pci_hb->num_prt_entries; p++) {
             prt_entry_t *prt = &pci_hb->prt_entries[p];
 
-            DEBUG_DRIVER("\t\t\tslot %hu, pin %hu, lvl trig %hu, act low %hu, gsi %u\n", prt->slot, prt->pin,
+            DEBUG_DRIVER("\t\t\tslot %hu, pin %hu, lvl trig %hu, act low %hu, gsi %u\n", prt->dev, prt->pin,
                          prt->level_triggered, prt->active_low, prt->gsi);
 
-            if (prt->path.depth) {
+            if (prt->bridge_path.depth) {
                 DEBUG_DRIVER("\t\t\t\thops from host bridge\n");
-                for (uint8_t d = 0; d < prt->path.depth; d++) {
-                    uint8_t dev = prt->path.devfn[d] >> 3;
-                    uint8_t fn = prt->path.devfn[d] & 0x7;
+                for (uint8_t d = 0; d < prt->bridge_path.depth; d++) {
+                    uint8_t dev = prt->bridge_path.devfn[d] >> 3;
+                    uint8_t fn = prt->bridge_path.devfn[d] & 0x7;
                     DEBUG_DRIVER("\t\t\t\t\tdev: %hu, fn: %hu\n", dev, fn);
                 }
             }
@@ -876,7 +876,7 @@ static void dump_acpi_info(void)
     DEBUG_DRIVER("ACPI MADT Interrupt Source Overrides:\n");
     for (size_t i = 0; i < post_acpi_handover->num_madt_iso_entries; i++) {
         madt_iso_entry_t *iso = &post_acpi_handover->madt_iso_entries[i];
-        DEBUG_DRIVER("\tbus %hu, source %hu, GSI %u, lvl trig %hu, act low %hu\n", iso->bus, iso->source, iso->gsi,
+        DEBUG_DRIVER("\tbus %hu, source %hu, GSI %u, lvl trig %hu, act low %hu\n", iso->bus, iso->isa_irq, iso->gsi,
                      iso->level_triggered, iso->active_low);
     }
 
@@ -885,14 +885,21 @@ static void dump_acpi_info(void)
         DEBUG_DRIVER("\tioapic %lu, GSI base %u\n", i, post_acpi_handover->madt_ioapic_gsi_bases[i]);
     }
 
-    DEBUG_DRIVER("HPET: %s\n", post_acpi_handover->hpet_available ? "yes:" : "no");
-    if (post_acpi_handover->hpet_available) {
+    DEBUG_DRIVER("HPET: %s\n", post_acpi_handover->has_hpet ? "yes:" : "no");
+    if (post_acpi_handover->has_hpet) {
         DEBUG_DRIVER("\tpaddr 0x%lx, min period clock tick %hu\n", post_acpi_handover->hpet.paddr,
                      post_acpi_handover->hpet.min_clk_tick);
     }
 
     DEBUG_DRIVER("FADT:\n");
     DEBUG_DRIVER("\tMessage Signalled Interrupts: %s\n", post_acpi_handover->system_supports_msi ? "yes" : "no");
+}
+
+static void bus_scan(void)
+{
+    // for (size_t hb = 0; hb < post_acpi_handover->num_mcfg_entries; hb++) {
+    //     uint64_t map_paddr = post_acpi_handover->
+    // }
 }
 
 void init(void)
@@ -909,6 +916,7 @@ void init(void)
 
 #ifdef CONFIG_DEBUG_DRIVER
     dump_acpi_info();
+    bus_scan();
 #endif
 
     initialised = true;
