@@ -790,13 +790,18 @@
 // }
 
 #include "internal.h"
+#include "pci.h"
 
 #define CPTR_POST_ACPI_CNODE  (microkit_cspace_root_slot_to_cptr(1))
 #define CPTR_SELF_VSPACE    (microkit_cspace_root_slot_to_cptr(2))
 
 /* In the PCI B:D.F address, device is 5 bits, function is 3 bits. Then each device have a 4K
  * configuration space. */
-#define PCIE_SIZE_BYTES_PER_BUS (BIT(5) * BIT(3) * 0x1000)
+#define PCI_DEV_BITS 5
+#define PCI_FUNC_BITS 3
+#define PCIE_SIZE_BYTES_PER_BUS (BIT(PCI_DEV_BITS) * BIT(PCI_FUNC_BITS) * 0x1000)
+
+#define NO_VENDOR 0xffff
 
 #define ACPI_DRIVER_CH 0
 acpi_handover_t *post_acpi_handover;
@@ -808,20 +813,20 @@ typedef struct {
 
 typedef struct {
     bool initialised;
+    acpi_handover_t *handover;
 
     uint64_t vaddr_watermark;
 
-    ecam_t ecams[ACPI_MAX_NUM_MCFG_ENTRIES];
-    size_t num_ecams;
+    void *ecams_vaddr[ACPI_MAX_NUM_MCFG_ENTRIES];
 } pci_drv_state_t;
 
 static pci_drv_state_t drv_state;
 
-static bool map_ecams(pci_drv_state_t *driver_state, acpi_handover_t *handover)
+static bool map_ecams(pci_drv_state_t *driver_state)
 {
-    assert(handover->num_mcfg_entries <= ACPI_MAX_NUM_MCFG_ENTRIES);
-    for (size_t i = 0; i < handover->num_mcfg_entries; i++) {
-        mcfg_entry_t *mcfg_entry = &handover->mcfg_entries[i];
+    assert(driver_state->handover->num_mcfg_entries <= ACPI_MAX_NUM_MCFG_ENTRIES);
+    for (size_t i = 0; i < driver_state->handover->num_mcfg_entries; i++) {
+        mcfg_entry_t *mcfg_entry = &driver_state->handover->mcfg_entries[i];
         uint64_t ecam_size_bytes = ((mcfg_entry->end_bus_inclusive + 1) - mcfg_entry->start_bus)
                                  * PCIE_SIZE_BYTES_PER_BUS;
         ecam_size_bytes = ROUND_UP(ecam_size_bytes, BIT(seL4_LargePageBits));
@@ -833,34 +838,103 @@ static bool map_ecams(pci_drv_state_t *driver_state, acpi_handover_t *handover)
                      mcfg_entry->segment, mcfg_entry->start_bus, mcfg_entry->end_bus_inclusive, mcfg_entry->paddr,
                      (uintptr_t)vaddr, ecam_size_bytes);
 
-        if (!map_memory_region(&handover->shadow_cnode, CPTR_SELF_VSPACE, mcfg_entry->paddr, ecam_size_bytes, true,
-                               (uintptr_t)vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+        if (!map_memory_region(&driver_state->handover->shadow_cnode, CPTR_SELF_VSPACE, mcfg_entry->paddr,
+                               ecam_size_bytes, true, (uintptr_t)vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
             DEBUG_DRIVER_ERR("mapping unsuccessful\n");
             return false;
         }
 
-        driver_state->ecams[i].vaddr = vaddr;
-        memcpy(&driver_state->ecams[i].desc, mcfg_entry, sizeof(mcfg_entry_t));
+        driver_state->ecams_vaddr[i] = vaddr;
     }
 
     DEBUG_DRIVER("All ECAMs mapped\n");
-    driver_state->num_ecams = handover->num_mcfg_entries;
     return true;
 }
 
-// static bus_to_ecam_idx()
-
-static void bus_scan(void)
+static bool bus_to_ecam_idx(pci_drv_state_t *driver_state, uint16_t segment, uint8_t bus, size_t *idx)
 {
-    // for (size_t hb = 0; hb < post_acpi_handover->num_mcfg_entries; hb++) {
-    //     uint64_t map_paddr = post_acpi_handover->
-    // }
+    for (size_t i = 0; i < driver_state->handover->num_mcfg_entries; i++) {
+        mcfg_entry_t *mcfg_entry = &driver_state->handover->mcfg_entries[i];
+        if (mcfg_entry->segment == segment && bus >= mcfg_entry->start_bus && bus <= mcfg_entry->end_bus_inclusive) {
+            *idx = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+static pci_conf_space_common_hdr_t *pci_bdf_to_conf_space(void *ecam, uint8_t bus, uint8_t dev, uint8_t func)
+{
+    uintptr_t ecam_base = (uintptr_t)ecam;
+    uintptr_t conf_space = ecam_base + ((bus << 20) | (dev << 15) | (func << 12));
+    return (pci_conf_space_common_hdr_t *)conf_space;
+}
+
+static void bus_scan_recursive(pci_drv_state_t *driver_state, uint8_t bus, void *ecam)
+{
+    for (uint8_t dev = 0; dev < BIT(PCI_DEV_BITS); dev++) {
+        for (uint8_t func = 0; func < BIT(PCI_FUNC_BITS); func++) {
+            pci_conf_space_common_hdr_t *common_hdr = pci_bdf_to_conf_space(ecam, bus, dev, func);
+
+            if (common_hdr->vendor_id == NO_VENDOR) {
+                if (func == 0) {
+                    /* nothing in this slot */
+                    break;
+                }
+                /* gap in a multi-function device */
+                continue;
+            }
+
+            DEBUG_DRIVER("\t%02x:%02x.%x:\n", bus, dev, func);
+            DEBUG_DRIVER("\t\tVendor: 0x%04X, Device: 0x%04X\n", common_hdr->vendor_id, common_hdr->device_id);
+            DEBUG_DRIVER("\t\tClass: %s\n",
+                         pci_class_and_subclass_to_string(common_hdr->class_code, common_hdr->subclass));
+
+            if ((common_hdr->header_type & 0x7f) == 1) {    /* type 1 header: a bridge */
+                pci_conf_space_bridge_t *bridge = (pci_conf_space_bridge_t *)common_hdr;
+                uint8_t secondary = bridge->secondary_bus_num;
+                uint8_t subordinate = bridge->subordinate_bus_num;
+                if (secondary > bus && secondary <= subordinate)
+                    bus_scan_recursive(driver_state, secondary, ecam);
+                else
+                    DEBUG_DRIVER_ERR("bridge %02x:%02x.%x unconfigured\n", bus, dev, func);
+            }
+
+            if (func == 0 && !(common_hdr->header_type & 0x80))
+                /* single-function device */
+                break;
+        }
+    }
+}
+
+static bool host_bridges_scan(pci_drv_state_t *driver_state)
+{
+    for (size_t hb = 0; hb < driver_state->handover->num_host_bridges; hb++) {
+        host_bridge_t *hb_desc = &driver_state->handover->host_bridges[hb];
+
+        size_t ecam_idx;
+        uint8_t segment = hb_desc->segment;
+        uint8_t bus = hb_desc->root_bus;
+        if (!bus_to_ecam_idx(driver_state, segment, bus, &ecam_idx)) {
+            DEBUG_DRIVER_ERR("Failed to look up ECAM for host bridge with segment %u, root bus %u\n", hb_desc->segment,
+                             hb_desc->root_bus);
+            return false;
+        }
+        assert(ecam_idx <= driver_state->handover->num_mcfg_entries);
+        void *ecam_vaddr = driver_state->ecams_vaddr[ecam_idx];
+
+        DEBUG_DRIVER("Host bridge segment %u, root bus %u:\n", segment, bus);
+        bus_scan_recursive(driver_state, bus, ecam_vaddr);
+    }
+
+    return true;
 }
 
 void init(void)
 {
     memset(&drv_state, 0, sizeof(drv_state));
     drv_state.vaddr_watermark = BIT(32);
+    drv_state.handover = post_acpi_handover;
 
     DEBUG_DRIVER("Blocking on ACPI driver handover\n");
     microkit_msginfo msginfo = microkit_msginfo_new(0, 0);
@@ -876,14 +950,17 @@ void init(void)
     dump_acpi_info(post_acpi_handover);
 #endif
 
-    map_ecams(&drv_state, post_acpi_handover);
-    bus_scan();
+    if (!map_ecams(&drv_state))
+        return;
+    if (!host_bridges_scan(&drv_state))
+        return;
 
     drv_state.initialised = true;
 }
 
 void notified(microkit_channel ch)
 {
+    DEBUG_DRIVER_ERR("Unexpected notification on channel %u\n", ch);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)

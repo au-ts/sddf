@@ -54,8 +54,8 @@ typedef struct {
 
 /* PCI Host Bridge description */
 typedef struct {
-    uint64_t segment;
-    uint64_t root_bus;
+    uint16_t segment;
+    uint8_t root_bus;
     resource_range_t crs_entries[ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE];
     size_t num_crs_entries;
     prt_entry_t prt_entries[ACPI_MAX_NUM_PRT_ENTRIES_PER_HOST_BRIDGE];
