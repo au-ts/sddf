@@ -1037,7 +1037,9 @@ static bool handle_pcie_bridge(pci_drv_state_t *driver_state, host_bridge_t *hb,
         }
 
         new_path.devfn[new_path.depth++] = (dev << 3) | func;
-        bus_scan_recursive(driver_state, hb, ecam, secondary, new_path);
+        if (!bus_scan_recursive(driver_state, hb, ecam, secondary, new_path)) {
+            return false;
+        }
     } else {
         DEBUG_DRIVER_ERR("bridge %02x:%02x.%x unconfigured\n", bus, dev, func);
         // @billn todo, assign bus number and whatnot

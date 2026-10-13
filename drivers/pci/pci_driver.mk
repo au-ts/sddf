@@ -15,10 +15,7 @@ PCI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 pci_driver.elf: pci/pci.o pci/debug.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-pci/pci.o: ${PCI_DIR}/pci.c ${CHECK_FLAGS_BOARD_MD5} |pci $(SDDF_LIBC_INCLUDE)
-	${CC} ${CFLAGS} -o $@ -c $<
-
-pci/debug.o: ${PCI_DIR}/debug.c ${CHECK_FLAGS_BOARD_MD5} |pci $(SDDF_LIBC_INCLUDE)
+pci/%.o: ${PCI_DIR}/%.c ${CHECK_FLAGS_BOARD_MD5} |pci $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -o $@ -c $<
 
 pci:
