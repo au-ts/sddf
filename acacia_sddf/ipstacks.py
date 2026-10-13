@@ -1,7 +1,13 @@
 # Copyright 2026, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-from acacia import ConfigStruct, MemoryRegion, ProtectionDomain, Subsystem, System
+from acacia import (
+    ConfigStruct,
+    MemoryRegion,
+    ProtectionDomain,
+    Subsystem,
+    build_hook,
+)
 
 from .net import sDDFEthernet
 from .sddf import RegionResourceFactory
@@ -20,9 +26,7 @@ class sDDFLWIP(Subsystem):
         # Disable client list, since we assume that we take our only PD now.
         super().__init__(net.sdf, f"lwip_{target_pd.name}", clients_allowed=False)
 
-        # Automatically call
-        self.add_build_hook(self.create_pbuf_pool)
-
+    @build_hook  # Run this at Acacia build time, after the PD has finished modifying its memory map
     def create_pbuf_pool(self):
         # We use connect clients to defer allocating a vaddr for the map until after
         # the metaprogram is finished doing config.

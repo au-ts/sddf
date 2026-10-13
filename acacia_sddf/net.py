@@ -14,6 +14,7 @@ from acacia import (
     SchedulingProperties,
     SubsystemBuildError,
     System,
+    build_hook,
 )
 
 from .driver_manifest import (
@@ -302,6 +303,7 @@ class sDDFEthernet(sDDFDriverClass):
             )
         self.acl_rules.append((client0.name, client1.name, zero_to_one, one_to_zero))
 
+    @build_hook  # Mark this to run after metaprogram is finished modifying things.
     def connect_clients(self):
         if len(self.clients) == 0:
             raise SubsystemBuildError(
