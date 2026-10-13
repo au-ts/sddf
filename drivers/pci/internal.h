@@ -18,4 +18,6 @@
 #define DEBUG_DRIVER_ERR(fmt, ...) \
     sddf_dprintf("PCI DRIVER %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
+const char *pci_class_and_subclass_to_string(uint8_t class, uint8_t subclass);
+
 void dump_acpi_info(acpi_handover_t *post_acpi_handover);
