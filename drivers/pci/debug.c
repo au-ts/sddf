@@ -3,8 +3,6 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
-// #include "pci.h"
-
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
