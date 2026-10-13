@@ -827,6 +827,10 @@ static bool map_ecams(pci_drv_state_t *driver_state)
     assert(driver_state->handover->num_mcfg_entries <= ACPI_MAX_NUM_MCFG_ENTRIES);
     for (size_t i = 0; i < driver_state->handover->num_mcfg_entries; i++) {
         mcfg_entry_t *mcfg_entry = &driver_state->handover->mcfg_entries[i];
+
+        /* The paddr in the MCFG is not the real base, it starts from bus 0,
+         * not mcfg_entry->start_bus, so we need to correct for this */
+        uint64_t actual_paddr = mcfg_entry->paddr + ((uint64_t)mcfg_entry->start_bus << 20);
         uint64_t ecam_size_bytes = ((mcfg_entry->end_bus_inclusive + 1) - mcfg_entry->start_bus)
                                  * PCIE_SIZE_BYTES_PER_BUS;
         ecam_size_bytes = ROUND_UP(ecam_size_bytes, BIT(seL4_LargePageBits));
@@ -838,13 +842,14 @@ static bool map_ecams(pci_drv_state_t *driver_state)
                      mcfg_entry->segment, mcfg_entry->start_bus, mcfg_entry->end_bus_inclusive, mcfg_entry->paddr,
                      (uintptr_t)vaddr, ecam_size_bytes);
 
-        if (!map_memory_region(&driver_state->handover->shadow_cnode, CPTR_SELF_VSPACE, mcfg_entry->paddr,
-                               ecam_size_bytes, true, (uintptr_t)vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
+        if (!map_memory_region(&driver_state->handover->shadow_cnode, CPTR_SELF_VSPACE, actual_paddr, ecam_size_bytes,
+                               true, (uintptr_t)vaddr, seL4_ReadWrite, seL4_X86_CacheDisabled)) {
             DEBUG_DRIVER_ERR("mapping unsuccessful\n");
             return false;
         }
 
-        driver_state->ecams_vaddr[i] = vaddr;
+        driver_state->ecams_vaddr[i] = vaddr - (mcfg_entry->start_bus * PCIE_SIZE_BYTES_PER_BUS);
+        driver_state->vaddr_watermark += ecam_size_bytes;
     }
 
     DEBUG_DRIVER("All ECAMs mapped\n");
@@ -874,7 +879,7 @@ static void bus_scan_recursive(pci_drv_state_t *driver_state, uint8_t bus, void 
 {
     for (uint8_t dev = 0; dev < BIT(PCI_DEV_BITS); dev++) {
         for (uint8_t func = 0; func < BIT(PCI_FUNC_BITS); func++) {
-            pci_conf_space_common_hdr_t *common_hdr = pci_bdf_to_conf_space(ecam, bus, dev, func);
+            volatile pci_conf_space_common_hdr_t *common_hdr = pci_bdf_to_conf_space(ecam, bus, dev, func);
 
             if (common_hdr->vendor_id == NO_VENDOR) {
                 if (func == 0) {
@@ -890,10 +895,19 @@ static void bus_scan_recursive(pci_drv_state_t *driver_state, uint8_t bus, void 
             DEBUG_DRIVER("\t\tClass: %s\n",
                          pci_class_and_subclass_to_string(common_hdr->class_code, common_hdr->subclass));
 
-            if ((common_hdr->header_type & 0x7f) == 1) {    /* type 1 header: a bridge */
-                pci_conf_space_bridge_t *bridge = (pci_conf_space_bridge_t *)common_hdr;
-                uint8_t secondary = bridge->secondary_bus_num;
-                uint8_t subordinate = bridge->subordinate_bus_num;
+            uint8_t hdr_type = common_hdr->header_type & 0x7f;
+            if (hdr_type == 0) {
+                volatile pci_conf_space_endpoint_t *endpoint_cs = (pci_conf_space_endpoint_t *)common_hdr;
+                if (endpoint_cs->interrupt_pin) {
+                    /* -1 to match ACPI PRT's 0-indexing */
+                    uint8_t int_pin = endpoint_cs->interrupt_pin - 1;
+                    DEBUG_DRIVER("\t\tInterrupt Pin: %u\n", int_pin);
+                }
+
+            } else if (hdr_type == 1) {    /* type 1 header: a bridge */
+                volatile pci_conf_space_bridge_t *bridge_cs = (pci_conf_space_bridge_t *)common_hdr;
+                uint8_t secondary = bridge_cs->secondary_bus_num;
+                uint8_t subordinate = bridge_cs->subordinate_bus_num;
                 if (secondary > bus && secondary <= subordinate)
                     bus_scan_recursive(driver_state, secondary, ecam);
                 else
@@ -913,7 +927,7 @@ static bool host_bridges_scan(pci_drv_state_t *driver_state)
         host_bridge_t *hb_desc = &driver_state->handover->host_bridges[hb];
 
         size_t ecam_idx;
-        uint8_t segment = hb_desc->segment;
+        uint16_t segment = hb_desc->segment;
         uint8_t bus = hb_desc->root_bus;
         if (!bus_to_ecam_idx(driver_state, segment, bus, &ecam_idx)) {
             DEBUG_DRIVER_ERR("Failed to look up ECAM for host bridge with segment %u, root bus %u\n", hb_desc->segment,
