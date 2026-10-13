@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Iterable
 from pathlib import Path
+import json
 from datetime import datetime
 import sys
 from dataclasses import dataclass
@@ -188,6 +189,7 @@ def subset_test_cases(
 
 def run_tests(tests: list[TestConfig]) -> None:
     parser = argparse.ArgumentParser(description="Run tests")
+    parser.add_argument("--print-boards", action="store_true")
 
     filters = parser.add_argument_group(title="filters")
     filters.add_argument(
@@ -226,6 +228,10 @@ def run_tests(tests: list[TestConfig]) -> None:
     )
 
     tests = subset_test_cases(tests, filter_args)
+
+    if args.print_boards:
+        print(json.dumps(sorted(set(test.board for test in tests))))
+        exit(0)
 
     tests = apply_runner_arguments(parser, args, tests, test_case_summary)
 

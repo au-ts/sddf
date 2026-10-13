@@ -236,6 +236,32 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
+  generate_board_names:
+    name: Generate machine queue board names
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'au-ts' &&
+              (
+                (github.event_name == 'schedule') ||
+                (github.event_name == 'pull_request' &&
+                  (
+                    (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test')) ||
+                    (github.event.action == 'labeled' && github.event.label.name == 'hardware-test')
+                  )
+                )
+              )
+         }}
+    outputs:
+      matrix: ${{steps.list_boards.outputs.matrix}}
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v6
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+      - id: list_boards
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          echo "matrix=$(exec ./ci/run.py --print-boards --no-only-qemu)" >> $GITHUB_OUTPUT
+
   tests_hardware:
     name: Tests (hardware)
     runs-on: ubuntu-latest
@@ -250,23 +276,11 @@ jobs:
                 )
               )
          }}
-    needs: build_linux_x86_64_nix
+    needs: [build_linux_x86_64_nix, generate_board_names]
     strategy:
       fail-fast: false
       matrix:
-        board:
-          - hifive_p550
-          - imx8mm_evk
-          - imx8mq_evk
-          - imx8mp_iotgate
-          - maaxboard
-          - odroidc2
-          - odroidc4
-          - rockpro64
-          - rpi4b_1gb
-          - serengeti
-          - star64
-          - zcu102
+        board: ${{fromJson(needs.generate_board_names.outputs.matrix)}}
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ matrix.board }}
       cancel-in-progress: true
@@ -317,23 +331,11 @@ jobs:
                 )
               )
          }}
-    needs: build_pancake_linux_x86_64_nix
+    needs: [build_pancake_linux_x86_64_nix, generate_board_names]
     strategy:
       fail-fast: false
       matrix:
-        board:
-          - hifive_p550
-          - imx8mm_evk
-          - imx8mq_evk
-          - imx8mp_iotgate
-          - maaxboard
-          - odroidc2
-          - odroidc4
-          - rockpro64
-          - rpi4b_1gb
-          - serengeti
-          - star64
-          - zcu102
+        board: ${{fromJson(needs.generate_board_names.outputs.matrix)}}
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake-${{ matrix.board }}
       cancel-in-progress: true
