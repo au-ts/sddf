@@ -12,7 +12,10 @@ from acacia import (
     ProtectionDomain,
     SchedulingProperties,
     System,
+    build_hook,
 )
+
+from ci.build import build
 
 from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
@@ -146,6 +149,7 @@ class sDDFI2C(sDDFDriverClass):
             self.driver, I2C_PROTOCOL_MAGIC, driver_virt_connection
         )
 
+    @build_hook  # Mark this to run when Acacia is performing final steps
     def connect_clients(self):
         assert self.virt is not None
         assert self.driver is not None

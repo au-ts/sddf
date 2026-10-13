@@ -5,6 +5,7 @@ from typing import Optional
 
 from acacia import (
     IRQ,
+    build_hook,
     Channel,
     ConfigStruct,
     Map,
@@ -45,6 +46,7 @@ class sDDFTimer(sDDFDriverClass):
 
         self.client_configs = []
 
+    @build_hook  # Mark this to run when Acacia is performing final steps
     def connect_clients(self):
         # Clients are connected with:
         # a. channel allowing PPCs -> driver, notifications -> client

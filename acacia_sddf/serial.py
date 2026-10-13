@@ -12,6 +12,7 @@ from acacia import (
     SchedulingProperties,
     SubsystemBuildError,
     System,
+    build_hook,
 )
 from acacia.irq import IrqIoapic
 from acacia.x86 import IOPort
@@ -202,6 +203,7 @@ class sDDFSerial(sDDFDriverClass):
             driver_rx_conn,
         )
 
+    @build_hook  # Mark this to run when Acacia is performing final steps
     def connect_clients(self):
         assert self.virt_tx is not None
         assert self.driver is not None
