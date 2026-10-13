@@ -251,7 +251,7 @@ jobs:
               )
          }}
     outputs:
-      matrix: ${{steps.list_boards.outputs.matrix}}
+      board: ${{steps.list_boards.outputs.board}}
     steps:
       - name: Checkout sDDF repository
         uses: actions/checkout@v6
@@ -260,7 +260,7 @@ jobs:
       - id: list_boards
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
-          echo "matrix=$(exec ./ci/run.py --print-boards --no-only-qemu)" >> $GITHUB_OUTPUT
+          echo "board=$(exec ./ci/run.py --print-boards --no-only-qemu)" >> $GITHUB_OUTPUT
 
   tests_hardware:
     name: Tests (hardware)
@@ -280,7 +280,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{fromJson(needs.generate_board_names.outputs.matrix)}}
+        board: ${{ fromJson(needs.generate_board_names.outputs.board) }}
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ matrix.board }}
       cancel-in-progress: true
@@ -335,7 +335,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{fromJson(needs.generate_board_names.outputs.matrix)}}
+        board: ${{ fromJson(needs.generate_board_names.outputs.board) }}
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake-${{ matrix.board }}
       cancel-in-progress: true
