@@ -13,6 +13,7 @@ from acacia import (
     SchedulingProperties,
     SubsystemBuildError,
     System,
+    build_hook,
 )
 
 from .driver_manifest import register_sddf_subsystem
@@ -121,6 +122,41 @@ class sDDFBlk(sDDFDriverClass):
             Channel.End(self.driver, can_notify=True, can_pp=False),
         )
 
+    def add_client(
+        self,
+        client: ProtectionDomain,
+        partition_number: int,
+        queue_capacity: int = BlkClientOptions.queue_capacity,
+        data_size: int = BlkClientOptions.data_size,
+    ):
+        if client in self.client_blk_configs:
+            raise SubsystemBuildError(f"Duplicate blk client {client.name}!")
+        if client.name == self.driver.name:
+            raise SubsystemBuildError(
+                f"Invalid blk client, same name as driver '{client.name}'"
+            )
+        if client.name == self.virt.name:
+            raise SubsystemBuildError(
+                f"Invalid blk client, same name as virt '{client.name}'"
+            )
+        if len(self.client_blk_configs) >= BLK_MAX_CLIENTS:
+            raise SubsystemBuildError(
+                f"Blk supports at most {BLK_MAX_CLIENTS} clients!"
+            )
+        if not 0 < queue_capacity <= 0xFFFF:
+            raise SubsystemBuildError(
+                f"Client {client.name} queue_capacity={queue_capacity} does not fit in uint16_t!"
+            )
+        if not self.sdf.arch.addr_is_page_aligned(data_size):
+            raise SubsystemBuildError(
+                f"Client data size {data_size} is not page aligned!"
+            )
+        self.client_blk_configs[client] = BlkClientOptions(
+            partition_number, queue_capacity, data_size
+        )
+        super().add_client(client)
+
+    @build_hook  # Mark this to run when Acacia builds the subsystem. Runs 1st / 2 (before client connection)
     def create_driver_virt_connection(self):
         driver_q_capacity = sum(
             [
@@ -185,46 +221,10 @@ class sDDFBlk(sDDFDriverClass):
         # assembly time.
         self.virt_driver_config_proto = (virt_driver_conn, virt_data_map)
 
-    def add_client(
-        self,
-        client: ProtectionDomain,
-        partition_number: int,
-        queue_capacity: int = BlkClientOptions.queue_capacity,
-        data_size: int = BlkClientOptions.data_size,
-    ):
-        if client in self.client_blk_configs:
-            raise SubsystemBuildError(f"Duplicate blk client {client.name}!")
-        if client.name == self.driver.name:
-            raise SubsystemBuildError(
-                f"Invalid blk client, same name as driver '{client.name}'"
-            )
-        if client.name == self.virt.name:
-            raise SubsystemBuildError(
-                f"Invalid blk client, same name as virt '{client.name}'"
-            )
-        if len(self.client_blk_configs) >= BLK_MAX_CLIENTS:
-            raise SubsystemBuildError(
-                f"Blk supports at most {BLK_MAX_CLIENTS} clients!"
-            )
-        if not 0 < queue_capacity <= 0xFFFF:
-            raise SubsystemBuildError(
-                f"Client {client.name} queue_capacity={queue_capacity} does not fit in uint16_t!"
-            )
-        if not self.sdf.arch.addr_is_page_aligned(data_size):
-            raise SubsystemBuildError(
-                f"Client data size {data_size} is not page aligned!"
-            )
-        self.client_blk_configs[client] = BlkClientOptions(
-            partition_number, queue_capacity, data_size
-        )
-        super().add_client(client)
-
+    @build_hook  # Mark this to run when Acacia builds the subsystem. Runs 2nd / 2. Must come after virt-driver conn
     def connect_clients(self):
         assert self.virt is not None
         assert self.driver is not None
-
-        # Create driver-virt queues now that we know how they should be sized.
-        self.create_driver_virt_connection()
 
         virt_client_struct_protos = []
         client_config_protos = []
