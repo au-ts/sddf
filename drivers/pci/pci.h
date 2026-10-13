@@ -8,6 +8,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define PCI_COMMAND_IO_SPACE_MASK BIT(0)
+#define PCI_COMMAND_MEM_SPACE_MASK BIT(1)
+
+#define PCI_BAR_IO_SPACE_MASK BIT(0)
+#define PCI_BAR_PREFETCHABLE_MASK BIT(3)
+#define PCI_BAR_ADDR_MASK 0xFFFFFFF0
+
 typedef struct {
     uint16_t vendor_id;      // 0x00: Vendor ID
     uint16_t device_id;      // 0x02: Device ID
@@ -24,11 +31,13 @@ typedef struct {
 } __attribute__((__packed__)) pci_conf_space_common_hdr_t;
 
 // Type 0 PCI configuration space header for endpoints
+#define PCI_TYPE_0_NUM_BARS 6
+
 typedef struct {
     pci_conf_space_common_hdr_t hdr;
 
     // Base Address Registers (BARs)
-    uint32_t bar[6];              // 0x10-0x27: Base Address Registers
+    uint32_t bars[PCI_TYPE_0_NUM_BARS]; // 0x10-0x27: Base Address Registers
 
     // Subsystem Information
     uint32_t cardbus_cis_ptr;     // 0x28: CardBus CIS Pointer
