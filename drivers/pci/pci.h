@@ -69,8 +69,8 @@ typedef struct {
 
     uint8_t primary_bus_num;      // 0x18: primary bus number
     uint8_t secondary_bus_num;    // 0x19: Secondary bus number
-    uint8_t subordinate_bus_num;  // 0x20: Secondary bus number
-    uint8_t secondary_latency_timer; // 0x21: Secondary bus number
+    uint8_t subordinate_bus_num;  // 0x1A: Secondary bus number
+    uint8_t secondary_latency_timer; // 0x1B: Secondary bus number
 
     uint8_t io_base;              // 0x1C: I/O port base address
     uint8_t io_limit;             // 0x1D: I/O port address
