@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 #include <sddf/util/shadow_cnode.h>
 
@@ -37,10 +36,10 @@ typedef struct {
 } resource_range_t;
 
 /* "PCI Routing Table" */
-#define ACPI_MAX_PCI_PATH_DEPTH 4
+#define PCI_MAX_PATH_DEPTH 4
 typedef struct {
     uint8_t depth; /* 0 = host bridge's own _PRT */
-    uint8_t devfn[ACPI_MAX_PCI_PATH_DEPTH];  /* (dev << 3) | fn per hop, host bridge first */
+    uint8_t devfn[PCI_MAX_PATH_DEPTH];  /* (dev << 3) | fn per hop, host bridge first */
 } pci_path_t;
 
 typedef struct {

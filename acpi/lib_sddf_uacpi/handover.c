@@ -203,8 +203,8 @@ static uacpi_iteration_decision prt_cb(void *ctx, uacpi_namespace_node *node, ua
                 goto prt_bail;
             }
 
-            if (path.depth == ACPI_MAX_PCI_PATH_DEPTH) {
-                DEBUG_ACPI_ERR("depth greater than ACPI_MAX_PCI_PATH_DEPTH, consider increasing\n");
+            if (path.depth == PCI_MAX_PATH_DEPTH) {
+                DEBUG_ACPI_ERR("depth greater than PCI_MAX_PATH_DEPTH, consider increasing\n");
                 goto prt_bail;
             }
 
