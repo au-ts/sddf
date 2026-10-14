@@ -346,7 +346,7 @@ def generate(
         core_objs[i]["idle_elf"] = copy_elf("idle", "idle", core)
         core_objs[i]["idle_pd"] = ProtectionDomain(
             sdf,
-            f"bench_idleself.{core}",
+            f"bench_idle{core}",
             core_objs[i]["idle_elf"],
             priority=1,
             cpu=core,
@@ -420,7 +420,7 @@ def generate(
             # Then we create the config for the benchmark PD on the previous core
             core_objs[i - 1]["bench_config"] = BenchmarkConfig(
                 core_objs[i - 1]["start_ch"].end_b.ch_id,
-                core_objs[i]["start_ch"].edn_a.ch_id,
+                core_objs[i]["start_ch"].end_a.ch_id,
                 core_objs[i - 1]["stop_ch"].end_b.ch_id,
                 core_objs[i]["stop_ch"].end_a.ch_id,
                 core_objs[i - 1]["init_ch"].end_b.ch_id,

@@ -45,36 +45,36 @@ def _next_power_of_two(n: int) -> int:
 class sDDFMAC:
     def __init__(self, mac: str | List[int]):
         if type(mac) is str:
-            self.mac_str = mac
+            self.mac = self._parse_mac_addr(mac)
         elif type(mac) is list:
             for n in mac:
+                if t:=type(n) != int:
+                    raise TypeError(f"MACs must be made of int not {t}")
                 if n < 0 or n > 255:
                     raise ValueError("MAC bytes cannot be wider than 0xff!")
-            self.mac_str = ":".join([hex(t).split("0x")[1] for t in mac])
+            self.mac = mac
+        else:
+            raise TypeError("Invalid type to create MAC!")
 
-    @property
-    def mac_ints(self) -> List[int]:
-        return self._parse_mac_addr(self.mac_str)
+        if len(self.mac) != 6:
+            raise RuntimeError(f"Invalid MAC address: {self}")
 
     def _parse_mac_addr(self, mac_str: str) -> List[int]:
-        parts = mac_str.split(":")
-        if len(parts) != 6:
-            raise RuntimeError(f"Invalid MAC address: {mac_str}")
         try:
             return [int(p, 16) for p in parts]
         except ValueError:
             raise RuntimeError(f"Invalid MAC address: {mac_str}")
 
     def as_config_struct(self) -> ConfigStruct:
-        return ConfigStruct({"addr": self.mac_ints}, type_name="mac_addr_t")
+        return ConfigStruct({"addr": self.mac}, type_name="mac_addr_t")
 
     def __repr__(self) -> str:
-        return f"<sDDFMAC {self.mac_str}>"
+        return f"<sDDFMAC {':'.join(self.mac)}>"
 
     def __eq__(self, other: object) -> bool:
         if type(other) != sDDFMAC:
             return False
-        return self.mac_str == other.mac_str
+        return self.mac == other.mac
 
 
 @dataclass(frozen=True)
@@ -217,7 +217,7 @@ class sDDFEthernet(sDDFDriverClass):
         tx: bool = NetClientOptions.tx,
         tx_buffers: int = NetClientOptions.tx_buffers,
         vswitch_client: bool = NetClientOptions.vswitch,
-        mac_addr: Optional[str] = NetClientOptions.mac_addr,
+        mac_addr: Optional[sDDFMAC] = NetClientOptions.mac_addr,
     ):
         # A vswitch client requires a vswitch PD.
         if vswitch_client and self.vswitch is None:
@@ -272,6 +272,7 @@ class sDDFEthernet(sDDFDriverClass):
         super().add_client(client)
         idx = len(self.clients) - 1
         self.client_info.append(NetClientInfo())
+        # todo: convert config to be dicts indexed by the PD, this is fragile
         self.copiers.append(copier)
         self.copy_config_data.append(None)
         self.copy_configs.append(None)
@@ -758,7 +759,7 @@ class sDDFEthernet(sDDFDriverClass):
         configs = [self.driver_config, self.virt_rx_config, self.virt_tx_config]
         if self.vswitch is not None:
             configs.append(self.vswitch_config)
-        configs += self.copy_configs
+        configs += [c for c in self.copy_configs if c is not None]
         configs += self.client_configs
 
         return super().generate_config_structs() + configs
