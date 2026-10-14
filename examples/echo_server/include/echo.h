@@ -11,7 +11,7 @@
 #define TCP_ECHO_PORT 1236
 #define UTILIZATION_PORT 1237
 
-#define TCP_ECHO_MAX_CONNS 4
+#define TCP_ECHO_MAX_CONNS 10
 
 int setup_udp_socket(void);
 int setup_utilization_socket(void *benchmark_config);
