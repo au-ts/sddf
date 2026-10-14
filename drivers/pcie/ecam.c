@@ -10,7 +10,6 @@
 #include <sddf/util/vspace.h>
 
 #include "internal.h"
-#include "pci.h"
 
 bool map_ecams(pci_drv_state_t *driver_state)
 {

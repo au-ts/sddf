@@ -10,7 +10,6 @@
 #include <sddf/util/vspace.h>
 
 #include "internal.h"
-#include "pci.h"
 
 #define PCI_MAX_NUM_RESOURCES_PER_BRIDGE ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE
 
@@ -292,12 +291,12 @@ static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb,
                          pci_class_and_subclass_to_string(common_hdr->class_code, common_hdr->subclass));
 
             uint8_t hdr_type = common_hdr->header_type & 0x7f;
-            if (hdr_type == 0) {
+            if (hdr_type == PCI_HEADER_TYPE_ENDPOINT) {
                 volatile pci_conf_space_endpoint_t *endpoint_cs = (pci_conf_space_endpoint_t *)common_hdr;
                 if (!handle_pcie_endpoint(driver_state, hb, endpoint_cs, bus, dev, func, scan_state)) {
                     return false;
                 }
-            } else if (hdr_type == 1) {
+            } else if (hdr_type == PCI_HEADER_TYPE_PCI_TO_PCI_BRIDGE) {
                 volatile pci_conf_space_bridge_t *bridge_cs = (pci_conf_space_bridge_t *)common_hdr;
                 if (!handle_pcie_bridge(driver_state, hb, ecam, bridge_cs, bus, dev, func, scan_state)) {
                     return false;
