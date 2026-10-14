@@ -157,7 +157,7 @@ def test_case_summary(tests: list[TestConfig]):
         for board, group in itertools.groupby(subtests, key=lambda c: c.board):
             lines.append(
                 " - {}: {}".format(
-                    board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+                    board, ", ".join(f"{c.config}/{c.build_system}/{c.language}" for c in group)
                 )
             )
 
