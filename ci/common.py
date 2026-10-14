@@ -142,6 +142,7 @@ class TestConfig(TestCase):
             / self.board
             / self.config
             / self.build_system
+            / self.language
             / f"{now.strftime('%Y-%m-%d_%H.%M.%S')}.log"
         )
 
