@@ -8,6 +8,8 @@ PLATFORM := rk3568
 #I2C_DRIV_DIR :=
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_dwmac-5.10a.elf
+ETH_DRIV_DIR1 := dwmac-5.10a
+ETH_DRIV_1 := eth_driver_dwmac-5.10a.elf
 UART_DRIV_DIR := ns16550a
 TIMER_DRIV_DIR := ${PLATFORM}
 
