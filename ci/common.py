@@ -120,7 +120,7 @@ class TestConfig(TestCase):
         return self.board.startswith("qemu") or self.board == "x86_64_generic"
 
     def pretty_name(self) -> str:
-        return f"{self.example} on {self.board} ({self.config}, built with {self.build_system})"
+        return f"{self.example} on {self.board} ({self.config}, built with {self.build_system} in {self.language})"
 
     def backend(self, loader_img: Path) -> HardwareBackend:
         return self.backend_fn(self, loader_img)
