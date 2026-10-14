@@ -41,15 +41,12 @@ SUPPORTED_BOARDS:= cheshire \
 		   zcu102 \
 		   x86_64_generic
 
-include ${SDDF}/tools/make/board/common.mk
+SDDF_CUSTOM_LIBC := 1
+include ${SDDF}/tools/make/sddf.mk
 
 TOP := ${SDDF}/examples/serial
 METAPROGRAM := $(TOP)/meta.py
-UTIL := $(SDDF)/util
-SERIAL_COMPONENTS := $(SDDF)/serial/components
-UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SYSTEM_FILE := serial.system
-SDDF_CUSTOM_LIBC := 1
 
 IMAGES := serial_driver.elf \
 	  client.elf \
@@ -65,14 +62,6 @@ CFLAGS += \
 	-I${SDDF}/include/microkit
 
 ${IMAGES}: libsddf_util_debug.a
-
-include ${SDDF}/util/util.mk
-ifeq ($(PANCAKE_SERIAL_DRIVER),1)
-include ${UART_DRIVER}/serial_driver_pnk.mk
-else
-include ${UART_DRIVER}/serial_driver.mk
-endif
-include ${SERIAL_COMPONENTS}/serial_components.mk
 
 client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

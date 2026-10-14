@@ -7,7 +7,7 @@
 # Should be included _before_ toolchain makefile.
 PLATFORM := imx
 
-I2C_DRIV_DIR := ${PLATFORM}
+# I2C_DRIV_DIR := ${PLATFORM}
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_${NET_DRIV_DIR}.elf
 ETH_DRIV_DIR1 := imx
