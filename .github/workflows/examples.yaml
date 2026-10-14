@@ -236,8 +236,8 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
-  generate_board_names:
-    name: Generate machine queue board names
+  get_board_names:
+    name: Get board names
     runs-on: ubuntu-latest
     if: ${{ github.repository_owner == 'au-ts' &&
               (
@@ -276,11 +276,11 @@ jobs:
                 )
               )
          }}
-    needs: [build_linux_x86_64_nix, build_pancake_linux_x86_64_nix, generate_board_names]
+    needs: [build_linux_x86_64_nix, build_pancake_linux_x86_64_nix, get_board_names]
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJson(needs.generate_board_names.outputs.board) }}
+        board: ${{ fromJson(needs.get_board_names.outputs.board) }}
       max-parallel: 8
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ matrix.board }}
