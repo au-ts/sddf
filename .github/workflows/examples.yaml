@@ -312,6 +312,7 @@ jobs:
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
           exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }} --languages=c
       - name: Run tests (Pancake)
+        if: ${{ matrix.board != 'serengeti' }}
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
