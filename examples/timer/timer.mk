@@ -42,14 +42,12 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
 endif
 
-include ${SDDF}/tools/make/board/common.mk
+SDDF_CUSTOM_LIBC := 1
+include ${SDDF}/tools/make/sddf.mk
 
 TOP := ${SDDF}/examples/timer
 METAPROGRAM := $(TOP)/meta.py
-UTIL := $(SDDF)/util
-TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 SYSTEM_FILE := timer.system
-SDDF_CUSTOM_LIBC := 1
 
 IMAGES := timer_driver.elf client.elf
 
@@ -63,9 +61,6 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 
 all: $(IMAGE_FILE)
-
-include ${TIMER_DRIVER}/timer_driver.mk
-include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a
 

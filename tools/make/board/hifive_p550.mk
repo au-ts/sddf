@@ -3,8 +3,9 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-PLATFORM := riscv
-#NET_DRIV_DIR := dwmac-5.10a
-#ETH_DRIV := eth_driver_dwmac-5.10a.elf
-UART_DRIV_DIR := ns16550a
-#TIMER_DRIV_DIR := jh7110
+
+ifeq ($(PANCAKE_SERIAL_DRIVER),1)
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver_pnk.mk
+else
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver.mk
+endif

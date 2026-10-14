@@ -35,19 +35,11 @@ SYSTEM_FILE := echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
-include ${SDDF}/tools/make/board/common.mk
+SDDF_CUSTOM_LIBC := 1
+include ${SDDF}/tools/make/sddf.mk
 
 ECHO_SERVER := ${SDDF}/examples/echo_server
 METAPROGRAM := $(ECHO_SERVER)/meta.py
-BENCHMARK := $(SDDF)/benchmark
-UTIL := $(SDDF)/util
-ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
-SERIAL_COMPONENTS := $(SDDF)/serial/components
-UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
-TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
-NETWORK_COMPONENTS := $(SDDF)/network/components
-
-SDDF_CUSTOM_LIBC := 1
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
@@ -125,16 +117,6 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)
-
-
-include ${SDDF}/util/util.mk
-include ${SDDF}/network/components/network_components.mk
-include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
-include ${ETHERNET_DRIVER}/eth_driver.mk
-include ${BENCHMARK}/benchmark.mk
-include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/serial_driver.mk
-include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \

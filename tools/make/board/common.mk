@@ -39,7 +39,9 @@ endif
 
 PYTHON ?= python3
 
-LDFLAGS := -L$(BOARD_DIR)/lib
+# Add Microkit linker flags
+LDFLAGS := -L$(BOARD_DIR)/lib $(LDFLAGS)
+LIBS := -lmicrokit -Tmicrokit.ld $(LIBS)
 
 # Common Make rules
 %.elf: %.o

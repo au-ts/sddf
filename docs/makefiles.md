@@ -17,11 +17,12 @@ It copies a per-example Makefile into the build directory, then invokes Make
 recursively inside the build directory.
 
 The per-example Makefile sets up some variables, then includes
-`tools/Make/board/common.mk` which in turn includes board and tool-chain
-specific snippets.  These set up variables for controlling the build --- see the
-list of variables below.  In particular, the names of directories holding the
-drivers for the board are put into specific variables.  The project directory
-then can `include` the drivers it needs, using these variables.
+`tools/make/sddf.mk` which in turn includes board and tool-chain specific
+snippets.  These set up variables for controlling the build --- see the
+list of variables below.  In particular, this also `include`s all the sDDF
+component Makefiles and also the driver Makefiles.  The top-level Makefile
+can then depend on the drivers and/or components and Make will know how to
+build them.
 
 Variables
 ---------
@@ -38,24 +39,21 @@ Variables
 | `MICROKIT_CONFIG`  | `benchmark`, `debug`, or `release`     |
 | `SDDF`             | Name of top level directory containing |
 |                    | the SDDF source tree                   |
+| `SDDF_CUSTOM_LIBC` | A value controlling the 'libc' used by |
+| or                 | sDDF components during build. See      |
+| `SDDF_LIBC_INCLUDE`| [libc.md](./libc.md) for more details. |
 
 
 ### Set by Board snippet ###
-All the `...DRIV_DIR` variables give the name relative to
-`${SDDF}/drivers/_deviceclass_`.
+
+This file is responsible for including the appropriate driver snippets for
+the drivers supported by each board. It will also set the following variables:
 
 | Variable         | Purpose                                            |
 |:-----------------|:---------------------------------------------------|
-| `PLATFORM`       | Internal use: the name of the 'platform'           |
 | `CPU`            | For aarch64 only: the CPU variant to optimise for  |
-| `BLK_DRIV_DIR`   | Directory containing the block driver              |
-| `I2C_DRIV_DIR`   | Directory containing the I2C host driver           |
-| `NET_DRIV_DIR`   | First ethernet driver                              |
-| `ETH_DRIV_DIR1`  | Second ethernet driver                             |
 | `ETH_DRIV`       | Name of elf file for first ethernet driver         |
 | `ETH_DRIV1`      | Name of elf file for second ethernet driver        |
-| `TIMER_DRIV_DIR` | Directory containing timer driver                  |
-| `UART_DRIV_DIR`  | Directory containing the asynchronous serial driver |
 
 
 ### Set by `common.mk` ###
@@ -69,7 +67,7 @@ All the `...DRIV_DIR` variables give the name relative to
 | `DTB`           | Device tree binary name                     |
 | `DTC`           | Device tree compiler                        |
 | `PYTHON`        | Name of python interpreter to use           |
-| `LDFLAGS`       | A start at the board-specific flags to `ld` |
+| `LDFLAGS`       | Appends the Microkit board folder for  `ld` |
 
 
 `common.mk` also generates a file that is named by the hash of toolchain, board,

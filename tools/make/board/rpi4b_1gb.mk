@@ -5,9 +5,16 @@
 #
 # Set up variables for Raspberry Pi 4b ith 1Gb RAM
 # Should be included _before_ toolchain makefile.
-NET_DRIV_DIR := genet
-ETH_DRIV := eth_driver_genet.elf
-UART_DRIV_DIR := ns16550a
-TIMER_DRIV_DIR := bcm2835
-#I2C_DRIV_DIR := ${PLATFORM}
+
 CPU := cortex-a72
+
+ETH_DRIV := eth_driver_genet.elf
+include ${SDDF}/drivers/network/genet/eth_driver.mk
+
+ifeq ($(PANCAKE_SERIAL_DRIVER),1)
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver_pnk.mk
+else
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver.mk
+endif
+
+include ${SDDF}/drivers/timer/bcm2835/timer_driver.mk

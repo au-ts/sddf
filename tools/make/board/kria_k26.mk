@@ -5,10 +5,16 @@
 #
 # Set up variables for kria_k26
 # Should be included _before_ toolchain makefile.
-PLATFORM := zynqmp
-NET_DRIV_DIR := zynqmp-gem
-ETH_DRIV := eth_driver_znyqmp_gem.elf
-TIMER_DRIV_DIR := cdns
-UART_DRIV_DIR := ${PLATFORM}
 
 CPU := cortex-a53
+
+ETH_DRIV := eth_driver_znyqmp_gem.elf
+include ${SDDF}/drivers/network/zynqmp-gem/eth_driver.mk
+
+ifeq ($(PANCAKE_SERIAL_DRIVER),1)
+  include ${SDDF}/drivers/serial/zynqmp/serial_driver_pnk.mk
+else
+  include ${SDDF}/drivers/serial/zynqmp/serial_driver.mk
+endif
+
+include ${SDDF}/drivers/timer/cdns/timer_driver.mk

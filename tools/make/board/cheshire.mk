@@ -3,12 +3,11 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-PLATFORM := riscv
-# Placeholders
-#NET_DRIV_DIR :=
-#ETH_DRIV :=
-UART_DRIV_DIR := ns16550a
-I2C_DRIV_DIR := opentitan
-# Cheshire has no peripheral timer.
-# Serengeti is our fork with a timer
-#TIMER_DRIV_DIR := apb_timer
+
+include ${SDDF}/drivers/i2c/opentitan/i2c_driver.mk
+
+ifeq ($(PANCAKE_SERIAL_DRIVER),1)
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver_pnk.mk
+else
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver.mk
+endif
