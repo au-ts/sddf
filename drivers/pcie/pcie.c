@@ -780,7 +780,6 @@
 // }
 
 #include "internal.h"
-#include "pci.h"
 
 acpi_handover_t *post_acpi_handover;
 static pci_drv_state_t drv_state;

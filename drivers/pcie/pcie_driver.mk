@@ -4,24 +4,24 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the PCI driver
+# the PCIe driver
 #
 # NOTES:
-#  Generates pci_driver.elf
+#  Generates pcie_driver.elf
 #  Expects libsddf_util_debug.a to be in ${LIBS}
 
 PCI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-pci_driver.elf: pci/pci.o pci/ecam.o pci/bus_scan.o pci/debug.o
+pcie_driver.elf: pcie/pcie.o pcie/ecam.o pcie/bus_scan.o pcie/debug.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-pci/%.o: ${PCI_DIR}/%.c ${CHECK_FLAGS_BOARD_MD5} |pci $(SDDF_LIBC_INCLUDE)
+pcie/%.o: ${PCI_DIR}/%.c ${CHECK_FLAGS_BOARD_MD5} |pcie $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -o $@ -c $<
 
-pci:
-	mkdir -p pci
+pcie:
+	mkdir -p pcie
 
 clean::
-	rm -rf pci
+	rm -rf pcie
 clobber::
-	rm -f pci_driver.elf
+	rm -f pcie_driver.elf

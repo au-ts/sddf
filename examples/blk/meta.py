@@ -125,7 +125,7 @@ def generate(
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))
 
-    pci_driver = ProtectionDomain("pci_driver", "pci_driver.elf", priority=210)
+    pci_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=210)
     pci_driver.add_map(Map(post_acpi_handover_mr, 0x2000000, "rw", setvar_vaddr="post_acpi_handover"))
     pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
     pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=pci_driver, cnode=None, dest_cspace_slot=2))
