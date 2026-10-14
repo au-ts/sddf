@@ -31,30 +31,33 @@ def colour_number(num: bytes, colour: bytes) -> bytes:
 async def test(backend: HardwareBackend, test_config: common.TestConfig):
     # TODO: We really need some kind of colour (de)multiplexer....
 
-    async with asyncio.timeout(20):
+    async with asyncio.timeout(150):
         await wait_for_output(backend, b"Begin input\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
-        await wait_for_output(backend, ANSI_RESET)
 
-        await send_input(backend, b"1234567890")
-        await expect_output(backend, colour_number(b"1234567890", ANSI_RED))
-        await wait_for_output(
-            backend, b"client0 has received 10 characters so far!\r\n"
-        )
-        await wait_for_output(backend, ANSI_RESET)
+        # the point of the iteration is to stress test the serial example
+        for i in range(100):
+            for client_no in [0, 1]:
+                await wait_for_output(backend, ANSI_RESET)
 
-        # Switch to client 1.
-        await send_input(backend, b"\x1c1\r")
-        # TODO: ???
-        if test_config.config == "debug":
-            await expect_output(backend, b"VIRT_RX|LOG: switching to client 1\r\n")
+                await send_input(backend, f"\x1c{client_no}\r".encode())
+                # TODO: ???
+                if test_config.config == "debug":
+                    await expect_output(
+                        backend,
+                        f"VIRT_RX|LOG: switching to client {client_no}\r\n".encode(),
+                    )
 
-        await send_input(backend, b"1234567890")
-        await expect_output(backend, colour_number(b"1234567890", ANSI_GREEN))
-        await wait_for_output(
-            backend, b"client1 has received 10 characters so far!\r\n"
-        )
+                await send_input(backend, b"1234567890")
+                await expect_output(
+                    backend,
+                    colour_number(b"1234567890", [ANSI_RED, ANSI_GREEN][client_no]),
+                )
+                await wait_for_output(
+                    backend,
+                    f"client{client_no} has received {(i + 1) * 10} characters so far!\r\n".encode(),
+                )
 
 
 # export
