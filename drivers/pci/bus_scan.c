@@ -12,6 +12,14 @@
 #include "internal.h"
 #include "pci.h"
 
+#define PCI_MAX_NUM_RESOURCES_PER_BRIDGE ACPI_MAX_NUM_CRS_PER_HOST_BRIDGE
+
+typedef struct {
+    pci_path_t path;
+    size_t num_resources;
+    resource_range_t resources[PCI_MAX_NUM_RESOURCES_PER_BRIDGE];
+} bus_scan_state_t;
+
 static bool pci_path_equal(const pci_path_t *a, const pci_path_t *b)
 {
     if (a->depth != b->depth) {
@@ -80,21 +88,23 @@ static prt_entry_t *intx_to_prt(host_bridge_t *hb, pci_path_t path, uint8_t dev,
     }
 }
 
-static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *hb,
-                                 volatile pci_conf_space_endpoint_t *endpoint_cs, uint8_t bus, uint8_t dev,
-                                 uint8_t func, pci_path_t path)
+static bool mem_bar_in_valid_aperature(uint64_t paddr, uint64_t size_bytes, bus_scan_state_t *scan_state)
 {
-    if (endpoint_cs->interrupt_pin) {
-        /* -1 to match ACPI PRT's 0-indexing */
-        uint8_t int_pin = endpoint_cs->interrupt_pin - 1;
-        prt_entry_t *prt = intx_to_prt(hb, path, dev, int_pin);
-        if (!prt) {
-            return false;
+    assert(size_bytes);
+    for (int i = 0; i < scan_state->num_resources; i++) {
+        resource_range_t *res = &scan_state->resources[i];
+        if (res->kind == CRS_KIND_MEMORY) {
+            if (paddr >= res->base && (paddr + size_bytes - 1) <= res->end_inclusive) {
+                return true;
+            }
         }
-
-        DEBUG_DRIVER("\t\tInterrupt Pin: %u, GSI: %u\n", int_pin, prt->gsi);
     }
+    return false;
+}
 
+static void pcie_endpoint_bar_scan(pci_drv_state_t *driver_state, volatile pci_conf_space_endpoint_t *endpoint_cs,
+                                   bus_scan_state_t *scan_state)
+{
     for (int i = 0; i < PCI_TYPE_0_NUM_BARS; i++) {
         /* Don't care about I/O Space, for now... */
         uint32_t orig_bar_value = endpoint_cs->bars[i];
@@ -121,9 +131,11 @@ static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *h
             orig_bar_value_high = endpoint_cs->bars[i + 1];
         }
 
-        /* Read size */
+        /* Read size, general procedure is write all 1s to BAR, read back the mask,
+         * invert it, then restore the original value. This is why we want to disable I/O and mem space
+         * decoding. So the device doesn't decode paddr 0xffffffff. */
         uint32_t lo_rb = 0;
-        /* 32-bit BAR: pretend the high half read back all ones */
+        /* For 32-bit BAR: pretend the high half read back all ones (i.e. "nothing here" in PCI) */
         uint32_t hi_rb = 0xffffffff;
 
         endpoint_cs->bars[i] = 0xffffffff;
@@ -149,38 +161,109 @@ static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *h
         DEBUG_DRIVER("\t\tBAR %u: paddr 0x%lx, size: 0x%lx prefetchable: %s\n", i, paddr, bar_size_bytes,
                      prefetchable ? "yes" : "no");
 
+        if (!mem_bar_in_valid_aperature(paddr, bar_size_bytes, scan_state)) {
+            DEBUG_DRIVER_ERR("\t\t\tBAR not allocated by firmware\n");
+        }
+
     read_bar_complete:
         endpoint_cs->hdr.command = orig_cmd;
         if (is_64_bit) {
             i++;
         }
     }
+}
+
+static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *hb,
+                                 volatile pci_conf_space_endpoint_t *endpoint_cs, uint8_t bus, uint8_t dev,
+                                 uint8_t func, bus_scan_state_t scan_state)
+{
+    if (endpoint_cs->interrupt_pin) {
+        /* -1 to match ACPI PRT's 0-indexing */
+        uint8_t int_pin = endpoint_cs->interrupt_pin - 1;
+        prt_entry_t *prt = intx_to_prt(hb, scan_state.path, dev, int_pin);
+        if (!prt) {
+            return false;
+        }
+
+        DEBUG_DRIVER("\t\tInterrupt Pin: %u, GSI: %u\n", int_pin, prt->gsi);
+    }
+
+    pcie_endpoint_bar_scan(driver_state, endpoint_cs, &scan_state);
 
     return true;
 }
 
 static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
-                               pci_path_t path);
+                               bus_scan_state_t scan_state);
 
 static bool handle_pcie_bridge(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam,
                                volatile pci_conf_space_bridge_t *bridge_cs, uint8_t bus, uint8_t dev, uint8_t func,
-                               pci_path_t path)
+                               bus_scan_state_t scan_state)
 {
+    /* Bus number directly behind this bridge */
     uint8_t secondary = bridge_cs->secondary_bus_num;
+    /* Highest bus number anywhere behind this bridge, i.e. could be behind a bridge in this bridge */
     uint8_t subordinate = bridge_cs->subordinate_bus_num;
+    /* Check to prevent loops and rescans, the convention is that bus numbers will strictly increase down each path. */
     if (secondary > bus && secondary <= subordinate) {
-        pci_path_t new_path = path;
-        if (new_path.depth == PCI_MAX_PATH_DEPTH) {
+        if (scan_state.path.depth == PCI_MAX_PATH_DEPTH - 1) {
             DEBUG_DRIVER_ERR("topology too deep, consider increasing PCI_MAX_PATH_DEPTH\n");
             return false;
         }
 
-        new_path.devfn[new_path.depth++] = (dev << 3) | func;
-        if (!bus_scan_recursive(driver_state, hb, ecam, secondary, new_path)) {
+        bus_scan_state_t new_scan_state;
+        memset(&new_scan_state, 0, sizeof(new_scan_state));
+        new_scan_state.path = scan_state.path;
+        new_scan_state.path.devfn[new_scan_state.path.depth++] = (dev << 3) | func;
+
+        /* Get the memory aperatures of this bridge. See "3.2.5.8. Memory Base Register and Memory Limit Register"
+         * of the "PCI-to-PCI Bridge Architecture Specification Revision 1.1" for more details. */
+        uint32_t mem_base = bridge_cs->mem_base;
+        mem_base = mem_base >> 4;
+        mem_base = mem_base << 20;
+
+        uint32_t mem_limit = bridge_cs->mem_limit;
+        mem_limit = mem_limit >> 4;
+        mem_limit = (mem_limit << 20) | 0xFFFFF; /* The register give the start of the last 1MiB block */
+
+        if (mem_base < mem_limit) {
+            DEBUG_DRIVER("\t\tMemory aperature: 0x%x..0x%x\n", mem_base, mem_limit);
+            /* assert here is sound, because a pci-pci bridge only have 2 memory apertures. */
+            assert(new_scan_state.num_resources < PCI_MAX_NUM_RESOURCES_PER_BRIDGE);
+            new_scan_state.resources[new_scan_state.num_resources].kind = CRS_KIND_MEMORY;
+            new_scan_state.resources[new_scan_state.num_resources].base = mem_base;
+            new_scan_state.resources[new_scan_state.num_resources].end_inclusive = mem_limit;
+            new_scan_state.num_resources++;
+        }
+
+        uint64_t prefetch_mem_base = bridge_cs->pre_mem_base;
+        bool prefetch_is_64b = (prefetch_mem_base & 0xF) == 0x1 ? true : false;
+        prefetch_mem_base = prefetch_mem_base >> 4;
+        prefetch_mem_base = prefetch_mem_base << 20;
+        if (prefetch_is_64b) {
+            prefetch_mem_base |= ((uint64_t)bridge_cs->pre_mem_base_upper) << 32;
+        }
+
+        uint64_t prefetch_mem_limit = bridge_cs->pre_mem_limit;
+        prefetch_mem_limit = prefetch_mem_limit >> 4;
+        prefetch_mem_limit = prefetch_mem_limit << 20;
+        prefetch_mem_limit |= ((uint64_t)bridge_cs->pre_mem_limit_upper) << 32;
+        prefetch_mem_limit |= 0xFFFFF; /* The register give the start of the last 1MiB block */
+
+        if (prefetch_mem_base < prefetch_mem_limit) {
+            DEBUG_DRIVER("\t\tPrefetchable Memory aperature: 0x%lx..0x%lx\n", prefetch_mem_base, prefetch_mem_limit);
+            assert(new_scan_state.num_resources < PCI_MAX_NUM_RESOURCES_PER_BRIDGE);
+            new_scan_state.resources[new_scan_state.num_resources].kind = CRS_KIND_MEMORY;
+            new_scan_state.resources[new_scan_state.num_resources].base = prefetch_mem_base;
+            new_scan_state.resources[new_scan_state.num_resources].end_inclusive = prefetch_mem_limit;
+            new_scan_state.num_resources++;
+        }
+
+        if (!bus_scan_recursive(driver_state, hb, ecam, secondary, new_scan_state)) {
             return false;
         }
     } else {
-        DEBUG_DRIVER_ERR("bridge %02x:%02x.%x unconfigured\n", bus, dev, func);
+        DEBUG_DRIVER_ERR("bridge %02x:%02x.%x unconfigured or misprogrammed by firmware\n", bus, dev, func);
         // @billn todo, assign bus number and whatnot
     }
 
@@ -188,7 +271,7 @@ static bool handle_pcie_bridge(pci_drv_state_t *driver_state, host_bridge_t *hb,
 }
 
 static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
-                               pci_path_t path)
+                               bus_scan_state_t scan_state)
 {
     for (uint8_t dev = 0; dev < BIT(PCI_DEV_BITS); dev++) {
         for (uint8_t func = 0; func < BIT(PCI_FUNC_BITS); func++) {
@@ -211,12 +294,12 @@ static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb,
             uint8_t hdr_type = common_hdr->header_type & 0x7f;
             if (hdr_type == 0) {
                 volatile pci_conf_space_endpoint_t *endpoint_cs = (pci_conf_space_endpoint_t *)common_hdr;
-                if (!handle_pcie_endpoint(driver_state, hb, endpoint_cs, bus, dev, func, path)) {
+                if (!handle_pcie_endpoint(driver_state, hb, endpoint_cs, bus, dev, func, scan_state)) {
                     return false;
                 }
             } else if (hdr_type == 1) {
                 volatile pci_conf_space_bridge_t *bridge_cs = (pci_conf_space_bridge_t *)common_hdr;
-                if (!handle_pcie_bridge(driver_state, hb, ecam, bridge_cs, bus, dev, func, path)) {
+                if (!handle_pcie_bridge(driver_state, hb, ecam, bridge_cs, bus, dev, func, scan_state)) {
                     return false;
                 }
             }
@@ -248,8 +331,12 @@ bool host_bridges_scan(pci_drv_state_t *driver_state)
 
         DEBUG_DRIVER("Host bridge segment %u, root bus %u:\n", segment, bus);
 
-        pci_path_t path = { .depth = 0 };
-        if (!bus_scan_recursive(driver_state, hb_desc, ecam_vaddr, bus, path)) {
+        bus_scan_state_t scan_state;
+        memset(&scan_state, 0, sizeof(scan_state));
+        memcpy(&scan_state.resources, &hb_desc->crs_entries, sizeof(resource_range_t) * hb_desc->num_crs_entries);
+        scan_state.num_resources = hb_desc->num_crs_entries;
+
+        if (!bus_scan_recursive(driver_state, hb_desc, ecam_vaddr, bus, scan_state)) {
             return false;
         }
     }
