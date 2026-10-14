@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Iterable
 from pathlib import Path
+import json
 from datetime import datetime
 import sys
 from dataclasses import dataclass
@@ -119,7 +120,7 @@ class TestConfig(TestCase):
         return self.board.startswith("qemu") or self.board == "x86_64_generic"
 
     def pretty_name(self) -> str:
-        return f"{self.example} on {self.board} ({self.config}, built with {self.build_system})"
+        return f"{self.example} on {self.board} ({self.config}, built with {self.build_system} in {self.language})"
 
     def backend(self, loader_img: Path) -> HardwareBackend:
         return self.backend_fn(self, loader_img)
@@ -141,6 +142,7 @@ class TestConfig(TestCase):
             / self.board
             / self.config
             / self.build_system
+            / self.language
             / f"{now.strftime('%Y-%m-%d_%H.%M.%S')}.log"
         )
 
@@ -156,7 +158,10 @@ def test_case_summary(tests: list[TestConfig]):
         for board, group in itertools.groupby(subtests, key=lambda c: c.board):
             lines.append(
                 " - {}: {}".format(
-                    board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+                    board,
+                    ", ".join(
+                        f"{c.config}/{c.build_system}/{c.language}" for c in group
+                    ),
                 )
             )
 
@@ -188,6 +193,7 @@ def subset_test_cases(
 
 def run_tests(tests: list[TestConfig]) -> None:
     parser = argparse.ArgumentParser(description="Run tests")
+    parser.add_argument("--print-boards", action="store_true")
 
     filters = parser.add_argument_group(title="filters")
     filters.add_argument(
@@ -226,6 +232,10 @@ def run_tests(tests: list[TestConfig]) -> None:
     )
 
     tests = subset_test_cases(tests, filter_args)
+
+    if args.print_boards:
+        print(json.dumps(sorted(set(test.board for test in tests))))
+        exit(0)
 
     tests = apply_runner_arguments(parser, args, tests, test_case_summary)
 
