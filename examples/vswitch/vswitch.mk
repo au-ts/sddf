@@ -36,7 +36,6 @@ include ${SDDF}/tools/make/board/common.mk
 
 VSWITCH:= ${SDDF}/examples/vswitch
 METAPROGRAM := $(VSWITCH)/meta.py
-LWIPDIR := network/ipstacks/lwip/src
 UTIL := $(SDDF)/util
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
 SERIAL_COMPONENTS := $(SDDF)/serial/components

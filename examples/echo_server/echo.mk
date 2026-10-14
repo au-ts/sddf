@@ -39,7 +39,6 @@ include ${SDDF}/tools/make/board/common.mk
 
 ECHO_SERVER := ${SDDF}/examples/echo_server
 METAPROGRAM := $(ECHO_SERVER)/meta.py
-LWIPDIR := network/ipstacks/lwip/src
 BENCHMARK := $(SDDF)/benchmark
 UTIL := $(SDDF)/util
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
