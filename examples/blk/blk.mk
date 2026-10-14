@@ -55,8 +55,7 @@ TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
 SDDF_CUSTOM_LIBC := 1
 
-include ${SDDF}/tools/make/board/common.mk
-
+include ${SDDF}/tools/make/sddf.mk
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
@@ -69,23 +68,12 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 METAPROGRAM := $(TOP)/meta.py
 
-BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
-
 all: $(IMAGE_FILE)
 
-include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
-include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
-
 ifdef BLK_NEED_TIMER
-include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
 export BLK_NEED_TIMER
 endif
-
-include ${SDDF}/util/util.mk
-include ${SDDF}/blk/components/blk_components.mk
-include ${SDDF}/serial/components/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 

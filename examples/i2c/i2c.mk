@@ -20,17 +20,11 @@ export PYTHONPATH
 
 SUPPORTED_BOARDS := odroidc4
 
-include ${SDDF}/tools/make/board/common.mk
-
 SDDF_CUSTOM_LIBC := 1
-UTIL := $(SDDF)/util
+include ${SDDF}/tools/make/sddf.mk
+
+TOP := $(SDDF)/examples/i2c
 LIBCO := $(SDDF)/libco
-TOP := ${SDDF}/examples/i2c
-I2C := $(SDDF)/i2c
-SERIAL := $(SDDF)/serial
-I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIV_DIR}
-TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 PN532_DRIVER := $(SDDF)/i2c/devices/pn532
 DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
@@ -106,15 +100,8 @@ clean::
 clobber:: clean
 	rm -f ${REPORT_FILE} ${IMAGE_FILE} *.a .*cflags*
 
-include ${SDDF}/util/util.mk
-include ${I2C}/components/i2c_virt.mk
-include ${SERIAL}/components/serial_components.mk
-include ${SERIAL_DRIVER}/serial_driver.mk
-include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
-include ${I2C_DRIVER}/i2c_driver.mk
 include ${PN532_DRIVER}/pn532.mk
 include ${DS3231_DRIVER}/ds3231.mk
-include ${I2C}/libi2c.mk
 -include $(DEPS_DS3231)
 -include $(DEPS_PN532)

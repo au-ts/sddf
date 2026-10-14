@@ -3,10 +3,13 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-PLATFORM := riscv
-# Placeholders
-#NET_DRIV_DIR :=
-#ETH_DRIV :=
-UART_DRIV_DIR := ns16550a
-TIMER_DRIV_DIR := apb_timer
-I2C_DRIV_DIR := opentitan
+
+include ${SDDF}/drivers/i2c/opentitan/i2c_driver.mk
+
+ifeq ($(PANCAKE_SERIAL_DRIVER),1)
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver_pnk.mk
+else
+  include ${SDDF}/drivers/serial/ns16550a/serial_driver.mk
+endif
+
+include ${SDDF}/drivers/timer/apb_timer/timer_driver.mk
