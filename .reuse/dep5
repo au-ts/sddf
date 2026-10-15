@@ -22,6 +22,7 @@ Files:
     drivers/blk/mmc/imx/config.json
     drivers/blk/virtio/config.json
     drivers/i2c/meson/config.json
+    drivers/i2c/imx/config.json
     drivers/i2c/opentitan/config.json
     drivers/network/genet/config.json
     drivers/network/imx/config.json
