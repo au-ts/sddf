@@ -8,7 +8,7 @@
 
 #include <sddf/util/util.h>
 
-/* Config space types */
+/* ============ Config space types ============ */
 
 #define PCI_HEADER_TYPE_ENDPOINT 0
 #define PCI_HEADER_TYPE_PCI_TO_PCI_BRIDGE 1
