@@ -37,19 +37,15 @@ static inline void i2c_setup(void)
 
     // disable initially
     regs->i2cr = 0;
-    LOG_I2C_DRIVER("a\n");
 
     // clear interrupt flag
     regs->i2sr &= ~REG_SR_IIF;
-    LOG_I2C_DRIVER("b\n");
 
     // Set frequency divider for 400 KHz (IC=0x06, divider=60 for 24MHz clock)
     regs->ifdr = 0x06;
-    LOG_I2C_DRIVER("c\n");
 
     // enable, and turn on interrupts
     regs->i2cr = REG_CR_IEN | REG_CR_IIEN;
-    LOG_I2C_DRIVER("done\n");
 }
 
 /**
@@ -57,8 +53,6 @@ static inline void i2c_setup(void)
  */
 int i2c_halt(void)
 {
-    LOG_I2C_DRIVER("I2C HALT\n");
-
     // Clear MSTA bit to generate STOP
     regs->i2cr &= ~(REG_CR_MSTA | REG_CR_MTX);
 
@@ -89,8 +83,6 @@ void init(void)
 
     i2c_reset_state(&driver_data);
     queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
-
-    LOG_I2C_DRIVER("i.MX8M I2C driver initialised.\n");
 }
 
 /**
@@ -101,9 +93,9 @@ static inline void imx_i2c_start(bool repeat)
     // Update dummy read flag upon switch to MTX
     dummy_read = false;
     if (!repeat) {
-        regs->i2cr |= REG_CR_MSTA;
         // wait until bus is clear
         for (uint32_t i = 0; (i < 10000) && (regs->i2sr & REG_SR_IBB); i++) {}
+        regs->i2cr |= REG_CR_MSTA;
 
         // if our short busy wait failed, die
         if (regs->i2sr & REG_SR_IBB) {
@@ -119,19 +111,6 @@ static inline void imx_i2c_start(bool repeat)
 
     // Always enable TXAK at start of a transaction.
     regs->i2cr &= ~REG_CR_TXAK;
-}
-
-/**
- * After sending an address+start OR a data byte, call this function
- * to check if an acknowledgement is received.
- *
- * This is required as the hardware will only generate an interrupt on
- * the successful completion of a transfer.
- */
-static inline bool imx_i2c_ackd(void)
-{
-    // TODO: figure out if a busy wait is required
-    return ((regs->i2sr & REG_SR_RXAK) == 0);
 }
 
 /**
@@ -216,11 +195,8 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
         uint8_t addr_byte = (i2c_curr_addr(data) << 1);
         bool is_read = cmd_is_read(data->active_cmd);
 
-        if (is_read) {
-            addr_byte |= 0x1;  // Read operation (R/W bit = 1)
-        } else {
-            addr_byte &= ~0x1; // Write operation (R/W bit = 0)
-        }
+        // Set R/W bit if read. Guaranteed to be 0 otherwise due to above shift.
+        addr_byte |= (is_read) ? 1 : 0;
 
         LOG_I2C_DRIVER("Sending ADDR 0x%02x (read=%u)\n", i2c_curr_addr(data), is_read);
 
