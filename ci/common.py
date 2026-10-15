@@ -76,6 +76,17 @@ def backend_fn(
                 # fmt: on
                 *QEMU_COMMON_FLAGS,
             )
+        elif test_config.board == "qemu_virt_aarch64_el1":
+            return QemuBackend(
+                "qemu-system-aarch64",
+                # fmt: off
+                "-accel", "kvm"
+                "-machine", "virt",
+                "-cpu", "host",
+                "-device", f"loader,file={loader_img.resolve()},addr=0x70000000,cpu-num=0",
+                # fmt: on
+                *QEMU_COMMON_FLAGS,
+            )
         elif test_config.board == "x86_64_generic":
             return QemuBackend(
                 "qemu-system-x86_64",
