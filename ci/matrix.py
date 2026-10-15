@@ -238,6 +238,7 @@ _BoardNames = Literal[
     "serengeti",
     "star64",
     "qemu_virt_aarch64",
+    "qemu_virt_aarch64_el1",
     "qemu_virt_riscv64",
     "x86_64_generic",
     "zcu102",
@@ -246,6 +247,7 @@ _BoardNames = Literal[
 known_board_names = set(MACHINE_QUEUE_BOARDS.keys()) | {
     # simulation boards
     "qemu_virt_aarch64",
+    "qemu_virt_aarch64_el1",
     "qemu_virt_riscv64",
     "x86_64_generic",
     # build only
