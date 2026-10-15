@@ -98,6 +98,8 @@ class __sDDFDriverManifest:
     def get_configs_matching_compatible(
         self, subsystem_type: type["sDDFDriverClass"], compat: str
     ) -> list[sDDFDriverConfig]:
+        print(f"getting configs for {subsystem_type} w compat {compat}")
+        print(self.map)
         matches = [
             config
             for config in self.__getitem__(subsystem_type).values()
@@ -111,6 +113,16 @@ class __sDDFDriverManifest:
     def register_subsystem(
         self, subsystem_name: str, driver_class: type["sDDFDriverClass"]
     ):
+        """
+        Register a subsystem class with the sDDF to correlate it to a certain driver
+        subdirectory. Subsystem name should represent the leading dirs before any
+        driver instance in `sddf/drivers`.
+
+        Args:
+            subsystem_name: name of subsystem in sddf/drivers. May be a path, e.g. sensor/tmu.
+                            This allows us to support groups of similar drivers.
+            driver_class: a type representing a subclass of sDDFDriverClass.
+        """
         existing = self.subsystems.get(subsystem_name)
         if existing is not None:
             if existing is not driver_class:
@@ -222,12 +234,40 @@ class __sDDFDriverManifest:
             defaultdict(dict)
         )
         for key, document in self._configs.items():
-            # key is "<subsystem>/<driver>", where <driver> may contain slashes.
-            subsystem_name, driver_name = key.split("/", 1)
-            driver_class = self.subsystems.get(subsystem_name)
-            if driver_class is None:
-                continue  # not registered yet; materialised at a later rescan
-            new_map[driver_class][driver_name] = self._parse_config_json(document)
+            for subsystem_name, driver_class in self.subsystems.items():
+                # Dump trailing and leading slashes to avoid weirdness
+                key = key.lstrip("/").rstrip("/")
+
+                # Case 1: Key starts with subsystem  ... i.e. register_subsystem("i2c")
+                if key.startswith(f"{subsystem_name}/"):
+                    driver_name = key[len(subsystem_name) + 1 :]
+                    new_map[driver_class][driver_name] = self._parse_config_json(
+                        document
+                    )
+                    break
+
+                # Case 2: Key has a leading category ... i.e. register_subsystem("sensor/tmu")
+                if "/" in key:
+                    parts = key.split("/")
+                    try:
+                        idx = parts.index(subsystem_name)
+                        # If subsystem is not at the beginning, it's a category/subsystem/driver
+                        if idx > 0:
+                            # The driver name is everything after the subsystem
+                            driver_parts = parts[idx + 1 :]
+                            if driver_parts:
+                                driver_name = "/".join(driver_parts)
+                                new_map[driver_class][driver_name] = (
+                                    self._parse_config_json(document)
+                                )
+                                break
+                        # should be unreachable.
+                        raise RuntimeError(
+                            f"Subsystem name '{subsystem_name} for {driver_class} is invalid!"
+                        )
+                    except ValueError:
+                        # subsystem_name not in parts
+                        pass
         self.map = new_map
 
 
