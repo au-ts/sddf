@@ -30,7 +30,7 @@ TOP := ${SDDF}/examples/tmu
 SERIAL := $(SDDF)/serial
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
-TMU_DRIVER := $(SDDF)/drivers/tmu/${TMU_DRIV_DIR}
+TMU_DRIVER := $(SDDF)/drivers/sensor/tmu/${TMU_DRIV_DIR}
 
 IMAGES :=\
 	  client.elf \
