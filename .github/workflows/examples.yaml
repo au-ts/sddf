@@ -42,6 +42,7 @@ jobs:
         run: |
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+          ./venv/bin/pip install git+https://github.com/au-ts/microkit_acacia
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
         with:
@@ -68,6 +69,7 @@ jobs:
         run: |
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+          ./venv/bin/pip install git+https://github.com/au-ts/microkit_acacia
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
         with:
@@ -168,6 +170,7 @@ jobs:
         run: |
           python3.13 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+          ./venv/bin/pip install git+https://github.com/au-ts/microkit_acacia
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
       - name: Build examples
