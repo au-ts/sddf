@@ -1,14 +1,15 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
-
-from acacia import Arch, aarch64, riscv64, x86_64
+from typing import List, Optional, Tuple
+from acacia import System, ProtectionDomain, aarch64, riscv64, x86_64, Arch
+from importlib.metadata import version
 
 
 @dataclass(frozen=True)
 class DriverDouble:
-    compatible: str | None
-    node_path: str | None
+    compatible: str
+    node_path: str
 
 
 @dataclass
@@ -17,18 +18,18 @@ class Board:
     arch: Arch
     paddr_top: int
     # Driver mappings -> (compatible, preferred_node) tuples
-    serial: DriverDouble = DriverDouble(None, None)
-    ethernet: DriverDouble = DriverDouble(None, None)
-    timer: DriverDouble = DriverDouble(None, None)
-    i2c: DriverDouble = DriverDouble(None, None)
-    blk: DriverDouble = DriverDouble(None, None)
+    serial: Optional[DriverDouble] = DriverDouble(None, None)
+    ethernet: Optional[DriverDouble] = DriverDouble(None, None)
+    timer: Optional[DriverDouble] = DriverDouble(None, None)
+    i2c: Optional[DriverDouble] = DriverDouble(None, None)
+    blk: Optional[DriverDouble] = DriverDouble(None, None)
     partition: int = 0
-    baud_rate: int | None = None
+    baud_rate: Optional[int] = None
 
 
 # Keep this list in alphabetical order by board name
 # TODO: convert to Dictionary
-BOARDS: list[Board] = [
+BOARDS: List[Board] = [
     Board(
         name="cheshire",
         arch=riscv64,
@@ -92,8 +93,8 @@ BOARDS: list[Board] = [
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
         ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
-        blk=DriverDouble("fsl,imx8mq-usdhc", "soc@0/bus@30800000/mmc@30b40000"),
-        i2c=DriverDouble("","soc@0/bus@30800000/i2c@30a50000"),
+        blk=DriverDouble("", "soc@0/bus@30800000/mmc@30b40000"),
+        i2c=DriverDouble("fsl,imx8mq-i2c", "soc@0/bus@30800000/i2c@30a20000"),
         partition=2,
     ),
     Board(
@@ -121,7 +122,7 @@ BOARDS: list[Board] = [
         paddr_top=0x6_0000_000,
         serial=DriverDouble("arm,pl011", "pl011@9000000"),
         timer=DriverDouble("arm,armv8-timer", "timer"),
-        blk=DriverDouble("virtio,mmio", "virtio_mmio@a000200"),
+        blk=DriverDouble("", "virtio_mmio@a000200"),
         ethernet=DriverDouble("", "virtio_mmio@a000000"),
         i2c=None,
     ),
@@ -131,8 +132,8 @@ BOARDS: list[Board] = [
         paddr_top=0xA_0000_000,
         serial=DriverDouble("ns16550a", "soc/serial@10000000"),
         timer=DriverDouble("google,goldfish-rtc", "soc/rtc@101000"),
-        ethernet=DriverDouble("virtio,mmio", "soc/virtio_mmio@10001000"),
-        blk=DriverDouble("virtio,mmio", "soc/virtio_mmio@10002000"),
+        ethernet=DriverDouble("", "soc/virtio_mmio@10001000"),
+        blk=DriverDouble("", "soc/virtio_mmio@10002000"),
         partition=0,
         i2c=None,
     ),
@@ -143,15 +144,6 @@ BOARDS: list[Board] = [
         serial=DriverDouble("snps,dw-apb-uart", "serial@fe660000"),
         timer=DriverDouble("rockchip,rk3568-timer", "rktimer@fe5f0000"),
         ethernet=DriverDouble("", "ethernet@fe2a0000"),
-        baud_rate=1500000,
-    ),
-    Board(
-        name="rockpro64",
-        arch=aarch64,
-        paddr_top=0xF7000000,
-        serial=DriverDouble("snps,dw-apb-uart", "serial@ff1a0000"),
-        timer=DriverDouble("rockchip,rk3399-timer", "rktimer@ff850000"),
-        # https://github.com/u-boot/u-boot/blob/v2024.10/configs/rockpro64-rk3399_defconfig#L77
         baud_rate=1500000,
     ),
     Board(
