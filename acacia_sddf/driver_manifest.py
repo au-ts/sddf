@@ -98,6 +98,8 @@ class __sDDFDriverManifest:
     def get_configs_matching_compatible(
         self, subsystem_type: type["sDDFDriverClass"], compat: str
     ) -> list[sDDFDriverConfig]:
+        print(f"getting configs for {subsystem_type} w compat {compat}")
+        print(self.map)
         matches = [
             config
             for config in self.__getitem__(subsystem_type).values()
@@ -222,12 +224,14 @@ class __sDDFDriverManifest:
             defaultdict(dict)
         )
         for key, document in self._configs.items():
-            # key is "<subsystem>/<driver>", where <driver> may contain slashes.
-            subsystem_name, driver_name = key.split("/", 1)
-            driver_class = self.subsystems.get(subsystem_name)
-            if driver_class is None:
-                continue  # not registered yet; materialised at a later rescan
-            new_map[driver_class][driver_name] = self._parse_config_json(document)
+            for subsystem_name, driver_class in self.subsystems.items():
+                prefix = f"{subsystem_name}/"
+                if not key.startswith(prefix):
+                    continue
+
+                driver_name = key[len(prefix) :]
+                new_map[driver_class][driver_name] = self._parse_config_json(document)
+                break
         self.map = new_map
 
 
