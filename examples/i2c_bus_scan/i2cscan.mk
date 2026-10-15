@@ -20,6 +20,7 @@ export PYTHONPATH
 
 SUPPORTED_BOARDS := \
 		odroidc4 \
+		maaxboard \
 		serengeti
 
 SDDF_CUSTOM_LIBC := 1

@@ -20,3 +20,4 @@ else
 endif
 
 include ${SDDF}/drivers/timer/imx/timer_driver.mk
+include ${SDDF}/drivers/i2c/imx/i2c_driver.mk
