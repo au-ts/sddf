@@ -57,7 +57,8 @@ serial_queue_handle_t tx_queue_handle;
 
 void write(uint16_t port_offset, uint8_t v)
 {
-    microkit_x86_ioport_write_8((IOPORT_ID), IOPORT_BASE + port_offset, v);
+    microkit_dbg_putc(v);
+    // microkit_x86_ioport_write_8((IOPORT_ID), IOPORT_BASE + port_offset, v);
 }
 
 uint8_t read(uint16_t port_offset)
@@ -77,7 +78,6 @@ int rx_ready(void)
 
 void init(void)
 {
-    return;
     assert(serial_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
@@ -85,6 +85,8 @@ void init(void)
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
+    return;
 
     while (!(read(SERIAL_LSR) & 0x60)); /* wait until not busy */
 
