@@ -12,7 +12,7 @@
 
 PCI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-pcie_driver.elf: pcie/pcie.o pcie/ecam.o pcie/bus_scan.o pcie/debug.o
+pcie_driver.elf: pcie/pcie.o pcie/ecam.o pcie/bus_scan.o pcie/api.o pcie/debug.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 pcie/%.o: ${PCI_DIR}/%.c ${CHECK_FLAGS_BOARD_MD5} |pcie $(SDDF_LIBC_INCLUDE)

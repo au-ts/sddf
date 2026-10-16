@@ -28,16 +28,18 @@ typedef struct {
     uint16_t instance;       /* nth match in scan order, or SDDF_PCIE_DEVICE_INSTANCE_ANY */
     uint16_t vendor, device;
     uint8_t function;
-    uint32_t class_code;     /* class:subclass:prog-if */
+    uint32_t class_code;     /* 0x00:class:subclass:prog-if */
     uint8_t bus_master;      /* can DMA? If yes and x86 then the IOMMU needs to be set up,
                               * Microkit >= 2.3.0 turns on the Intel VT-d IOMMU by default. */
 } pcie_device_spec_t;
 
 typedef struct {
     uint8_t id;
+    uint64_t cspace_slot;
     uint64_t vspace_slot;
     uint8_t vspace_is_x86_ept;
-    uint64_t ntfn_slot;
+
+    uint8_t num_specs;
     pcie_device_spec_t specs[SDDF_PCIE_MAX_DEVICE_SPECS_PER_CLIENT];
 } pcie_connection_resource_t;
 

@@ -101,7 +101,7 @@ static bool mem_bar_in_valid_aperature(uint64_t paddr, uint64_t size_bytes, bus_
     return false;
 }
 
-static void pcie_endpoint_bar_scan(pci_drv_state_t *driver_state, volatile pci_conf_space_endpoint_t *endpoint_cs,
+static void pcie_endpoint_bar_scan(pcie_drv_state_t *driver_state, volatile pci_conf_space_endpoint_t *endpoint_cs,
                                    bus_scan_state_t *scan_state)
 {
     for (int i = 0; i < PCI_TYPE_0_NUM_BARS; i++) {
@@ -172,7 +172,7 @@ static void pcie_endpoint_bar_scan(pci_drv_state_t *driver_state, volatile pci_c
     }
 }
 
-static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *hb,
+static bool handle_pcie_endpoint(pcie_drv_state_t *driver_state, host_bridge_t *hb,
                                  volatile pci_conf_space_endpoint_t *endpoint_cs, uint8_t bus, uint8_t dev,
                                  uint8_t func, bus_scan_state_t scan_state)
 {
@@ -192,10 +192,10 @@ static bool handle_pcie_endpoint(pci_drv_state_t *driver_state, host_bridge_t *h
     return true;
 }
 
-static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
+static bool bus_scan_recursive(pcie_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
                                bus_scan_state_t scan_state);
 
-static bool handle_pcie_bridge(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam,
+static bool handle_pcie_bridge(pcie_drv_state_t *driver_state, host_bridge_t *hb, void *ecam,
                                volatile pci_conf_space_bridge_t *bridge_cs, uint8_t bus, uint8_t dev, uint8_t func,
                                bus_scan_state_t scan_state)
 {
@@ -269,7 +269,7 @@ static bool handle_pcie_bridge(pci_drv_state_t *driver_state, host_bridge_t *hb,
     return true;
 }
 
-static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
+static bool bus_scan_recursive(pcie_drv_state_t *driver_state, host_bridge_t *hb, void *ecam, uint8_t bus,
                                bus_scan_state_t scan_state)
 {
     for (uint8_t dev = 0; dev < BIT(PCI_DEV_BITS); dev++) {
@@ -312,7 +312,7 @@ static bool bus_scan_recursive(pci_drv_state_t *driver_state, host_bridge_t *hb,
     return true;
 }
 
-bool host_bridges_scan(pci_drv_state_t *driver_state)
+bool host_bridges_scan(pcie_drv_state_t *driver_state)
 {
     for (size_t hb = 0; hb < driver_state->handover->num_host_bridges; hb++) {
         host_bridge_t *hb_desc = &driver_state->handover->host_bridges[hb];

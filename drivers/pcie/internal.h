@@ -6,7 +6,26 @@
 
 #pragma once
 
+#include <sddf/pcie/protocol.h>
+#include <sddf/pcie/config.h>
 #include <sddf/util/util.h>
+
+/* ============ Debugging ============ */
+
+#define CONFIG_DEBUG_DRIVER
+
+#if defined(CONFIG_DEBUG_DRIVER)
+#define DEBUG_DRIVER(fmt, ...) \
+    sddf_dprintf("PCI DRIVER %s:%d|INFO: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define DEBUG_DRIVER(fmt, ...) do {} while (0)
+#endif
+
+#define DEBUG_DRIVER_ERR(fmt, ...) \
+    sddf_dprintf("PCI DRIVER %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+const char *pci_class_and_subclass_to_string(uint8_t class, uint8_t subclass);
+void dump_acpi_info(acpi_handover_t *post_acpi_handover);
 
 /* ============ Config space types ============ */
 
@@ -102,33 +121,26 @@ typedef struct {
 
 _Static_assert(sizeof(pci_conf_space_bridge_t) == 0x1000, "PCIe config space must be 4 KiB");
 
-/* ============ Debugging ============ */
+/* ============ Internal types and helpers ============ */
 
-#define CONFIG_DEBUG_DRIVER
+/* How many functions of every devices of every buses of every segments we can keep track of.
+ * We need to keep track of all of them, since the BAR allocator need to consider all functions. */
+#define MAX_NUM_PCI_FUNCTIONS 256
 
-#if defined(CONFIG_DEBUG_DRIVER)
-#define DEBUG_DRIVER(fmt, ...) \
-    sddf_dprintf("PCI DRIVER %s:%d|INFO: " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#else
-#define DEBUG_DRIVER(fmt, ...) do {} while (0)
-#endif
+// typedef struct {
 
-#define DEBUG_DRIVER_ERR(fmt, ...) \
-    sddf_dprintf("PCI DRIVER %s:%d|ERROR: " fmt, __func__, __LINE__, ##__VA_ARGS__)
-
-const char *pci_class_and_subclass_to_string(uint8_t class, uint8_t subclass);
-void dump_acpi_info(acpi_handover_t *post_acpi_handover);
-
-/* ============ Types and helpers ============ */
+// } pcie_function;
 
 typedef struct {
     bool initialised;
     acpi_handover_t *handover;
+    pcie_driver_config_t *config;
 
     uint64_t vaddr_watermark;
 
     void *ecams_vaddr[ACPI_MAX_NUM_MCFG_ENTRIES];
-} pci_drv_state_t;
+
+} pcie_drv_state_t;
 
 #define CPTR_POST_ACPI_CNODE  (microkit_cspace_root_slot_to_cptr(1))
 #define CPTR_SELF_VSPACE    (microkit_cspace_root_slot_to_cptr(2))
@@ -146,10 +158,10 @@ typedef struct {
 /* ============ ECAMs management ============ */
 
 /* Map all ECAMs described by the firmware MCFG. */
-bool map_ecams(pci_drv_state_t *driver_state);
+bool map_ecams(pcie_drv_state_t *driver_state);
 
 /* These functions have no side effects */
-bool bus_and_segment_to_ecam_idx(pci_drv_state_t *driver_state, uint16_t segment, uint8_t bus, size_t *idx);
+bool bus_and_segment_to_ecam_idx(pcie_drv_state_t *driver_state, uint16_t segment, uint8_t bus, size_t *idx);
 pci_conf_space_common_hdr_t *pci_geo_addr_to_conf_space(void *ecam, uint8_t bus, uint8_t dev, uint8_t func);
 
 /* ============ Bus management ============ */
@@ -158,4 +170,20 @@ pci_conf_space_common_hdr_t *pci_geo_addr_to_conf_space(void *ecam, uint8_t bus,
  * Then, for each said device, work out their:
  * 1. Global System Interrupt (GSI) number
  * 2. Base Address Registers (BARs) paddr and sizes. Assign them if firmware had not assign them. */
-bool host_bridges_scan(pci_drv_state_t *driver_state);
+bool host_bridges_scan(pcie_drv_state_t *driver_state);
+
+/* ============ Handle clients PPCs ============ */
+
+sddf_pcie_status_t pcie_claim_device(unsigned int channel, uint8_t spec_idx, sddf_pcie_handle_t *handle);
+sddf_pcie_status_t pcie_read_config_space_8(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
+                                            uint8_t *value);
+sddf_pcie_status_t pcie_read_config_space_16(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
+                                             uint16_t *value);
+sddf_pcie_status_t pcie_read_config_space_32(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
+                                             uint32_t *value);
+sddf_pcie_status_t pcie_get_mem_bar(unsigned int channel, sddf_pcie_handle_t handle, uint8_t bar_index,
+                                    uint64_t *bar_size, bool *is_64b, bool *prefetchable);
+sddf_pcie_status_t pcie_map_mem_bar(unsigned int channel, sddf_pcie_handle_t handle, uint8_t bar_index,
+                                    uint64_t map_addr, sddf_pcie_mem_attr_t attributes, bool read_write);
+sddf_pcie_status_t pcie_map_intx(unsigned int channel, sddf_pcie_handle_t handle, uint64_t ch_id);
+sddf_pcie_status_t pcie_ack_intx(unsigned int channel, sddf_pcie_handle_t handle);

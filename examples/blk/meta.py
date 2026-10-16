@@ -125,16 +125,16 @@ def generate(
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
     acpi_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=acpi_driver, cnode=None, dest_cspace_slot=2))
 
-    pci_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=210)
-    pci_driver.add_map(Map(post_acpi_handover_mr, 0x2000000, "rw", setvar_vaddr="post_acpi_handover"))
-    pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
-    pci_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=pci_driver, cnode=None, dest_cspace_slot=2))
+    pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=210)
+    pcie_driver.add_map(Map(post_acpi_handover_mr, 0x2000000, "rw", setvar_vaddr="post_acpi_handover"))
+    pcie_driver.add_cap_map(CapMap(type=CapMap.CapType.Cnode, pd=None, cnode=post_capdl_cnode, dest_cspace_slot=1))
+    pcie_driver.add_cap_map(CapMap(type=CapMap.CapType.Vspace, pd=pcie_driver, cnode=None, dest_cspace_slot=2))
 
-    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0, pp_b=True))
+    sdf.add_channel(Channel(acpi_driver, pcie_driver, a_id=0, b_id=0, pp_b=True))
 
-    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 2))
-    # pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 3))
-    # sdf.add_channel(Channel(pci_driver, blk_driver, a_id=1, b_id=10))
+    sdf.add_channel(Channel(pcie_driver, blk_driver, a_id=1, b_id=10))
+    pcie_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, pd=blk_driver, cnode=None, dest_cspace_slot=3))
+    pcie_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pd=blk_driver, cnode=None, dest_cspace_slot=4))
 
     if nvme:
         # Queue descriptors accessed via DMA so we map these regions as uncached.
@@ -278,7 +278,7 @@ def generate(
 
     serial_system.add_client(client)
 
-    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver, pci_driver]
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, acpi_driver, pcie_driver]
     if need_timer:
         pds += [timer_driver]
     for pd in pds:

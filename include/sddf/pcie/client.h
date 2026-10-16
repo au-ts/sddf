@@ -28,7 +28,7 @@ static inline sddf_pcie_status_t sddf_pcie_claim_device(unsigned int channel, ui
                                                         sddf_pcie_handle_t *handle)
 {
     sddf_set_mr(0, spec_idx);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_CLAIM_DEVICE, 0, 0, 1));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_CLAIM_DEVICE, 0, 0, SDDF_PCIE_CLAIM_DEVICE_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     if (status == SDDF_PCIE_STATUS_OK) {
@@ -54,7 +54,7 @@ static inline sddf_pcie_status_t sddf_pcie_read_config_space_8(unsigned int chan
 {
     sddf_set_mr(0, handle);
     sddf_set_mr(1, offset);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_8, 0, 0, 2));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_8, 0, 0, SDDF_PCIE_READ_CS_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     if (status == SDDF_PCIE_STATUS_OK) {
@@ -68,7 +68,7 @@ static inline sddf_pcie_status_t sddf_pcie_read_config_space_16(unsigned int cha
 {
     sddf_set_mr(0, handle);
     sddf_set_mr(1, offset);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_16, 0, 0, 2));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_16, 0, 0, SDDF_PCIE_READ_CS_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     if (status == SDDF_PCIE_STATUS_OK) {
@@ -82,7 +82,7 @@ static inline sddf_pcie_status_t sddf_pcie_read_config_space_32(unsigned int cha
 {
     sddf_set_mr(0, handle);
     sddf_set_mr(1, offset);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_32, 0, 0, 2));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_READ_CS_32, 0, 0, SDDF_PCIE_READ_CS_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     if (status == SDDF_PCIE_STATUS_OK) {
@@ -92,7 +92,7 @@ static inline sddf_pcie_status_t sddf_pcie_read_config_space_32(unsigned int cha
 }
 
 /**
- * Get the details of the device's `bar_index`th BAR.
+ * Get the details of the device's `bar_index`th memory BAR.
  * A 64-bit BAR occupies two BAR slots and is referred to by the lower index.
  * @param channel ID of the PCIe driver.
  * @param handle handle of the claimed device.
@@ -105,12 +105,13 @@ static inline sddf_pcie_status_t sddf_pcie_read_config_space_32(unsigned int cha
  *         SDDF_PCIE_STATUS_NOT_FOUND if the device does not implement the BAR, or the high index of a 64-bit BAR was given,
  *         SDDF_PCIE_STATUS_INVALID_ARGUMENT if the bar index is out of bound.
  */
-static inline sddf_pcie_status_t sddf_pcie_get_bar(unsigned int channel, sddf_pcie_handle_t handle, uint8_t bar_index,
-                                                   uint64_t *bar_size, bool *is_64b, bool *prefetchable)
+static inline sddf_pcie_status_t sddf_pcie_get_mem_bar(unsigned int channel, sddf_pcie_handle_t handle,
+                                                       uint8_t bar_index, uint64_t *bar_size, bool *is_64b,
+                                                       bool *prefetchable)
 {
     sddf_set_mr(0, handle);
     sddf_set_mr(1, bar_index);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_GET_BAR, 0, 0, 2));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_GET_MEM_BAR, 0, 0, SDDF_PCIE_GET_MEM_BAR_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     if (status == SDDF_PCIE_STATUS_OK) {
@@ -120,11 +121,6 @@ static inline sddf_pcie_status_t sddf_pcie_get_bar(unsigned int channel, sddf_pc
     }
     return status;
 }
-
-typedef enum {
-    SDDF_PCIE_MEM_CACHE_DISABLED = 0,
-    SDDF_PCIE_MEM_CACHE_ENABLED = 1,
-} sddf_pcie_mem_attr_t;
 
 /**
  * Map the device's `bar_index`th memory BAR into the client's address space.
@@ -151,7 +147,7 @@ static inline sddf_pcie_status_t sddf_pcie_map_mem_bar(unsigned int channel, sdd
     sddf_set_mr(
         4,
         read_write); // @billn > 4 words = no fastpath, issue? can do bit packing? investigate later not a problem now
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_MAP_BAR, 0, 0, 5));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_MAP_MEM_BAR, 0, 0, SDDF_PCIE_MAP_MEM_BAR_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     return status;
@@ -160,22 +156,22 @@ static inline sddf_pcie_status_t sddf_pcie_map_mem_bar(unsigned int channel, sdd
 /**
  * Route the device's legacy INTx interrupt to the client's channel `cid`.
  * INTx lines are shared between devices, so the interrupt goes to the PCIe driver first,
- * which then notifies the clients whose devices raised it. `cid` is therefore a normal
+ * which then notifies the clients whose devices raised it. `ch_id` is therefore a normal
  * notification channel: do not call microkit_irq_ack() or sddf_irq_ack() on it,
  * call sddf_pcie_ack_intx() instead once the cause of the interrupt has been cleared in the device.
  * This is a lot of context switching and slow, so use MSI/MSI-X instead when the device supports it.
  * @param channel ID of the PCIe driver.
  * @param handle handle of the claimed device.
- * @param cid ID of the channel the client receives the interrupt on.
+ * @param ch_id ID of the channel the client receives the interrupt on.
  * @return SDDF_PCIE_STATUS_OK on success,
  *         SDDF_PCIE_STATUS_INVALID_HANDLE if the handle is invalid,
  *         SDDF_PCIE_STATUS_NOT_FOUND if the device does not use INTx.
  */
-static inline sddf_pcie_status_t sddf_pcie_map_intx(unsigned int channel, sddf_pcie_handle_t handle, uint64_t cid)
+static inline sddf_pcie_status_t sddf_pcie_map_intx(unsigned int channel, sddf_pcie_handle_t handle, uint64_t ch_id)
 {
     sddf_set_mr(0, handle);
-    sddf_set_mr(1, cid);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_MAP_INTX, 0, 0, 2));
+    sddf_set_mr(1, ch_id);
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_MAP_INTX, 0, 0, SDDF_PCIE_MAP_INTX_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     return status;
@@ -193,7 +189,7 @@ static inline sddf_pcie_status_t sddf_pcie_map_intx(unsigned int channel, sddf_p
 static inline sddf_pcie_status_t sddf_pcie_ack_intx(unsigned int channel, sddf_pcie_handle_t handle)
 {
     sddf_set_mr(0, handle);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_ACK_INTX, 0, 0, 1));
+    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_PCIE_ACK_INTX, 0, 0, SDDF_PCIE_ACK_INTX_NUM_WORDS));
 
     sddf_pcie_status_t status = sddf_get_mr(0);
     return status;

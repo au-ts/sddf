@@ -11,7 +11,7 @@
 
 #include "internal.h"
 
-bool map_ecams(pci_drv_state_t *driver_state)
+bool map_ecams(pcie_drv_state_t *driver_state)
 {
     assert(driver_state->handover->num_mcfg_entries <= ACPI_MAX_NUM_MCFG_ENTRIES);
     for (size_t i = 0; i < driver_state->handover->num_mcfg_entries; i++) {
@@ -45,7 +45,7 @@ bool map_ecams(pci_drv_state_t *driver_state)
     return true;
 }
 
-bool bus_and_segment_to_ecam_idx(pci_drv_state_t *driver_state, uint16_t segment, uint8_t bus, size_t *idx)
+bool bus_and_segment_to_ecam_idx(pcie_drv_state_t *driver_state, uint16_t segment, uint8_t bus, size_t *idx)
 {
     for (size_t i = 0; i < driver_state->handover->num_mcfg_entries; i++) {
         mcfg_entry_t *mcfg_entry = &driver_state->handover->mcfg_entries[i];
