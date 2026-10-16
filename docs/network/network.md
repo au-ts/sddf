@@ -708,7 +708,7 @@ $(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data ne
 
 $(OBJCOPY) --update-section .net_client_config=net_client_client0.data echo0.elf
 $(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
-$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
+$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_client0.data echo0.elf
 ```
 
 #### Include paths
