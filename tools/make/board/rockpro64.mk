@@ -8,7 +8,7 @@
 # WARNING: not fully working yet
 PLATFORM := rk3399
 
-I2C_DRIV_DIR := ${PLATFORM}
+# I2C_DRIV_DIR := ${PLATFORM}
 NET_DRIV_DIR := meson
 ETH_DRIV := eth_driver_meson.elf
 TIMER_DRIV_DIR := rk3399

@@ -8,7 +8,7 @@
 PLATFORM := imx
 
 BLK_DRIV_DIR := mmc/${PLATFORM}
-I2C_DRIV_DIR := ${PLATFORM}
+# I2C_DRIV_DIR := ${PLATFORM}
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_dwmac-5.10a.elf
 TIMER_DRIV_DIR := ${PLATFORM}

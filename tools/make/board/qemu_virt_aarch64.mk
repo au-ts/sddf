@@ -14,6 +14,10 @@ ETH_DRIV_1 := ${ETH_DRIV}
 TIMER_DRIV_DIR ?= ${PLATFORM}
 UART_DRIV_DIR ?= ${PLATFORM}
 
+# Another way to do this would be:
+# include ${SDDF}/drivers/blk/virtio/mmio/blk_driver.mk
+# And then it is a board file that is responsible for including the definitions
+
 CPU := cortex-a53
 QEMU := qemu-system-aarch64
 QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
