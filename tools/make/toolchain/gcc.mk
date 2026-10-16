@@ -44,3 +44,7 @@ CFLAGS += \
 	-Wall \
 	${CFLAGS_ARCH} \
 	-I ${BOARD_DIR}/include
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mno-outline-atomics
+endif
