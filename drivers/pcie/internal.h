@@ -7,7 +7,6 @@
 #pragma once
 
 #include <sddf/acpi/handover.h>
-#include <sddf/pcie/protocol.h>
 #include <sddf/pcie/config.h>
 #include <sddf/util/util.h>
 
@@ -219,19 +218,3 @@ bool host_bridges_scan(pcie_drv_state_t *driver_state);
 /* For each PCIe function recorded by `host_bridges_scan`, attempt to match it against a spec in
  * in the clients' specs table given by the metaprogram. */
 bool match_specs(pcie_drv_state_t *driver_state);
-
-/* ============ Handle clients PPCs ============ */
-
-sddf_pcie_status_t pcie_claim_device(unsigned int channel, uint8_t spec_idx, sddf_pcie_handle_t *handle);
-sddf_pcie_status_t pcie_read_config_space_8(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
-                                            uint8_t *value);
-sddf_pcie_status_t pcie_read_config_space_16(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
-                                             uint16_t *value);
-sddf_pcie_status_t pcie_read_config_space_32(unsigned int channel, sddf_pcie_handle_t handle, uint16_t offset,
-                                             uint32_t *value);
-sddf_pcie_status_t pcie_get_mem_bar(unsigned int channel, sddf_pcie_handle_t handle, uint8_t bar_index,
-                                    uint64_t *bar_size, bool *is_64b, bool *prefetchable);
-sddf_pcie_status_t pcie_map_mem_bar(unsigned int channel, sddf_pcie_handle_t handle, uint8_t bar_index,
-                                    uint64_t map_addr, sddf_pcie_mem_attr_t attributes, bool read_write);
-sddf_pcie_status_t pcie_map_intx(unsigned int channel, sddf_pcie_handle_t handle, uint64_t ch_id);
-sddf_pcie_status_t pcie_ack_intx(unsigned int channel, sddf_pcie_handle_t handle);

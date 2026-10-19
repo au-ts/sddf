@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/acpi/handover.h>
-#include <sddf/pcie/protocol.h>
 #include <sddf/pcie/config.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/vspace.h>
@@ -849,120 +848,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     if (!drv_state.initialised) {
         /* Impossible, init always return before protected can be called by the Microkit event loop. */
         assert(false);
-        return microkit_msginfo_new(0, 0);
     }
 
-    sddf_pcie_status_t status = SDDF_PCIE_STATUS_INVALID_ARGUMENT;
-    uint16_t num_ret_words = 1;
-    uint64_t label = microkit_msginfo_get_label(msginfo);
-    uint64_t count = microkit_msginfo_get_count(msginfo);
-    sddf_pcie_handle_t handle;
-
-    switch (label) {
-    case SDDF_PCIE_CLAIM_DEVICE: {
-        if (count != SDDF_PCIE_CLAIM_DEVICE_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t spec_idx = microkit_mr_get(0);
-
-        status = pcie_claim_device(ch, spec_idx, &handle);
-        if (status == SDDF_PCIE_STATUS_OK) {
-            microkit_mr_set(1, handle);
-            num_ret_words += 1;
-        }
-        break;
-    }
-    case SDDF_PCIE_READ_CS_8:
-    case SDDF_PCIE_READ_CS_16:
-    case SDDF_PCIE_READ_CS_32: {
-        if (count != SDDF_PCIE_READ_CS_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t handle = microkit_mr_get(0);
-        uint64_t offset = microkit_mr_get(1);
-
-        uint32_t value = 0;
-        if (label == SDDF_PCIE_READ_CS_8) {
-            uint8_t v = 0;
-            status = pcie_read_config_space_8(ch, handle, offset, &v);
-            value = v;
-        } else if (label == SDDF_PCIE_READ_CS_16) {
-            uint16_t v = 0;
-            status = pcie_read_config_space_16(ch, handle, offset, &v);
-            value = v;
-        } else {
-            status = pcie_read_config_space_32(ch, handle, offset, &value);
-        }
-
-        if (status == SDDF_PCIE_STATUS_OK) {
-            microkit_mr_set(1, value);
-            num_ret_words += 1;
-        }
-        break;
-    }
-    case SDDF_PCIE_GET_MEM_BAR: {
-        if (count != SDDF_PCIE_GET_MEM_BAR_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t handle = microkit_mr_get(0);
-        uint64_t bar_index = microkit_mr_get(1);
-
-        uint64_t bar_size = 0;
-        bool is_64b = false;
-        bool prefetchable = false;
-        status = pcie_get_mem_bar(ch, handle, bar_index, &bar_size, &is_64b, &prefetchable);
-        if (status == SDDF_PCIE_STATUS_OK) {
-            microkit_mr_set(1, bar_size);
-            microkit_mr_set(2, is_64b);
-            microkit_mr_set(3, prefetchable);
-            num_ret_words += 3;
-        }
-        break;
-    }
-    case SDDF_PCIE_MAP_MEM_BAR: {
-        if (count != SDDF_PCIE_MAP_MEM_BAR_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t handle = microkit_mr_get(0);
-        uint64_t bar_index = microkit_mr_get(1);
-        uint64_t map_addr = microkit_mr_get(2);
-        uint64_t attributes = microkit_mr_get(3);
-        uint64_t read_write = microkit_mr_get(4);
-
-        status = pcie_map_mem_bar(ch, handle, bar_index, map_addr, attributes, read_write);
-        break;
-    }
-    case SDDF_PCIE_MAP_INTX: {
-        if (count != SDDF_PCIE_MAP_INTX_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t handle = microkit_mr_get(0);
-        uint64_t ch_id = microkit_mr_get(1);
-
-        status = pcie_map_intx(ch, handle, ch_id);
-        break;
-    }
-    case SDDF_PCIE_ACK_INTX: {
-        if (count != SDDF_PCIE_ACK_INTX_NUM_WORDS) {
-            status = SDDF_PCIE_STATUS_TRUNCATED;
-            break;
-        }
-        uint64_t handle = microkit_mr_get(0);
-
-        status = pcie_ack_intx(ch, handle);
-        break;
-    }
-    default:
-        DEBUG_DRIVER_ERR("Unknown request %lu from channel %u\n", label, ch);
-        status = SDDF_PCIE_STATUS_INVALID_ARGUMENT;
-        break;
-    }
-
-    microkit_mr_set(0, status);
-    return microkit_msginfo_new(0, num_ret_words);
+    return microkit_msginfo_new(0, 0);
 }

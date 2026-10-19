@@ -13,7 +13,6 @@
 #include <sddf/resources/device.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
-#include <sddf/pcie/client.h>
 
 #include "nvme.h"
 #include "nvme_queue.h"
