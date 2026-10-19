@@ -391,7 +391,7 @@ void dump_acpi_info(acpi_handover_t *post_acpi_handover)
                 for (uint8_t d = 0; d < prt->bridge_path.depth; d++) {
                     uint8_t dev = prt->bridge_path.devfn[d] >> 3;
                     uint8_t fn = prt->bridge_path.devfn[d] & 0x7;
-                    DEBUG_DRIVER("\t\t\t\t\tdev: %hu, fn: %hu\n", dev, fn);
+                    DEBUG_DRIVER("\t\t\t\t\tdev: 0x%x, fn: %hu\n", dev, fn);
                 }
             }
         }

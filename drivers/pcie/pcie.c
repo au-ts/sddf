@@ -815,6 +815,7 @@ void init(void)
     }
     drv_state.vaddr_watermark = BIT(32);
     drv_state.handover = post_acpi_handover;
+    drv_state.config = &config;
 
     DEBUG_DRIVER("Blocking on ACPI driver handover\n");
     microkit_msginfo msginfo = microkit_msginfo_new(0, 0);
@@ -833,6 +834,8 @@ void init(void)
     if (!map_ecams(&drv_state))
         return;
     if (!host_bridges_scan(&drv_state))
+        return;
+    if (!match_specs(&drv_state))
         return;
 
     drv_state.initialised = true;

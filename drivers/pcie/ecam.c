@@ -5,8 +5,6 @@
  */
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/acpi/handover.h>
-#include <sddf/util/printf.h>
 #include <sddf/util/vspace.h>
 
 #include "internal.h"

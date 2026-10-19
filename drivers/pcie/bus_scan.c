@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/acpi/handover.h>
-#include <sddf/util/printf.h>
-#include <sddf/util/vspace.h>
 
 #include "internal.h"
 
@@ -211,6 +209,7 @@ static bool handle_pcie_endpoint(pcie_drv_state_t *driver_state, host_bridge_t *
 
     pcie_endpoint_bar_scan(driver_state, endpoint_cs, pcie_func, &scan_state);
 
+    driver_state->num_funcs += 1;
     return true;
 }
 

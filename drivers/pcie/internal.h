@@ -9,6 +9,7 @@
 #include <sddf/acpi/handover.h>
 #include <sddf/pcie/config.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 
 /* ============ Debugging ============ */
 
@@ -157,7 +158,7 @@ typedef struct {
 } pcie_function_t;
 
 #define FUNCTION_TABLE_INDEX_NONE ((int64_t)-1)
-typedef int32_t pcie_func_table_idx_t;
+typedef int64_t pcie_func_table_idx_t;
 
 typedef struct {
     uint32_t gsi;
@@ -212,9 +213,15 @@ pci_conf_space_common_hdr_t *pci_geo_addr_to_conf_space(void *ecam, uint8_t bus,
  * Then, for each function of said device, work out their:
  * 1. Global System Interrupt (GSI) number
  * 2. Base Address Registers (BARs) paddr and sizes. (TODO) Assign them if firmware had not assign them.
- * 3. Fill out funcs_table. */
+ * 3. Fill out funcs_table.
+ *
+ * Can return false if the firmware left things in a buggy state or an unimplemented code path is entered. */
 bool host_bridges_scan(pcie_drv_state_t *driver_state);
 
 /* For each PCIe function recorded by `host_bridges_scan`, attempt to match it against a spec in
- * in the clients' specs table given by the metaprogram. */
+ * in the clients' specs table given by the metaprogram. Returns false if we can't match a spec
+ * to a PCIe function for all specs. */
 bool match_specs(pcie_drv_state_t *driver_state);
+
+/* For all specs, map all the client requested resources such as BARs and interrupt to the client. */
+bool bind_functions_to_clients(pcie_drv_state_t *driver_state);
