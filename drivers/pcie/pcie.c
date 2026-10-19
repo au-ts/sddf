@@ -3,8 +3,6 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
-// #include "pci.h"
-
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/vspace.h>
@@ -33,6 +31,12 @@ void init(void)
             .vendor = SDDF_PCIE_DEVICE_SPEC_VENDOR_ID_ANY,
             .function = SDDF_PCIE_DEVICE_SPEC_FUNCTION_ID_ANY,
             .instance = SDDF_PCIE_DEVICE_INSTANCE_ANY,
+            .bars[0] = (pcie_mem_bar_spec_t) {
+                .entry_valid = 1,
+                .map_addr = BIT(32),
+                .min_size = 0x4000,
+                .max_size = 0x4000,
+            }
         },
     };
 
@@ -41,6 +45,10 @@ void init(void)
         for (size_t s = 0; s < SDDF_PCIE_MAX_DEVICE_SPECS_PER_CLIENT; s++) {
             drv_state.spec_to_func[c][s] = FUNCTION_TABLE_INDEX_NONE;
         }
+    }
+    for (size_t f = 0; f < MAX_NUM_PCIE_FUNCTIONS; f++) {
+        drv_state.funcs_table[f].owner = PCIE_FUNC_OWNER_NONE;
+        drv_state.funcs_table[f].gsi = PCIE_FUNC_GSI_NONE;
     }
     drv_state.vaddr_watermark = BIT(32);
     drv_state.handover = post_acpi_handover;
@@ -64,7 +72,9 @@ void init(void)
         return;
     if (!host_bridges_scan(&drv_state))
         return;
-    if (!match_specs(&drv_state))
+    if (!match_specs_to_functions(&drv_state))
+        return;
+    if (!bind_functions_to_clients(&drv_state))
         return;
 
     drv_state.initialised = true;

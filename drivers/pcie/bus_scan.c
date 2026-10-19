@@ -162,10 +162,10 @@ static void pcie_endpoint_bar_scan(pcie_drv_state_t *driver_state, volatile pci_
             DEBUG_DRIVER_ERR("\t\t\tBAR not allocated by firmware\n");
         }
 
-        pcie_func->bars[pcie_func->num_bars].bar_idx = i;
-        pcie_func->bars[pcie_func->num_bars].paddr = paddr;
-        pcie_func->bars[pcie_func->num_bars].size_bytes = bar_size_bytes;
-        pcie_func->bars[pcie_func->num_bars].prefetchable = prefetchable;
+        pcie_func->bars[i].valid = true;
+        pcie_func->bars[i].paddr = paddr;
+        pcie_func->bars[i].size_bytes = bar_size_bytes;
+        pcie_func->bars[i].prefetchable = prefetchable;
 
     read_bar_complete:
         endpoint_cs->hdr.command = orig_cmd;
@@ -186,7 +186,7 @@ static bool handle_pcie_endpoint(pcie_drv_state_t *driver_state, host_bridge_t *
 
     pcie_function_t *pcie_func = &driver_state->funcs_table[driver_state->num_funcs];
     memset(pcie_func, 0, sizeof(pcie_function_t));
-    pcie_func->owner = PCIE_FUNC_OWNER_UNCLAIMED;
+    pcie_func->owner = PCIE_FUNC_OWNER_NONE;
 
     pcie_func->bus = bus;
     pcie_func->dev = dev;

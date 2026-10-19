@@ -54,9 +54,9 @@ static bool spec_matches(pcie_device_spec_t *spec, pcie_function_t *candidate)
     return true;
 }
 
-bool match_specs(pcie_drv_state_t *driver_state)
+bool match_specs_to_functions(pcie_drv_state_t *driver_state)
 {
-    DEBUG_DRIVER("Starting PCIe client specs matcher\n");
+    DEBUG_DRIVER("Starting PCIe client spec to function matcher\n");
     size_t successful_matches = 0, required_matches = 0;
 
     for (size_t c = 0; c < driver_state->config->num_clients; c++) {
@@ -83,28 +83,65 @@ bool match_specs(pcie_drv_state_t *driver_state)
                 }
 
                 num_matches++;
-                break;
             }
 
+            pcie_function_t *matched_func = &driver_state->funcs_table[bound];
+
             if (bound == FUNCTION_TABLE_INDEX_NONE) {
-                DEBUG_DRIVER("\tspec is not a match to any function\n");
+                DEBUG_DRIVER_ERR("\tclient %lu spec %lu: not a match to any function\n", c, s);
                 continue;
             }
             if (client_spec->instance == SDDF_PCIE_DEVICE_INSTANCE_ANY && num_matches > 1) {
-                DEBUG_DRIVER("\tambiguous spec, 2 or more specs matched 1 PCIe function\n");
+                DEBUG_DRIVER_ERR("\tclient %lu spec %lu: matched %zu functions, ambiguous spec!\n", c, s, num_matches);
                 continue;
             }
-            if (driver_state->spec_to_func[c][s] != FUNCTION_TABLE_INDEX_NONE) {
-                DEBUG_DRIVER_ERR("spec conflict\n");
-                return false;
+            if (matched_func->owner != PCIE_FUNC_OWNER_NONE) {
+                DEBUG_DRIVER_ERR("\tclient %lu spec %lu: matched %02x:%02x.%x, but already bound to client %d\n", c, s,
+                                 matched_func->bus, matched_func->dev, matched_func->func, matched_func->owner);
+                continue;
             }
 
-            DEBUG_DRIVER("\tmatched to %02x:%02x.%x\n", driver_state->funcs_table[bound].bus,
-                         driver_state->funcs_table[bound].dev, driver_state->funcs_table[bound].func);
-            successful_matches += 1;
-            driver_state->spec_to_func[c][s] = bound;
+            bool bars_spec_ok = true;
+            assert(SDDF_PCIE_DEVICE_MAX_NUM_BARS == PCI_TYPE_0_NUM_BARS);
+            for (int b = 0; b < PCI_TYPE_0_NUM_BARS; b++) {
+                if (!client_spec->bars[b].entry_valid) {
+                    continue;
+                }
 
-            /* todo other things */
+                if (!matched_func->bars[b].valid) {
+                    DEBUG_DRIVER_ERR(
+                        "\tnot a match to %02x:%02x.%x, BAR %d claimed but spec but not implemented by device\n",
+                        matched_func->bus, matched_func->dev, matched_func->func, b);
+                    bars_spec_ok = false;
+                    break;
+                }
+
+                if (matched_func->bars[b].size_bytes > client_spec->bars[b].max_size) {
+                    DEBUG_DRIVER_ERR("\tnot a match to %02x:%02x.%x, BAR %d actual 0x%lx bytes greater than max 0x%lx "
+                                     "bytes in spec\n",
+                                     matched_func->bus, matched_func->dev, matched_func->func, b,
+                                     matched_func->bars[b].size_bytes, client_spec->bars[b].max_size);
+                    bars_spec_ok = false;
+                    break;
+                }
+
+                if (matched_func->bars[b].size_bytes < client_spec->bars[b].min_size) {
+                    DEBUG_DRIVER_ERR(
+                        "\tnot a match to %02x:%02x.%x, BAR %d actual 0x%lx bytes lower than min 0x%lx bytes in spec\n",
+                        matched_func->bus, matched_func->dev, matched_func->func, b, matched_func->bars[b].size_bytes,
+                        client_spec->bars[b].min_size);
+                    bars_spec_ok = false;
+                    break;
+                }
+            }
+
+            if (bars_spec_ok) {
+                DEBUG_DRIVER("\tmatched to %02x:%02x.%x\n", matched_func->bus, matched_func->dev, matched_func->func);
+                successful_matches += 1;
+
+                driver_state->spec_to_func[c][s] = bound;
+                matched_func->owner = c;
+            }
         }
     }
 

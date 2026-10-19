@@ -24,6 +24,18 @@ static char SDDF_PCIE_MAGIC[SDDF_PCIE_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x67 };
 #define SDDF_PCIE_DEVICE_SPEC_FUNCTION_ID_ANY 0xFF
 #define SDDF_PCIE_DEVICE_SPEC_CLASS_CODE_ANY 0xFFFFFFFF
 
+#define SDDF_PCIE_DEVICE_MAX_NUM_BARS 6
+
+typedef struct {
+    /* We need to record this because a 64-bit BAR take up 2 BARs in
+     * the config space, thus the `bars` table is sparse */
+    uint8_t entry_valid;
+
+    uint64_t map_addr;
+    uint64_t min_size;
+    uint64_t max_size;
+} pcie_mem_bar_spec_t;
+
 typedef struct {
     uint16_t instance;       /* nth match in scan order, or SDDF_PCIE_DEVICE_INSTANCE_ANY */
     uint16_t vendor, device;
@@ -31,6 +43,11 @@ typedef struct {
     uint32_t class_code;     /* 0x00:class:subclass:prog-if */
     uint8_t bus_master;      /* can DMA? If yes and x86 then the IOMMU needs to be set up,
                               * Microkit >= 2.3.0 turns on the Intel VT-d IOMMU by default. */
+
+    pcie_mem_bar_spec_t bars[SDDF_PCIE_DEVICE_MAX_NUM_BARS];
+
+    uint8_t map_intx;
+    uint32_t ch_id;
 } pcie_device_spec_t;
 
 typedef struct {

@@ -129,14 +129,16 @@ _Static_assert(sizeof(pci_conf_space_bridge_t) == 0x1000, "PCIe config space mus
 #define MAX_NUM_PCIE_FUNCTIONS 256
 
 typedef struct {
-    uint8_t bar_idx; /* We need to record this because a 64-bit BAR take up 2 BARs in the config space */
+    /* We need to record this because a 64-bit BAR take up 2 BARs in
+     * the config space, thus the `bars` table is sparse */
+    bool valid;
     uint64_t paddr;
     uint64_t size_bytes;
     uint8_t prefetchable;
 } pcie_bar_info_t;
 
 // #define PCIE_FUNC_INTX_LINE_NONE ((int16_t)-1)
-#define PCIE_FUNC_OWNER_UNCLAIMED ((int8_t)-1)
+#define PCIE_FUNC_OWNER_NONE ((int8_t)-1)
 #define PCIE_FUNC_GSI_NONE 0xFFFFFFFF
 
 typedef struct {
@@ -221,7 +223,7 @@ bool host_bridges_scan(pcie_drv_state_t *driver_state);
 /* For each PCIe function recorded by `host_bridges_scan`, attempt to match it against a spec in
  * in the clients' specs table given by the metaprogram. Returns false if we can't match a spec
  * to a PCIe function for all specs. */
-bool match_specs(pcie_drv_state_t *driver_state);
+bool match_specs_to_functions(pcie_drv_state_t *driver_state);
 
 /* For all specs, map all the client requested resources such as BARs and interrupt to the client. */
 bool bind_functions_to_clients(pcie_drv_state_t *driver_state);
