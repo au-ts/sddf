@@ -11,7 +11,6 @@
 #include <sddf/network/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
-#include <sddf/util/printf.h>
 
 #include "ethernet.h"
 
@@ -144,7 +143,7 @@ static void rx_return(void)
 
         net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
-            sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->des3);
+            LOG_DRIVER_ERR("RX descriptor returned with error status %x\n", d->des3);
             idx = rx.tail % rx.capacity;
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
@@ -264,7 +263,7 @@ static void handle_irq()
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_CH0_INTERRUPT_EN_FBEE) {
-                sddf_dprintf("Ethernet device fatal bus error\n");
+                LOG_DRIVER_ERR("Ethernet device fatal bus error\n");
             }
         }
         e = *DMA_REG(DMA_CH0_STATUS);
@@ -507,18 +506,10 @@ void init(void)
 #endif /* CONFIG_PLAT_RK3568 */
 
     // Check if the PHY device is up
-    uint32_t phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
-    if (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) {
-        sddf_dprintf("PHY device is up and running\n");
-    } else {
-        sddf_dprintf("PHY device is currently down\n");
-    }
-
-    if (phy_stat & BIT(16)) {
-        sddf_dprintf("PHY device is operating in full duplex mode\n");
-    } else {
-        sddf_dprintf("PHY device is operating in half duplex mode\n");
-    }
+    uint32_t UNUSED phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
+    LOG_DRIVER("%s: PHY device is %s, operating in %s duplex mode\n", sddf_get_pd_name(),
+               (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) ? "up and running" : "down",
+               (phy_stat & BIT(16)) ? "full" : "half");
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
@@ -539,6 +530,6 @@ void notified(sddf_channel ch)
     } else if (ch == config.virt_tx.id) {
         tx_provide();
     } else {
-        sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
+        LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
     }
 }

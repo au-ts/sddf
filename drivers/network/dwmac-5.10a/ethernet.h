@@ -4,6 +4,18 @@
  */
 #pragma once
 
+// #define DEBUG_DRIVER
+
+#ifdef DEBUG_DRIVER
+#define LOG_DRIVER(...) do{ sddf_dprintf("ETH DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#define UNUSED
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#define UNUSED __attribute__((unused))
+#endif
+
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("ETH DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 /* This register description is from the NXP i.MX8MP SoC TRM. */
 
 /* NOTE: This is a subset of the registers available. */
