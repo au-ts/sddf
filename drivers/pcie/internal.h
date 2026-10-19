@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <sddf/acpi/handover.h>
 #include <sddf/pcie/protocol.h>
 #include <sddf/pcie/config.h>
 #include <sddf/util/util.h>
@@ -123,13 +124,48 @@ _Static_assert(sizeof(pci_conf_space_bridge_t) == 0x1000, "PCIe config space mus
 
 /* ============ Internal types and helpers ============ */
 
-/* How many functions of every devices of every buses of every segments we can keep track of.
+/* How many functions of every devices of every buses of every segments the driver can keep track of.
  * We need to keep track of all of them, since the BAR allocator need to consider all functions. */
-#define MAX_NUM_PCI_FUNCTIONS 256
+#define MAX_NUM_PCIE_FUNCTIONS 256
 
-// typedef struct {
+typedef struct {
+    uint8_t bar_idx; /* We need to record this because a 64-bit BAR take up 2 BARs in the config space */
+    uint64_t paddr;
+    uint64_t size_bytes;
+    uint8_t prefetchable;
+} pcie_bar_info_t;
 
-// } pcie_function;
+// #define PCIE_FUNC_INTX_LINE_NONE ((int16_t)-1)
+#define PCIE_FUNC_OWNER_UNCLAIMED ((int8_t)-1)
+#define PCIE_FUNC_GSI_NONE 0xFFFFFFFF
+
+typedef struct {
+    uint8_t bus, dev, func;
+    pci_path_t path;
+    host_bridge_t *hb;
+    volatile pci_conf_space_endpoint_t *cs;
+
+    uint8_t num_bars;
+    pcie_bar_info_t bars[PCI_TYPE_0_NUM_BARS];
+
+    // uint8_t intx_pin;   /* 0 = none */
+    // int16_t intx_line;  /* index into intx_lines */
+    uint32_t gsi;
+
+    int8_t owner;       /* index into pcie_driver_config_t->clients */
+    // uint8_t intx_ch_id; /* owner's channel for INTx */
+    bool intx_masked;   /* we set Interrupt Disable, waiting for the owner's ack */
+} pcie_function_t;
+
+#define FUNCTION_TABLE_INDEX_NONE ((int64_t)-1)
+typedef int32_t pcie_func_table_idx_t;
+
+typedef struct {
+    uint32_t gsi;
+    microkit_channel ch;    /* our own channel the IRQ handler cap signals */
+} intx_line_t;
+
+#define MAX_NUM_INTX_LINES 16
 
 typedef struct {
     bool initialised;
@@ -140,6 +176,13 @@ typedef struct {
 
     void *ecams_vaddr[ACPI_MAX_NUM_MCFG_ENTRIES];
 
+    size_t num_funcs;
+    pcie_function_t funcs_table[MAX_NUM_PCIE_FUNCTIONS];
+
+    pcie_func_table_idx_t spec_to_func[SDDF_PCIE_MAX_CLIENTS][SDDF_PCIE_MAX_DEVICE_SPECS_PER_CLIENT];
+
+    size_t num_intx_lines;
+    intx_line_t intx_lines[MAX_NUM_INTX_LINES];
 } pcie_drv_state_t;
 
 #define CPTR_POST_ACPI_CNODE  (microkit_cspace_root_slot_to_cptr(1))
@@ -167,10 +210,15 @@ pci_conf_space_common_hdr_t *pci_geo_addr_to_conf_space(void *ecam, uint8_t bus,
 /* ============ Bus management ============ */
 
 /* For each host bridge described by the firmware DSDT/SSDTs, scan it for the devices we care about.
- * Then, for each said device, work out their:
+ * Then, for each function of said device, work out their:
  * 1. Global System Interrupt (GSI) number
- * 2. Base Address Registers (BARs) paddr and sizes. Assign them if firmware had not assign them. */
+ * 2. Base Address Registers (BARs) paddr and sizes. (TODO) Assign them if firmware had not assign them.
+ * 3. Fill out funcs_table. */
 bool host_bridges_scan(pcie_drv_state_t *driver_state);
+
+/* For each PCIe function recorded by `host_bridges_scan`, attempt to match it against a spec in
+ * in the clients' specs table given by the metaprogram. */
+bool match_specs(pcie_drv_state_t *driver_state);
 
 /* ============ Handle clients PPCs ============ */
 

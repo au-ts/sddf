@@ -809,6 +809,11 @@ void init(void)
     };
 
     memset(&drv_state, 0, sizeof(drv_state));
+    for (size_t c = 0; c < SDDF_PCIE_MAX_CLIENTS; c++) {
+        for (size_t s = 0; s < SDDF_PCIE_MAX_DEVICE_SPECS_PER_CLIENT; s++) {
+            drv_state.spec_to_func[c][s] = FUNCTION_TABLE_INDEX_NONE;
+        }
+    }
     drv_state.vaddr_watermark = BIT(32);
     drv_state.handover = post_acpi_handover;
 

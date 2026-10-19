@@ -102,7 +102,7 @@ static bool mem_bar_in_valid_aperature(uint64_t paddr, uint64_t size_bytes, bus_
 }
 
 static void pcie_endpoint_bar_scan(pcie_drv_state_t *driver_state, volatile pci_conf_space_endpoint_t *endpoint_cs,
-                                   bus_scan_state_t *scan_state)
+                                   pcie_function_t *pcie_func, bus_scan_state_t *scan_state)
 {
     for (int i = 0; i < PCI_TYPE_0_NUM_BARS; i++) {
         /* Don't care about I/O Space, for now... */
@@ -164,6 +164,11 @@ static void pcie_endpoint_bar_scan(pcie_drv_state_t *driver_state, volatile pci_
             DEBUG_DRIVER_ERR("\t\t\tBAR not allocated by firmware\n");
         }
 
+        pcie_func->bars[pcie_func->num_bars].bar_idx = i;
+        pcie_func->bars[pcie_func->num_bars].paddr = paddr;
+        pcie_func->bars[pcie_func->num_bars].size_bytes = bar_size_bytes;
+        pcie_func->bars[pcie_func->num_bars].prefetchable = prefetchable;
+
     read_bar_complete:
         endpoint_cs->hdr.command = orig_cmd;
         if (is_64_bit) {
@@ -176,6 +181,22 @@ static bool handle_pcie_endpoint(pcie_drv_state_t *driver_state, host_bridge_t *
                                  volatile pci_conf_space_endpoint_t *endpoint_cs, uint8_t bus, uint8_t dev,
                                  uint8_t func, bus_scan_state_t scan_state)
 {
+    if (driver_state->num_funcs == MAX_NUM_PCIE_FUNCTIONS) {
+        DEBUG_DRIVER_ERR("out of memory to bookkeep PCIe functions, consider increasing MAX_NUM_PCIE_FUNCTIONS\n");
+        return false;
+    }
+
+    pcie_function_t *pcie_func = &driver_state->funcs_table[driver_state->num_funcs];
+    memset(pcie_func, 0, sizeof(pcie_function_t));
+    pcie_func->owner = PCIE_FUNC_OWNER_UNCLAIMED;
+
+    pcie_func->bus = bus;
+    pcie_func->dev = dev;
+    pcie_func->func = func;
+    pcie_func->path = scan_state.path;
+    pcie_func->hb = hb;
+    pcie_func->cs = endpoint_cs;
+
     if (endpoint_cs->interrupt_pin) {
         /* -1 to match ACPI PRT's 0-indexing */
         uint8_t int_pin = endpoint_cs->interrupt_pin - 1;
@@ -185,9 +206,10 @@ static bool handle_pcie_endpoint(pcie_drv_state_t *driver_state, host_bridge_t *
         }
 
         DEBUG_DRIVER("\t\tInterrupt Pin: %u, GSI: %u\n", int_pin, prt->gsi);
+        pcie_func->gsi = prt->gsi;
     }
 
-    pcie_endpoint_bar_scan(driver_state, endpoint_cs, &scan_state);
+    pcie_endpoint_bar_scan(driver_state, endpoint_cs, pcie_func, &scan_state);
 
     return true;
 }
