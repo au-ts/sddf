@@ -236,6 +236,32 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
+  get_board_names:
+    name: Get board names
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'au-ts' &&
+              (
+                (github.event_name == 'schedule') ||
+                (github.event_name == 'pull_request' &&
+                  (
+                    (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test')) ||
+                    (github.event.action == 'labeled' && github.event.label.name == 'hardware-test')
+                  )
+                )
+              )
+         }}
+    outputs:
+      board: ${{steps.list_boards.outputs.board}}
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v6
+      - name: Setup systems-ci
+        uses: au-ts/systems-ci@main
+      - id: list_boards
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          echo "board=$(exec ./ci/run.py --print-boards --no-only-qemu)" >> $GITHUB_OUTPUT
+
   tests_hardware:
     name: Tests (hardware)
     runs-on: ubuntu-latest
@@ -250,9 +276,14 @@ jobs:
                 )
               )
          }}
-    needs: build_linux_x86_64_nix
+    needs: [build_linux_x86_64_nix, build_pancake_linux_x86_64_nix, get_board_names]
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJson(needs.get_board_names.outputs.board) }}
+      max-parallel: 8
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ matrix.board }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -265,8 +296,9 @@ jobs:
       - name: Download images
         uses: actions/download-artifact@v8
         with:
-          name: loader-images
+          pattern: loader-images*
           path: ci_build
+          merge-multiple: true
       - name: Setup systems-ci
         uses: au-ts/systems-ci@main
       - name: Setup machine queue SSH key
@@ -278,63 +310,19 @@ jobs:
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
-          exec ./ci/run.py --no-only-qemu
-      - name: Archive logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ci-logs-hardware
-          path: ci_logs
-          if-no-files-found: error
-
-  tests_hardware_pancake:
-    name: Tests Pancake (hardware)
-    runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'au-ts' &&
-              (
-                (github.event_name == 'schedule') ||
-                (github.event_name == 'pull_request' &&
-                  (
-                    (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test')) ||
-                    (github.event.action == 'labeled' && github.event.label.name == 'hardware-test')
-                  )
-                )
-              )
-         }}
-    needs: build_pancake_linux_x86_64_nix
-    concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake
-      cancel-in-progress: true
-    steps:
-      - name: Checkout sDDF repository
-        uses: actions/checkout@v6
-      - name: Get machine queue
-        uses: actions/checkout@v6
-        with:
-          repository: seL4/machine_queue
-          path: machine_queue
-      - name: Download images
-        uses: actions/download-artifact@v8
-        with:
-          name: loader-images-pancake
-          path: ci_build
-      - name: Setup systems-ci
-        uses: au-ts/systems-ci@main
-      - name: Setup machine queue SSH key
-        run: .github/workflows/setup_ssh_key.sh
-        env:
-          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
-      - name: Run tests
+          exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }} --languages=c
+      - name: Run tests (Pancake)
+        if: ${{ matrix.board != 'serengeti' }}
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
-          exec ./ci/run.py --no-only-qemu --examples=serial --languages=pancake
+          exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }} --languages=pancake --examples=serial
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-logs-hardware-pancake
+          name: ci-logs-hardware-${{ matrix.board }}
           path: ci_logs
           if-no-files-found: error
 
