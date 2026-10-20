@@ -135,6 +135,8 @@ bool match_specs_to_functions(pcie_drv_state_t *driver_state)
                 }
             }
 
+            // @billn todo check that device have intx
+
             if (bars_spec_ok) {
                 DEBUG_DRIVER("\tmatched to %02x:%02x.%x\n", matched_func->bus, matched_func->dev, matched_func->func);
                 successful_matches += 1;

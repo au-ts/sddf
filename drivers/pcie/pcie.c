@@ -36,7 +36,9 @@ void init(void)
                 .map_addr = BIT(32),
                 .min_size = 0x4000,
                 .max_size = 0x4000,
-            }
+            },
+            .map_intx = 1,
+            .ch_id = 50,
         },
     };
 
