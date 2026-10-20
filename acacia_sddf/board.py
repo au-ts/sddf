@@ -92,6 +92,7 @@ BOARDS: list[Board] = [
         serial=DriverDouble("fsl,imx8mq-uart", "soc@0/bus@30800000/serial@30860000"),
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
         ethernet=DriverDouble("", "soc@0/bus@30800000/ethernet@30be0000"),
+        i2c=DriverDouble("fsl,imx8mq-i2c", "soc@0/bus@30800000/i2c@30a20000"),
         blk=DriverDouble("fsl,imx8mq-usdhc", "soc@0/bus@30800000/mmc@30b40000"),
         partition=2,
     ),
