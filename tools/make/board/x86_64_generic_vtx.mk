@@ -8,6 +8,15 @@
 
 CPU := generic
 
+ifeq (${X86_BOARD},qemu_virt_x86)
+    BLK_DRIV_DIR ?= virtio/pci
+    NET_DRIV_DIR ?= virtio/pci
+    ETH_DRIV ?= eth_driver_virtio.elf
+    UART_DRIV_DIR ?= pc99
+
+    CPU := generic
+endif
+
 SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
 SEL4_32B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4_32.elf
 
@@ -24,15 +33,17 @@ QEMU_ARCH_ARGS := -accel kvm -cpu host,+sse,+sse2,+fsgsbase,+pdpe1gb,+xsaveopt,+
 QEMU_NET_ARGS := -device virtio-net-pci,netdev=netdev0,addr=0x2.0
 QEMU_BLK_ARGS := -device virtio-blk-pci,drive=hd,addr=0x3.0
 
-include ${SDDF}/drivers/blk/virtio/pci/blk_driver.mk
+include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pcie/pcie_driver.mk
 
-ETH_DRIV := eth_driver_virtio.elf
-include ${SDDF}/drivers/network/virtio/pci/eth_driver.mk
+include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
+
+include ${SDDF}/drivers/network/${NET_DRIV_DIR}/eth_driver.mk
 
 ifeq ($(PANCAKE_SERIAL_DRIVER),1)
-  include ${SDDF}/drivers/serial/pc99/serial_driver_pnk.mk
+  include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver_pnk.mk
 else
-  include ${SDDF}/drivers/serial/pc99/serial_driver.mk
+  include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
 endif
 
 include ${SDDF}/drivers/timer/tsc_hpet/timer_driver.mk
