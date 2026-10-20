@@ -251,8 +251,24 @@ jobs:
               )
          }}
     needs: build_linux_x86_64_nix
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - hifive_p550
+          - imx8mm_evk
+          - imx8mq_evk
+          - imx8mp_iotgate
+          - maaxboard
+          - odroidc2
+          - odroidc4
+          - rockpro64
+          - rpi4b_1gb
+          - serengeti
+          - star64
+          - zcu102
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ matrix.board }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -278,12 +294,12 @@ jobs:
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
-          exec ./ci/run.py --no-only-qemu
+          exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }}
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-logs-hardware
+          name: ci-logs-hardware-${{ matrix.board }}
           path: ci_logs
           if-no-files-found: error
 
@@ -302,8 +318,24 @@ jobs:
               )
          }}
     needs: build_pancake_linux_x86_64_nix
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - hifive_p550
+          - imx8mm_evk
+          - imx8mq_evk
+          - imx8mp_iotgate
+          - maaxboard
+          - odroidc2
+          - odroidc4
+          - rockpro64
+          - rpi4b_1gb
+          - serengeti
+          - star64
+          - zcu102
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-pancake-${{ matrix.board }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
@@ -329,12 +361,12 @@ jobs:
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
-          exec ./ci/run.py --no-only-qemu --examples=serial --languages=pancake
+          exec ./ci/run.py --no-only-qemu --examples=serial --board=${{ matrix.board }} --languages=pancake
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-logs-hardware-pancake
+          name: ci-logs-hardware-pancake-${{ matrix.board }}
           path: ci_logs
           if-no-files-found: error
 
