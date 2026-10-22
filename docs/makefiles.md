@@ -53,7 +53,7 @@ the drivers supported by each board. It will also set the following variables:
 |:-----------------|:---------------------------------------------------|
 | `CPU`            | For aarch64 only: the CPU variant to optimise for  |
 | `ETH_DRIV`       | Name of elf file for first ethernet driver         |
-| `ETH_DRIV1`      | Name of elf file for second ethernet driver        |
+| `ETH_DRIV_1`     | Name of elf file for second ethernet driver        |
 
 
 ### Set by `common.mk` ###

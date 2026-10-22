@@ -11,7 +11,6 @@
 #include <sddf/network/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
-#include <sddf/util/printf.h>
 
 #include "ethernet.h"
 
@@ -28,6 +27,11 @@ uintptr_t resets = 0x3000000;
 uintptr_t resets = 0x3000000;
 #define RK3568_CRU_SOFTRST 0x400
 #define RK3568_CRU_SOFTRST_CON13 0x34
+#define RK3568_CRU_SOFTRST_CON14 0x38
+#define RK3568_CRU_SOFTRST_CON13_ARESETN_GMAC0 7
+#define RK3568_CRU_SOFTRST_CON14_ARESETN_GMAC1 12
+#define RK3568_GMAC0_PADDR 0xfe2a0000
+#define RK3568_GMAC1_PADDR 0xfe010000
 #endif /* CONFIG_PLAT_RK3568 */
 
 #define RX_COUNT 256
@@ -139,7 +143,7 @@ static void rx_return(void)
 
         net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
-            sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->des3);
+            LOG_DRIVER_ERR("RX descriptor returned with error status %x\n", d->des3);
             idx = rx.tail % rx.capacity;
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
@@ -259,7 +263,7 @@ static void handle_irq()
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_CH0_INTERRUPT_EN_FBEE) {
-                sddf_dprintf("Ethernet device fatal bus error\n");
+                LOG_DRIVER_ERR("Ethernet device fatal bus error\n");
             }
         }
         e = *DMA_REG(DMA_CH0_STATUS);
@@ -482,27 +486,30 @@ void init(void)
 #endif /* CONFIG_PLAT_STAR64 */
 
 #ifdef CONFIG_PLAT_RK3568
-    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + RK3568_CRU_SOFTRST + RK3568_CRU_SOFTRST_CON13);
+    uintptr_t softrst_con;
+    uint32_t softrst_bit;
+    if (device_resources.regions[0].io_addr == RK3568_GMAC1_PADDR) {
+        softrst_con = RK3568_CRU_SOFTRST_CON14;
+        softrst_bit = RK3568_CRU_SOFTRST_CON14_ARESETN_GMAC1;
+    } else {
+        assert(device_resources.regions[0].io_addr == RK3568_GMAC0_PADDR);
+        softrst_con = RK3568_CRU_SOFTRST_CON13;
+        softrst_bit = RK3568_CRU_SOFTRST_CON13_ARESETN_GMAC0;
+    }
+
+    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + RK3568_CRU_SOFTRST + softrst_con);
     uint32_t reset_val = *reset_eth;
-    /* Bit 23 is WE to bit 7 and bit 7 is aresetn_gmac0 */
-    reset_val &= ~BIT(7);
-    reset_val |= BIT(23);
+    /* Upper half of register is write enable, de-assert the reset bit in lower half */
+    reset_val &= ~BIT(softrst_bit);
+    reset_val |= BIT(softrst_bit + 16);
     *reset_eth = reset_val;
 #endif /* CONFIG_PLAT_RK3568 */
 
     // Check if the PHY device is up
-    uint32_t phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
-    if (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) {
-        sddf_dprintf("PHY device is up and running\n");
-    } else {
-        sddf_dprintf("PHY device is currently down\n");
-    }
-
-    if (phy_stat & BIT(16)) {
-        sddf_dprintf("PHY device is operating in full duplex mode\n");
-    } else {
-        sddf_dprintf("PHY device is operating in half duplex mode\n");
-    }
+    uint32_t UNUSED phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
+    LOG_DRIVER("%s: PHY device is %s, operating in %s duplex mode\n", sddf_get_pd_name(),
+               (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) ? "up and running" : "down",
+               (phy_stat & BIT(16)) ? "full" : "half");
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
@@ -523,6 +530,6 @@ void notified(sddf_channel ch)
     } else if (ch == config.virt_tx.id) {
         tx_provide();
     } else {
-        sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
+        LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
     }
 }
