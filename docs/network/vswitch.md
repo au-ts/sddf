@@ -9,9 +9,10 @@ The vswitch is an optional component of the sDDF networking stack. It models a
 physical Ethernet switch with the ability to send and receive packets to all
 network clients connected to it.
 
-The vswitch supports a simple, static Access Control List (ACL) scheme in the
-form of allow lists stating which clients can communicate with each other. The
-communication can be uni or bi-directional.
+The vswitch supports a simple Access Control List (ACL) scheme in the form of
+allow lists stating which ports may communicate with each other. ACLs are
+configured statically when the system is generated and may be updated at
+run-time by authorised clients. Communication can be uni- or bi-directional.
 
 With a vswitch one can create multiple isolated networks in a system,
 maintaining the principle of confidentiality. Clients never receive buffers that
@@ -27,19 +28,22 @@ section.
 
 ## System Architecture
 
-Vswitch clients must be connected to the vswitch for both transmission and
-reception. The transmit queues of vswitch clients are connected to the vswitch
+Vswitch clients must be connected to the vswitch for:
+(1) both transmission and reception, or (2) ACL rules update, or both (1) and (2).
+When (1), the transmit queues of vswitch clients are connected to the vswitch
 component, as are the receive queues of the vswitch client's Copy component.
 Thus all packets sent and received by vswitch client pass through the vswitch
-component.
+component. When (2), a PPC channel between the client and the vSwitch is established.
 
 An example system with two vswitch clients and one non-vswitch client is shown
 in the following figure:
 ![VSwitch in the system](/docs/network/imgs/vswitch.svg)
 
-The abstraction the vswitch uses for a client (a pair of Rx and Tx queues) is a
-*port*. See the following definition from the [network config
-file](/include/sddf/network/config.h):
+The abstraction the vswitch uses for a data-plane connection (a pair of Rx and
+Tx queues for transmission and reception) is a *port*. A port can correspond to
+no more than a client PD. Clients that serve only for the purpose of ACL rules
+update have no corresponding vSwitch port. See the following definition from the
+[network config file](/include/sddf/network/config.h):
 
 ```c
 typedef struct net_vswitch_port_config {
@@ -47,17 +51,67 @@ typedef struct net_vswitch_port_config {
     net_connection_resource_t tx; // Tx queue of the port
     region_resource_t tx_data; // Tx data region of the port
     mac_addr_t mac_addr; // MAC address of the port (ignored if virtualiser port)
-    uint64_t acl; // Access control list of the port
+    uint64_t initial_acl; // ACL state installed when the vSwitch starts
 } net_vswitch_port_config_t;
 ```
 
-The final port in the vswitch's port list (port at index `config.num_ports`) is
+The final port in the vswitch's port list (port at index `config.num_ports - 1`) is
 the virtualiser port - the port which holds the connections with the Rx and Tx
 virtualisers. In the virtualiser port, the Rx and Tx connections are reversed.
 The Rx virtualiser is connected to the `tx` queue, and the Tx virtualiser is
 connected to the `rx` queue. This allows the vswitch component to handle the
 system receiving packets as the virtualiser port *transmitting* packets, and the
 system transmitting packets as the virtualiser port *receiving* packets.
+
+A port in a vSwitch and a client to a vSwitch are represented separately.
+The abstraction of a vSwitch client contains a `connection` and a `acl_set_permission`.
+The `connection` can represent either a port or a PPC channel (by using upper bits in
+the data word to denote whether the lower bits represent the ID of a port or a PPC
+channel). Such an abstraction identifies the connection through which a PD may transmit
+network pacakages, issue PPCs, and records whether it may update ACLs:
+
+```c
+typedef uint8_t net_vswitch_client_connection_t;
+
+typedef struct net_vswitch_client_config {
+    net_vswitch_client_connection_t connection;
+    bool acl_set_permission;
+} net_vswitch_client_config_t;
+```
+
+In implementation, a client connection is a tagged byte. Its upper two bits
+identify the connection type and its lower six bits contain either a port ID
+or a direct PPC channel ID. The two supported client roles are:
+
+* A **port-backed client** owns a port and its queues for data-plane. Its PPC
+  channel is obtained from the port's Tx connection. It may optionally be
+  authorised to update ACLs.
+* A **channel-backed client** stores a PPC channel directly and has no port. An
+  ACL-only client uses this form, consumes no queues or data regions, and can
+  only use the ACL update operation.
+
+Registering a data-plane client as an ACL client sets `acl_set_permission` on
+its existing port-backed client entry. It does not allocate another client
+entry, channel, or port. The virtualiser port has no corresponding client entry
+because it does not issue PPCs.
+
+### ACL representation
+
+Each port's ACL state is a bitmap of the destination ports to which it may
+transmit. Therefore, bit `d` in `ports[s].initial_acl` initially permits traffic
+from source port `s` to destination port `d`. The vSwitch copies this bitmap
+into its mutable ACL state during initialisation.
+
+When a client needs to update an ACL rule in either a uni- or bi-directional way,
+it should provide two bitmaps following such an ACL representation:
+
+* The **outward** bitmap for port `p` replaces `p`'s own ACL state because it
+  describes the destinations to which `p` may transmit.
+* The **inward** bitmap for port `p` updates bit `p` in every source port's ACL
+  state because it describes the sources which may transmit to `p`.
+
+Passing `UINT64_MAX` for either bitmap leaves that direction unchanged. Bitmap
+bits beyond the configured port range are ignored.
 
 ## Buffer Descriptor Region ID
 
@@ -220,6 +274,26 @@ Then, to connect a client to the vswitch, set the vswitch argument to true:
 net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
 ```
 
+To create an ACL-only client, register the PD with `add_acl_client`:
+
+```py
+net_system.add_acl_client(acl_manager)
+```
+
+This creates a PPC channel to the vswitch without allocating a port, Copier,
+queues, or data regions. To grant ACL-set permission to an existing data-plane
+client, register the same PD with both methods:
+
+```py
+net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
+net_system.add_acl_client(client0)
+```
+
+The sdfgen tool recognises the overlap, creates one port-backed client entry, and
+reuses the data-plane client's PPC channel. A standalone ACL manager instead
+gets a channel-backed client entry. The sdfgen tool accounts for both forms when
+checking the Microkit channel-ID limit.
+
 Then proceed creating your net subsystem as usual, until `net_system.connect()`
 is called. You then need to specify your static vswitch ACL rules, which define
 which clients can communicate with which (note by default there are *no*
@@ -278,28 +352,56 @@ The PPC API (call IDs, arguments, return values) can be found in
  * Request another client's IP address.
  */
 #define VSWITCH_REQ_CLIENT 2
+
+/**
+ * Set a port's allowed incoming and outgoing traffic.
+ */
+#define VSWITCH_SET_ACL 3
 ```
 
-The three available PPC calls are:
+The four available PPC calls are:
+
 1. Set IP Address: Publish an IP address associated with this port, for other
-   clients  to query.
+   clients to query.
 2. Query vswitch state: Return a bitmap of reachable neighbours. Bit(n) is set
    if client n is reachable.
 3. Request a vswitch client's IP address: Return the IP address registered by
    client n.
+4. Set ACL: Replace the inward and/or outward ACL bitmap of a target port. This
+   call requires ACL-set permission and may be used by either an authorised
+   data-plane client or an ACL-only client.
+
+The first three operations require the caller to own a data-plane port. An
+ACL-only client receives `VSWITCH_ERR_INVALID_OPERATION` if it invokes one of
+them.
+`VSWITCH_SET_ACL` returns `VSWITCH_ERR_ACL_PERMISSION_DENIED` when the
+caller lacks ACL-set permission and `VSWITCH_ERR_ACL_INVALID_PORT` when the
+target port is outside the configured range.
+
+An ACL update passes the following message registers:
+
+```c
+sddf_set_mr(VSWITCH_ACL_PORT, target_port);
+sddf_set_mr(VSWITCH_ACL_IW_BITMAP, inward_bitmap);
+sddf_set_mr(VSWITCH_ACL_OW_BITMAP, outward_bitmap);
+sddf_ppcall(vswitch_channel,
+            seL4_MessageInfo_new(VSWITCH_SET_ACL, 0, 0,
+                                 VSWITCH_ACL_NUM_ARGS));
+```
 
 See the vswitch example client [client.c](/examples/vswitch/client.c) for an
-example of how to use each of these APIs.
+example of the data-plane APIs, and
+[orchestrator.c](/examples/vswitch/orchestrator.c) for an ACL-only client which
+updates ACLs at run-time.
 
 ## Limitations
 
-Due to each vswitch client requiring 2 channels with the vswitch, there is a
-limitation of 31 vswitch clients per system. This limitation however could
-easily be overcome in the future with additional support from Microkit.
+Each port uses two channel IDs and each ACL-only client uses one. The
+virtualiser port also uses two. Microkit provides 62 channel IDs per PD, so all
+channels allocated to the vSwitch PD must fit within that limit. Granting ACL
+permission to a data-plane client does not allocate another channel. This
+limitation could be overcome in the future with additional Microkit support.
 
 Currently we only support one vswitch per net subsystem, as we did not see the
 need for chaining multiple vswitches. Isolated subnets are achievable using a
 single vswitch with appropriate ACLs.
-
-In the future, support will be added for the modification of ACL rules at
-run-time. This will require clients having a notion of a capability over ACLs.
