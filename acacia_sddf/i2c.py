@@ -15,8 +15,6 @@ from acacia import (
     build_hook,
 )
 
-from ci.build import build
-
 from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
 
