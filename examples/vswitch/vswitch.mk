@@ -92,35 +92,36 @@ else
 		--output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
-	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client2_net_copier.data network_copy2.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client3_net_copier.data network_copy3.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx_serial_virt_tx_config.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .device_resources=eth_driver_device_resources.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_driver_config=eth_driver_net_driver_config.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_virt_rx_config=network_virt_rx_net_virt_rx_config.data network_virt_rx.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=network_virt_tx_net_virt_tx_config.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .net_copy_config=network_copy0_net_copy_config.data network_copy0.elf
+	$(OBJCOPY) --update-section .net_copy_config=network_copy1_net_copy_config.data network_copy1.elf
+	$(OBJCOPY) --update-section .net_copy_config=network_copy2_net_copy_config.data network_copy2.elf
+	$(OBJCOPY) --update-section .net_copy_config=network_copy3_net_copy_config.data network_copy3.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data client0.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data client0.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data client1.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data client1.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data client1.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client2.data client2.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client2.data client2.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client2.data client2.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client3.data client3.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client3.data client3.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client3.data client3.elf
-	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data client0.elf
-	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data client1.elf
-	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client2.data client2.elf
-	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client3.data client3.elf
-	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
+	$(OBJCOPY) --update-section .timer_client_config=client0_timer_client_config.data client0.elf
+	$(OBJCOPY) --update-section .net_client_config=client0_net_client_config.data client0.elf
+	$(OBJCOPY) --update-section .serial_client_config=client0_serial_client_config.data client0.elf
+	$(OBJCOPY) --update-section .timer_client_config=client1_timer_client_config.data client1.elf
+	$(OBJCOPY) --update-section .net_client_config=client1_net_client_config.data client1.elf
+	$(OBJCOPY) --update-section .serial_client_config=client1_serial_client_config.data client1.elf
+	$(OBJCOPY) --update-section .timer_client_config=client2_timer_client_config.data client2.elf
+	$(OBJCOPY) --update-section .net_client_config=client2_net_client_config.data client2.elf
+	$(OBJCOPY) --update-section .serial_client_config=client2_serial_client_config.data client2.elf
+	$(OBJCOPY) --update-section .timer_client_config=client3_timer_client_config.data client3.elf
+	$(OBJCOPY) --update-section .net_client_config=client3_net_client_config.data client3.elf
+	$(OBJCOPY) --update-section .serial_client_config=client3_serial_client_config.data client3.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=client0_lib_sddf_lwip_config.data client0.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=client1_lib_sddf_lwip_config.data client1.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=client2_lib_sddf_lwip_config.data client2.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=client3_lib_sddf_lwip_config.data client3.elf
+	$(OBJCOPY) --update-section .net_vswitch_config=network_vswitch_net_vswitch_config.data network_vswitch.elf
 	touch $@
+
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
