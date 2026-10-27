@@ -339,7 +339,7 @@ class sDDFEthernet(sDDFDriverClass):
                         "rx_conn": vswitch_rx_conn,
                         "tx_conn": vswitch_tx_conn,
                         "tx_data_map": vswitch_tx_data_map,
-                        "mac_addr": info.mac_addr.as_config_struct(),
+                        "mac_addr": info.mac_addr,
                         "acl": 0,
                     }
                 )
@@ -382,7 +382,7 @@ class sDDFEthernet(sDDFDriverClass):
                     "rx_conn": self.virt_port["rx"],
                     "tx_conn": self.virt_port["tx"],
                     "tx_data_map": self.virt_port["tx_data"],
-                    "mac_addr": [0, 0, 0, 0, 0, 0],
+                    "mac_addr": sDDFMAC([0, 0, 0, 0, 0, 0]),
                     "acl": 0,
                 }
             )
@@ -722,8 +722,8 @@ class sDDFEthernet(sDDFDriverClass):
 
         ch = Channel(
             self.sdf,
-            Channel.End(server, can_notify=True, can_pp=server_pp),
-            Channel.End(client, can_notify=True, can_pp=False),
+            Channel.End(server, can_notify=True, can_pp=False),
+            Channel.End(client, can_notify=True, can_pp=server_pp),
         )
 
         server_conn = self.net_connection_resource_factory(
