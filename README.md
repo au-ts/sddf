@@ -47,15 +47,15 @@ On apt based Linux distributions run the following commands:
 
 ```sh
 sudo apt install make clang llvm lld device-tree-compiler python3 python3-pip
-pip3 install sdfgen==0.35.0
+pip install git+https://github.com/au-ts/microkit_acacia
 ```
 
-If you get `error: externally-managed-environment` when installing via pip,
-instead run:
+If you get `error: externally-managed-environment` when installing via pip, please
+create a virtual environment to use with the sDDF.
 ```sh
-# sdfgen is an isolated package and does not depend on anything
-# else so it will not break any system packages.
-pip3 install --break-system-packages sdfgen==0.35.0
+python3 -m venv YOUR_VENV_NAME
+source ./YOUR_VENV_NAME/bin/activate
+pip install git+https://github.com/au-ts/microkit_acacia
 ```
 
 #### Microkit SDK
