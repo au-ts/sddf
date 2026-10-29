@@ -70,15 +70,15 @@ tar xf microkit-sdk-2.3.1-linux-x86-64.tar.gz
 On macOS, you can install the dependencies via Homebrew:
 ```sh
 brew install llvm lld make dtc python3
-pip3 install sdfgen==0.35.0
+pip install git+https://github.com/au-ts/microkit_acacia
 ```
 
-If you get `error: externally-managed-environment` when installing via pip,
-instead run:
+If you get `error: externally-managed-environment` when installing via pip, please
+create a virtual environment to use with the sDDF.
 ```sh
-# sdfgen is an isolated package and does not depend on anything
-# else so it will not break any system packages.
-pip3 install --break-system-packages sdfgen==0.35.0
+python3 -m venv YOUR_VENV_NAME
+source ./YOUR_VENV_NAME/bin/activate
+pip install git+https://github.com/au-ts/microkit_acacia
 ```
 
 #### Microkit SDK
@@ -103,8 +103,9 @@ shell via:
 nix develop
 ```
 
-Note that this will set the `MICROKIT_SDK` environment variable to the SDK path,
-you do not need to download the Microkit SDK manually.
+Note that this will set the `MICROKIT_SDK` environment variable to the SDK path
+and provide Acacia, you do not need to download the Microkit SDK or install
+Acacia manually.
 
 ## Examples
 
