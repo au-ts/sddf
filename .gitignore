@@ -23,3 +23,4 @@ venv/
 __pycache__
 .*.sw*
 *.dtb
+acacia_sddf/sddf_driver_config_cache.json
