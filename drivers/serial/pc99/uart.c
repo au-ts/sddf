@@ -20,10 +20,10 @@
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
-// @billn Need a way to express io port in sdfgen config structure
+// @billn Need a way to express io port in Acacia config structure
 #define IOPORT_ID 0
 #define IOPORT_BASE 0x3f8
-// @billn need some sort of "machine description" format for x86 sdfgen to automatically pull in IRQ
+// @billn need some sort of "machine description" format for x86 Acacia to automatically pull in IRQ
 #define IRQ_ID 1
 
 /*

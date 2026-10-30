@@ -18,7 +18,7 @@
 #include "cheshire-i2c.h"   // Alternate devices should replace this include and substitute
 #include "i2c.h"
 
-/* sdfgen */
+/* Acacia config structs */
 __attribute__((__section__(".i2c_driver_config"))) i2c_driver_config_t config;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -333,7 +333,7 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *q
 
 void init(void)
 {
-    // Check sdfgen properties
+    // Check Acacia config
     assert(i2c_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 5);

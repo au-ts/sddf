@@ -234,10 +234,6 @@ The receive virtualiser has three states:
    changed. Entering an invalid client number will return the virtualiser to the
    normal state without any change to the current client.
 
-The two special characters *switch_char* and *terminate_num_char* are
-configurable using the [Microkit sdfgen
-tool](https://au-ts.github.io/microkit_sdf_gen/).
-
 If the current client's receive data region is full at the time of a character
 being enqueued, the new character will be dropped. This ensures that the receive
 virtualiser may continue making progress regardless of the state of a client's
@@ -251,39 +247,44 @@ virtualisers. See [here](/docs/developing.md) for tips on how to do this and
 [drivers.md](/docs/drivers.md) for an existing list of all serial devices
 supported.
 
-### sdfgen
+### Acacia
 
-It is highly recommended to use the [Microkit sdfgen
-tool](https://au-ts.github.io/microkit_sdf_gen/) to create sDDF and LionsOS
-systems. To add a *serial system* within a Python meta program, it is as simple
-as creating the UART driver and serial virtualiser protection domains and
-passing them into the serial subsystem:
+It is highly recommended to use [Acacia](https://au-ts.github.io/microkit_acacia/index.html)
+to create sDDF and LionsOS systems. To add a *serial system* within a Python
+metaprogram, it is as simple as creating an `sDDFSerial` subsystem. Acacia
+creates the UART driver and serial virtualiser protection domains for you:
 ```py
-from sdfgen import SystemDescription, Sddf
+from acacia_sddf import sDDFSerial
 
-ProtectionDomain = SystemDescription.ProtectionDomain
-
-serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=198)
-serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
-
-# Providing a virt rx is optional
-serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx)
+serial = sDDFSerial(
+    sdf,
+    board.serial.compatible,
+    board.serial.node_path,
+    driver_prio=200,
+    virt_tx_prio=199,
+    # Providing a virt rx is optional
+    allow_rx=True,
+    virt_rx_prio=198,
+)
 ```
 
-Where the serial node is obtained from the board's device tree, and sdf is the
-system description instance. Note that priorities of serial components and
-clients are all *configurable*, however the system is designed with the
-assumption that the driver runs at the highest priority, followed by the
-virtualisers and finally the clients. For further documentation on the options
-which can be provided when creating a serial subsystem, or using the Microkit
-sdfgen tool in general, you can check the documentation
-[here](https://au-ts.github.io/microkit_sdf_gen/).
+Where `board` is the target board from `acacia_sddf.BOARDS`, whose serial
+compatible string and node path are used to find the device in the board's
+device tree, and `sdf` is the Acacia `System` instance.
+
+Note that priorities of serial components and clients are all *configurable*,
+however the system is designed with the assumption that the driver runs at the
+highest priority, followed by the virtualisers and finally the clients. Other
+options which can be provided when creating a serial subsystem include
+`baud_rate`, `enable_color` (colour each client's output differently),
+`begin_str` (string printed by the transmit virtualiser on start up) and `cpu`.
+For further documentation on using Acacia in general, you can check the
+documentation [here](https://au-ts.github.io/microkit_acacia/index.html).
 
 Adding a protection domain as a client of the system is as simple as:
 ```py
-client = ProtectionDomain("client", "client.elf", priority=1)
-serial_system.add_client(client)
+client = ProtectionDomain(sdf, "client", "client.elf", priority=1)
+serial.add_client(client)
 ```
 
 Additionally, clients of the serial subsystem will require the relevant serial
@@ -292,26 +293,26 @@ Clients](#interfacing-with-clients) section below.
 
 Currently the serial subsystem supports either *transmit only* mode, or *receive
 and transmit* where all clients are configured to be able to receive characters.
-If the serial subsystem is created *without* a receive virtualiser, then it will
-be transmit only. If a receive virtualiser is provided, then each client will be
-given the ability to receive characters. In the future, receive and transmit
-ability will be decided on a per client basis as each client is added to the
-system.
+If the serial subsystem is created with `allow_rx=False` (the default), then it
+will be transmit only. If `allow_rx=True`, a receive virtualiser is created and
+each client will be given the ability to receive characters. In the future,
+receive and transmit ability will be decided on a per client basis as each
+client is added to the system.
 
 ### Interfacing with clients
 
-The Microkit sdfgen tool will create all the serial resources required for each
-serial component. The virtual addresses of memory regions and channel values
-will be placed into serialised C structs and written to `.data` files in the
-build directory for each serial component. These structs are called *config*
-structures, and the *serial* config structures are defined
-[here](/include/sddf/serial/config.h). Once the meta program has completed, the
-makefile will use a series of `OBJCOPY`s to update the corresponding sections in
-each elf file. This gives components access to these values at boot time.
+Acacia will create all the serial resources required for each serial component.
+The virtual addresses of memory regions and channel values will be placed into
+serialised C structs and written to `.data` files in the build directory for
+each serial component. These structs are called *config* structures, and the
+*serial* config structures are defined [here](/include/sddf/serial/config.h).
+Once the metaprogram has called `sdf.make_config_structs()`, the makefile will
+use a series of `OBJCOPY`s to update the corresponding sections in each elf
+file. This gives components access to these values at boot time.
 
 The `OBJCOPY` commands are in the makefile snippets, and look as follows:
 ```sh
-$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
+$(OBJCOPY) --update-section .serial_client_config=client0_serial_client_config.data client0.elf
 ```
 When a new serial client is added to the system, an additional `OBJCOPY` command
 must be added to the makefile snippet to ensure the client's elf is updated

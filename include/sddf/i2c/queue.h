@@ -13,7 +13,7 @@
 /*
  * The data region contains buffers for the driver to read from / write to. This macro is used
  * to ensure offsets are appropriately contained within the region as expected.
- * TODO: probably delete this? this serves no obvious purpose with sdfgen parsing such information.
+ * TODO: probably delete this? this serves no obvious purpose with Acacia parsing such information.
  */
 #ifndef I2C_MAX_DATA_SIZE
 #define I2C_MAX_DATA_SIZE 256

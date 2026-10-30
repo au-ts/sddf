@@ -16,7 +16,7 @@
  * ~~ ipg_clkc_highfreq: high-freq reference clock, frequency depends on board.
  *
  * Uboot sets up the 24MHz clock for us, and we just trust that it's there.
- * TODO: use clock driver to set this up properly, enforced by sdfgen.
+ * TODO: use clock driver to set this up properly, enforced by Acacia.
  */
 
 #include <stdint.h>
