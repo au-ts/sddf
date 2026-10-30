@@ -194,7 +194,7 @@ BOARDS: list[Board] = [
     Board(
         name="x86_64_generic",
         arch=x86_64,
-        paddr_top=0x7FFDF000,
+        paddr_top=0x30000000,
     ),
     Board(
         name="x86_64_generic_vtx",
