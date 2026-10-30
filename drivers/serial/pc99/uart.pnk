@@ -11,10 +11,10 @@
 #define IOPORT_DATA            pnk_mem(6)
 #define IOPORT_DATA_PTR        pnk_mem_ptr(6)
 
-// @billn Need a way to express io port in sdfgen config structure
+// @billn Need a way to express io port in Acacia config structure
 #define IOPORT_ID 0
 #define IOPORT_BASE 1016
-// @billn need some sort of "machine description" format for x86 sdfgen to automatically pull in IRQ
+// @billn need some sort of "machine description" format for x86 Acacia to automatically pull in IRQ
 #define IRQ_ID 1
 
 /*

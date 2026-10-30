@@ -36,22 +36,14 @@ was error prone and so we have been working on tooling to decrease the friction
 when building more complicated systems.
 
 The metaprogram is specific to each example system, it makes use of the
-[sdfgen](https://github.com/au-ts/microkit_sdf_gen) tooling to auto-generate the
+[Acacia](https://github.com/au-ts/microkit_acacia) tooling to auto-generate the
 artefacts mentioned above.
 
-The sdfgen tooling allows users to describe systems in a higher level without
+Acacia allows users to describe systems in a higher level without
 needing to focus on tedious details that are necessary to put a system together.
 It provides an API for doing this that we invoke in our metaprogram to build up
 the system by adding the required protection domains, memory regions, and sDDF
 sub-systems.
-
-sdfgen provides a C API as well as a Python package. For the purpose of ease of
-experimentation, the metaprograms in the example systems are a Python script but
-what language you use is up to you.
-
-You can find more details in the
-[repository](https://github.com/au-ts/microkit_sdf_gen) and an API reference for
-the Python package [here](https://au-ts.github.io/microkit_sdf_gen/).
 
 ### Adding a new board
 
@@ -390,9 +382,9 @@ supporting infrastructure as well:
   client and data management tasks
 * an sDDF queue library containing the queue data structure and helper functions
   used to pass data and buffers between drivers, virtualisers and clients
-* an sdfgen module allowing the new sub-system to be seamlessly added to systems
+* an Acacia module defining how the class connects to clients and sets itself up.
 
-Creating a new device class module for sdfgen is an involved task, and will
+Creating a new device class module for Acacia is an involved task, and will
 require encoding into the tool all the information that is needed for the
 sub-system to be automatically generated. This includes:
 * necessary protection domains (driver, virtualisers)
@@ -402,3 +394,5 @@ sub-system to be automatically generated. This includes:
 * the configuration options available for the system (memory region sizes,
   protection domain priorities, client multiplexing options, data processing
   options, etc)
+
+See the [Acacia docs](https://au-ts.github.io/microkit_acacia/subsystems.html).

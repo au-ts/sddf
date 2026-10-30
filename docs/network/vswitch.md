@@ -192,38 +192,50 @@ data regions of vswitch clients need to be mapped into the vswitch PD.
 
 ## Usage
 
-### sdfgen
+### Acacia
 
 To use vswitch component in your system, a few modifications are required to the
-`meta.py` and `.mk` files. The `microkit_sdf_gen` tool contains all necessary
-machinery to augment the `.system` file for you. First you need to create a
-vswitch PD same as you do with other PDs:
+`meta.py` and `.mk` files. The `sDDFEthernet` Acacia subsystem contains all
+necessary machinery to augment the `.system` file for you. First you need to
+create a vswitch protection domain:
 
 ```py
-vswitch = ProtectionDomain("net_vswitch", "network_vswitch.elf", priority=97)
+vswitch = ProtectionDomain(
+    sdf,
+    "net_vswitch",
+    "network_vswitch.elf",
+    scheduling=SchedulingProperties(priority=97),
+)
 ```
 
 Important caveat is that it's priority has to be higher than clients that are
 connected to it to support the PPC functionality.
 
-When you declare your Network subsystem, you must pass in this vswitch PD to the "vswitch" argument:
+When you declare your network subsystem, you must pass in this vswitch PD to the "vswitch" argument:
 
 ```py
-net_system = Sddf.Net(
-	sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, vswitch=vswitch
+ethernet = sDDFEthernet(
+    sdf,
+    board.ethernet.compatible,
+    board.ethernet.node_path,
+    driver_prio=101,
+    virt_tx_prio=100,
+    virt_rx_prio=99,
+    vswitch=vswitch,
 )
 ```
 
-Then, to connect a client to the vswitch, set the vswitch argument to true:
+Then, to connect a client to the vswitch, set the `vswitch_client` argument to
+true. Vswitch clients must have a copier:
 
 ```py
-net_system.add_client_with_copier(client0, client0_net_copier, vswitch=True)
+ethernet.add_client(client0, copier=client0_net_copier, vswitch_client=True)
 ```
 
-Then proceed creating your net subsystem as usual, until `net_system.connect()`
-is called. You then need to specify your static vswitch ACL rules, which define
+You then need to specify your static vswitch ACL rules, which define
 which clients can communicate with which (note by default there are *no*
-permissions):
+permissions). The Tx virtualiser represents traffic to and from the physical
+network:
 
 ```py
 # Assume we have clients 0, 1, 2, 3 and a virtualiser V
@@ -232,18 +244,18 @@ permissions):
 # 1 -> 0, 2, V
 # 2 -> 0, 1, V
 # 3 -> 0, V
-net_system.add_acl_rule(client0, client1, True, True)
-net_system.add_acl_rule(client0, client2, True, True)
-net_system.add_acl_rule(client0, client3, True, True)
-net_system.add_acl_rule(client0, net_virt_tx, True, True)
-net_system.add_acl_rule(client1, client2, True, True)
-net_system.add_acl_rule(client1, net_virt_tx, True, True)
-net_system.add_acl_rule(client2, net_virt_tx, True, True)
-net_system.add_acl_rule(client3, net_virt_tx, True, True)
+ethernet.add_acl_rule(client0, client1, True, True)
+ethernet.add_acl_rule(client0, client2, True, True)
+ethernet.add_acl_rule(client0, client3, True, True)
+ethernet.add_acl_rule(client0, ethernet.virt_tx, True, True)
+ethernet.add_acl_rule(client1, client2, True, True)
+ethernet.add_acl_rule(client1, ethernet.virt_tx, True, True)
+ethernet.add_acl_rule(client2, ethernet.virt_tx, True, True)
+ethernet.add_acl_rule(client3, ethernet.virt_tx, True, True)
 ```
 
-Finally, the system can be serialised with
-`net_system.serialise_config(output_dir)`.
+Finally, the config data is generated along with the rest of the system with
+`sdf.make_config_structs(output_dir)`.
 
 ### Makefiles
 
@@ -255,7 +267,7 @@ include it as an argument to the final system image.
 Next, you must copy the system configuration data into the vswitch elf file
 after the metaprogram has run:
 ```sh
-$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
+$(OBJCOPY) --update-section .net_vswitch_config=network_vswitch_net_vswitch_config.data network_vswitch.elf
 ```
 
 ### Protected Procedure Call API
