@@ -1,22 +1,23 @@
 #
-# Copyright 2024, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the ESWIN timer driver
+# the eswin timer driver
 #
 # NOTES:
 #  Generates timer_driver.elf
-#  Expects libsddf_util_debug.a to be in ${LIBS}
+#  Expects libsddf_util_debug.a in ${LIBS}
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-timer_driver.elf: timer/timer.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+timer_driver.elf: timer/timer_driver.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer $(SDDF_LIBC_INCLUDE)
-	${CC} ${CFLAGS} -o $@ -c $<
+timer/timer_driver.o: CFLAGS+=-I${TIMER_DIR}
+timer/timer_driver.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} $(SDDF_LIBC_INCLUDE)|timer
+	${CC} ${CFLAGS} -c -o $@ $<
 
 timer:
 	mkdir -p timer

@@ -13,4 +13,3 @@ else
   include ${SDDF}/drivers/serial/ns16550a/serial_driver.mk
 endif
 include ${SDDF}/drivers/timer/eswin/timer_driver.mk
-include ${SDDF}/drivers/net/eswin/timer_driver.mk
