@@ -9,6 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_common.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -28,17 +29,16 @@ volatile struct timer_regs *timeout_timer_regs;
 #define TIMER_COUNTER 1
 #define TIMER_TIMEOUT 2
 
+// Return the memory offset of timer N in the register map
 #define TIMER_N_OFFSET(n) ((n - 1) * 0x14)
 
+// ?
 #define LOAD_COUNT2(n) (0xb0 + TIMER_N_OFFSET(n))
-
 #define REG_PTR(off)     ((volatile uint32_t *)((regs_base) + (off)))
-
-#define MAX_TIMEOUTS 6
-static uint64_t timeouts[MAX_TIMEOUTS];
 
 #define TIMER_MAX_TICKS UINT32_MAX
 
+// TODO: pass in from DTS via Acacia
 #ifdef CONFIG_PLAT_HIFIVE_P550
 /* 24 MHz frequency. Obtained from 'timebase-frequency = <0xf4240>' in the DTS. */
 #define TIMER_TICKS_PER_SECOND 24000000
@@ -55,7 +55,7 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 uint32_t counter_timer_elapses = 0;
 uint32_t timeout_timer_elapses = 0;
 
-static uint64_t get_ticks_in_ns(bool irq)
+static uint64_t get_ticks_in_ns(void)
 {
     /* the timer value counts down from the load value */
     uint64_t value_l = (TIMER_MAX_TICKS - counter_timer_regs->val);
@@ -115,6 +115,9 @@ static void process_timeouts(uint64_t curr_time)
     }
 }
 
+static inline void irq_inc_counts(void) {
+}
+
 void notified(microkit_channel ch)
 {
     assert(ch == device_resources.irqs[0].id);
@@ -126,6 +129,8 @@ void notified(microkit_channel ch)
 
     if (timeout_timer_regs->int_status & 0x1) {
         timeout_timer_elapses += 1;
+        value_h += 1;
+        value_l = (uint64_t)(TIMER_MAX_TICKS - counter_timer_regs->val);
         uint64_t curr_time = get_ticks_in_ns(true);
         process_timeouts(curr_time);
         timeout_timer_regs->eoi;
