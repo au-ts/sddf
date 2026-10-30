@@ -434,8 +434,7 @@ requires a handful of functions to be called in the Microkit `init` and
    their `init` function. Details on the parameters for this function can be
    found in the library's [header](/include/sddf/network/lib_sddf_lwip.h) file.
 
-   This function also requires a config struct emitted by the [sdfgen](#sdfgen)
-   tool.
+   This function also requires a config struct emitted by [Acacia](#acacia).
 
    Once the library has been initialised, you must also make sure to set the
    first timeout using the [timer subsystem](/docs/timer/timer.md). This will be
@@ -477,91 +476,82 @@ See [here](/docs/developing.md) for tips on how to do this and
 [drivers.md](/docs/drivers.md) for an existing list of all ethernet devices
 supported.
 
-### sdfgen
+### Acacia
 
-It is highly recommended to use the [Microkit sdfgen
-tool](https://au-ts.github.io/microkit_sdf_gen/) to create sDDF and LionsOS
+It is highly recommended to use [Acacia](https://au-ts.github.io/microkit_acacia/index.html)
+to create sDDF and LionsOS
 systems. System components are written with the assumption that the
-[sdfgen](/docs/developing.md#the-metaprogram) tool will be used. This tool was
+[Acacia](/docs/developing.md#the-metaprogram) tool will be used. This tool was
 written to act as system glue, providing an abstract API for creating Microkit
 system resources and emitting both the Microkit system description file as well
 as binary data files for each component of the system. The data files provide
 the system information needed for inter-component communication as well as other
 functionalities like device information.
 
-To add a *network system* in your Python metaprogram, you must first create
-protection domains for each of the system components:
-* The [ethernet driver](/drivers/network/) for your platform.
+To add a *network system* in your Python metaprogram, create an
+`sDDFEthernet` subsystem. Acacia creates the protection domains for each of the
+network system components for you:
+* The [ethernet driver](/drivers/network/) for your platform, selected by
+matching the device tree node's compatible string against the sDDF drivers.
 * The [receive](/network/components/virt_rx.c) and
 [transmit](/network/components/virt_tx.c) network virtualisers.
 
-Once these components have been declared, a sdfgen network subsystem can be
-created:
-
 ```py
-from sdfgen import SystemDescription, Sddf
+from acacia_sddf import sDDFEthernet
 
-ProtectionDomain = SystemDescription.ProtectionDomain
-
-ethernet_driver = ProtectionDomain(
-    "ethernet_driver",
-    "eth_driver.elf",
-    priority=101,
-    budget=100,
-    period=400,
-    cpu=get_core("ethernet_driver"),
+ethernet = sDDFEthernet(
+    sdf,
+    board.ethernet.compatible,
+    board.ethernet.node_path,
+    driver_prio=101,
+    virt_tx_prio=100,
+    virt_rx_prio=99,
 )
-
-net_virt_tx = ProtectionDomain(
-    "net_virt_tx",
-    "network_virt_tx.elf",
-    priority=100,
-    budget=20000,
-    cpu=get_core("net_virt_tx"),
-)
-net_virt_rx = ProtectionDomain(
-    "net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_core("net_virt_rx")
-)
-
-net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
-
 ```
 
-Once the system has been created, clients can be added along with their
+The driver and virtualiser protection domains are available as
+`ethernet.driver`, `ethernet.virt_tx` and `ethernet.virt_rx` should you need to
+modify them, e.g. to add extra memory mappings or change which core they run on.
+
+Once the subsystem has been created, clients can be added along with their
 respective [copy](/network/components/copy.c) components:
 
 ```py
-
 client0 = ProtectionDomain(
-    "client0", client0_elf, priority=97, budget=20000, cpu=get_core("client0")
+    sdf,
+    "client0",
+    "client0.elf",
+    scheduling=SchedulingProperties(priority=97, budget=20000),
 )
-
 client0_net_copier = ProtectionDomain(
+    sdf,
     "client0_net_copier",
-    client0_net_copier_elf,
-    priority=98,
-    budget=20000,
-    cpu=get_core("client0_net_copier"),
+    "network_copy0.elf",
+    scheduling=SchedulingProperties(priority=98, budget=20000),
 )
 
-net_system.add_client_with_copier(client0, client0_net_copier)
+ethernet.add_client(client0, copier=client0_net_copier)
 ```
 
-See the [sdfgen docs](https://au-ts.github.io/microkit_sdf_gen/) for more
-details on the sdfgen network API like setting a client's MAC address, creating
-a client with only Rx or Tx capabilities, or creating a trusted client without a
-copier.
+`add_client` also accepts arguments for setting a client's MAC address
+(`mac_addr=sDDFMAC("52:54:01:00:00:10")`, with `sDDFMAC` imported from
+`acacia_sddf.net`), creating a client with only Rx or Tx
+capabilities (`rx=False` or `tx=False`), changing the number of client buffers
+(`rx_buffers`, `tx_buffers`), and connecting the client to a
+[vswitch](/docs/network/vswitch.md) (`vswitch_client=True`). A trusted client
+can be added without a copier by omitting the `copier` argument, in which case
+it is given direct access to the Rx DMA region.
 
 Note that priorities of network components are *configurable*, however the
-system is designed with the assumption that the driver runs at the highest
-priority, followed by the Tx virtualiser, the Rx virtualiser, and finally the
-copiers and clients. This priority ordering is with respect to the network
-components, and *passive* drivers like the timer driver should run as the
-highest priority. Rx IRQs to improve latency. If you wish to prioritise one
-client over another, ensure this is reflected in the priority of their copiers
-as well. In the future we will also be introducing the ability to customise the
-order in which clients are processed by the Tx virtualiser, but currently
-clients are processed in the order which they are added to the system.
+system requires that the driver runs at the highest priority, followed by the Tx
+virtualiser, the Rx virtualiser, and finally the copiers and clients. This
+priority ordering is with respect to the network components, and *passive*
+drivers like the timer driver should run as the highest priority. Rx IRQs to
+improve latency. If you wish to prioritise one client over another, ensure this
+is reflected in the priority of their copiers as well. In the future we will
+also be introducing the ability to customise the order in which clients are
+processed by the Tx virtualiser, but currently clients are processed in the
+order which they are added to the system.
 
 If you wish for a client to use [lib sDDF lwIP](#lib-sddf-lwip), you will also
 need to generate the resources needed for this in your metaprogram. This is
@@ -570,49 +560,40 @@ number of client Rx buffers, as well as access to the timer subsystem. To do
 this, add the following to your metaprogram:
 
 ```py
-# Create a timer driver
-timer_driver = ProtectionDomain(
-    "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
-)
+from acacia_sddf import sDDFLWIP, sDDFTimer
 
 # Create a timer subsystem
-timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
 
 # Add your client to the timer subsystem
-timer_system.add_client(client0)
+timer.add_client(client0)
 
 # Create lwIP resources for your client
-client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
+sDDFLWIP(ethernet, client0)
 ```
 
-Once all your system resources are created, ensure to connect and serialise the
-data files each component needs to access them as follows:
+There is no need to keep a reference to the `sDDFLWIP` object, it registers
+itself with the system when created.
+
+Once all your system resources are created, generate the system description
+and the config data for every subsystem:
 
 ```py
-# connect and serialise the network subsystem data
-assert net_system.connect()
-assert net_system.serialise_config(output_dir)
-
-# connect and serialise the timer subsystem data if required
-assert timer_system.connect()
-assert timer_system.serialise_config(output_dir)
-
-# connect and serialise the lib sDDF lwIP client data
-assert client0_lib_sddf_lwip.connect()
-assert client0_lib_sddf_lwip.serialise_config(output_dir)
+sdf.make_config_structs(output_dir)
+sdf.write_xml_file(f"{output_dir}/{sdf_file}")
 ```
 
-This will create `.data` files in your selected build directory which you will
-then need to `OBJCOPY` into the respective `.elf` files, see
-[here](#building-components-and-libraries).
+`make_config_structs` connects all of the subsystems and creates `.data` files
+in your selected build directory which you will then need to `OBJCOPY` into the
+respective `.elf` files, see [here](#building-components-and-libraries).
 
 ### Interfacing with clients
 
-The Microkit sdfgen tool will create all the network resources required for each
-network component. The virtual addresses of memory regions, channel values and
-client information will be placed into serialised C structs and written to
-`.data` files in the build director. These structs are called *config*
-structures, and the *network* config structures are defined
+Acacia will create all the network resources required for each network
+component. The virtual addresses of memory regions, channel values and client
+information will be placed into serialised C structs and written to `.data`
+files in the build directory. These structs are called *config* structures, and
+the *network* config structures are defined
 [here](/include/sddf/network/config.h).
 
 Each network client must declare a `net_client_config` struct for the system
@@ -691,12 +672,15 @@ as follows:
 
 ```sh
 # device resources for the ethernet driver
-$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
+$(OBJCOPY) --update-section .device_resources=eth_driver_device_resources.data eth_driver.elf
 # network subsystem resources
-$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
-$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
-$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
+$(OBJCOPY) --update-section .net_driver_config=eth_driver_net_driver_config.data eth_driver.elf
+$(OBJCOPY) --update-section .net_virt_rx_config=network_virt_rx_net_virt_rx_config.data network_virt_rx.elf
+$(OBJCOPY) --update-section .net_virt_tx_config=network_virt_tx_net_virt_tx_config.data network_virt_tx.elf
 ```
+
+Each `.data` file is named after the program image it belongs to, followed by
+the name of the section it is copied into.
 
 For network clients, there is one `.data` file for the network connection, and
 if lib sDDF lwIP is in use there will also be a file for the library and the
@@ -704,11 +688,11 @@ timer subsystem connection. Additionally, each copy component will also have a
 network connection data file:
 
 ```sh
-$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf
+$(OBJCOPY) --update-section .net_copy_config=network_copy0_net_copy_config.data network_copy0.elf
 
-$(OBJCOPY) --update-section .net_client_config=net_client_client0.data echo0.elf
-$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
-$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
+$(OBJCOPY) --update-section .net_client_config=echo0_net_client_config.data echo0.elf
+$(OBJCOPY) --update-section .timer_client_config=echo0_timer_client_config.data echo0.elf
+$(OBJCOPY) --update-section .lib_sddf_lwip_config=echo0_lib_sddf_lwip_config.data echo0.elf
 ```
 
 #### Include paths
