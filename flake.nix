@@ -7,8 +7,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.35.1";
-    sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     systems-ci.url = "github:au-ts/systems-ci/main";
     systems-ci.flake = false;
     acacia.url = "github:au-ts/microkit_acacia/1.0";
@@ -18,7 +16,6 @@
   outputs =
     {
       nixpkgs,
-      sdfgen,
       systems-ci,
       acacia,
       ...
@@ -44,14 +41,6 @@
           };
 
           llvm = pkgs.llvmPackages_18;
-
-          pysdfgen = sdfgen.packages.${system}.pysdfgen.override {
-            pythonPackages = pkgs.python312Packages;
-          };
-
-          ts_ci = pkgs.callPackage "${systems-ci}/ts_ci/package.nix" {
-            python3Packages = pkgs.python312Packages;
-          };
 
           mk_acacia = pkgs.callPackage "${acacia}/package.nix" {
             python3Packages = pkgs.python312Packages;
@@ -86,8 +75,6 @@
           genmc = pkgs.callPackage ./ci/genmc/nix/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
 
           pythonTool = pkgs.python312.withPackages (ps: [
-            pysdfgen
-            ts_ci
             mk_acacia
           ]);
         in
