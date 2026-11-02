@@ -22,6 +22,7 @@ class Board:
     timer: DriverDouble = DriverDouble(None, None)
     i2c: DriverDouble = DriverDouble(None, None)
     blk: DriverDouble = DriverDouble(None, None)
+    tmu: DriverDouble = DriverDouble(None, None)
     partition: int = 0
     baud_rate: int | None = None
 
@@ -98,6 +99,7 @@ BOARDS: list[Board] = [
         timer=DriverDouble("fsl,imx8mq-gpt", "soc@0/bus@30000000/timer@302d0000"),
         blk=DriverDouble("fsl,imx8mq-usdhc", "soc@0/bus@30800000/mmc@30b40000"),
         ethernet=DriverDouble("fsl,imx8mq-fec", "soc@0/bus@30800000/ethernet@30be0000"),
+        tmu=DriverDouble("fsl,imx8mq-tmu", "soc@0/bus@30000000/tmu@30260000"),
         partition=2,
     ),
     Board(

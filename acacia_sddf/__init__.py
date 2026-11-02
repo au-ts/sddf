@@ -4,13 +4,14 @@
 from .blk import sDDFBlk
 from .board import BOARDS, Board
 from .driver_manifest import (
+    register_sddf_subsystem,
     sDDFDriverConfig,
     sDDFDriverManifest,
-    register_sddf_subsystem,
 )
 from .i2c import sDDFI2C
+from .ipstacks import sDDFLWIP
 from .net import sDDFEthernet
 from .sddf import sDDFDriverClass
 from .serial import sDDFSerial
 from .timer import sDDFTimer
-from .ipstacks import sDDFLWIP
+from .tmu import sDDFTMU
