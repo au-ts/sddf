@@ -32,7 +32,7 @@ website [here](https://trustworthy.systems/projects/drivers/).
 
 ## Dependencies
 
-* [Microkit SDK 2.3.1](https://github.com/seL4/microkit/releases/tag/2.3.1)
+* [Microkit SDK 2.4.0](https://github.com/seL4/microkit/releases/tag/2.4.0)
 * GNU Make
 * Clang and LLVM bintools
 * Device Tree Compiler
@@ -61,8 +61,8 @@ pip install git+https://github.com/au-ts/microkit_acacia
 #### Microkit SDK
 
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.3.1/microkit-sdk-2.3.1-linux-x86-64.tar.gz
-tar xf microkit-sdk-2.3.1-linux-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.4.0/microkit-sdk-2.4.0-linux-x86-64.tar.gz
+tar xf microkit-sdk-2.4.0-linux-x86-64.tar.gz
 ```
 
 ### Homebrew
@@ -85,14 +85,14 @@ pip install git+https://github.com/au-ts/microkit_acacia
 
 For Apple Silicon:
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.3.1/microkit-sdk-2.3.1-macos-aarch64.tar.gz
-tar xf microkit-sdk-2.3.1-macos-aarch64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.4.0/microkit-sdk-2.4.0-macos-aarch64.tar.gz
+tar xf microkit-sdk-2.4.0-macos-aarch64.tar.gz
 ```
 
 For Intel:
 ```sh
-wget https://github.com/seL4/microkit/releases/download/2.3.1/microkit-sdk-2.3.1-macos-x86-64.tar.gz
-tar xf microkit-sdk-2.3.1-macos-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.4.0/microkit-sdk-2.4.0-macos-x86-64.tar.gz
+tar xf microkit-sdk-2.4.0-macos-x86-64.tar.gz
 ```
 
 ### Nix
