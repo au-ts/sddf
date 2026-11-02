@@ -21,16 +21,11 @@ export PYTHONPATH
 SUPPORTED_BOARDS := \
 		maaxboard
 
-include ${SDDF}/tools/make/board/common.mk
-
 SDDF_CUSTOM_LIBC := 1
-UTIL := $(SDDF)/util
+include ${SDDF}/tools/make/sddf.mk
+
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/tmu
-SERIAL := $(SDDF)/serial
-TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
-TMU_DRIVER := $(SDDF)/drivers/sensor/tmu/${TMU_DRIV_DIR}
 
 IMAGES :=\
 	  client.elf \
@@ -94,9 +89,4 @@ clean::
 clobber:: clean
 	rm -f ${REPORT_FILE} ${IMAGE_FILE} *.a .*cflags*
 
-include ${SDDF}/util/util.mk
-include ${SERIAL}/components/serial_components.mk
-include ${SERIAL_DRIVER}/serial_driver.mk
-include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
-include ${TMU_DRIVER}/tmu_driver.mk
