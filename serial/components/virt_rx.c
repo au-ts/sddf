@@ -10,13 +10,13 @@
 #include <sddf/serial/config.h>
 #include <string.h>
 #include <sddf/util/printf.h>
+#include "virt_rx.h"
 
 __attribute__((__section__(".serial_virt_rx_config"))) serial_virt_rx_config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
-#define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
 
 mode_t current_mode = normal;

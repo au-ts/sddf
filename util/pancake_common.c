@@ -5,6 +5,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sddf/serial/config.h>
+#include <sddf/serial/queue.h>
 #include <sddf/util/pancake_common.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
@@ -54,7 +56,21 @@ void *cml_install(uint8_t *src, size_t len, uint8_t *dest)
 }
 #endif
 
-void init_pancake_mem()
+/* This function checks that the constants hard-coded in Pancake programs for the size of
+   a struct and the offset of a field within the struct are correct. */
+static void init_pancake_check()
+{
+    /* used in include/sddf/serial/config.pnk */
+    assert(sizeof(serial_connection_resource_t) == 40);
+    assert(offsetof(serial_connection_resource_t, id) == 32);
+    assert(sizeof(serial_virt_tx_client_config_t) == 104);
+    assert(offsetof(serial_virt_tx_client_config_t, conn) == 0);
+
+    /* used in include/sddf/serial/queue.pnk */
+    assert(sizeof(serial_queue_handle_t) == 24);
+}
+
+static void init_pancake_mem()
 {
     unsigned long cml_heap_sz = 1024 * 10;
     unsigned long cml_stack_sz = 1024 * 10;
@@ -66,4 +82,10 @@ void init_pancake_mem()
     assert((uintptr_t)cml_heap % sizeof(uintptr_t) == 0);
     assert((uintptr_t)cml_stack % sizeof(uintptr_t) == 0);
     assert((uintptr_t)cml_stackend % sizeof(uintptr_t) == 0);
+}
+
+void init_pancake()
+{
+    init_pancake_check();
+    init_pancake_mem();
 }

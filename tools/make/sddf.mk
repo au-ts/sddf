@@ -36,4 +36,8 @@ include ${SDDF}/network/components/network_components.mk
 include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
 
 # Serial
-include ${SDDF}/serial/components/serial_components.mk
+ifeq ($(PANCAKE_SERIAL_VIRTUALISERS),1)
+  include ${SDDF}/serial/components/serial_components_pnk.mk
+else
+  include ${SDDF}/serial/components/serial_components.mk
+endif

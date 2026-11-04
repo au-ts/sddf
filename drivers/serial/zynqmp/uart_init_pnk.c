@@ -14,7 +14,7 @@ void init(void)
 {
     c_init();
 
-    init_pancake_mem();
+    init_pancake();
 
     uintptr_t *pnk_mem = (uintptr_t *)cml_heap;
 
