@@ -1,0 +1,19 @@
+diff --git a/src/portable/synopsys/dwc2/dwc2_bcm.h b/src/portable/synopsys/dwc2/dwc2_bcm.h
+index 91cae821e..0bdea99a6 100644
+--- a/tusb/src/portable/synopsys/dwc2/dwc2_bcm.h
++++ b/tusb/src/portable/synopsys/dwc2/dwc2_bcm.h
+@@ -64,6 +64,14 @@ static inline void dwc2_dcd_int_disable (uint8_t rhport)
+   BP_DisableIRQ(_dwc2_controller[rhport].irqnum);
+ }
+ 
++TU_ATTR_ALWAYS_INLINE
++static inline void dwc2_int_set(uint8_t rhport, tusb_role_t role, bool enabled)
++{
++  (void) rhport;
++  (void) role;
++  (void) enabled;
++}
++
+ static inline void dwc2_remote_wakeup_delay(void)
+ {
+   // try to delay for 1 ms

@@ -1,0 +1,9 @@
+001-tusb_c.patch -p1
+002-dwc2_bcm_h.patch -p1
+003-hcd_dwc2_c.patch -p1
+004-tusb_debug_h.patch -p1
+005-hid_host_c.patch -p1
+006-msc_host_c.patch -p1
+007-hub_c.patch -p1
+008-usbh_c.patch -p1
+009-usbh_h.patch -p1

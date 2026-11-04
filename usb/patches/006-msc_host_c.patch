@@ -1,0 +1,31 @@
+diff --git a/src/class/msc/msc_host.c b/src/class/msc/msc_host.c
+index 6a36c2820..93a37338f 100644
+--- a/tusb/src/class/msc/msc_host.c
++++ b/tusb/src/class/msc/msc_host.c
+@@ -28,6 +28,8 @@
+ 
+ #if CFG_TUH_ENABLED && CFG_TUH_MSC
+ 
++#include <sddf/usb/constants.h>
++
+ #include "host/usbh.h"
+ #include "host/usbh_pvt.h"
+ 
+@@ -77,7 +79,7 @@ typedef struct {
+ } msch_epbuf_t;
+ 
+ static msch_interface_t _msch_itf[CFG_TUH_DEVICE_MAX];
+-CFG_TUH_MEM_SECTION static msch_epbuf_t _msch_epbuf[CFG_TUH_DEVICE_MAX];
++static msch_epbuf_t* _msch_epbuf = (msch_epbuf_t*) _MSCH_EPBUF_VADDR;
+ 
+ TU_ATTR_ALWAYS_INLINE static inline msch_interface_t* get_itf(uint8_t daddr) {
+   return &_msch_itf[daddr - 1];
+@@ -301,6 +303,8 @@ bool tuh_msc_reset(uint8_t dev_addr) {
+ bool msch_init(void) {
+   TU_LOG_DRV("sizeof(msch_interface_t) = %u\r\n", sizeof(msch_interface_t));
+   TU_LOG_DRV("sizeof(msch_epbuf_t) = %u\r\n", sizeof(msch_epbuf_t));
++  TU_LOG1("sizeof(msch_epbuf_t) * CFG_TUH_DEVICE_MAX = %u B\r\n",
++          sizeof(msch_epbuf_t) * CFG_TUH_DEVICE_MAX);
+   tu_memclr(_msch_itf, sizeof(_msch_itf));
+   return true;
+ }

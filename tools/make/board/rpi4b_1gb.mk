@@ -9,5 +9,6 @@
 # ETH_DRIV := eth_driver_dwmac-5.10a.elf
 UART_DRIV_DIR := ns16550a
 TIMER_DRIV_DIR := bcm2835
+USB_DRIV_DIR := dwc2
 #I2C_DRIV_DIR := ${PLATFORM}
 CPU := cortex-a72

@@ -1,0 +1,31 @@
+diff --git a/src/class/hid/hid_host.c b/src/class/hid/hid_host.c
+index 29bcae99f..99f10b87a 100644
+--- a/tusb/src/class/hid/hid_host.c
++++ b/tusb/src/class/hid/hid_host.c
+@@ -28,6 +28,8 @@
+ 
+ #if (CFG_TUH_ENABLED && CFG_TUH_HID)
+ 
++#include <sddf/usb/constants.h>
++
+ #include "host/usbh.h"
+ #include "host/usbh_pvt.h"
+ 
+@@ -66,7 +68,7 @@ typedef struct {
+ } hidh_epbuf_t;
+ 
+ static hidh_interface_t _hidh_itf[CFG_TUH_HID];
+-CFG_TUH_MEM_SECTION static hidh_epbuf_t _hidh_epbuf[CFG_TUH_HID];
++static hidh_epbuf_t* _hidh_epbuf = (hidh_epbuf_t*) _HIDH_EPBUF_VADDR;
+ 
+ static uint8_t _hidh_default_protocol = HID_PROTOCOL_BOOT;
+ 
+@@ -456,6 +458,8 @@ bool tuh_hid_send_report(uint8_t daddr, uint8_t idx, uint8_t report_id, const vo
+ //--------------------------------------------------------------------+
+ bool hidh_init(void) {
+   TU_LOG_DRV("sizeof(hidh_interface_t) = %u\r\n", sizeof(hidh_interface_t));
++  TU_LOG1("sizeof(hidh_epbuf_t) * CFG_TUH_HID = %u B\r\n",
++          sizeof(hidh_epbuf_t) * CFG_TUH_HID);
+   tu_memclr(_hidh_itf, sizeof(_hidh_itf));
+   return true;
+ }

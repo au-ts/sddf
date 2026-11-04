@@ -6,28 +6,26 @@
 
 # USB example
 
-This is a very simple example where a single client program is setting timeouts
-and getting the current time from a timer driver.
+This is a simple example demonstrating keyboard, mice and mass-storage device
+support via USB. There are two virtualisers: one for human-interface devices and
+one for mass-storage devices. The first device of each type that is connected
+will be bound to its respective virtualiser until it is disconnected. 
 
 ## Building
 
 The following platforms are supported:
 
-* imx8mm_evk
-* imx8mp_evk
-* imx8mq_evk
-* maaxboard
-* odroidc2
-* odroidc4
-* qemu_virt_aarch64
-* qemu_virt_riscv64
-* rpi4b_1gb
-* serengeti
-* star64
-* x86_64_generic
-* zcu102
+* rpi4b_1gb[^1]
+
+[^1]: While the Raspberry Pi 4B is supported, it requires activating a legacy
+USB controller via a device-tree overlay and non-USB-C power delivery (the USB-C
+port is the only port supported by the legacy controller). The Raspberry Pi
+Compute Module 4 is almost equivalent, and when paired with its I/O board,
+is a much more convenient platform.
 
 ### Make
+
+(More detailed build instructions are to come.)
 
 ```sh
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
@@ -35,44 +33,29 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
 
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu`
-to your make command after building for qemu_virt_aarch64.
-
-### Zig
-
-You can also build this example with the Zig build system:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=<board>
-```
-
-The options for `<board>` are the same as the Makefile.
-
-You can simulate QEMU with:
-```sh
-zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
-```
-
-The final bootable image will be in `zig-out/bin/loader.img`.
-
 ## Running
 
 When running the example, you should see something similar to the following
 output:
 ```
-CLIENT|INFO: The time now is: 29422640
-CLIENT|INFO: Setting a time out for 1 second
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 1031980992
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 2032392176
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 3032782448
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 4033253600
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 5033766064
-CLIENT|INFO: Got a timeout!
-CLIENT|INFO: Now the time (in nanoseconds) is: 6034408576
+CLIENT|INFO: Starting...
+CLIENT|INFO: A mass storage device has been mounted
+    Kingston DataTraveler 3.0 rev 
+    Disk size: 59006 MB
+    Block count: 120845300; Block size: 512
+CLIENT|INFO: A keyboard device has been mounted
+CLIENT|INFO: Keyboard HID report received
+    Modifiers:  0x02     <LeftShift> 
+    Keycode:    0x0b    H
+CLIENT|INFO: i
+CLIENT|INFO: t
+CLIENT|INFO: Keyboard HID report received
+    Modifiers:  0x01     <LeftControl> 
+    Keycode:    0x17    t
+CLIENT|INFO: A keyboard device has been unmounted
+CLIENT|INFO: A mouse device has been mounted
+CLIENT|INFO: Mouse HID report received
+    Buttons:    0x01     <ButtonLeft> 
+    X offset:   0
+    Y offset:   0
 ```
-
-The client will continuously set timeouts and read the current time.

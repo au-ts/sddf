@@ -1,0 +1,21 @@
+diff --git a/src/host/usbh.h b/src/host/usbh.h
+index 7ddec35b7..ce4122aee 100644
+--- a/tusb/src/host/usbh.h
++++ b/tusb/src/host/usbh.h
+@@ -32,6 +32,7 @@
+ #endif
+ 
+ #include "common/tusb_common.h"
++#include "hcd.h"
+ 
+ #if CFG_TUH_MAX3421
+ #include "portable/analog/max3421/hcd_max3421.h"
+@@ -178,6 +179,8 @@ bool tuh_deinit(uint8_t rhport);
+ // To check if an rhport is initialized, use tuh_rhport_is_active()
+ bool tuh_inited(void);
+ 
++bool tuh_queue_event(hcd_event_t const * event);
++
+ // Task function should be called in main/rtos loop, extended version of tuh_task()
+ // - timeout_ms: millisecond to wait, zero = no wait, 0xFFFFFFFF = wait forever
+ // - in_isr: if function is called in ISR

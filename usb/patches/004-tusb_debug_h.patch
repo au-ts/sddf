@@ -1,0 +1,16 @@
+diff --git a/src/common/tusb_debug.h b/src/common/tusb_debug.h
+index ba5b4afd1..b69cac3c3 100644
+--- a/tusb/src/common/tusb_debug.h
++++ b/tusb/src/common/tusb_debug.h
+@@ -42,6 +42,11 @@
+ // 3 : print info
+ #if CFG_TUSB_DEBUG
+ 
++/* FIXME */
++#define PRIuPTR "lu"
++#define PRIu32 "u"
++#define PRIX32 "X"
++
+ // Enum to String for debugging purposes
+ #if CFG_TUSB_DEBUG >= CFG_TUH_LOG_LEVEL || CFG_TUSB_DEBUG >= CFG_TUD_LOG_LEVEL
+ extern char const* const tu_str_speed[];
