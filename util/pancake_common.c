@@ -62,14 +62,8 @@ static void init_pancake_check()
 {
     /* used in include/sddf/serial/config.pnk */
     assert(sizeof(serial_connection_resource_t) == 40);
-
-    /* used in include/sddf/serial/config.pnk */
     assert(offsetof(serial_connection_resource_t, id) == 32);
-
-    /* used in include/sddf/serial/config.pnk */
     assert(sizeof(serial_virt_tx_client_config_t) == 104);
-
-    /* used in include/sddf/serial/config.pnk */
     assert(offsetof(serial_virt_tx_client_config_t, conn) == 0);
 
     /* used in include/sddf/serial/queue.pnk */
