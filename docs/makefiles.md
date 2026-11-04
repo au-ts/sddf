@@ -42,6 +42,7 @@ Variables
 | `SDDF_CUSTOM_LIBC` | A value controlling the 'libc' used by |
 | or                 | sDDF components during build. See      |
 | `SDDF_LIBC_INCLUDE`| [libc.md](./libc.md) for more details. |
+| `PANCAKE`          | `1` to build with Pancake components   |
 
 
 ### Set by Board snippet ###
