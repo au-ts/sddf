@@ -60,10 +60,19 @@ void *cml_install(uint8_t *src, size_t len, uint8_t *dest)
    a struct and the offset of a field within the struct are correct. */
 static void init_pancake_check()
 {
+    /* used in include/sddf/serial/config.pnk */
     assert(sizeof(serial_connection_resource_t) == 40);
+
+    /* used in include/sddf/serial/config.pnk */
     assert(offsetof(serial_connection_resource_t, id) == 32);
+
+    /* used in include/sddf/serial/config.pnk */
     assert(sizeof(serial_virt_tx_client_config_t) == 104);
+
+    /* used in include/sddf/serial/config.pnk */
     assert(offsetof(serial_virt_tx_client_config_t, conn) == 0);
+
+    /* used in include/sddf/serial/queue.pnk */
     assert(sizeof(serial_queue_handle_t) == 24);
 }
 
