@@ -79,7 +79,7 @@ jobs:
           make
           echo "$(pwd):$PATH" >> $GITHUB_PATH
       - name: Build examples
-        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --languages=pancake --examples=serial
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc) --languages=pancake
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
@@ -124,7 +124,7 @@ jobs:
       - name: Get Nix dependencies
         run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
-        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py $MICROKIT_SDK $(nproc) --languages=pancake --example=serial'
+        run: nix develop --ignore-environment -c bash -c 'source systems-ci/setup.sh && CI=1 ./ci/build.py $MICROKIT_SDK $(nproc) --languages=pancake'
       - name: Archive image artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -226,7 +226,7 @@ jobs:
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
-          exec ./ci/run.py --only-qemu --examples=serial --languages=pancake
+          exec ./ci/run.py --only-qemu --languages=pancake
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -316,7 +316,7 @@ jobs:
           export PATH="$(pwd)/machine_queue":$PATH
           # GitHub Actions is broken
           # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
-          exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }} --languages=pancake --examples=serial
+          exec ./ci/run.py --no-only-qemu --board=${{ matrix.board }} --languages=pancake
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v7
