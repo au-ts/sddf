@@ -244,7 +244,7 @@ export fun notified(1 ch)
                 uart_write_imsc(imsc);
                 rx_return();
             } else {
-                custom_debug_print(1, ch);
+                custom_debug_print(DEBUG_PRINT_UART_UNEXPECTED_CHANNEL, ch);
             }
         }
     }

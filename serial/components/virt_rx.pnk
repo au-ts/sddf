@@ -75,7 +75,7 @@ fun rx_return()
                             transferred = true;
                         }
                     } else {
-                        custom_debug_print(4, res.1);
+                        custom_debug_print(DEBUG_PRINT_VIRT_RTX_INVALID_DIGIT, res.1);
                     }
                     reset_state();
                 }
@@ -93,9 +93,9 @@ fun rx_return()
                             current_client = input_number;
                             local_tail = serial_queue_get_tail(rx_queue_handle_cli + current_client * SERIAL_QUEUE_SIZE);
                             transferred = false;
-                            custom_debug_print(0, input_number);
+                            custom_debug_print(DEBUG_PRINT_VIRT_RX_SWITCH, input_number);
                         } else {
-                            custom_debug_print(5, input_number);
+                            custom_debug_print(DEBUG_PRINT_INVALID_CLIENT_SWITCH, input_number);
                         }
                         reset_state();
                     }
@@ -111,9 +111,9 @@ fun rx_return()
                         !st8 next_client + next_client_index, res.1;
                         next_client_index = next_client_index + 1;
                     } else {
-                        custom_debug_print(6, next_client_index + 1);
-                        custom_debug_print(7, MAX_CLI_BASE_10);
-                        custom_debug_print(8, res.1);
+                        custom_debug_print(DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_1, next_client_index + 1);
+                        custom_debug_print(DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_2, MAX_CLI_BASE_10);
+                        custom_debug_print(DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_3, res.1);
                         reset_state();
                     }
                 }
@@ -145,7 +145,7 @@ export fun notified(1 ch)
     if (ch == ID) {
         rx_return();
     } else {
-        custom_debug_print(9, ch);
+        custom_debug_print(DEBUG_PRINT_VIRT_RX_UNEXPECTED_CHANNEL, ch);
     }
 
     return 0;

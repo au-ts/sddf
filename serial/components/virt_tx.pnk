@@ -186,7 +186,7 @@ fun tx_provide(1 ch)
     }
 
     if (active_client == SDDF_SERIAL_MAX_CLIENTS) {
-        custom_debug_print(10, ch);
+        custom_debug_print(DEBUG_PRINT_VIRT_TX_UNKNOWN_CHANNEL, ch);
         return 0;
     }
 

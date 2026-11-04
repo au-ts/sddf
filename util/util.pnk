@@ -19,6 +19,19 @@
 #define debug_print(value) \
     @debug_print(0, value, 0, __LINE__)
 
+/* Helper constants for indexing the string literal array for debug_print */
+#define DEBUG_PRINT_VIRT_RX_SWITCH             0
+#define DEBUG_PRINT_UART_UNEXPECTED_CHANNEL    1
+#define DEBUG_PRINT_UART_STATUS_ERROR          2
+#define DEBUG_PRINT_LSR_ERROR                  3
+#define DEBUG_PRINT_VIRT_RTX_INVALID_DIGIT     4
+#define DEBUG_PRINT_INVALID_CLIENT_SWITCH      5
+#define DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_1    6
+#define DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_2    7
+#define DEBUG_PRINT_VIRT_RX_INVALID_DIGIT_3    8
+#define DEBUG_PRINT_VIRT_RX_UNEXPECTED_CHANNEL 9
+#define DEBUG_PRINT_VIRT_TX_UNKNOWN_CHANNEL    10
+
 /* Helper functions for FFI calls */
 inline fun sddf_irq_ack(1 channel)
 {
