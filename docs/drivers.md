@@ -33,6 +33,7 @@ Device Tree compatible strings/platforms it is known to work with.
     * `nxp,imx8mp-dwmac-eqos`
     * `snps,dwmac-5.10a`
     * `snps,dwmac-5.20`
+    * `eswin,eic7700-qos-eth`
 * i.MX8
     * `fsl,imx8mq-fec`
 * Meson
@@ -60,6 +61,7 @@ Device Tree compatible strings/platforms it is known to work with.
     * `starfive,jh7110-uart`
     * `ns16550a`
     * `pc99`
+    * `snps,dw-apb-uart`
 * AMD Zynq UltraScale+ MPSoC UART
     * `xlnx,zynqmp-uart`
 * virtIO console
