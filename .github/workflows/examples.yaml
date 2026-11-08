@@ -177,7 +177,7 @@ jobs:
 
   tests_qemu:
     name: Tests (QEMU)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build_linux_x86_64_nix
     steps:
       - name: Checkout sDDF repository
@@ -207,7 +207,7 @@ jobs:
 
   tests_qemu_pancake:
     name: Tests Pancake (QEMU)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build_pancake_linux_x86_64_nix
     steps:
       - name: Checkout sDDF repository
@@ -237,7 +237,7 @@ jobs:
 
   get_board_names:
     name: Get board names
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ github.repository_owner == 'au-ts' &&
               (
                 (github.event_name == 'schedule') ||
@@ -263,7 +263,7 @@ jobs:
 
   tests_hardware:
     name: Tests (hardware)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ github.repository_owner == 'au-ts' &&
               (
                 (github.event_name == 'schedule') ||
@@ -327,7 +327,7 @@ jobs:
 
   bench_hardware:
     name: Benchmarks (hardware)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ github.repository_owner == 'au-ts' &&
               (
                 (github.event_name == 'schedule') ||
