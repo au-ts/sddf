@@ -22,7 +22,7 @@ on:
 env:
   MICROKIT_VERSION: 2.4.0
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.4.0/
-  CAKE_JOB_ID: 3440
+  CAKE_JOB_ID: 3671
 
 jobs:
   build_linux_x86_64:
