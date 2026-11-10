@@ -5,8 +5,23 @@
 #
 
 QEMU := qemu-system-riscv64
-QEMU_ARCH_ARGS := -machine virt \
-					-kernel $(IMAGE_FILE) \
+QEMU_MACHINE := virt
+QEMU_IMAGE_ARGS = -kernel $(IMAGE_FILE)
+
+ifeq ($(MULTIKERNEL),1)
+QEMU_MACHINE := virt,aia=aplic-imsic
+
+QEMU_SMP_ARGS = -smp $(shell $(PYTHON) -c \
+    'import json, sys; print(max(p["hart"] for p in json.load(open(sys.argv[1]))) + 1)' \
+    "$(MULTIKERNEL_CONFIG)")
+
+QEMU_IMAGE_ARGS = -kernel $(BUILD_DIR)/$(firstword $(IMAGE_FILE)) \
+		$(foreach image,$(wordlist 2,$(words $(IMAGE_FILE)),$(IMAGE_FILE)),\
+    	-device loader,file=$(BUILD_DIR)/$(image))
+endif
+
+QEMU_ARCH_ARGS = -machine $(QEMU_MACHINE) \
+					$(QEMU_IMAGE_ARGS) \
 					-m size=2G \
 					-serial mon:stdio \
 				    -global virtio-mmio.force-legacy=false

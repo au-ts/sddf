@@ -8,6 +8,9 @@
 #include <microkit.h>
 #include <sel4/sel4.h>
 #include <stdint.h>
+#ifdef MULTIKERNEL
+#include <sddf/util/multikernel.h>
+#endif
 
 typedef microkit_channel sddf_channel;
 
@@ -30,11 +33,22 @@ static inline void sddf_deferred_irq_ack(sddf_channel ch)
 
 static inline void sddf_notify(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    if (sddf_send_ipi(ch)) {
+        return;
+    }
+#endif
     microkit_notify(ch);
 }
 
 static inline void sddf_deferred_notify(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    /* Simpler to immediately send. This is not a system call. */
+    if (sddf_send_ipi(ch)) {
+        return;
+    }
+#endif
     microkit_deferred_notify(ch);
 }
 

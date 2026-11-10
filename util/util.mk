@@ -17,6 +17,11 @@ endif
 
 OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o arch_timestamp_counter.o
 
+ifeq ($(MULTIKERNEL),1)
+	CFLAGS += -DMULTIKERNEL
+	OBJS_LIBUTIL += multikernel.o
+endif
+
 ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
 	CFLAGS += -I${SDDF}/include/sddf/util/custom_libc
 	OBJS_LIBUTIL += custom_libc/libc.o custom_libc/memcmp.o custom_libc/memcpy.o \
