@@ -137,7 +137,7 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
     }
 
     queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
     queue->free->tail++;
@@ -160,7 +160,7 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
     }
 
     queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
     queue->active->tail++;
@@ -183,7 +183,7 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
     }
 
     *buffer = queue->free->buffers[queue->free->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
     queue->free->head++;
@@ -206,7 +206,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
     }
 
     *buffer = queue->active->buffers[queue->active->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
     queue->active->head++;
@@ -263,7 +263,7 @@ static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_ad
 static inline void net_request_signal_free(net_queue_handle_t *queue)
 {
     queue->free->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
 }
@@ -276,7 +276,7 @@ static inline void net_request_signal_free(net_queue_handle_t *queue)
 static inline void net_request_signal_active(net_queue_handle_t *queue)
 {
     queue->active->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
 }
@@ -289,7 +289,7 @@ static inline void net_request_signal_active(net_queue_handle_t *queue)
 static inline void net_cancel_signal_free(net_queue_handle_t *queue)
 {
     queue->free->consumer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
 }
@@ -302,7 +302,7 @@ static inline void net_cancel_signal_free(net_queue_handle_t *queue)
 static inline void net_cancel_signal_active(net_queue_handle_t *queue)
 {
     queue->active->consumer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+#if defined(CONFIG_ENABLE_SMP_SUPPORT) || defined(MULTIKERNEL)
     THREAD_MEMORY_RELEASE();
 #endif
 }
