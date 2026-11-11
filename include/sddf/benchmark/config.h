@@ -30,6 +30,9 @@
 #endif
 
 #define BENCHMARK_MAX_CHILDREN 64 // TODO: Can we have a higher upper bound on this?
+#ifndef SDDF_BENCHMARK_MAX_CORES
+#define SDDF_BENCHMARK_MAX_CORES CONFIG_MAX_NUM_NODES
+#endif
 
 typedef struct benchmark_child_config {
     char name[SDDF_NAME_LENGTH];
@@ -86,5 +89,5 @@ typedef struct benchmark_client_config {
     uint8_t num_cores;
     /* Addresses of each active core's cycle counts maintained by and shared
     with the idle thread on that core. */
-    void *core_ccounts[CONFIG_MAX_NUM_NODES];
+    void *core_ccounts[SDDF_BENCHMARK_MAX_CORES];
 } benchmark_client_config_t;

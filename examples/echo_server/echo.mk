@@ -47,6 +47,16 @@ IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
 	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
+ifeq ($(MULTIKERNEL),1)
+MULTIKERNEL_CONFIG ?= $(ECHO_SERVER)/partitions.json
+include ${SDDF}/tools/make/multikernel.mk
+CFLAGS += -DSDDF_BENCHMARK_MAX_CORES=$(words $(MULTIKERNEL_NAMES))
+echo.o utilization_socket.o benchmark.o idle.o: $(MULTIKERNEL_CONFIG)
+else
+METAPROGRAM_ARGS := --smp $(SMP_CONFIG)
+endif
+
+QEMU_SMP_ARGS ?= -smp 4
 
 CFLAGS += \
 	  -Wno-unused-function \
@@ -72,7 +82,7 @@ ECHO_OBJS := echo.o utilization_socket.o \
 
 DEPS := $(ECHO_OBJS:.o=.d)
 
-all: loader.img
+all: $(IMAGE_FILE)
 
 echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
@@ -81,16 +91,20 @@ echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
 
+ifeq ($(MULTIKERNEL),1)
+$(MULTIKERNEL_MANIFEST): $(METAPROGRAM) $(IMAGES) $(DTB)
+else
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+endif
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(METAPROGRAM_ARGS) \
 		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
 else
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(METAPROGRAM_ARGS) \
 		$(if $(BENCH_PMU_EVENTS), --bench_pmu_events $(BENCH_PMU_EVENTS))
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
@@ -113,10 +127,12 @@ endif
 	touch $@
 
 
+ifneq ($(MULTIKERNEL),1)
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)
+endif
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
@@ -129,7 +145,7 @@ hostfwd=udp::1238-10.0.2.16:1235,\
 hostfwd=tcp::1239-10.0.2.16:1236,\
 hostfwd=tcp::1240-10.0.2.16:1237 \
 		-global virtio-mmio.force-legacy=false \
-		-d guest_errors -smp 4
+		-d guest_errors $(QEMU_SMP_ARGS)
 
 clean::
 	${RM} -f *.elf .depend* $

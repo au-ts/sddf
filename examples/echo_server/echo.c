@@ -81,6 +81,9 @@ void init(void)
 
 void notified(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    sddf_multikernel_ack(ch);
+#endif
     if (ch == net_config.rx.id) {
         sddf_lwip_process_rx();
     } else if (ch == timer_config.driver_id) {

@@ -1,0 +1,18 @@
+[
+    {
+        "name": "kernel_001",
+        "hart": 0,
+        "private_ram": 134217728,
+        "pds": [
+            "timer_driver", "serial_driver", "serial_virt_tx",
+            "ethernet_driver", "net_virt_tx", "net_virt_rx",
+            "client0", "client1", "bench0", "bench_idle0"
+        ]
+    },
+    {
+        "name": "kernel_002",
+        "hart": 1,
+        "private_ram": 134217728,
+        "pds": ["client0_net_copier", "client1_net_copier", "bench1", "bench_idle1"]
+    }
+]

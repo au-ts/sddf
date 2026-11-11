@@ -216,7 +216,7 @@ static void benchmark_start(void)
 
     /* Notify benchmark PD running on next core */
     if (!benchmark_config.last_core) {
-        microkit_notify(benchmark_config.tx_start_ch);
+        sddf_notify(benchmark_config.tx_start_ch);
     }
 }
 
@@ -279,12 +279,15 @@ static void benchmark_stop(void)
 
     /* Notify benchmark PD running on next core */
     if (!benchmark_config.last_core) {
-        microkit_notify(benchmark_config.tx_stop_ch);
+        sddf_notify(benchmark_config.tx_stop_ch);
     }
 }
 
 void notified(microkit_channel ch)
 {
+#ifdef MULTIKERNEL
+    sddf_multikernel_ack(ch);
+#endif
     if (ch == serial_config.tx.id) {
         return;
     } else if (ch == benchmark_config.rx_start_ch) {

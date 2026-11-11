@@ -16,21 +16,30 @@ override BUILD_DIR := $(abspath ${BUILD_DIR})
 export BUILD_DIR
 export SDDF := $(abspath ../..)
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
+ifneq ($(MULTIKERNEL),1)
 SMP_CONFIG ?=core_config/single_core.json
 ifeq ($(wildcard ${SMP_CONFIG}),)
   $(error A valid SMP config .json file must be provided)
 endif
 override SMP_CONFIG:=$(abspath ${SMP_CONFIG})
+endif
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
 export ECHO_INCLUDE := $(abspath .)/include
 
+ifeq ($(MULTIKERNEL),1)
+MULTIKERNEL_CONFIG ?= partitions.json
+override MULTIKERNEL_CONFIG := $(abspath $(MULTIKERNEL_CONFIG))
+all qemu clean clobber: ${BUILD_DIR}/Makefile FORCE
+	${MAKE}  -C ${BUILD_DIR} BUILD_DIR=${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} MULTIKERNEL_CONFIG=${MULTIKERNEL_CONFIG} $@
+else
 all: ${IMAGE_FILE}
 
 qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} SMP_CONFIG=${SMP_CONFIG} $(notdir $@)
+	${MAKE}  -C ${BUILD_DIR} BUILD_DIR=${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} SMP_CONFIG=${SMP_CONFIG} $(notdir $@)
+endif
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}

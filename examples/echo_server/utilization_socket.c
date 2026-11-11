@@ -69,8 +69,8 @@ static struct tcp_pcb *utiliz_socket;
 
 benchmark_client_config_t *bench;
 
-uint64_t core_ccount_start[CONFIG_MAX_NUM_NODES];
-uint64_t idle_ccount_start[CONFIG_MAX_NUM_NODES];
+uint64_t core_ccount_start[SDDF_BENCHMARK_MAX_CORES];
+uint64_t idle_ccount_start[SDDF_BENCHMARK_MAX_CORES];
 
 #define MAX_TCP_DATA_LEN 1460
 

@@ -7,6 +7,7 @@ import shutil
 import struct
 import subprocess
 import sys
+from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from acacia import (
@@ -450,6 +451,16 @@ def generate(
         client0_elf, "benchmark_client_config", "benchmark_client_config"
     )
 
+    if args.multikernel:
+        from acacia import Multikernel
+        sdf.resolve_subsystems()
+        multi_k = Multikernel(sdf, args.multikernel)
+        for partition in multi_k.partitions[1:]:
+            for pd in partition.pds:
+                for mapping in pd.maps:
+                    mapping.mr.physical = True
+        multi_k.prepare(Path(output_dir) / "multikernel")
+
     # Below expects config structs to exist, so make them
     sdf.make_config_structs(dump=True)
 
@@ -485,7 +496,10 @@ def generate(
             core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
         )
 
-    sdf.write_xml_file(f"{output_dir}/{sdf_file}")
+    if args.multikernel:
+        multi_k.write(Path(output_dir) / "multikernel")
+    else:
+        sdf.write_xml_file(f"{output_dir}/{sdf_file}")
 
 
 # ARM PMU event identifier dictionary:
@@ -531,7 +545,9 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
     parser.add_argument("--objcopy", required=True)
-    parser.add_argument("--smp", required=True)
+    core_config = parser.add_mutually_exclusive_group(required=True)
+    core_config.add_argument("--smp")
+    core_config.add_argument("--multikernel", type=Path, help="Partition configuration JSON")
     parser.add_argument("--bench_pmu_events", required=False)
 
     args = parser.parse_args()
@@ -547,8 +563,12 @@ if __name__ == "__main__":
     global obj_copy
     obj_copy = args.objcopy
 
-    with open(args.smp, "r") as core_alloc:
-        core_dict = json.load(core_alloc)
+    if args.multikernel:
+        partitions = sorted(json.loads(args.multikernel.read_text()), key=lambda p:p["hart"])
+        core_dict = {name: core for core,partition in enumerate(partitions) for name in partition["pds"]}
+    else:
+        with open(args.smp, "r") as core_alloc:
+            core_dict = json.load(core_alloc)
     get_core = lambda name: core_dict[name]
 
     if args.bench_pmu_events:

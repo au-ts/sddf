@@ -91,6 +91,9 @@ void rx_return(void)
 
 void notified(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    sddf_multikernel_ack(ch);
+#endif
     rx_return();
 }
 
