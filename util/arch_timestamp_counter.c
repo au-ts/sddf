@@ -171,4 +171,14 @@ uint64_t sddf_read_freq(void)
     return cached_tsc_frequency;
 }
 
+#elif defined(CONFIG_ARCH_RISCV)
+uint64_t sddf_read_counter(void) {
+    uint64_t time;
+    asm volatile("rdtime %0" : "=r"(time));
+    return time;
+}
+
+uint64_t sddf_read_freq(void) {
+    return CONFIG_TIMER_FREQUENCY;
+}
 #endif

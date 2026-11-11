@@ -35,12 +35,12 @@ static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout
 static inline uint64_t sddf_timer_time_now(unsigned int channel)
 {
     // TODO: remove this guard once remaining architectures supported
-#if defined(CONFIG_ARCH_X86)
+#if defined(CONFIG_ARCH_X86) || defined(CONFIG_ARCH_RISCV)
     uint64_t freq = sddf_read_freq();
     if (likely(freq != 0)) {
         return ticks_to_ns(sddf_read_counter(), freq);
     }
-#endif // CONFIG_ARCH_X86
+#endif
 
     sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_GET_TIME, 0, 0, 0));
     return sddf_get_mr(0);
