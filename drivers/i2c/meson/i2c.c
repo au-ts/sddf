@@ -326,7 +326,8 @@ void init(void)
 
     // Set up driver state and shared regions
     i2c_reset_state(&driver_data);
-    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
+    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.num_req_buffers,
+                                  config.virt.resp_queue.vaddr, config.virt.num_resp_buffers);
 
     microkit_dbg_puts("Driver initialised.\n");
 }

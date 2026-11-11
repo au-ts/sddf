@@ -10,28 +10,6 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 
-/*
- * The data region contains buffers for the driver to read from / write to. This macro is used
- * to ensure offsets are appropriately contained within the region as expected.
- * TODO: probably delete this? this serves no obvious purpose with Acacia parsing such information.
- */
-#ifndef I2C_MAX_DATA_SIZE
-#define I2C_MAX_DATA_SIZE 256
-#endif
-
-/*
- * We define the (default) queue size to fill an entire 4KiB page in the queue region.
- * NOTE: we size this based on the request queue as it contains larger structs and there
- * should never be more responses than requests.
- *
- * sizeof(i2c_cmd_t) = (8 + 1 + 1) + 2 padding = 16 bytes.
- * Queue size = 4096 // 16 = 256 (before considering bookkeeping struct)
- */
-#ifndef I2C_QUEUE_CAPACITY
-#define QUEUE_HANDLE_SZ (32)    // 24 bytes + padding
-#define I2C_QUEUE_CAPACITY ((4096 - QUEUE_HANDLE_SZ) / sizeof(i2c_cmd_t))
-#endif
-
 typedef enum i2c_err {
     I2C_ERR_QUEUE = -1,
     I2C_ERR_OK = 0,
@@ -93,7 +71,7 @@ typedef struct i2c_request_queue {
     // to prevent a race condition between the clients and virt.
     uint32_t staged_active_tail;
     i2c_queue_ctrl_t ctrl;
-    i2c_cmd_t cmds[I2C_QUEUE_CAPACITY];
+    i2c_cmd_t cmds[];
 } i2c_request_queue_t;
 
 typedef struct i2c_response {
@@ -107,13 +85,15 @@ typedef struct i2c_response {
  * error reporting. */
 typedef struct i2c_response_queue {
     i2c_queue_ctrl_t ctrl;
-    i2c_response_t responses[I2C_QUEUE_CAPACITY];
+    i2c_response_t responses[];
 } i2c_response_queue_t;
 
 /* Convenience struct for storing request and response queues */
 typedef struct i2c_queue_handle {
     i2c_request_queue_t *request;
+    size_t request_capacity;
     i2c_response_queue_t *response;
+    size_t response_capacity;
 } i2c_queue_handle_t;
 
 /**
@@ -146,13 +126,25 @@ static inline int i2c_parse_cmd_header(i2c_cmd_t *cmd)
  *
  * @param queue queue handle to use.
  * @param request pointer to request queue in shared memory.
+ * @param req_queue_capacity capacity of request queue
  * @param response pointer to response queue in shared memory.
+ * @param resp_queue_capacity capacity of response queue
  */
-static inline i2c_queue_handle_t i2c_queue_init(i2c_request_queue_t *request, i2c_response_queue_t *response)
+static inline i2c_queue_handle_t i2c_queue_init(i2c_request_queue_t *request, size_t req_queue_capacity,
+                                                i2c_response_queue_t *response, size_t resp_queue_capacity)
 {
     i2c_queue_handle_t handle;
     handle.request = request;
     handle.response = response;
+
+    // Capacities must be a power of 2
+    assert((req_queue_capacity & (req_queue_capacity - 1)) == 0);
+    assert((resp_queue_capacity & (resp_queue_capacity - 1)) == 0);
+
+    // Set capacities
+    handle.request_capacity = req_queue_capacity;
+    handle.response_capacity = resp_queue_capacity;
+
     handle.request->staged_active_tail = 0;
 
     return handle;
@@ -172,16 +164,15 @@ static inline int i2c_queue_empty(i2c_queue_ctrl_t q_ctrl)
 }
 
 /**
- * Check if the queue is full by looking at all commited entries.
- * Use i2c_request_queue_full() to consider uncommitted entries.
+ * Check if the response queue is full.
  *
- * @param queue queue to check.
+ * @param h queue handle to check
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-static inline int i2c_queue_full(i2c_queue_ctrl_t q_ctrl)
+static inline int i2c_response_queue_full(i2c_queue_handle_t h)
 {
-    return q_ctrl.tail - q_ctrl.head + 1 == I2C_QUEUE_CAPACITY;
+    return h.response->ctrl.tail - h.response->ctrl.head + 1 == (uint32_t)h.response_capacity;
 }
 
 /**
@@ -194,7 +185,7 @@ static inline int i2c_queue_full(i2c_queue_ctrl_t q_ctrl)
  */
 static inline int i2c_request_queue_full(i2c_queue_handle_t h)
 {
-    return (h.request->staged_active_tail - h.request->ctrl.head + 1) == I2C_QUEUE_CAPACITY;
+    return (h.request->staged_active_tail - h.request->ctrl.head + 1) == (uint32_t)h.request_capacity;
 }
 
 /**
@@ -244,7 +235,7 @@ static inline int i2c_enqueue_request(i2c_queue_handle_t h, i2c_cmd_t cmd)
     // If the staged tail is less than the real tail, queue is broken.
     assert(queue->staged_active_tail >= queue->ctrl.tail);
 
-    size_t index = queue->staged_active_tail % I2C_QUEUE_CAPACITY;
+    size_t index = queue->staged_active_tail % (uint32_t)h.request_capacity;
     queue->cmds[index] = cmd;
     // We update the staged tail instead of the real one.
     queue->staged_active_tail++;
@@ -290,11 +281,11 @@ static inline void i2c_request_abort(i2c_queue_handle_t h)
 static inline int i2c_enqueue_response(i2c_queue_handle_t h, i2c_addr_t bus_address, i2c_err_t error, size_t err_cmd)
 {
     i2c_response_queue_t *queue = h.response;
-    if (i2c_queue_full(queue->ctrl)) {
+    if (i2c_response_queue_full(h)) {
         return -1;
     }
 
-    size_t index = queue->ctrl.tail % I2C_QUEUE_CAPACITY;
+    size_t index = queue->ctrl.tail % (uint32_t)h.response_capacity;
     queue->responses[index].bus_address = bus_address;
     queue->responses[index].error = error;
     queue->responses[index].err_cmd = err_cmd;
@@ -318,7 +309,7 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_cmd_t *cmd)
         return -1;
     }
 
-    size_t index = queue->ctrl.head % I2C_QUEUE_CAPACITY;
+    size_t index = queue->ctrl.head % (uint32_t)h.request_capacity;
     *cmd = queue->cmds[index];
     THREAD_MEMORY_RELEASE();
     queue->ctrl.head++;
@@ -343,7 +334,7 @@ static inline int i2c_dequeue_response(i2c_queue_handle_t h, i2c_addr_t *bus_add
         return -1;
     }
 
-    size_t index = queue->ctrl.head % I2C_QUEUE_CAPACITY;
+    size_t index = queue->ctrl.head % (uint32_t)h.response_capacity;
     *bus_address = queue->responses[index].bus_address;
     *error = queue->responses[index].error;
     *err_cmd = queue->responses[index].err_cmd;

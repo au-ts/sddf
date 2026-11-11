@@ -17,21 +17,21 @@
 #define SDDF_I2C_MAGIC_LEN 5
 static char SDDF_I2C_MAGIC[SDDF_I2C_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x4 };
 
-// zig; Connection
+// Generic connection between any two places in the I2C system
 typedef struct i2c_connection_resource {
     region_resource_t req_queue;
     region_resource_t resp_queue;
-    uint16_t num_buffers;
+    uint16_t num_req_buffers;
+    uint16_t num_resp_buffers;
     uint8_t id;
 } i2c_connection_resource_t;
 
-// zig: Driver
 typedef struct i2c_driver_config {
     char magic[SDDF_I2C_MAGIC_LEN + 1];
     i2c_connection_resource_t virt;
 } i2c_driver_config_t;
 
-// zig: Virt.Client
+// Description of a client for the i2c virt. Part of i2c_virt_config only.
 typedef struct i2c_virt_client_config {
     i2c_connection_resource_t conn;
     size_t data_size;
@@ -39,15 +39,16 @@ typedef struct i2c_virt_client_config {
     uintptr_t client_data_vaddr;
 } i2c_virt_client_config_t;
 
-// zig: Virt
+// General virt configuration
 typedef struct i2c_virt_config {
     char magic[SDDF_I2C_MAGIC_LEN + 1];
     uint64_t num_clients;
     i2c_connection_resource_t driver;
+    region_resource_t intermediary_mr;
     i2c_virt_client_config_t clients[SDDF_I2C_MAX_CLIENTS];
 } i2c_virt_config_t;
 
-// zig: Client
+// Per-client configuration
 typedef struct i2c_client_config {
     char magic[SDDF_I2C_MAGIC_LEN + 1];
     i2c_connection_resource_t virt;

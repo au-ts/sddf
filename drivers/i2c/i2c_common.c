@@ -130,7 +130,7 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
         LOG_I2C_DRIVER_ERR("fatal: failed to dequeue request\n");
         return;
     }
-    if (header.payload.i2c_header.batch_len > I2C_MAX_DATA_SIZE
+    if (header.payload.i2c_header.batch_len > queue_handle->request_capacity
         || header.payload.i2c_header.batch_len > i2c_queue_length((queue_handle->request)->ctrl)) {
         LOG_I2C_DRIVER_ERR("Incoherent request size! %u!\n", header.payload.i2c_header.batch_len);
         assert(false); // Virt is broken.
@@ -213,7 +213,7 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t 
 void state_resp(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle)
 {
     LOG_I2C_DRIVER("S_RESP\n");
-    if (i2c_queue_full(queue_handle->response->ctrl)) {
+    if (i2c_response_queue_full(*queue_handle)) {
         LOG_I2C_DRIVER_ERR("Tried to return a response, but no buffers are available! Dropping..\n");
         f->next_state = S_IDLE;
         i2c_halt();

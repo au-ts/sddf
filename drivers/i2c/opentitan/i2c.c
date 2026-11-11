@@ -388,7 +388,8 @@ void init(void)
     regs->fifo_ctrl &= (~I2C_FIFO_CTRL_FMTILVL_MASK);
 
     // Prepare transport layer
-    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
+    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.num_req_buffers,
+                                  config.virt.resp_queue.vaddr, config.virt.num_resp_buffers);
     i2c_reset_state(&driver_data);
     LOG_I2C_DRIVER("Driver initialised.\n");
 }

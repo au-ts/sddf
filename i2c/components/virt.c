@@ -30,7 +30,7 @@ i2c_queue_handle_t driver_queue;
 virt_q_t deferred_queue;
 
 // Intermediate buffer: used to store commands while transaction is parsed and validated.
-i2c_cmd_t intermediary[I2C_QUEUE_CAPACITY];
+i2c_cmd_t *intermediary;
 size_t intermediary_idx = 0;
 
 // Security list: owner of each i2c address on the bus
@@ -99,7 +99,7 @@ int process_request(uint32_t client_id, i2c_cmd_t *deferred_cmd, size_t deferred
     i2c_cmd_t cmd;
     i2c_cmd_t *prev_cmd = NULL;
     i2c_addr_t bus_address = 0;
-    size_t max_work = I2C_QUEUE_CAPACITY;
+    size_t max_work = config.driver.num_req_buffers;
 
     // Load deferred command.
     if (deferred_work != 0) {
@@ -108,6 +108,7 @@ int process_request(uint32_t client_id, i2c_cmd_t *deferred_cmd, size_t deferred
         intermediary[0] = *deferred_cmd;
         intermediary_idx = 1;
         batch_remaining = deferred_cmd->payload.i2c_header.batch_len;
+        bus_address = deferred_cmd->payload.i2c_header.address;
         assert(cmd_count <= max_work);
     }
 
@@ -185,7 +186,7 @@ int process_request(uint32_t client_id, i2c_cmd_t *deferred_cmd, size_t deferred
             // Finally: determine if the driver queue can fit this command. If not, we go to
             // sleep here and defer the work until the driver has returned.
             // IMPORTANT: need to track intermediary fullness here too.
-            if (force_defer || I2C_QUEUE_CAPACITY - i2c_request_queue_length(driver_queue) < head_len + 1) {
+            if (force_defer || config.driver.num_req_buffers - i2c_request_queue_length(driver_queue) < head_len + 1) {
                 LOG_VIRT("Driver queue cannot accept command. Deferring\n");
                 // We defer all work here, not just the current command. We list the current
                 // command separately as we cannot enqueue it again safely.
@@ -274,8 +275,11 @@ int process_request(uint32_t client_id, i2c_cmd_t *deferred_cmd, size_t deferred
         transmit_intermediary();
         enqueued = true;
     } else {
-        // Command was malformed somehow. This should never happen! Virt broken otherwise...
-        assert(intermediary_idx != 0);
+        // Command was malformed somehow. Return an error.
+        if (intermediary_idx != 0) {
+            LOG_VIRT_ERR("Incoherent command sequence!");
+            return_error(I2C_ERR_MALFORMED_TRANSACTION, client_id, bus_address, 0);
+        }
     }
 
     // Successfully validated command(s). Send.
@@ -327,11 +331,16 @@ void init(void)
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
-    driver_queue = i2c_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
+
+    driver_queue = i2c_queue_init(config.driver.req_queue.vaddr, config.driver.num_req_buffers,
+                                  config.driver.resp_queue.vaddr, config.driver.num_resp_buffers);
     for (int i = 0; i < config.num_clients; i++) {
-        client_queues[i] = i2c_queue_init(config.clients[i].conn.req_queue.vaddr,
-                                          config.clients[i].conn.resp_queue.vaddr);
+        client_queues[i] = i2c_queue_init(
+            config.clients[i].conn.req_queue.vaddr, config.clients[i].conn.num_req_buffers,
+            config.clients[i].conn.resp_queue.vaddr, config.clients[i].conn.num_resp_buffers);
     }
+    // Intermediary region is created by Acacia.
+    intermediary = config.intermediary_mr.vaddr;
 }
 
 /**

@@ -64,7 +64,7 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
     uint16_t num_batches = MAX((len + 254) / 255, 1); // Number of 255 long batches. cmd_t indexes with uint8
 
     // Give up if queue cannot fit this many commands. Add 1 for header.
-    if (I2C_QUEUE_CAPACITY - i2c_request_queue_length(*conf->handle) < num_batches + 1) {
+    if (conf->handle->request_capacity - i2c_request_queue_length(*conf->handle) < num_batches + 1) {
         return -1;
     }
 
