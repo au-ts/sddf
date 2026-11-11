@@ -82,7 +82,8 @@ void init(void)
     i2c_setup();
 
     i2c_reset_state(&driver_data);
-    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
+    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.num_req_buffers,
+                                  config.virt.resp_queue.vaddr, config.virt.num_resp_buffers);
 }
 
 /**

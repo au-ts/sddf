@@ -219,7 +219,8 @@ void init(void)
     assert(i2c_config_check_magic((void *)&i2c_config));
 
     data_region = (uintptr_t)i2c_config.data.vaddr;
-    queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
+    queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.num_req_buffers,
+                           i2c_config.virt.resp_queue.vaddr, i2c_config.virt.num_resp_buffers);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, PN532_I2C_BUS_ADDRESS);
     if (!claimed) {

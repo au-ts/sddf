@@ -124,7 +124,8 @@ void init(void)
     assert(i2c_config_check_magic((void *)&i2c_config));
 
     data_region = (uintptr_t)i2c_config.data.vaddr;
-    queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
+    queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.num_req_buffers,
+                           i2c_config.virt.resp_queue.vaddr, i2c_config.virt.num_resp_buffers);
 
     // Claim all addresses except the general call address (0)
     for (uint8_t i = 1; i < (1 << 7); i++) {
