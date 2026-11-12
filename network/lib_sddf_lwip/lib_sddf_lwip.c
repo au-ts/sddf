@@ -240,7 +240,7 @@ static inline net_sddf_err_t tx_handle_intercept_default(struct pbuf *p)
  */
 inline uint32_t sys_now(void)
 {
-    return sddf_timer_time_now(sddf_state.timer_ch) / NS_IN_MS;
+    return sddf_timer_time_now() / NS_IN_MS;
 }
 
 void sddf_lwip_process_timeout(void)
@@ -468,7 +468,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     sddf_state.tx_ch = net_config->tx.id;
     sddf_state.rx_buffer_data_region = (uintptr_t)net_config->rx_data.vaddr;
     sddf_state.tx_buffer_data_region = (uintptr_t)net_config->tx_data.vaddr;
-    sddf_state.timer_ch = timer_config->driver_id;
+    sddf_state.timer_ch = timer_config->virt_id;
 
     /* Initialise lwip state */
     if (ip_string) {

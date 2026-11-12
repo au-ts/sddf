@@ -45,7 +45,7 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
+	  timer_driver.elf timer_virt.elf serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(MULTIKERNEL),1)
 MULTIKERNEL_CONFIG ?= $(ECHO_SERVER)/partitions.json
@@ -117,10 +117,8 @@ endif
 	$(OBJCOPY) --update-section .net_copy_config=network_copy0_net_copy_config.data network_copy.elf network_copy0.elf
 	$(OBJCOPY) --update-section .net_copy_config=network_copy1_net_copy_config.data network_copy.elf network_copy1.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=echo0_timer_client_config.data echo0.elf
 	$(OBJCOPY) --update-section .net_client_config=echo0_net_client_config.data echo0.elf
 	$(OBJCOPY) --update-section .serial_client_config=echo0_serial_client_config.data echo0.elf
-	$(OBJCOPY) --update-section .timer_client_config=echo1_timer_client_config.data echo1.elf
 	$(OBJCOPY) --update-section .net_client_config=echo1_net_client_config.data echo1.elf
 	$(OBJCOPY) --update-section .serial_client_config=echo1_serial_client_config.data echo1.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=echo0_lib_sddf_lwip_config.data echo0.elf
@@ -129,7 +127,7 @@ endif
 
 
 ifneq ($(MULTIKERNEL),1)
-${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE) $(wildcard *.data)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)

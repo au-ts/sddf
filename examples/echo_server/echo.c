@@ -22,7 +22,7 @@
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+timer_client_config_t *timer_config;
 
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
@@ -53,7 +53,7 @@ void netif_status_callback(char *ip_addr)
  */
 void set_timeout(void)
 {
-    sddf_timer_set_timeout(timer_config.driver_id, LWIP_TICK_MS * NS_IN_MS);
+    sddf_timer_set_timeout(timer_config, LWIP_TICK_MS * NS_IN_MS);
 }
 
 void init(void)
@@ -68,7 +68,7 @@ void init(void)
                    net_config.tx.num_buffers);
     net_buffers_init(&net_tx_handle, 0);
 
-    sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
+    sddf_lwip_init(&lib_sddf_lwip_config, &net_config, timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
                    netif_status_callback, NULL, NULL, NULL);
     set_timeout();
 
@@ -86,7 +86,7 @@ void notified(sddf_channel ch)
 #endif
     if (ch == net_config.rx.id) {
         sddf_lwip_process_rx();
-    } else if (ch == timer_config.driver_id) {
+    } else if (ch == timer_config->virt_id) {
         sddf_lwip_process_timeout();
         set_timeout();
     } else if (ch == serial_config.tx.id || ch == net_config.tx.id) {

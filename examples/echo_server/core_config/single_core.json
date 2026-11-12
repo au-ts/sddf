@@ -1,5 +1,6 @@
 {
     "timer_driver": 0,
+    "timer_virt": 0,
     "serial_driver": 0,
     "serial_virt_tx": 0,
     "ethernet_driver": 0,
