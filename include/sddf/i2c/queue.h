@@ -91,9 +91,9 @@ typedef struct i2c_response_queue {
 /* Convenience struct for storing request and response queues */
 typedef struct i2c_queue_handle {
     i2c_request_queue_t *request;
-    size_t request_capacity;
+    uint32_t request_capacity;
     i2c_response_queue_t *response;
-    size_t response_capacity;
+    uint32_t response_capacity;
 } i2c_queue_handle_t;
 
 /**
@@ -130,8 +130,8 @@ static inline int i2c_parse_cmd_header(i2c_cmd_t *cmd)
  * @param response pointer to response queue in shared memory.
  * @param resp_queue_capacity capacity of response queue
  */
-static inline i2c_queue_handle_t i2c_queue_init(i2c_request_queue_t *request, size_t req_queue_capacity,
-                                                i2c_response_queue_t *response, size_t resp_queue_capacity)
+static inline i2c_queue_handle_t i2c_queue_init(i2c_request_queue_t *request, uint32_t req_queue_capacity,
+                                                i2c_response_queue_t *response, uint32_t resp_queue_capacity)
 {
     i2c_queue_handle_t handle;
     handle.request = request;
@@ -172,7 +172,7 @@ static inline int i2c_queue_empty(i2c_queue_ctrl_t q_ctrl)
  */
 static inline int i2c_response_queue_full(i2c_queue_handle_t h)
 {
-    return h.response->ctrl.tail - h.response->ctrl.head + 1 == (uint32_t)h.response_capacity;
+    return h.response->ctrl.tail - h.response->ctrl.head + 1 == h.response_capacity;
 }
 
 /**
@@ -185,7 +185,7 @@ static inline int i2c_response_queue_full(i2c_queue_handle_t h)
  */
 static inline int i2c_request_queue_full(i2c_queue_handle_t h)
 {
-    return (h.request->staged_active_tail - h.request->ctrl.head + 1) == (uint32_t)h.request_capacity;
+    return (h.request->staged_active_tail - h.request->ctrl.head + 1) == h.request_capacity;
 }
 
 /**
@@ -235,7 +235,7 @@ static inline int i2c_enqueue_request(i2c_queue_handle_t h, i2c_cmd_t cmd)
     // If the staged tail is less than the real tail, queue is broken.
     assert(queue->staged_active_tail >= queue->ctrl.tail);
 
-    size_t index = queue->staged_active_tail % (uint32_t)h.request_capacity;
+    size_t index = queue->staged_active_tail & (h.request_capacity - 1);
     queue->cmds[index] = cmd;
     // We update the staged tail instead of the real one.
     queue->staged_active_tail++;
@@ -285,7 +285,7 @@ static inline int i2c_enqueue_response(i2c_queue_handle_t h, i2c_addr_t bus_addr
         return -1;
     }
 
-    size_t index = queue->ctrl.tail % (uint32_t)h.response_capacity;
+    size_t index = queue->ctrl.tail & (h.response_capacity - 1);
     queue->responses[index].bus_address = bus_address;
     queue->responses[index].error = error;
     queue->responses[index].err_cmd = err_cmd;
@@ -309,7 +309,7 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_cmd_t *cmd)
         return -1;
     }
 
-    size_t index = queue->ctrl.head % (uint32_t)h.request_capacity;
+    size_t index = queue->ctrl.head & (h.request_capacity - 1);
     *cmd = queue->cmds[index];
     THREAD_MEMORY_RELEASE();
     queue->ctrl.head++;
@@ -334,7 +334,7 @@ static inline int i2c_dequeue_response(i2c_queue_handle_t h, i2c_addr_t *bus_add
         return -1;
     }
 
-    size_t index = queue->ctrl.head % (uint32_t)h.response_capacity;
+    size_t index = queue->ctrl.head & (h.response_capacity - 1);
     *bus_address = queue->responses[index].bus_address;
     *error = queue->responses[index].error;
     *err_cmd = queue->responses[index].err_cmd;
