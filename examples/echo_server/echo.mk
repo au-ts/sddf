@@ -115,6 +115,7 @@ endif
 	$(OBJCOPY) --update-section .net_virt_rx_config=network_virt_rx_net_virt_rx_config.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=network_virt_tx_net_virt_tx_config.data network_virt_tx.elf
 	$(OBJCOPY) --update-section .net_copy_config=network_copy0_net_copy_config.data network_copy.elf network_copy0.elf
+	$(OBJCOPY) --update-section .net_copy_config=network_copy1_net_copy_config.data network_copy.elf network_copy1.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=echo0_timer_client_config.data echo0.elf
 	$(OBJCOPY) --update-section .net_client_config=echo0_net_client_config.data echo0.elf

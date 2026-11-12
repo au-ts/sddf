@@ -294,7 +294,7 @@ def generate(
         scheduling=SchedulingProperties(priority=97, budget=20000),
         cpu=get_core("client1"),
     )
-    client1_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
+    client1_net_copier_elf = copy_elf("network_copy", "network_copy", 1)
     client0_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
 
     client0_net_copier = ProtectionDomain(
