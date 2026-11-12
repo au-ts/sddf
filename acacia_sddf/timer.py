@@ -73,13 +73,13 @@ class sDDFTimer(sDDFDriverClass):
         return super().generate_config_structs() + self.client_configs
 
     def timer_client_config_factory(
-        self, client_pd: ProtectionDomain, driver_id: int
+        self, client_pd: ProtectionDomain, virt_id: int
     ) -> ConfigStruct:
         """
         create timer_client_config for client_pd with serial id n
         """
         # invariant: this PD only is a client to timer one time.
-        fields = {"magic": TIMER_PROTOCOL_MAGIC, "driver_id": driver_id}
+        fields = {"magic": TIMER_PROTOCOL_MAGIC, "virt_id": virt_id, "req_vaddr": 0}
         return ConfigStruct(
             fields,
             type_name="timer_client_config_t",

@@ -15,12 +15,20 @@ static char SDDF_TIMER_MAGIC[SDDF_TIMER_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x6 }
 
 typedef struct timer_client_config {
     char magic[SDDF_TIMER_MAGIC_LEN + 1];
-    uint8_t driver_id;
+    uint8_t virt_id;
+    uint64_t req_vaddr;
 } timer_client_config_t;
 
-static inline bool timer_config_check_magic(void *config)
+typedef struct {
+    char magic[SDDF_TIMER_MAGIC_LEN + 1];
+    uint8_t driver_id;
+    // NOTE: indexed by channel, zero unused channels
+    uint64_t req_vaddrs[SDDF_TIMER_MAX_CLIENTS];
+} sddf_timer_virt_config_t;
+
+static inline bool timer_config_check_magic(const void *config)
 {
-    char *magic = (char *)config;
+    const char *magic = (const char *)config;
     for (int i = 0; i < SDDF_TIMER_MAGIC_LEN; i++) {
         if (magic[i] != SDDF_TIMER_MAGIC[i]) {
             return false;

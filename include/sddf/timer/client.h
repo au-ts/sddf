@@ -8,20 +8,24 @@
 #include <os/sddf.h>
 #include <stdint.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 #include <sddf/timer/timer_common.h>
 #include <sddf/util/util.h>
 #include <sddf/util/arch_timestamp_counter.h>
 
 /**
- * Request a timeout via PPC into the passive timer driver.
- * Use the label to indicate this request.
- * @param channel ID of the timer driver.
+ * Request a timeout via the timer virt.
+ * @param reference to timer client configuration
  * @param timeout relative timeout in nanoseconds.
  */
-static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout)
+static inline void sddf_timer_set_timeout(const timer_client_config_t *config, uint64_t timeout)
 {
-    sddf_set_mr(0, timeout);
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_SET_TIMEOUT, 0, 0, 1));
+    uint64_t ticks = ns_to_ticks(timeout, sddf_read_freq());
+    uint64_t now = sddf_read_counter();
+    timeout = now + ticks;
+    uint64_t *slot = (uint64_t *)config->req_vaddr;
+    __atomic_store_n(slot, timeout, __ATOMIC_RELEASE);
+    sddf_notify(config->virt_id);
 }
 
 /**
