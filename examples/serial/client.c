@@ -27,6 +27,9 @@ void init(void)
 uint16_t char_count;
 void notified(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    sddf_multikernel_ack(ch);
+#endif
     char c;
     while (!serial_dequeue(&rx_queue_handle, &c)) {
         if (c == '\r') {

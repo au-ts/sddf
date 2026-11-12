@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from acacia import DeviceTreeBlob, ProtectionDomain, System
 from acacia.arch import x86_64
@@ -29,9 +30,21 @@ def generate(sdf_file: str, output_dir: str):
     for pd in [client0, client1]:
         serial.add_client(pd)
 
+    if args.multikernel:
+        from acacia import Multikernel
+
+        sdf.resolve_subsystems()
+        multi_k = Multikernel(sdf, args.multikernel)
+        for client in (client0, client1):
+            for mapping in client.maps:
+                mapping.mr.physical = True
+        multi_k.prepare(Path(output_dir) / "multikernel")
+
     sdf.make_config_structs()
-    out_file = f"{output_dir}/{sdf_file}"
-    sdf.write_xml_file(out_file)
+    if args.multikernel:
+        multi_k.write(Path(output_dir) / "multikernel")
+    else:
+        sdf.write_xml_file(f"{output_dir}/{sdf_file}")
 
 
 if __name__ == "__main__":
@@ -41,6 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--multikernel", type=Path, help="Partition configuration JSON")
 
     args = parser.parse_args()
 

@@ -51,6 +51,10 @@ SYSTEM_FILE := serial.system
 IMAGES := serial_driver.elf \
 	  client.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
+ifeq ($(MULTIKERNEL),1)
+MULTIKERNEL_CONFIG ?= $(TOP)/partitions.json
+include ${SDDF}/tools/make/multikernel.mk
+endif
 CFLAGS +=  -Wno-unused-function -Werror
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
@@ -69,13 +73,17 @@ client.elf: client.o libsddf_util.a
 client.o: ${TOP}/client.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+ifeq ($(MULTIKERNEL),1)
+$(MULTIKERNEL_MANIFEST): $(METAPROGRAM) $(IMAGES) $(DTB)
+else
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+endif
 	cp client.elf client0.elf
 	cp client.elf client1.elf
 ifneq ($(strip $(DTS)),)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(METAPROGRAM_ARGS)
 else
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE) $(METAPROGRAM_ARGS)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_serial_driver_config.data serial_driver.elf
@@ -85,11 +93,13 @@ endif
 	$(OBJCOPY) --update-section .serial_client_config=client1_serial_client_config.data client1.elf
 	touch $@
 
+ifneq ($(MULTIKERNEL),1)
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+endif
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -nographic -d guest_errors $(QEMU_ARCH_ARGS)
+	$(QEMU) -nographic -d guest_errors $(QEMU_ARCH_ARGS) $(QEMU_SMP_ARGS)
 
 clean::
 	${RM} -f *.elf

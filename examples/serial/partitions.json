@@ -1,0 +1,14 @@
+[
+    {
+        "name": "kernel_001",
+        "hart": 0,
+        "private_ram": 134217728,
+        "pds": ["serial_driver", "serial_virt_tx", "serial_virt_rx"]
+    },
+    {
+        "name": "kernel_002",
+        "hart": 1,
+        "private_ram": 134217728,
+        "pds": ["client0", "client1"]
+    }
+]

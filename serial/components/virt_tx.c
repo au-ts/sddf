@@ -195,6 +195,9 @@ void init(void)
 
 void notified(sddf_channel ch)
 {
+#ifdef MULTIKERNEL
+    sddf_multikernel_ack(ch);
+#endif
     if (ch == config.driver.id) {
         tx_return();
     } else {
