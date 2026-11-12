@@ -22,7 +22,7 @@ from .sddf import RegionResourceFactory, sDDFDriverClass
 I2C_PROTOCOL_MAGIC = "sDDF" + chr(0x4)
 I2C_CMD_T_SZ = 16  # bytes
 I2C_RESPONSE_T_SZ = 16  # bytes
-I2C_Q_HANDLE_SZ = 32  # bytes
+I2C_REQ_Q_T_SZ = 32  # bytes
 
 
 @dataclass
@@ -40,7 +40,7 @@ class I2CAddress:
 
 
 def is_pow_2(x: int):
-    return x & (x - 1) == 0
+    return x > 0 and x & (x - 1) == 0
 
 
 class sDDFI2C(sDDFDriverClass):
@@ -54,7 +54,7 @@ class sDDFI2C(sDDFDriverClass):
         cpu: int | None = None,
         virt_elf: str = "i2c_virt.elf",
         driver_elf: str = "i2c_driver.elf",
-        req_queue_size: int = 128,
+        req_queue_capacity: int = 128,
         data_size: int | None = None,
     ):
         """
@@ -69,30 +69,30 @@ class sDDFI2C(sDDFDriverClass):
             virt_prio: int      - seL4 priority of virt
             driver_elf: str     - name of ELF file defining driver
             virt_elf: str       - name of ELF file defining virt
-            req_queue_size: int - power-of-2 number of i2c commands that can fit in a queue.
+            req_queue_capacity: int     - power-of-2 number of i2c commands that can fit in a queue.
             data_size: int      - power-of-2 size of data MR to back requests. Default to 1 page.
 
         Since the number of responses in a system is always much smaller than the number of
-        requests, we unconditionally squeeze them into one page.
+        requests, we unconditionally squeeze all requests into one page.
 
         Note: this class assumes a DTB node is available. We do not support non-DTB
               classes currently, but it is WIP.
         """
-        # Queue size must be exponent of two
-        if req_queue_size <= 0 or not is_pow_2(req_queue_size):
+        # Queue size must be power of two
+        if not is_pow_2(req_queue_capacity):
             raise ValueError(
-                f"I2C queue size {req_queue_size} must be a non-zero exponent of 2!"
+                f"I2C queue size {req_queue_capacity} must be a non-zero power of 2!"
             )
 
         if data_size is None:
             data_size = sdf.arch.default_page_size_bytes()
         if not is_pow_2(data_size):
-            raise ValueError("Data region size must be an exponent of 2!")
+            raise ValueError("Data region size must be a power of 2!")
         self.data_size = data_size
 
         self.sdf = sdf
         self.cpu = cpu
-        self.req_queue_capacity = req_queue_size
+        self.req_queue_capacity = req_queue_capacity
 
         driver = ProtectionDomain(
             self.sdf,
@@ -139,10 +139,10 @@ class sDDFI2C(sDDFDriverClass):
         # TODO: use dwarfdump to find size of i2c_cmd_t struct manually. Acacia doesn't
         # support this yet. https://github.com/au-ts/microkit_acacia/issues/63
 
-        # i2c_cmd_t is 16 bytes, queue handle is 32 bytes. By default (queue_size=128), we
+        # i2c_cmd_t is 16 bytes, queue object is 32 bytes. By default (queue_size=128), we
         # want to use one small page only, so this is OK.
         self.req_q_mr_sz = self.sdf.arch.roundup_to_page(
-            (I2C_CMD_T_SZ * self.req_queue_capacity) + I2C_Q_HANDLE_SZ
+            (I2C_CMD_T_SZ * self.req_queue_capacity) + I2C_REQ_Q_T_SZ
         )
 
         # Far fewer responses than requests (many i2c_cmds -> one response). Fit as many
@@ -150,10 +150,10 @@ class sDDFI2C(sDDFDriverClass):
         # Invariant: both page size and struct size are a power of 2, so this should also be one.
         self.resp_q_mr_sz = self.sdf.arch.default_page_size_bytes()
         num_responses_in_page = self.resp_q_mr_sz // (I2C_RESPONSE_T_SZ)
-        assert is_pow_2(num_responses_in_page)
 
         # Also need to fit in queue handle. Bin num responses down to nearest pow-2.
         self.resp_queue_capacity = num_responses_in_page >> 1
+        assert is_pow_2(self.resp_queue_capacity)
 
         # Create queues & config for driver
         self.virt_driver_config, driv_virt_conn = self.make_i2c_queues(
