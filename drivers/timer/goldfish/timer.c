@@ -8,11 +8,10 @@
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/timer_driver.h>
+#include <sddf/util/arch_timestamp_counter.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
-
-#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 // This is a virtual timer - it has no clock rate and just returns nanoseconds directly.
 // This is equivalent to a 1GHz clock, but we don't attempt time conversion here since
@@ -32,7 +31,9 @@ typedef struct {
 } goldfish_timer_regs_t;
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+timer_driver_config_t *config;
 static volatile goldfish_timer_regs_t *timer_regs;
+static bool armed;
 
 static inline uint64_t get_ticks_in_ns(void)
 {
@@ -73,14 +74,16 @@ static void process_timeouts(uint64_t curr_time)
 
 void init()
 {
+    assert(timer_config_check_magic(config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
     timer_regs = (goldfish_timer_regs_t *)device_resources.regions[0].region.vaddr;
 
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
+    timer_regs->irq_enabled = 0;
+    timer_regs->clear_alarm = 1;
+    timer_regs->clear_interrupt = 1;
+    armed = false;
 }
 
 void notified(sddf_channel ch)
@@ -90,23 +93,28 @@ void notified(sddf_channel ch)
 
     /* Handled irq -> clear device interrupt */
     timer_regs->clear_interrupt = 1;
-    uint64_t curr_time = get_ticks_in_ns();
-    process_timeouts(curr_time);
+    timer_regs->irq_enabled = 0;
+    timer_regs->clear_alarm = 1;
+    if (armed) {
+        armed = false;
+        sddf_notify(config->virt_id);
+    }
 }
 
 seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
     switch (seL4_MessageInfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_ticks_in_ns();
-        sddf_set_mr(0, time_ns);
-        return seL4_MessageInfo_new(0, 0, 0, 1);
-    }
     case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_us = (uint64_t)(sddf_get_mr(0));
-        timeouts[ch] = curr_time + offset_us;
-        process_timeouts(curr_time);
+        uint64_t next_timeout = sddf_get_mr(0);
+        timer_regs->irq_enabled = 0;
+        timer_regs->clear_alarm = 1;
+        timer_regs->clear_interrupt = 1;
+        uint64_t gf_curr_time = get_ticks_in_ns();
+        uint64_t sys_curr_time = sddf_read_counter();
+        uint64_t ticks = next_timeout > sys_curr_time ? next_timeout - sys_curr_time : 0;
+        uint64_t next_delay = ticks_to_ns(ticks, sddf_read_freq());
+        armed = true;
+        set_timeout(gf_curr_time + MAX(next_delay, 1));
         break;
     }
     default:

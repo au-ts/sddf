@@ -17,7 +17,9 @@ timer_driver.elf: timer/timer_driver.o
 
 timer/timer_driver.o: CFLAGS+=-I${TIMER_DIR}
 timer/timer_driver.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} $(SDDF_LIBC_INCLUDE)|timer
-	${CC} ${CFLAGS} -c -o $@ $<
+	${CC} ${CFLAGS} -MMD -MP -c -o $@ $<
+
+-include timer/timer_driver.d
 
 timer:
 	mkdir -p timer

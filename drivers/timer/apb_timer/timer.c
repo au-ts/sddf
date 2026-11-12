@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <sddf/timer/config.h>
 #include <sddf/timer/timer_driver.h>
 #include <sddf/resources/device.h>
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/timer/protocol.h>
-#include <sddf/timer/timer_heap.h>
+#include <sddf/util/arch_timestamp_counter.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 
@@ -51,6 +52,7 @@
 #define CMP_IRQ(n)          (device_resources.irqs[(2*n)+1].id)
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+timer_driver_config_t *config;
 
 // Timer block implements NUM_TIMERS separate timers with back-to-back registers
 struct timer_regs {
@@ -62,6 +64,7 @@ struct timer_regs {
 
 // Array of regs structs, not just one set!
 volatile struct timer_regs *regs;
+static bool armed;
 
 /* Keep track of how many timer overflows have occured.
  * Used as the most significant segment of ticks.
@@ -70,9 +73,6 @@ volatile struct timer_regs *regs;
  * on other devices.
  */
 uint32_t timekeeper_overflow_count = 0;
-
-// Priority heap for managing timeouts
-static timer_heap_t timeouts;
 
 typedef struct apbtimer_timeout_conf {
     uint32_t cmp;
@@ -157,6 +157,19 @@ static inline void setup_timekeeper(void)
 }
 
 /**
+ * Calculate cmp value for the timeout given a delay in architecture counter ticks.
+ * If delay exceeds capacity of timer return maximum cmp.
+ */
+static uint32_t calculate_timeout_from_arch_ticks(uint64_t tick_delay)
+{
+    uint64_t freq = sddf_read_freq();
+    uint32_t cmp = APBTIMER_MAX_TICKS - 1;
+    if (tick_delay <= period_transform(cmp, freq, APBTIMER_CLK_FREQ)) {
+        cmp = period_transform(tick_delay, APBTIMER_CLK_FREQ, freq);
+    }
+    return MAX(cmp, 1);
+}
+/**
  * Enable or disable timeout timer.
  */
 static inline void timeout_set_enable(bool enable)
@@ -214,21 +227,16 @@ static void process_timeouts(void)
 
 void notified(microkit_channel ch)
 {
-
     LOG_APBTIMER("notified by channel %u\n", ch);
-    if (ch == OVERFLOW_IRQ(TIMER_TIMEKEEPER)) {
-        LOG_APBTIMER("timekeeper overflow irq!\n");
-        timekeeper_overflow_count += 1;
-    } else if (ch == CMP_IRQ(TIMER_TIMEOUT) || ch == OVERFLOW_IRQ(TIMER_TIMEOUT)) {
+    if (ch == CMP_IRQ(TIMER_TIMEOUT) || ch == OVERFLOW_IRQ(TIMER_TIMEOUT)) {
         LOG_APBTIMER("timeout irq!\n");
         timeout_set_enable(0);
         regs[TIMER_TIMEOUT].timer = 0;
-        process_timeouts();
-    } else {
-        LOG_APBTIMER("unexpected notification from channel %u\n", ch);
-        return;
+        if (armed) {
+            armed = false;
+            microkit_notify(config->virt_id);
+        }
     }
-
     microkit_deferred_irq_ack(ch);
 }
 
@@ -236,18 +244,15 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     LOG_APBTIMER("ppc from channel %u\n", ch);
     switch (microkit_msginfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME: {
-        uint64_t time_ns = get_time_ns();
-        seL4_SetMR(0, time_ns);
-        LOG_APBTIMER("getting time\n");
-        return microkit_msginfo_new(0, 1);
-    }
     case SDDF_TIMER_SET_TIMEOUT: {
-        uint64_t curr_time = get_time_ns();
-        uint64_t offset_ns = seL4_GetMR(0);
-        LOG_APBTIMER("setting timeout for %zu\n", offset_ns);
-        timer_heap_insert(&timeouts, curr_time + offset_ns, ch);
-        process_timeouts();
+        uint64_t next_timeout = seL4_GetMR(0);
+        timeout_set_enable(0);
+        uint64_t curr_time = sddf_read_counter();
+        uint64_t next_delay = next_timeout > curr_time ? next_timeout - curr_time : 0;
+        uint64_t cmp = calculate_timeout_from_arch_ticks(next_delay);
+        regs[TIMER_TIMEOUT].cmp = cmp;
+        armed = true;
+        timeout_set_enable(1);
         break;
     }
     default:
@@ -260,6 +265,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
+    assert(timer_config_check_magic(config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 4);
     assert(device_resources.num_regions == 1);
@@ -267,8 +273,10 @@ void init(void)
     uintptr_t timer_base = (uintptr_t)device_resources.regions[0].region.vaddr;
     regs = (volatile struct timer_regs *)timer_base;
 
-    setup_timekeeper();
-
-    // Initialise priority heap
-    timer_heap_init(&timeouts);
+    for (int i = 0; i < NUM_TIMERS; i++) {
+        regs[i].ctrl = 0;
+        regs[i].timer = 0;
+        regs[i].cmp = 0;
+    }
+    armed = false;
 }
