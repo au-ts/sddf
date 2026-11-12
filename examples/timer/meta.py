@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from acacia import DeviceTreeBlob, ProtectionDomain, System
 from acacia.arch import x86_64
@@ -17,9 +18,20 @@ def generate(sdf_file: str, output_dir: str):
     timer = sDDFTimer(sdf, board.timer.compatible, board.timer.node_path)
     timer.add_client(client)
 
+    if args.multikernel:
+        local_client = ProtectionDomain(sdf, "local_client", "client.elf", priority=1)
+        timer.add_client(local_client)
+        from acacia import Multikernel
+        sdf.resolve_subsystems()
+        multi_k = Multikernel(sdf, args.multikernel)
+        multi_k.prepare(Path(output_dir) / "multikernel")
+
     sdf.make_config_structs()
     out_file = f"{output_dir}/{sdf_file}"
-    sdf.write_xml_file(out_file)
+    if args.multikernel:
+        multi_k.write(Path(output_dir) / "multikernel")
+    else:
+        sdf.write_xml_file(out_file)
 
 
 if __name__ == "__main__":
@@ -29,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--multikernel", type=Path, help="Parition configuration JSON")
 
     args = parser.parse_args()
 

@@ -49,7 +49,12 @@ TOP := ${SDDF}/examples/timer
 METAPROGRAM := $(TOP)/meta.py
 SYSTEM_FILE := timer.system
 
-IMAGES := timer_driver.elf client.elf
+IMAGES := timer_driver.elf timer_virt.elf client.elf
+
+ifeq ($(MULTIKERNEL),1)
+MULTIKERNEL_CONFIG ?= $(TOP)/partitions.json
+include ${SDDF}/tools/make/multikernel.mk
+endif
 
 CFLAGS += \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
@@ -65,29 +70,36 @@ all: $(IMAGE_FILE)
 ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $< -o client.o
+	$(CC) -c $(CFLAGS) -MMD -MP $< -o client.o
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-ifneq ($(strip $(DTS)),)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+ifeq ($(MULTIKERNEL),1)
+$(MULTIKERNEL_MANIFEST): $(METAPROGRAM) $(IMAGES) $(DTB)
 else
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+endif
+ifneq ($(strip $(DTS)),)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(METAPROGRAM_ARGS)
+else
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE) $(METAPROGRAM_ARGS)
 endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=client_timer_client_config.data client.elf
 	touch $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
+ifneq ($(MULTIKERNEL),1)
+$(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE) $(wildcard *.data)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+endif
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-nographic \
-			-d guest_errors
+			-d guest_errors $(QEMU_SMP_ARGS)
 
 clean::
-	rm -f client.o
+	rm -f client.o client.d
 clobber:: clean
 	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE}
+
+-include client.d

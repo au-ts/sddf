@@ -20,10 +20,17 @@ override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
+ifeq ($(MULTIKERNEL),1)
+MULTIKERNEL_CONFIG ?= partitions.json
+override MULTIKERNEL_CONFIG := $(abspath $(MULTIKERNEL_CONFIG))
+all qemu clean clobber: ${BUILD_DIR}/Makefile FORCE
+	${MAKE} -C ${BUILD_DIR} BUILD_DIR=${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} MULTIKERNEL_CONFIG=${MULTIKERNEL_CONFIG} $@
+else
 all: ${IMAGE_FILE}
 
 qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+	${MAKE} -C ${BUILD_DIR} BUILD_DIR=${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+endif
 
 ${BUILD_DIR}/Makefile: timer.mk
 	mkdir -p ${BUILD_DIR}

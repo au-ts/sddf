@@ -3,6 +3,8 @@
 
 from typing import Optional
 
+from acacia.pd import MAX_IDS
+
 from acacia import (
     IRQ,
     build_hook,
@@ -32,6 +34,8 @@ class sDDFTimer(sDDFDriverClass):
         cpu: Optional[int] = None,
         driver_elf: str = "timer_driver.elf",
     ):
+        if dev_compatible not in ("google,goldfish-rtc", "pulp,apb_timer"):
+            raise SubsystemBuildError("Timer virt currently supports Goldfish and CVA6/APB timers")
         self.cpu = cpu
         driver = ProtectionDomain(
             sdf,
@@ -45,47 +49,70 @@ class sDDFTimer(sDDFDriverClass):
         )
 
         self.client_configs = []
+        self.client_config_symbols = {}
+        self.virt = ProtectionDomain(
+            sdf, "timer_virt", "timer_virt.elf", priority=driver_prio - 1, cpu=cpu
+        )
+        self.virt_config = ConfigStruct(
+            {
+                "magic": TIMER_PROTOCOL_MAGIC,
+                "driver_id": 0,
+                "req_vaddrs" : [0] * MAX_IDS
+            },
+            type_name="sddf_timer_virt_config_t"
+        )
+        self.virt_config.make_prefill(self.virt, "timer_config")
+
+    def add_client(self, client: ProtectionDomain, config_symbol: str = "timer_config"):
+        super().add_client(client)
+        self.client_config_symbols[client] = config_symbol
 
     @build_hook  # Mark this to run when Acacia is performing final steps
     def connect_clients(self):
-        # Clients are connected with:
-        # a. channel allowing PPCs -> driver, notifications -> client
-        # ... that's it!
-        for c in self.clients:
-            if c.priority >= self.driver.priority:
-                raise SubsystemBuildError(
-                    f"Client {c} has higher or equal priority to timer driver!"
-                )
-            ch = Channel(
-                self.sdf,
-                Channel.End(c, can_notify=False, can_pp=True),
-                Channel.End(self.driver, can_notify=True, can_pp=False),
+        if len(self.clients) >= MAX_IDS:
+            raise SubsystemBuildError(f"Timer virt supports at most {MAX_IDS - 1} clients")
+        ch = Channel(self.sdf,
+                     Channel.End(self.virt, can_notify=False, can_pp=True),
+                     Channel.End(self.driver)
             )
-            self.client_configs.append(
-                self.timer_client_config_factory(c, ch.id_for_pd(c))
-            )
+        self.virt_config.fields["driver_id"] = ch.id_for_pd(self.virt)
+        self.driver_config = ConfigStruct({
+                "magic": TIMER_PROTOCOL_MAGIC,
+                "virt_id": ch.id_for_pd(self.driver)
+            },
+            type_name="timer_driver_config_t"
+        )
+        self.driver_config.make_prefill(self.driver, "config")
+        for client in self.clients:
+            ch = Channel(self.sdf, Channel.End(client), Channel.End(self.virt))
+            mailbox = MemoryRegion(self.sdf, f"timer/{client.name}/requst", 0x1000, physical=True)
+            client_map = client.create_automap(mailbox, "rw")
+            virt_map = self.virt.create_automap(mailbox, "rw")
+            self.client_configs.append(self.timer_client_config_factory(
+                client, ch.id_for_pd(client), client_map.vaddr))
+            self.virt_config.fields["req_vaddrs"][ch.id_for_pd(self.virt)] = virt_map.vaddr
 
     def x86_resources(self):
         self.add_x86_hpet()
 
     def generate_config_structs(self):
         # We've already made our structs
-        return super().generate_config_structs() + self.client_configs
+        return super().generate_config_structs() + self.client_configs + [self.virt_config, self.driver_config]
 
     def timer_client_config_factory(
-        self, client_pd: ProtectionDomain, virt_id: int
+        self, client_pd: ProtectionDomain, virt_id: int, req_vaddr: int
     ) -> ConfigStruct:
         """
         create timer_client_config for client_pd with serial id n
         """
         # invariant: this PD only is a client to timer one time.
-        fields = {"magic": TIMER_PROTOCOL_MAGIC, "virt_id": virt_id, "req_vaddr": 0}
-        return ConfigStruct(
+        fields = {"magic": TIMER_PROTOCOL_MAGIC, "virt_id": virt_id, "req_vaddr": req_vaddr}
+        config = ConfigStruct(
             fields,
             type_name="timer_client_config_t",
-            target_file=client_pd.prog_image,
-            section_name="timer_client_config",
         )
+        config.make_prefill(client_pd, self.client_config_symbols[client_pd])
+        return config
 
     # x86 utility
     def add_x86_hpet(self):

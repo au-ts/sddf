@@ -1,0 +1,14 @@
+[
+    {
+        "name": "kernel_001",
+        "hart": 0,
+        "private_ram": 134217728,
+        "pds": ["timer_driver", "timer_virt", "local_client"]
+    },
+    {
+        "name": "kernel_002",
+        "hart": 1,
+        "private_ram": 134217728,
+        "pds": ["client"]
+    }
+]
