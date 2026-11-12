@@ -26,22 +26,9 @@ static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout
 
 /**
  * Request the time since start up.
- * If architecture counter is usable, fast-paths reading the hardware counter
- * locally via sddf_read_counter().
- * If unusable, silently falls back to a PPC into the passive timer driver.
- * @param channel ID of the timer driver.
  * @return the time in nanoseconds since start up.
  */
-static inline uint64_t sddf_timer_time_now(unsigned int channel)
+static inline uint64_t sddf_timer_time_now(void)
 {
-    // TODO: remove this guard once remaining architectures supported
-#if defined(CONFIG_ARCH_X86) || defined(CONFIG_ARCH_RISCV)
-    uint64_t freq = sddf_read_freq();
-    if (likely(freq != 0)) {
-        return ticks_to_ns(sddf_read_counter(), freq);
-    }
-#endif
-
-    sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_GET_TIME, 0, 0, 0));
-    return sddf_get_mr(0);
+    return ticks_to_ns(sddf_read_counter(), sddf_read_freq());
 }
