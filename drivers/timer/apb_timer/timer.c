@@ -183,48 +183,6 @@ static inline void timeout_set_enable(bool enable)
     }
 }
 
-/**
- * Process timeouts from the queue using the timeout timer.
- * This *differs* from most other sDDF timers because we process timeouts
- * on a relative basis rather than with respect to the absolute time, as such
- * a method is cumbersome and inefficient with 32 bit timers.
- *
- * Timeouts are stored using absolute time upon PPC, this function converts the
- * next timeout into a relative stamp from the current time and awaits it using
- * the timeout timer. Automatically sets prescaler to satisfy most granular time
- * resolution.
- */
-static void process_timeouts(void)
-{
-    uint64_t curr_time = get_time_ns();
-    LOG_APBTIMER("Processing timeouts. Current time: %zu ns\n", curr_time);
-
-    // Pop from priority heap until all timeouts are serviced
-    while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
-        timeout_t expired;
-        bool ret = timer_heap_pop(&timeouts, &expired);
-        assert(ret); // This should never happen! Peek should catch empty queue
-        LOG_APBTIMER("timeout expired for client %u\n", expired.client_channel);
-        microkit_notify(expired.client_channel);
-    }
-
-    timeout_t *next = timer_heap_peek(&timeouts);
-    // Reissue next timeout irq, if needed.
-    if (next != NULL) {
-        uint64_t next_delay = next->timestamp - curr_time;
-        apbtimer_timeout_conf_t next_conf = calculate_timeout_from_ns(next_delay);
-        LOG_APBTIMER("Next delay: %zu - prescaler = %d - cmp = %u\n", next_delay, next_conf.prescaler, next_conf.cmp);
-        set_timeout_prescaler(next_conf.prescaler);
-        regs[TIMER_TIMEOUT].cmp = next_conf.cmp;
-        assert(regs[TIMER_TIMEOUT].cmp == next_conf.cmp);
-        LOG_APBTIMER("next delay: %zu\n", next_delay);
-        // Start timeout timer running
-        timeout_set_enable(true);
-    } else {
-        LOG_APBTIMER("No more timeouts remain. Idling.\n");
-    }
-}
-
 void notified(microkit_channel ch)
 {
     LOG_APBTIMER("notified by channel %u\n", ch);

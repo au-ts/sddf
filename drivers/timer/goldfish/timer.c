@@ -49,29 +49,6 @@ void set_timeout(uint64_t timeout)
     timer_regs->irq_enabled = 1U;
 }
 
-static uint64_t timeouts[MAX_TIMEOUTS];
-
-static void process_timeouts(uint64_t curr_time)
-{
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
-    }
-
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        set_timeout(next_timeout);
-    }
-}
-
 void init()
 {
     assert(timer_config_check_magic(config));
