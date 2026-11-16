@@ -82,7 +82,7 @@ class sDDFTimer(sDDFDriverClass):
         fields = {"magic": TIMER_PROTOCOL_MAGIC, "driver_id": driver_id}
         return ConfigStruct(
             fields,
-            type_name="timer_client_config_t",
+            type_name="timer_client_config",
             target_file=client_pd.prog_image,
             section_name="timer_client_config",
         )

@@ -50,6 +50,6 @@ class sDDFLWIP(Subsystem):
                 },
                 target_file=self.pd.prog_image,
                 section_name="lib_sddf_lwip_config",
-                type_name="lib_sddf_lwip_config_t",
+                type_name="lib_sddf_lwip_config",
             )
         ]

@@ -386,7 +386,7 @@ class sDDFSerial(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="serial_driver_config_t",
+            type_name="serial_driver_config",
             target_file=driver_pd.prog_image,
             section_name="serial_driver_config",
         )
@@ -409,7 +409,7 @@ class sDDFSerial(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="serial_virt_rx_config_t",
+            type_name="serial_virt_rx_config",
             target_file=virt_rx_pd.prog_image,
             section_name="serial_virt_rx_config",
         )
@@ -445,7 +445,7 @@ class sDDFSerial(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="serial_virt_tx_config_t",
+            type_name="serial_virt_tx_config",
             target_file=virt_tx_pd.prog_image,
             section_name="serial_virt_tx_config",
         )
@@ -464,7 +464,7 @@ class sDDFSerial(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="serial_client_config_t",
+            type_name="serial_client_config",
             target_file=client_pd.prog_image,
             section_name="serial_client_config",
         )

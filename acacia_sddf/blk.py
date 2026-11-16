@@ -364,7 +364,7 @@ class sDDFBlk(sDDFDriverClass):
         fields = {"magic": magic, "virt": virt_connection}
         return ConfigStruct(
             fields,
-            "blk_driver_config_t",
+            "blk_driver_config",
             target_file=driver_pd.prog_image,
             section_name="blk_driver_config",
         )
@@ -415,7 +415,7 @@ class sDDFBlk(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "blk_virt_config_t",
+            "blk_virt_config",
             target_file=virt_pd.prog_image,
             section_name="blk_virt_config",
         )
@@ -434,7 +434,7 @@ class sDDFBlk(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "blk_client_config_t",
+            "blk_client_config",
             target_file=client_pd.prog_image,
             section_name="blk_client_config",
         )

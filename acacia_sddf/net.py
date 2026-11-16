@@ -792,7 +792,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_driver_config_t",
+            "net_driver_config",
             target_file=self.driver.prog_image,
             section_name="net_driver_config",
         )
@@ -805,7 +805,7 @@ class sDDFEthernet(sDDFDriverClass):
             "mac_addrs": [m.as_config_struct() for m in mac_addrs],
             "num_macs": num_macs,
         }
-        return ConfigStruct(fields, "net_virt_rx_client_config_t")
+        return ConfigStruct(fields, "net_virt_rx_client_config")
 
     def net_virt_rx_config_factory(
         self,
@@ -827,7 +827,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_virt_rx_config_t",
+            "net_virt_rx_config",
             target_file=self.virt_rx.prog_image,
             section_name="net_virt_rx_config",
         )
@@ -855,7 +855,7 @@ class sDDFEthernet(sDDFDriverClass):
             "regions": region_structs,
             "num_regions": num_regions,
         }
-        return ConfigStruct(fields, "net_virt_tx_client_config_t")
+        return ConfigStruct(fields, "net_virt_tx_client_config")
 
     def net_virt_tx_config_factory(
         self,
@@ -871,7 +871,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_virt_tx_config_t",
+            "net_virt_tx_config",
             target_file=self.virt_tx.prog_image,
             section_name="net_virt_tx_config",
         )
@@ -886,7 +886,7 @@ class sDDFEthernet(sDDFDriverClass):
             "mac_addr": mac_addr.as_config_struct(),
             "acl": acl,
         }
-        return ConfigStruct(fields, "net_vswitch_port_config_t")
+        return ConfigStruct(fields, "net_vswitch_port_config")
 
     def net_vswitch_config_factory(
         self,
@@ -902,7 +902,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_vswitch_config_t",
+            "net_vswitch_config",
             target_file=self.vswitch.prog_image,
             section_name="net_vswitch_config",
         )
@@ -925,7 +925,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_copy_config_t",
+            "net_copy_config",
             target_file=copier_pd.prog_image,
             section_name="net_copy_config",
         )
@@ -963,7 +963,7 @@ class sDDFEthernet(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            "net_client_config_t",
+            "net_client_config",
             target_file=client_pd.prog_image,
             section_name="net_client_config",
         )

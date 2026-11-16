@@ -338,7 +338,7 @@ class sDDFI2C(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="i2c_client_config_t",
+            type_name="i2c_client_config",
             target_file=client_pd.prog_image,
             section_name="i2c_client_config",
         )
@@ -359,7 +359,7 @@ class sDDFI2C(sDDFDriverClass):
             "driver_data_vaddr": driver_d_vaddr,
             "client_data_vaddr": client_d_vaddr,
         }
-        return ConfigStruct(fields, type_name="i2c_virt_client_config_t")
+        return ConfigStruct(fields, type_name="i2c_virt_client_config")
 
     def i2c_virt_config_factory(
         self,
@@ -379,7 +379,7 @@ class sDDFI2C(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="i2c_virt_config_t",
+            type_name="i2c_virt_config",
             target_file=virt_pd.prog_image,
             section_name="i2c_virt_config",
         )
@@ -393,7 +393,7 @@ class sDDFI2C(sDDFDriverClass):
         }
         return ConfigStruct(
             fields,
-            type_name="i2c_driver_config_t",
+            type_name="i2c_driver_config",
             target_file=driver_pd.prog_image,
             section_name="i2c_driver_config",
         )

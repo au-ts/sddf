@@ -240,7 +240,7 @@ def DeviceResourcesFactory(
     }
     return ConfigStruct(
         fields,
-        type_name="device_resources_t",
+        type_name="device_resources",
         section_name=section_name,
         target_file=target_file,
     )
