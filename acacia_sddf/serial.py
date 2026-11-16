@@ -19,6 +19,7 @@ from acacia.x86 import IOPort
 
 from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
+from .utility import is_pow_2
 
 SERIAL_DEFAULT_BEGIN_STR = "Begin input\r\n"
 SERIAL_MAX_BEGIN_STR_LEN = 128
@@ -53,9 +54,8 @@ class sDDFSerial(sDDFDriverClass):
                 virt_rx_prio = virt_tx_prio
             assert driver_prio > virt_rx_prio > 0
 
-        # Data size must be exponent of two
-        if data_size & (data_size - 1) != 0:
-            raise ValueError(f"Virt data size of {data_size} isn't an exponent of 2!")
+        if not is_pow_2(data_size):
+            raise ValueError(f"Virt data size of {data_size} isn't a power of 2!")
 
         self.cpu = cpu
         driver = ProtectionDomain(
