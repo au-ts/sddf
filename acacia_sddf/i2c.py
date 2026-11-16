@@ -18,6 +18,7 @@ from acacia import (
 
 from .driver_manifest import register_sddf_subsystem
 from .sddf import RegionResourceFactory, sDDFDriverClass
+from .utility import is_pow_2
 
 I2C_PROTOCOL_MAGIC = "sDDF" + chr(0x4)
 I2C_CMD_T_SZ = 16  # bytes
@@ -37,10 +38,6 @@ class I2CAddress:
             self.addr &= ~(1 << 31)
         else:
             self.is_ten_bit = False
-
-
-def is_pow_2(x: int):
-    return x > 0 and x & (x - 1) == 0
 
 
 class sDDFI2C(sDDFDriverClass):

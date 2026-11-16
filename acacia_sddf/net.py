@@ -29,17 +29,10 @@ from .sddf import (
     RegionResourceFactory,
     sDDFDriverClass,
 )
+from .utility import is_pow_2, next_pow_2
 
 NET_MAGIC = "sDDF" + chr(0x5)
 NET_BUFFER_SIZE = 2048
-
-
-def _is_power_of_two(n: int) -> bool:
-    return n > 0 and (n & (n - 1)) == 0
-
-
-def _next_power_of_two(n: int) -> int:
-    return 1 << ((n - 1).bit_length())
 
 
 class sDDFMAC:
@@ -129,7 +122,7 @@ class sDDFEthernet(sDDFDriverClass):
         if rx_dma_mr is not None:
             if rx_dma_mr.paddr is None:
                 raise SubsystemBuildError("rx dma region must have a physical address!")
-            if not _is_power_of_two(rx_buffers):
+            if not is_pow_2(rx_buffers):
                 raise SubsystemBuildError(
                     f"number of rx buffers ({rx_buffers}) must be a power of two!"
                 )
@@ -241,12 +234,12 @@ class sDDFEthernet(sDDFDriverClass):
                 f"Client {client.name} must have at least rx or tx enabled"
             )
         # Number of client buffers must each be a power of two.
-        if tx and not _is_power_of_two(tx_buffers):
+        if tx and not is_pow_2(tx_buffers):
             raise SubsystemBuildError(
                 f"Client {client.name}: tx buffer count ({tx_buffers}) "
                 f"is not a power of two"
             )
-        if rx and copier is not None and not _is_power_of_two(rx_buffers):
+        if rx and copier is not None and not is_pow_2(rx_buffers):
             raise SubsystemBuildError(
                 f"Client {client.name}: rx buffer count ({rx_buffers}) "
                 f"is not a power of two"
@@ -700,7 +693,7 @@ class sDDFEthernet(sDDFDriverClass):
         server_pp: bool,
     ):
         # Queues must always be a power of two.
-        rounded = _next_power_of_two(num_buffers)
+        rounded = next_pow_2(num_buffers)
         queue_mr_size = self.sdf.arch.roundup_to_page(8 + 16 * rounded)
         dev = self._device_name()
 
