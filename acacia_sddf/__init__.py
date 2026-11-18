@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from .blk import sDDFBlk
+from .gpu import sDDFGpu
 from .board import BOARDS, Board
 from .driver_manifest import (
     sDDFDriverConfig,

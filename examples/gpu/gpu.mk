@@ -20,54 +20,47 @@ SUPPORTED_BOARDS := qemu_virt_aarch64
 ifeq ($(strip ${TOOLCHAIN}),)
 	TOOLCHAIN := clang
 endif
-include ${SDDF}/tools/make/board/common.mk
-
-TOP := ${SDDF}/examples/gpu
-PROJECT_INCLUDE := ${TOP}/include
-
-IMAGES := gpu_driver.elf client.elf gpu_virt.elf timer_driver.elf
-CFLAGS += -Wno-unused-function -Werror -Wno-unused-command-line-argument \
-	  -I${SDDF}/include \
-	  -I${SDDF}/include/microkit \
-	  -I${PROJECT_INCLUDE}
 SDDF_CUSTOM_LIBC := 1
 ifneq ($(strip ${BLOB}), 0)
 CFLAGS_gpu := -DGPU_BLOB_SUPPORT
 else
 CFLAGS_gpu :=
 endif
+
+# Must be set before including sddf.mk, QEMU_ARCH_ARGS refers to IMAGE_FILE
+IMAGE_FILE := loader.img
+REPORT_FILE := report.txt
+SYSTEM_FILE := gpu.system
+
+include ${SDDF}/tools/make/sddf.mk
+
+TOP := ${SDDF}/examples/gpu
+METAPROGRAM := ${TOP}/meta.py
+
+IMAGES := gpu_driver.elf client.elf gpu_virt.elf timer_driver.elf
+CFLAGS += -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+	  -I${SDDF}/include \
+	  -I${SDDF}/include/microkit
 LDFLAGS := -L${BOARD_DIR}/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-IMAGE_FILE := loader.img
-REPORT_FILE := report.txt
-SYSTEM_FILE := ${TOP}/board/${MICROKIT_BOARD}/gpu.system
-
-GPU_DRIVER := ${SDDF}/drivers/gpu/${GPU_DRIV_DIR}
-GPU_COMPONENTS := ${SDDF}/gpu/components
-TIMER_DRIVER := ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}
-
+# Blob resources need guest RAM backed by memfd so QEMU can create udmabufs
+# (Linux only). Without blob, plain RAM works on any host, including macOS.
 ifneq ($(strip ${BLOB}), 0)
 	QEMU_OPTIONS := -device virtio-gpu-device,edid=off,blob=on,max_outputs=1,indirect_desc=off,event_idx=off
+	QEMU_MEM_OPTIONS := -machine memory-backend=main-mem -object memory-backend-memfd,id=main-mem,size=2G
 else
 	QEMU_OPTIONS := -device virtio-gpu-device,edid=off,blob=off,max_outputs=1,indirect_desc=off,event_idx=off
+	QEMU_MEM_OPTIONS :=
 endif
 
-QEMU_CMD := ${QEMU} -machine virt,virtualization=on,memory-backend=main-mem \
-			-device loader,file=${IMAGE_FILE},addr=0x70000000,cpu-num=0 \
-			-m size=2G \
-			-object memory-backend-memfd,id=main-mem,size=2G \
+QEMU_CMD := ${QEMU} ${QEMU_ARCH_ARGS} \
+			${QEMU_MEM_OPTIONS} \
 			${QEMU_OPTIONS} \
-			-global virtio-mmio.force-legacy=false \
 			-d guest_errors
 			# -trace enable=virtio*
 
 all: ${IMAGE_FILE}
-
-include ${SDDF}/util/util.mk
-include ${GPU_DRIVER}/gpu_driver.mk
-include ${GPU_COMPONENTS}/gpu_components.mk
-include ${TIMER_DRIVER}/timer_driver.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
@@ -92,6 +85,16 @@ fb_img.o: ${TOP}/fb_img.S fb_img.bgra
 client.elf: client.o fb_img.o
 	${LD} ${LDFLAGS} $^ ${LIBS} -o $@
 
+${SYSTEM_FILE}: ${METAPROGRAM} ${IMAGES} ${DTB}
+	$(PYTHON) $(METAPROGRAM) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=gpu_driver_device_resources.data gpu_driver.elf
+	$(OBJCOPY) --update-section .gpu_driver_config=gpu_driver_gpu_driver_config.data gpu_driver.elf
+	$(OBJCOPY) --update-section .gpu_virt_config=gpu_virt_gpu_virt_config.data gpu_virt.elf
+	$(OBJCOPY) --update-section .gpu_client_config=client_gpu_client_config.data client.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=client_timer_client_config.data client.elf
+	touch $@
+
 ${IMAGE_FILE} ${REPORT_FILE}: ${IMAGES} ${SYSTEM_FILE}
 	${MICROKIT_TOOL} ${SYSTEM_FILE} --search-path ${BUILD_DIR} --board ${MICROKIT_BOARD} --config ${MICROKIT_CONFIG} -o ${IMAGE_FILE} -r ${REPORT_FILE}
 
@@ -101,4 +104,4 @@ qemu: ${IMAGE_FILE}
 clean::
 	rm -f client.o fb_img.o fb_img.bgra
 clobber:: clean
-	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE}
+	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE} ${SYSTEM_FILE} *.data

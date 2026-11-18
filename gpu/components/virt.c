@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/gpu/queue.h>
 #include <sddf/gpu/events.h>
+#include <sddf/gpu/config.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
-#include <gpu_config.h>
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_GPU_VIRT
@@ -23,9 +23,6 @@
 #endif
 #define LOG_GPU_VIRT_ERR(...) do{ sddf_dprintf("GPU_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define DRIVER_CH 0
-#define CLI_CH_OFFSET 1
-
 #define UNMAPPED_RESOURCE_ID UINT32_MAX
 _Static_assert(
     GPU_MAX_RESOURCES <= UINT32_MAX - 2,
@@ -33,32 +30,34 @@ _Static_assert(
 the largest value reserved for unmapped resources");
 
 #define VIRTUALISER_ID UINT32_MAX
-_Static_assert(GPU_NUM_CLIENTS <= UINT32_MAX - 1, "Client ids can only occupy 32 bits of memory, with the largest "
-                                                  "value reserved for virtualiser id itself");
+_Static_assert(SDDF_GPU_MAX_CLIENTS <= UINT32_MAX - 1, "Client ids can only occupy 32 bits of memory, with the "
+                                                       "largest value reserved for virtualiser id itself");
 
-/* Microkit patched variables */
-gpu_events_t *gpu_driver_events;
-gpu_req_queue_t *gpu_driver_req_queue;
-gpu_resp_queue_t *gpu_driver_resp_queue;
-uintptr_t gpu_driver_data;
-gpu_events_t *gpu_client_events;
-gpu_req_queue_t *gpu_client_req_queue;
-gpu_resp_queue_t *gpu_client_resp_queue;
-uintptr_t gpu_client_data;
+__attribute__((__section__(".gpu_virt_config"))) gpu_virt_config_t config;
+
+static gpu_events_t *gpu_driver_events;
+static uintptr_t gpu_driver_data;
 
 gpu_queue_handle_t drv_h;
 
 typedef struct client {
     gpu_queue_handle_t queue_h;
     gpu_events_t *events;
-    microkit_channel ch;
+    sddf_channel ch;
+    /* Client's data region as mapped into the virtualiser */
+    uintptr_t data_vaddr;
+    uint64_t data_size;
+    /* I/O address of the client's data region, as seen by the device */
+    uint64_t data_io_addr;
     /* Mapping from virtualiser resource id to driver resource id */
     uint32_t res_map_virt_to_drv[GPU_MAX_RESOURCES + 1];
 } client_t;
-static client_t clients[GPU_NUM_CLIENTS];
+static client_t clients[SDDF_GPU_MAX_CLIENTS];
+static uint32_t num_clients;
 /* Driver resource id allocations */
 static ialloc_t res_ialloc;
-static uint32_t res_ialloc_idxlist[GPU_MAX_RESOURCES];
+/* One larger than GPU_MAX_RESOURCES, id 0 is reserved at init for disabling scanout */
+static uint32_t res_ialloc_idxlist[GPU_MAX_RESOURCES + 1];
 
 typedef struct resource {
     bool has_backing;
@@ -76,7 +75,7 @@ typedef struct blob_scanout {
     uint32_t width;
     uint32_t height;
 } blob_scanout_t;
-/* Indexed by resource id and scanout id */
+/* Indexed by scanout id and driver resource id */
 static blob_scanout_t blob_scanouts[GPU_MAX_SCANOUTS][GPU_MAX_RESOURCES + 1];
 
 /* This bookkeeping exists to store information between a request/response pair. */
@@ -88,10 +87,10 @@ typedef struct reqbk {
     uint32_t res_scanout;
 } reqbk_t;
 /* Indexed by virt-to-drv request id */
-static reqbk_t reqsbk[GPU_QUEUE_CAPACITY_DRV];
+static reqbk_t reqsbk[SDDF_GPU_MAX_QUEUE_CAPACITY];
 /* Virt-to-drv request id allocations */
 static ialloc_t req_ialloc;
-static uint32_t req_ialloc_idxlist[GPU_QUEUE_CAPACITY_DRV];
+static uint32_t req_ialloc_idxlist[SDDF_GPU_MAX_QUEUE_CAPACITY];
 
 /* Display info populated during initialisation and any display_info event */
 static gpu_resp_get_display_info_t get_display_info = { 0 };
@@ -108,40 +107,53 @@ static bool handle_init_get_display_info_response(void);
 void init(void)
 {
     LOG_GPU_VIRT("Initialising GPU virtualiser!\n");
-    ialloc_init(&req_ialloc, req_ialloc_idxlist, GPU_QUEUE_CAPACITY_DRV);
-    ialloc_init_with_offset(&res_ialloc, res_ialloc_idxlist, GPU_MAX_RESOURCES, 1);
+    assert(gpu_config_check_magic(&config));
+    assert(config.num_clients <= SDDF_GPU_MAX_CLIENTS);
+    assert(config.driver.conn.num_buffers <= SDDF_GPU_MAX_QUEUE_CAPACITY);
+
+    num_clients = config.num_clients;
+    gpu_driver_events = (gpu_events_t *)config.driver.conn.events.vaddr;
+    gpu_driver_data = (uintptr_t)config.driver.data.region.vaddr;
+    assert(config.driver.data.region.size >= sizeof(gpu_resp_get_display_info_t));
+
+    ialloc_init(&req_ialloc, req_ialloc_idxlist, config.driver.conn.num_buffers);
+    ialloc_init(&res_ialloc, res_ialloc_idxlist, GPU_MAX_RESOURCES + 1);
+    /* Reserve GPU_DISABLE_SCANOUT_RESOURCE_ID so that it is never handed to a resource */
+    uint32_t reserved_res_id;
+    int err = ialloc_alloc(&res_ialloc, &reserved_res_id);
+    assert(!err && reserved_res_id == GPU_DISABLE_SCANOUT_RESOURCE_ID);
 
     /* Initialise client queues */
-    for (int i = 0; i < GPU_NUM_CLIENTS; i++) {
-        gpu_req_queue_t *curr_req = gpu_virt_cli_req_queue(gpu_client_req_queue, i);
-        gpu_resp_queue_t *curr_resp = gpu_virt_cli_resp_queue(gpu_client_resp_queue, i);
-        uint32_t curr_queue_capacity = gpu_virt_cli_queue_capacity(i);
-        gpu_queue_init(&clients[i].queue_h, curr_req, curr_resp, curr_queue_capacity);
-        gpu_events_t *curr_events = gpu_virt_cli_events_region(gpu_client_events, i);
-        clients[i].events = curr_events;
-        clients[i].ch = CLI_CH_OFFSET + i;
+    for (int i = 0; i < num_clients; i++) {
+        gpu_virt_config_client_t *cli_config = &config.clients[i];
+        assert(cli_config->conn.num_buffers <= SDDF_GPU_MAX_QUEUE_CAPACITY);
+        gpu_queue_init_from_conn(&clients[i].queue_h, &cli_config->conn);
+        clients[i].events = (gpu_events_t *)cli_config->conn.events.vaddr;
+        clients[i].ch = cli_config->conn.id;
+        clients[i].data_vaddr = (uintptr_t)cli_config->data.region.vaddr;
+        clients[i].data_size = cli_config->data.region.size;
+        clients[i].data_io_addr = cli_config->data.io_addr;
         for (int j = 1; j < GPU_MAX_RESOURCES + 1; j++) {
             clients[i].res_map_virt_to_drv[j] = UNMAPPED_RESOURCE_ID;
         }
     }
 
-    gpu_queue_init(&drv_h, gpu_driver_req_queue, gpu_driver_resp_queue, GPU_QUEUE_CAPACITY_DRV);
+    gpu_queue_init_from_conn(&drv_h, &config.driver.conn);
     LOG_GPU_VIRT("Requesting initial display info\n");
     init_request_get_display_info();
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
 #ifdef DEBUG_GPU_VIRT
-    if (ch == DRIVER_CH) {
+    if (ch == config.driver.conn.id) {
         LOG_GPU_VIRT("Received notification from driver\n");
     } else {
-        int cli_id = ch - CLI_CH_OFFSET;
-        LOG_GPU_VIRT("Received notification from client %d\n", cli_id);
+        LOG_GPU_VIRT("Received notification on channel %d\n", ch);
     }
 #endif
     if (!display_info_init) {
-        if (ch == DRIVER_CH && handle_init_get_display_info_response()) {
+        if (ch == config.driver.conn.id && handle_init_get_display_info_response()) {
             display_info_init = true;
             LOG_GPU_VIRT("Initialised display info\n");
         } else {
@@ -149,7 +161,7 @@ void notified(microkit_channel ch)
         }
     }
 
-    if (ch == DRIVER_CH) {
+    if (ch == config.driver.conn.id) {
         handle_driver();
         /* We need to handle the client queues aswell, due to the scenario that we haven't fully
          * handled them when either the driver request queue or bookkeeping structures are full. When
@@ -172,7 +184,7 @@ static inline void init_request_get_display_info()
         },
     });
     assert(!err);
-    microkit_notify(DRIVER_CH);
+    sddf_notify(config.driver.conn.id);
 }
 
 static inline bool handle_init_get_display_info_response()
@@ -220,8 +232,7 @@ static inline bool gpu_resource_create_blob(int cli_id, gpu_req_t *req, gpu_req_
         return false;
     }
 
-    if (req->resource_create_blob.mem_offset + req->resource_create_blob.mem_size
-        > gpu_virt_cli_data_region_size(cli_id)) {
+    if (req->resource_create_blob.mem_offset + req->resource_create_blob.mem_size > clients[cli_id].data_size) {
         LOG_GPU_VIRT_ERR("RESOURCE_CREATE_BLOB: Range in memory region to store blob "
                          "resource is out of its allocated bounds, failing request\n");
         fail_resp->status = GPU_RESP_ERR_INVALID_PARAMETER;
@@ -244,7 +255,8 @@ static inline bool gpu_resource_create_blob(int cli_id, gpu_req_t *req, gpu_req_
 
     drv_req->code = GPU_REQ_RESOURCE_CREATE_BLOB;
     drv_req->resource_create_blob.resource_id = drv_res_id;
-    drv_req->resource_create_blob.mem_offset = req->resource_create_blob.mem_offset;
+    /* The driver hands this address straight to the device */
+    drv_req->resource_create_blob.mem_offset = clients[cli_id].data_io_addr + req->resource_create_blob.mem_offset;
     drv_req->resource_create_blob.mem_size = req->resource_create_blob.mem_size;
     return true;
 }
@@ -297,11 +309,10 @@ static inline bool gpu_set_scanout_blob(int cli_id, gpu_req_t *req, gpu_req_t *d
         return false;
     }
 
-    blob_scanouts[req->set_scanout_blob.scanout_id][req->set_scanout_blob.resource_id].active = true;
-    blob_scanouts[req->set_scanout_blob.scanout_id][req->set_scanout_blob.resource_id].width =
-        req->set_scanout_blob.width;
-    blob_scanouts[req->set_scanout_blob.scanout_id][req->set_scanout_blob.resource_id].height =
-        req->set_scanout_blob.height;
+    uint32_t drv_res_id = clients[cli_id].res_map_virt_to_drv[req->set_scanout_blob.resource_id];
+    blob_scanouts[req->set_scanout_blob.scanout_id][drv_res_id].active = true;
+    blob_scanouts[req->set_scanout_blob.scanout_id][drv_res_id].width = req->set_scanout_blob.width;
+    blob_scanouts[req->set_scanout_blob.scanout_id][drv_res_id].height = req->set_scanout_blob.height;
 
     reqsbk[drv_req->id].res_virt = req->set_scanout_blob.resource_id;
 
@@ -397,8 +408,7 @@ static inline bool gpu_resource_attach_backing(int cli_id, gpu_req_t *req, gpu_r
         return false;
     }
 
-    if (req->resource_attach_backing.mem_offset + req->resource_attach_backing.mem_size
-        > gpu_virt_cli_data_region_size(cli_id)) {
+    if (req->resource_attach_backing.mem_offset + req->resource_attach_backing.mem_size > clients[cli_id].data_size) {
         LOG_GPU_VIRT_ERR("RESOURCE_ATTACH_BACKING: Range in memory region to attach for "
                          "backing is out of its allocated bounds, failing request\n");
         fail_resp->status = GPU_RESP_ERR_INVALID_PARAMETER;
@@ -423,7 +433,9 @@ static inline bool gpu_resource_attach_backing(int cli_id, gpu_req_t *req, gpu_r
     drv_req->code = GPU_REQ_RESOURCE_ATTACH_BACKING;
     drv_req->resource_attach_backing.resource_id =
         clients[cli_id].res_map_virt_to_drv[req->resource_attach_backing.resource_id];
-    drv_req->resource_attach_backing.mem_offset = req->resource_attach_backing.mem_offset;
+    /* The driver hands this address straight to the device */
+    drv_req->resource_attach_backing.mem_offset = clients[cli_id].data_io_addr
+                                                + req->resource_attach_backing.mem_offset;
     drv_req->resource_attach_backing.mem_size = req->resource_attach_backing.mem_size;
     return true;
 }
@@ -549,7 +561,7 @@ static inline bool gpu_transfer_to_2d(int cli_id, gpu_req_t *req, gpu_req_t *drv
     }
 
     unsigned long transfer_base =
-        (unsigned long)(gpu_virt_cli_data_region(gpu_client_data, cli_id)
+        (unsigned long)(clients[cli_id].data_vaddr
                         + drv_resources[clients[cli_id].res_map_virt_to_drv[req->transfer_to_2d.resource_id]].mem_offset
                         + req->transfer_to_2d.mem_offset);
     cache_clean(transfer_base,
@@ -636,8 +648,7 @@ static bool handle_client(int cli_id)
          */
         if (req.code == GPU_REQ_GET_DISPLAY_INFO) {
             client_notify = true;
-            if (req.get_display_info.mem_offset + sizeof(gpu_resp_get_display_info_t)
-                > gpu_virt_cli_data_region_size(cli_id)) {
+            if (req.get_display_info.mem_offset + sizeof(gpu_resp_get_display_info_t) > clients[cli_id].data_size) {
                 LOG_GPU_VIRT_ERR("GET_DISPLAY_INFO: Range in memory region to store display "
                                  "info is out of its allocated bounds, failing request\n");
                 err = gpu_enqueue_resp(h, (gpu_resp_t) {
@@ -647,8 +658,8 @@ static bool handle_client(int cli_id)
                 assert(!err);
                 continue;
             }
-            memcpy((void *)(gpu_virt_cli_data_region(gpu_client_data, cli_id) + req.get_display_info.mem_offset),
-                   &get_display_info, sizeof(gpu_resp_get_display_info_t));
+            memcpy((void *)(clients[cli_id].data_vaddr + req.get_display_info.mem_offset), &get_display_info,
+                   sizeof(gpu_resp_get_display_info_t));
             err = gpu_enqueue_resp(h, (gpu_resp_t) {
                                           .id = req.id,
                                           .status = GPU_RESP_OK,
@@ -736,7 +747,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(clients[cli_id].ch);
+        sddf_notify(clients[cli_id].ch);
     }
 
     return driver_notify;
@@ -745,13 +756,13 @@ static bool handle_client(int cli_id)
 static void handle_clients()
 {
     bool notify = false;
-    for (int i = 0; i < GPU_NUM_CLIENTS; i++) {
+    for (int i = 0; i < num_clients; i++) {
         if (handle_client(i)) {
             notify = true;
         }
     }
     if (notify) {
-        microkit_notify(DRIVER_CH);
+        sddf_notify(config.driver.conn.id);
     }
 }
 
@@ -782,7 +793,7 @@ static inline bool request_display_info()
 static void handle_driver()
 {
     int err = 0;
-    bool client_notify[GPU_NUM_CLIENTS] = { 0 };
+    bool client_notify[SDDF_GPU_MAX_CLIENTS] = { 0 };
     bool driver_notify = false;
     gpu_resp_t resp = { 0 };
 
@@ -835,7 +846,7 @@ static void handle_driver()
                 /* Forward display info event to clients*/
                 LOG_GPU_VIRT("Received display info data from driver, "
                              "forwarding display info event to clients\n");
-                for (int i = 0; i < GPU_NUM_CLIENTS; i++) {
+                for (int i = 0; i < num_clients; i++) {
                     gpu_events_set_display_info(clients[i].events);
                     client_notify[i] = true;
                 }
@@ -857,13 +868,14 @@ static void handle_driver()
         case GPU_REQ_RESOURCE_CREATE_BLOB: {
             if (resp.status != GPU_RESP_OK) {
                 LOG_GPU_VIRT("Resource create blob response failed\n");
-                err = ialloc_free(&res_ialloc, clients[reqbk->cli_id].res_map_virt_to_drv[reqbk->res_virt]);
+                uint32_t drv_res_id = clients[reqbk->cli_id].res_map_virt_to_drv[reqbk->res_virt];
+                err = ialloc_free(&res_ialloc, drv_res_id);
                 assert(!err);
                 clients[reqbk->cli_id].res_map_virt_to_drv[reqbk->res_virt] = UNMAPPED_RESOURCE_ID;
 
                 /* Clear any previously set scanout state */
                 for (int i = 0; i < GPU_MAX_SCANOUTS; i++) {
-                    blob_scanouts[i][reqbk->res_virt].active = false;
+                    blob_scanouts[i][drv_res_id].active = false;
                 }
             }
             break;
@@ -932,12 +944,12 @@ static void handle_driver()
     }
 
     if (driver_notify) {
-        microkit_notify(DRIVER_CH);
+        sddf_notify(config.driver.conn.id);
     }
 
-    for (int i = 0; i < GPU_NUM_CLIENTS; i++) {
+    for (int i = 0; i < num_clients; i++) {
         if (client_notify[i]) {
-            microkit_notify(clients[i].ch);
+            sddf_notify(clients[i].ch);
         }
     }
 }

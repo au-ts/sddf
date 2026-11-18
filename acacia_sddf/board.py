@@ -22,6 +22,7 @@ class Board:
     timer: DriverDouble = DriverDouble(None, None)
     i2c: DriverDouble = DriverDouble(None, None)
     blk: DriverDouble = DriverDouble(None, None)
+    gpu: DriverDouble = DriverDouble(None, None)
     partition: int = 0
     baud_rate: int | None = None
 
@@ -128,6 +129,7 @@ BOARDS: list[Board] = [
         timer=DriverDouble("arm,armv8-timer", "timer"),
         blk=DriverDouble("virtio,mmio", "virtio_mmio@a000200"),
         ethernet=DriverDouble("virtio,mmio", "virtio_mmio@a000000"),
+        gpu=DriverDouble("virtio,mmio", "virtio_mmio@a003e00"),
         i2c=None,
     ),
     Board(

@@ -11,6 +11,7 @@
 #   Assumes libsddf_util_debug.a is in LIBS
 
 GPU_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+GPU_VIRTIO_TRANSPORT_DIR := $(SDDF)/virtio/transport/
 
 CFLAGS_gpu ?= -mstrict-align
 
@@ -20,16 +21,20 @@ ${CHECK_GPU_DRV_FLAGS_MD5}:
 	-rm -f .gpu_drv_cflags-*
 	touch $@
 
-gpu_driver.elf: gpu/virtio/gpu_driver.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+gpu_driver.elf: gpu/virtio/gpu_driver.o gpu/virtio/mmio/transport.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 gpu/virtio/gpu_driver.o: ${GPU_DRIVER_DIR}gpu.c ${CHECK_GPU_DRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p gpu/virtio
 	${CC} -c ${CFLAGS} ${CFLAGS_gpu} -I ${GPU_DRIVER_DIR} -o $@ $<
 
--include virtio/gpu.d
+gpu/virtio/mmio/transport.o: ${GPU_VIRTIO_TRANSPORT_DIR}mmio.c ${CHECK_GPU_DRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
+	mkdir -p gpu/virtio/mmio
+	${CC} -c ${CFLAGS} -o $@ $<
+
+-include gpu/virtio/gpu_driver.d
 
 clean::
-	rm -f gpu/virtio/gpu_driver.[do]
+	rm -f gpu/virtio/gpu_driver.[do] gpu/virtio/mmio/transport.[do]
 clobber:: clean
 	rm -rf gpu_driver.elf gpu
