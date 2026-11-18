@@ -41,6 +41,8 @@ BOARDS: list[Board] = [
         arch=riscv64,
         paddr_top=0xA0000000,
         serial=DriverDouble("snps,dw-apb-uart", "soc/serial@0x50900000"),
+        ethernet=DriverDouble("eswin,eic7700-qos-eth", "soc/ethernet@50400000"),
+        timer=DriverDouble("eswin,eswin-timer", "soc/timer@0x51840000"),
     ),
     Board(
         name="imx8mm_evk",
