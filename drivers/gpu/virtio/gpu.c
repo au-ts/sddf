@@ -766,36 +766,43 @@ static void handle_request()
 static void handle_irq()
 {
     bool notify = false;
-    uint32_t irq_status = virtio_transport_read_isr(&dev);
-    if (irq_status & VIRTIO_IRQ_VQUEUE) {
-        LOG_GPU_VIRTIO_DRIVER("Received virtqueue used buffer notification\n");
-        // ACK before handling responses
-        virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
-        notify = handle_response();
-        /* Now that there are (maybe) some free descriptors, we want to handle any remaining
-         * requests that we may have left in the queue before due to being
-         * out of free descriptors.
-         */
-        handle_request();
-    }
+    uint32_t irq_status;
+    /*
+     * The virtio-mmio interrupt is edge-triggered and the line stays asserted
+     * while any interrupt status bit is set. If the device sets a bit while
+     * another is still pending (e.g. a used buffer arriving while we handle a
+     * config change) there is no new edge, so we must keep handling until the
+     * status reads as clear, otherwise we never receive another interrupt.
+     */
+    while ((irq_status = virtio_transport_read_isr(&dev)) != 0) {
+        // ACK before handling so that new events are not lost
+        virtio_transport_write_isr(&dev, irq_status);
 
-    if (irq_status & VIRTIO_IRQ_CONFIG) {
-        if (virtio_config->events_read & VIRTIO_GPU_EVENT_DISPLAY) {
-            LOG_GPU_VIRTIO_DRIVER("Received display info event\n");
-            gpu_events_set_display_info(gpu_events);
-            virtio_config->events_clear = VIRTIO_GPU_EVENT_DISPLAY;
-            virtio_transport_write_isr(&dev, VIRTIO_IRQ_CONFIG);
-            notify = true;
-        } else {
-            LOG_GPU_VIRTIO_DRIVER_ERR("Unknown event: 0x%x\n", virtio_config->events_read);
+        if (irq_status & VIRTIO_IRQ_VQUEUE) {
+            LOG_GPU_VIRTIO_DRIVER("Received virtqueue used buffer notification\n");
+            notify |= handle_response();
+            /* Now that there are (maybe) some free descriptors, we want to handle any remaining
+             * requests that we may have left in the queue before due to being
+             * out of free descriptors.
+             */
+            handle_request();
+        }
+
+        if (irq_status & VIRTIO_IRQ_CONFIG) {
+            uint32_t events = virtio_config->events_read;
+            if (events & VIRTIO_GPU_EVENT_DISPLAY) {
+                LOG_GPU_VIRTIO_DRIVER("Received display info event\n");
+                gpu_events_set_display_info(gpu_events);
+                notify = true;
+            }
+            if (events & ~VIRTIO_GPU_EVENT_DISPLAY) {
+                LOG_GPU_VIRTIO_DRIVER_ERR("Unknown event: 0x%x\n", events);
+            }
+            virtio_config->events_clear = events;
         }
     }
 
     if (notify) {
         sddf_notify(config.virt.id);
-    } else {
-        LOG_GPU_VIRTIO_DRIVER_ERR("Received interrupt but is neither a used buffer notification nor "
-                                  "a gpu event, irq status: 0x%x\n",
-                                  irq_status);
     }
 }
