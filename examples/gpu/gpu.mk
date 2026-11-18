@@ -27,6 +27,11 @@ else
 CFLAGS_gpu :=
 endif
 
+# Must be set before including sddf.mk, QEMU_ARCH_ARGS refers to IMAGE_FILE
+IMAGE_FILE := loader.img
+REPORT_FILE := report.txt
+SYSTEM_FILE := gpu.system
+
 include ${SDDF}/tools/make/sddf.mk
 
 TOP := ${SDDF}/examples/gpu
@@ -39,10 +44,6 @@ CFLAGS += -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 LDFLAGS := -L${BOARD_DIR}/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-IMAGE_FILE := loader.img
-REPORT_FILE := report.txt
-SYSTEM_FILE := gpu.system
-
 # Blob resources need guest RAM backed by memfd so QEMU can create udmabufs
 # (Linux only). Without blob, plain RAM works on any host, including macOS.
 ifneq ($(strip ${BLOB}), 0)
@@ -53,13 +54,9 @@ else
 	QEMU_MEM_OPTIONS :=
 endif
 
-QEMU_CMD := ${QEMU} -machine virt,virtualization=on \
-			-device loader,file=${IMAGE_FILE},addr=0x70000000,cpu-num=0 \
-			-m size=2G \
+QEMU_CMD := ${QEMU} ${QEMU_ARCH_ARGS} \
 			${QEMU_MEM_OPTIONS} \
 			${QEMU_OPTIONS} \
-			-serial mon:stdio \
-			-global virtio-mmio.force-legacy=false \
 			-d guest_errors
 			# -trace enable=virtio*
 
