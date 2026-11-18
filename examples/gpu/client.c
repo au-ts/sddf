@@ -5,13 +5,14 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/gpu/queue.h>
 #include <sddf/gpu/events.h>
+#include <sddf/gpu/config.h>
 #include <sddf/timer/client.h>
-#include <gpu_config.h>
+#include <sddf/timer/config.h>
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_GPU_CLIENT
@@ -23,9 +24,6 @@
 #endif
 #define LOG_GPU_CLIENT_ERR(...) do{ sddf_dprintf("GPU_CLIENT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define VIRT_CH 0
-#define TIMER_CH 1
-
 #define DISPLAY_INFO_DATA_OFFSET 0x1000
 
 #ifndef FB_IMG_WIDTH
@@ -35,14 +33,14 @@
 #error "FB_IMG_HEIGHT not defined"
 #endif
 
-_Static_assert(FB_IMG_WIDTH *FB_IMG_HEIGHT *GPU_BPP_2D <= GPU_DATA_REGION_SIZE_CLI0 - DISPLAY_INFO_DATA_OFFSET,
-               "FB_IMG_WIDTH * FB_IMG_HEIGHT * GPU_BPP_2D must be less than or "
-               "equal to GPU_VIRTIO_DATA_REGION_SIZE");
+__attribute__((__section__(".gpu_client_config"))) gpu_client_config_t gpu_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
-gpu_events_t *gpu_events;
-gpu_req_queue_t *gpu_req_queue;
-gpu_resp_queue_t *gpu_resp_queue;
-uintptr_t gpu_data;
+#define VIRT_CH (gpu_config.virt.id)
+#define TIMER_CH (timer_config.driver_id)
+
+static gpu_events_t *gpu_events;
+static uintptr_t gpu_data;
 
 extern char _fb_img[];
 extern char _fb_img_end[];
@@ -284,7 +282,7 @@ static void do_draw_state(void)
                    });
         sddf_timer_set_timeout(TIMER_CH, NS_IN_S);
         draw_state = DRAW_QUADRANT;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
     case DRAW_QUADRANT:
         /* This will make the following requests:
@@ -304,7 +302,7 @@ static void do_draw_state(void)
                    });
         sddf_timer_set_timeout(TIMER_CH, NS_IN_S);
         draw_state = DRAW_DISABLE;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
     case DRAW_DISABLE:
         /* This will make the following requests:
@@ -319,7 +317,7 @@ static void do_draw_state(void)
 #else
         draw_state = DRAW_FULL;
 #endif
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
 #ifdef GPU_BLOB_SUPPORT
     case DRAW_FULL_BLOB:
@@ -337,7 +335,7 @@ static void do_draw_state(void)
                         });
         sddf_timer_set_timeout(TIMER_CH, NS_IN_S);
         draw_state = DRAW_QUADRANT_BLOB;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
     case DRAW_QUADRANT_BLOB:
         /* This will make the following requests:
@@ -353,7 +351,7 @@ static void do_draw_state(void)
                         });
         sddf_timer_set_timeout(TIMER_CH, NS_IN_S);
         draw_state = DRAW_DISABLE_BLOB;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
     case DRAW_DISABLE_BLOB:
         /* This will make the following requests:
@@ -363,7 +361,7 @@ static void do_draw_state(void)
         cleanup_resources(1, 2);
         sddf_timer_set_timeout(TIMER_CH, NS_IN_S);
         draw_state = DRAW_FULL;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         break;
 #endif
     }
@@ -399,18 +397,24 @@ static void request_display_info()
 void init(void)
 {
     LOG_GPU_CLIENT("Initialising GPU client!\n");
+    assert(gpu_config_check_magic(&gpu_config));
+    assert(timer_config_check_magic(&timer_config));
+
+    gpu_events = (gpu_events_t *)gpu_config.virt.events.vaddr;
+    gpu_data = (uintptr_t)gpu_config.data.vaddr;
+
     /* Assert image size does not exceed data region size */
-    assert(FB_IMG_WIDTH * FB_IMG_HEIGHT * GPU_BPP_2D + DISPLAY_INFO_DATA_OFFSET <= GPU_DATA_REGION_SIZE_CLI0);
-    gpu_queue_init(&gpu_queue_handle, gpu_req_queue, gpu_resp_queue, GPU_QUEUE_CAPACITY_CLI0);
-    memcpy((void *)(gpu_data + 0x1000), (void *)_fb_img, (size_t)(_fb_img_end - _fb_img));
+    assert(FB_IMG_WIDTH * FB_IMG_HEIGHT * GPU_BPP_2D + DISPLAY_INFO_DATA_OFFSET <= gpu_config.data.size);
+    gpu_queue_init_from_conn(&gpu_queue_handle, &gpu_config.virt);
+    memcpy((void *)(gpu_data + DISPLAY_INFO_DATA_OFFSET), (void *)_fb_img, (size_t)(_fb_img_end - _fb_img));
 
     /* As part of initialisation, request for display info before sending anything else */
     LOG_GPU_CLIENT("Requesting initial display info\n");
     request_display_info();
-    microkit_notify(VIRT_CH);
+    sddf_notify(VIRT_CH);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     int err = 0;
     if (!display_info_init) {
@@ -444,7 +448,7 @@ void notified(microkit_channel ch)
         LOG_GPU_CLIENT("Requesting display info\n");
         request_display_info();
         pending_display_info_request = true;
-        microkit_notify(VIRT_CH);
+        sddf_notify(VIRT_CH);
         return;
     }
 

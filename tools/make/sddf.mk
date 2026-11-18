@@ -27,6 +27,9 @@ include ${SDDF}/benchmark/benchmark.mk
 # Block
 include ${SDDF}/blk/components/blk_components.mk
 
+# GPU
+include ${SDDF}/gpu/components/gpu_components.mk
+
 # I²C
 include ${SDDF}/i2c/components/i2c_virt.mk
 include ${SDDF}/i2c/libi2c.mk

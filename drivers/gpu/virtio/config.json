@@ -1,0 +1,28 @@
+{
+    "compatible": [
+        "virtio,mmio"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 4096,
+                "dt_index": 0
+            },
+            {
+                "name": "virtio_gpu_data",
+                "size": 2097152
+            },
+            {
+                "name": "virtio_gpu_metadata",
+                "size": 65536
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}

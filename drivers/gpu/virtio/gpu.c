@@ -5,7 +5,7 @@
 
 /*
  * This driver follows the non-legacy virtIO 1.2 specification for the gpu device.
- * It assumes that the transport method is MMIO.
+ * Device access goes through the sDDF virtIO transport layer.
  * This driver implements unaccelerated 2D commands in the control queue.
  *
  * It should also be noted that because this driver is intended to be used with a
@@ -13,17 +13,19 @@
  * may be needed if instead this driver was to be used in a different environment.
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdint.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 #include <sddf/util/ialloc.h>
-#include <sddf/virtio/virtio.h>
-#include <sddf/virtio/virtio_queue.h>
+#include <sddf/virtio/transport/common.h>
+#include <sddf/virtio/queue.h>
+#include <sddf/virtio/feature.h>
 #include <sddf/gpu/queue.h>
 #include <sddf/gpu/events.h>
+#include <sddf/gpu/config.h>
+#include <sddf/resources/device.h>
 #include <gpu.h>
-#include <gpu_config.h>
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_GPU_VIRTIO_DRIVER
@@ -35,25 +37,17 @@
 #endif
 #define LOG_GPU_VIRTIO_DRIVER_ERR(...) do{ sddf_dprintf("GPU_VIRTIO_DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define IRQ_CH 0
-#define VIRT_CH 1
+/* Indices into device_resources.regions, as declared in config.json */
+#define REGION_REGS 0
+#define REGION_VIRTIO_DATA 1
+#define REGION_VIRTIO_METADATA 2
 
-/*
- * This offset is the default for QEMU, but can change depending on
- * the configuration of QEMU and what other virtIO devices are being
- * used.
- */
-#ifndef VIRTIO_MMIO_GPU_OFFSET
-#define VIRTIO_MMIO_GPU_OFFSET (0xe00)
-#endif
-
-#define VIRTQ_QUEUE_SIZE GPU_QUEUE_CAPACITY_DRV
+/* Maximum number of descriptors in the control virtqueue. The actual
+ * number used is the minimum of this and what the device supports. */
+#define VIRTQ_MAX_QUEUE_SIZE 1024
 
 /* Size of data contained in a single descriptor */
 #define VIRTIO_DATA_ENTRY_SIZE 2048
-_Static_assert((uint64_t)VIRTIO_DATA_ENTRY_SIZE *(uint64_t)VIRTQ_QUEUE_SIZE <= GPU_VIRTIO_DATA_REGION_SIZE,
-               "VIRTIO_DATA_ENTRY_SIZE * VIRTQ_QUEUE_SIZE must be less than or "
-               "equal to GPU_VIRTIO_DATA_REGION_SIZE");
 
 #define VIRTIO_DATA(idx) ((idx) * VIRTIO_DATA_ENTRY_SIZE + virtio_data)
 #define VIRTIO_DATA_PADDR(idx) ((idx) * VIRTIO_DATA_ENTRY_SIZE + virtio_data_paddr)
@@ -65,19 +59,17 @@ _Static_assert((uint64_t)VIRTIO_DATA_ENTRY_SIZE *(uint64_t)VIRTQ_QUEUE_SIZE <= G
 #define BIT_LOW(n)  (1ul<<(n))
 #define BIT_HIGH(n) (1ul<<(n - 32 ))
 
-/* Microkit patched variables */
-uintptr_t virtio_regs;
-uintptr_t virtio_metadata;
-uintptr_t virtio_metadata_paddr;
-uintptr_t virtio_data;
-uintptr_t virtio_data_paddr;
-gpu_req_queue_t *gpu_req_queue;
-gpu_resp_queue_t *gpu_resp_queue;
-gpu_events_t *gpu_events;
-uintptr_t gpu_driver_data;
-uintptr_t gpu_client_data_paddr;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".gpu_driver_config"))) gpu_driver_config_t config;
 
-static volatile virtio_mmio_regs_t *regs;
+static uintptr_t virtio_metadata;
+static uintptr_t virtio_metadata_paddr;
+static uintptr_t virtio_data;
+static uintptr_t virtio_data_paddr;
+static gpu_events_t *gpu_events;
+static uintptr_t gpu_driver_data;
+
+static virtio_device_handle_t dev;
 static volatile struct virtio_gpu_config
     *virtio_config; /* gpu device configuration, populated by device during initialisation. */
 static struct virtq virtq;
@@ -94,12 +86,15 @@ typedef struct reqbk {
      */
     uint64_t mem_offset;
 } reqbk_t;
-static reqbk_t reqsbk[GPU_QUEUE_CAPACITY_DRV];
+static reqbk_t reqsbk[SDDF_GPU_MAX_QUEUE_CAPACITY];
+
+/* Number of descriptors in the control virtqueue, set during initialisation */
+static uint16_t virtq_queue_size;
 
 static ialloc_t ialloc_desc;
-static uint32_t ialloc_desc_idxlist[VIRTQ_QUEUE_SIZE];
+static uint32_t ialloc_desc_idxlist[VIRTQ_MAX_QUEUE_SIZE];
 /* Mapping from virtIO descriptor idx to sDDF id */
-static uint32_t virtio_desc_to_id[VIRTQ_QUEUE_SIZE];
+static uint32_t virtio_desc_to_id[VIRTQ_MAX_QUEUE_SIZE];
 
 static uint16_t last_handled_used_idx = 0;
 
@@ -110,67 +105,53 @@ static void handle_irq();
 void init(void)
 {
     LOG_GPU_VIRTIO_DRIVER("Initialising GPU virtio driver!\n");
-    ialloc_init(&ialloc_desc, ialloc_desc_idxlist, VIRTQ_QUEUE_SIZE);
+    assert(gpu_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 3);
+    assert(config.virt.num_buffers <= SDDF_GPU_MAX_QUEUE_CAPACITY);
 
-    gpu_queue_init(&gpu_queue_h, gpu_req_queue, gpu_resp_queue, GPU_QUEUE_CAPACITY_DRV);
+    virtio_data = (uintptr_t)device_resources.regions[REGION_VIRTIO_DATA].region.vaddr;
+    virtio_data_paddr = device_resources.regions[REGION_VIRTIO_DATA].io_addr;
+    virtio_metadata = (uintptr_t)device_resources.regions[REGION_VIRTIO_METADATA].region.vaddr;
+    virtio_metadata_paddr = device_resources.regions[REGION_VIRTIO_METADATA].io_addr;
+    gpu_events = (gpu_events_t *)config.virt.events.vaddr;
+    gpu_driver_data = (uintptr_t)config.data.vaddr;
 
-    regs = (volatile virtio_mmio_regs_t *)(virtio_regs + VIRTIO_MMIO_GPU_OFFSET);
-    virtio_config = (volatile struct virtio_gpu_config *)regs->Config;
+    gpu_queue_init_from_conn(&gpu_queue_h, &config.virt);
+
     virtio_gpu_init();
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-#ifdef DEBUG_GPU_VIRTIO_DRIVER
-    if (ch == IRQ_CH) {
+    if (ch == device_resources.irqs[0].id) {
         LOG_GPU_VIRTIO_DRIVER("Received interrupt from device\n");
-    } else {
-        LOG_GPU_VIRTIO_DRIVER("Received notification from virtualiser\n");
-    }
-#endif
-    switch (ch) {
-    case IRQ_CH:
         handle_irq();
-        microkit_deferred_irq_ack(ch);
-        break;
-    case VIRT_CH:
+        sddf_deferred_irq_ack(ch);
+    } else if (ch == config.virt.id) {
+        LOG_GPU_VIRTIO_DRIVER("Received notification from virtualiser\n");
         handle_request();
-        break;
-    default:
+    } else {
         LOG_GPU_VIRTIO_DRIVER_ERR("Received notification from unknown channel: 0x%x\n", ch);
     }
 }
 
 static void virtio_gpu_init(void)
 {
-    /* Do MMIO device init (section 4.2.3.1) */
-    if (!virtio_mmio_check_magic(regs)) {
-        LOG_GPU_VIRTIO_DRIVER_ERR("Invalid virtIO magic value!\n");
-        assert(false);
-    }
-
-    if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
-        LOG_GPU_VIRTIO_DRIVER_ERR("Incorrect virtIO version!\n");
-        assert(false);
-    }
-
-    if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_GPU)) {
-        LOG_GPU_VIRTIO_DRIVER_ERR("Not a virtIO gpu device!\n");
-        assert(false);
-    }
-
-    if (virtio_mmio_version(regs) != VIRTIO_GPU_DRIVER_VERSION) {
-        LOG_GPU_VIRTIO_DRIVER_ERR("Driver does not support given virtIO version: 0x%x\n", virtio_mmio_version(regs));
-        LOG_GPU_VIRTIO_DRIVER_ERR("Driver supports virtIO version: 0x%x\n", VIRTIO_GPU_DRIVER_VERSION);
+    if (!virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_GPU)) {
+        LOG_GPU_VIRTIO_DRIVER_ERR("Could not find a virtIO gpu device!\n");
         assert(false);
     }
 
     /* First reset the device */
-    regs->Status = 0;
+    virtio_transport_set_status(&dev, 0);
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
-    regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
     /* Set the DRIVER bit to say we know how to drive the device */
-    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
+
+    virtio_config = (volatile struct virtio_gpu_config *)virtio_transport_get_device_config(&dev);
 
     /* Now we can read configuration space to validate its fields */
     if (virtio_config->num_scanouts == 0) {
@@ -178,10 +159,9 @@ static void virtio_gpu_init(void)
         assert(false);
     }
 
-    uint32_t dev_features_low = regs->DeviceFeatures;
+    uint32_t dev_features_low = virtio_transport_get_device_features(&dev, 0);
     (void)(dev_features_low); /* Silence unused warnings */
-    regs->DeviceFeaturesSel = 1;
-    uint32_t dev_features_high = regs->DeviceFeatures;
+    uint32_t dev_features_high = virtio_transport_get_device_features(&dev, 1);
 
 #ifdef DEBUG_GPU_VIRTIO_DRIVER
     LOG_GPU_VIRTIO_DRIVER("Device is offering the following features:\n");
@@ -210,9 +190,8 @@ static void virtio_gpu_init(void)
     uint32_t drv_features_low = 0;
 #endif
     uint32_t drv_features_high = BIT_HIGH(VIRTIO_F_VERSION_1);
-    regs->DriverFeatures = drv_features_low;
-    regs->DriverFeaturesSel = 1;
-    regs->DriverFeatures = drv_features_high;
+    virtio_transport_set_driver_features(&dev, 0, drv_features_low);
+    virtio_transport_set_driver_features(&dev, 1, drv_features_high);
 
 #ifdef DEBUG_GPU_VIRTIO_DRIVER
     uint64_t drv_features = drv_features_low | ((uint64_t)drv_features_high << 32);
@@ -221,37 +200,41 @@ static void virtio_gpu_init(void)
     virtio_gpu_print_features(drv_features);
 #endif
 
-    regs->Status |= VIRTIO_DEVICE_STATUS_FEATURES_OK;
-    if (!(regs->Status & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_FEATURES_OK);
+    if (!(virtio_transport_get_status(&dev) & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
         LOG_GPU_VIRTIO_DRIVER_ERR("Device status features is not OK!\n");
         assert(false);
     }
 
     /* Add virtqueues */
-    size_t desc_off = 0;
-    size_t avail_off = ALIGN(desc_off + (16 * VIRTQ_QUEUE_SIZE), 2);
-    size_t used_off = ALIGN(avail_off + (6 + 2 * VIRTQ_QUEUE_SIZE), 4);
-    size_t size = used_off + (6 + 8 * VIRTQ_QUEUE_SIZE);
-    assert(size <= GPU_VIRTIO_METADATA_REGION_SIZE);
+    uint16_t host_q_capacity = virtio_transport_queue_get_capacity(&dev, VIRTIO_GPU_CONTROL_QUEUE);
+    virtq_queue_size = MIN(host_q_capacity, VIRTQ_MAX_QUEUE_SIZE);
+    assert(virtq_queue_size > 0);
+    ialloc_init(&ialloc_desc, ialloc_desc_idxlist, virtq_queue_size);
 
-    virtq.num = VIRTQ_QUEUE_SIZE;
+    assert((uint64_t)VIRTIO_DATA_ENTRY_SIZE * virtq_queue_size
+           <= device_resources.regions[REGION_VIRTIO_DATA].region.size);
+
+    size_t desc_off = 0;
+    size_t avail_off = ALIGN(desc_off + (16 * virtq_queue_size), 2);
+    size_t used_off = ALIGN(avail_off + (6 + 2 * virtq_queue_size), 4);
+    size_t size = used_off + (6 + 8 * virtq_queue_size);
+    assert(size <= device_resources.regions[REGION_VIRTIO_METADATA].region.size);
+
+    virtq.num = virtq_queue_size;
     virtq.desc = (struct virtq_desc *)(virtio_metadata + desc_off);
     virtq.avail = (struct virtq_avail *)(virtio_metadata + avail_off);
     virtq.used = (struct virtq_used *)(virtio_metadata + used_off);
 
-    assert(regs->QueueNumMax >= VIRTQ_QUEUE_SIZE);
-    regs->QueueSel = VIRTIO_GPU_CONTROL_QUEUE;
-    regs->QueueNum = VIRTQ_QUEUE_SIZE;
-    regs->QueueDescLow = (virtio_metadata_paddr + desc_off) & 0xFFFFFFFFUL;
-    regs->QueueDescHigh = (virtio_metadata_paddr + desc_off) >> 32;
-    regs->QueueDriverLow = (virtio_metadata_paddr + avail_off) & 0xFFFFFFFFUL;
-    regs->QueueDriverHigh = (virtio_metadata_paddr + avail_off) >> 32;
-    regs->QueueDeviceLow = (virtio_metadata_paddr + used_off) & 0xFFFFFFFFUL;
-    regs->QueueDeviceHigh = (virtio_metadata_paddr + used_off) >> 32;
-    regs->QueueReady = 1;
+    if (!virtio_transport_queue_setup(&dev, VIRTIO_GPU_CONTROL_QUEUE, virtq_queue_size,
+                                      virtio_metadata_paddr + desc_off, virtio_metadata_paddr + avail_off,
+                                      virtio_metadata_paddr + used_off)) {
+        LOG_GPU_VIRTIO_DRIVER_ERR("Failed to set up control virtqueue!\n");
+        assert(false);
+    }
 
     /* Finish initialisation */
-    regs->Status |= VIRTIO_DEVICE_STATUS_DRIVER_OK;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER_OK);
 }
 
 static gpu_resp_status_t virtio_gpu_to_sddf_resp_status(enum virtio_gpu_ctrl_type type)
@@ -309,19 +292,19 @@ static enum virtio_gpu_formats sddf_to_virtio_gpu_resource_format(gpu_formats_t 
 static bool handle_response()
 {
     int err = 0;
-    bool sddf_notify = false;
+    bool notify_virt = false;
     uint16_t i = last_handled_used_idx;
     uint16_t curr_idx = virtq.used->idx;
     while (i != curr_idx) {
         struct virtq_used_elem used = virtq.used->ring[i % virtq.num];
-        assert(used.id < VIRTQ_QUEUE_SIZE);
+        assert(used.id < virtq_queue_size);
 
         LOG_GPU_VIRTIO_DRIVER("Handling response %d\n", virtio_desc_to_id[used.id]);
 
         struct virtq_desc desc_head = virtq.desc[used.id];
         assert(desc_head.len >= sizeof(struct virtio_gpu_ctrl_hdr));
         assert(desc_head.flags & VIRTQ_DESC_F_NEXT);
-        assert(desc_head.next < VIRTQ_QUEUE_SIZE);
+        assert(desc_head.next < virtq_queue_size);
 
         gpu_resp_t resp = { 0 };
         resp.id = virtio_desc_to_id[used.id];
@@ -434,6 +417,8 @@ static bool handle_response()
         err = ialloc_free(&ialloc_desc, desc_head.next);
         assert(!err);
 
+        i++;
+
         if (gpu_queue_full_resp(&gpu_queue_h)) {
             LOG_GPU_VIRTIO_DRIVER_ERR("Response queue is full, dropping response\n");
             continue;
@@ -441,21 +426,19 @@ static bool handle_response()
 
         err = gpu_enqueue_resp(&gpu_queue_h, resp);
         assert(!err);
-        sddf_notify = true;
-
-        i++;
+        notify_virt = true;
     }
 
     last_handled_used_idx = i;
 
-    return sddf_notify;
+    return notify_virt;
 }
 
 static void handle_request()
 {
     int err = 0;
     bool virtio_queue_notify = false;
-    bool sddf_notify = false;
+    bool notify_virt = false;
     gpu_req_t req = { 0 };
     while (!gpu_queue_empty_req(&gpu_queue_h)) {
         if (ialloc_num_free(&ialloc_desc) < VIRTIO_MAX_DESC_PER_REQ) {
@@ -477,7 +460,7 @@ static void handle_request()
         uint32_t desc_head_idx = 0;
         err = ialloc_alloc(&ialloc_desc, &desc_head_idx);
         assert(!err);
-        assert(desc_head_idx < VIRTQ_QUEUE_SIZE);
+        assert(desc_head_idx < virtq_queue_size);
 
         virtio_desc_to_id[desc_head_idx] = req.id;
 
@@ -491,7 +474,7 @@ static void handle_request()
         uint32_t desc_footer_idx = 0;
         err = ialloc_alloc(&ialloc_desc, &desc_footer_idx);
         assert(!err);
-        assert(desc_footer_idx < VIRTQ_QUEUE_SIZE);
+        assert(desc_footer_idx < virtq_queue_size);
 
         virtq.desc[desc_footer_idx].addr = (uint64_t)VIRTIO_DATA_PADDR(desc_footer_idx);
         virtq.desc[desc_footer_idx].len = 0;
@@ -541,7 +524,7 @@ static void handle_request()
                 uint32_t desc_body_idx = 0;
                 err = ialloc_alloc(&ialloc_desc, &desc_body_idx);
                 assert(!err);
-                assert(desc_body_idx < VIRTQ_QUEUE_SIZE);
+                assert(desc_body_idx < virtq_queue_size);
 
                 virtq.desc[desc_head_idx].next = desc_body_idx;
                 virtq.desc[desc_head_idx].flags = VIRTQ_DESC_F_NEXT;
@@ -550,7 +533,8 @@ static void handle_request()
                 virtq.desc[desc_body_idx].len = sizeof(struct virtio_gpu_mem_entry);
 
                 struct virtio_gpu_mem_entry *mem_entry = (struct virtio_gpu_mem_entry *)VIRTIO_DATA(desc_body_idx);
-                mem_entry->addr = req.resource_create_blob.mem_offset + gpu_client_data_paddr;
+                /* The virtualiser has already translated this into an I/O address */
+                mem_entry->addr = req.resource_create_blob.mem_offset;
                 mem_entry->length = memsize;
 
                 virtq.desc[desc_body_idx].next = desc_footer_idx;
@@ -646,7 +630,7 @@ static void handle_request()
             uint32_t desc_body_idx = 0;
             err = ialloc_alloc(&ialloc_desc, &desc_body_idx);
             assert(!err);
-            assert(desc_body_idx < VIRTQ_QUEUE_SIZE);
+            assert(desc_body_idx < virtq_queue_size);
 
             virtq.desc[desc_head_idx].next = desc_body_idx;
             virtq.desc[desc_head_idx].flags = VIRTQ_DESC_F_NEXT;
@@ -655,7 +639,8 @@ static void handle_request()
             virtq.desc[desc_body_idx].len = sizeof(struct virtio_gpu_mem_entry);
 
             struct virtio_gpu_mem_entry *mem_entry = (struct virtio_gpu_mem_entry *)VIRTIO_DATA(desc_body_idx);
-            mem_entry->addr = req.resource_attach_backing.mem_offset + gpu_client_data_paddr;
+            /* The virtualiser has already translated this into an I/O address */
+            mem_entry->addr = req.resource_attach_backing.mem_offset;
             mem_entry->length = req.resource_attach_backing.mem_size;
 
             virtq.desc[desc_body_idx].next = desc_footer_idx;
@@ -761,31 +746,31 @@ static void handle_request()
 
             err = gpu_enqueue_resp(&gpu_queue_h, (gpu_resp_t) { req.id, GPU_RESP_ERR_UNSPEC });
             assert(!err);
-            sddf_notify = true;
+            notify_virt = true;
             break;
         }
         }
         virtio_queue_notify = true;
     }
 
-    if (sddf_notify) {
-        microkit_notify(VIRT_CH);
+    if (notify_virt) {
+        sddf_notify(config.virt.id);
     }
 
     if (virtio_queue_notify) {
         LOG_GPU_VIRTIO_DRIVER("Notifying device about new queue entries\n");
-        regs->QueueNotify = 0;
+        virtio_transport_queue_notify(&dev, VIRTIO_GPU_CONTROL_QUEUE);
     }
 }
 
 static void handle_irq()
 {
     bool notify = false;
-    uint32_t irq_status = regs->InterruptStatus;
-    if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
+    uint32_t irq_status = virtio_transport_read_isr(&dev);
+    if (irq_status & VIRTIO_IRQ_VQUEUE) {
         LOG_GPU_VIRTIO_DRIVER("Received virtqueue used buffer notification\n");
         // ACK before handling responses
-        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
         notify = handle_response();
         /* Now that there are (maybe) some free descriptors, we want to handle any remaining
          * requests that we may have left in the queue before due to being
@@ -794,12 +779,12 @@ static void handle_irq()
         handle_request();
     }
 
-    if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
+    if (irq_status & VIRTIO_IRQ_CONFIG) {
         if (virtio_config->events_read & VIRTIO_GPU_EVENT_DISPLAY) {
             LOG_GPU_VIRTIO_DRIVER("Received display info event\n");
             gpu_events_set_display_info(gpu_events);
             virtio_config->events_clear = VIRTIO_GPU_EVENT_DISPLAY;
-            regs->InterruptACK = VIRTIO_MMIO_IRQ_CONFIG;
+            virtio_transport_write_isr(&dev, VIRTIO_IRQ_CONFIG);
             notify = true;
         } else {
             LOG_GPU_VIRTIO_DRIVER_ERR("Unknown event: 0x%x\n", virtio_config->events_read);
@@ -807,7 +792,7 @@ static void handle_irq()
     }
 
     if (notify) {
-        microkit_notify(VIRT_CH);
+        sddf_notify(config.virt.id);
     } else {
         LOG_GPU_VIRTIO_DRIVER_ERR("Received interrupt but is neither a used buffer notification nor "
                                   "a gpu event, irq status: 0x%x\n",
