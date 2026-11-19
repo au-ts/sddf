@@ -12,6 +12,9 @@ into the [Viper](https://viper.ethz.ch/) verification language using a
 OS components can be verified for functional correctness and more.
 
 To build Pancake components, the Pancake compiler should be available.
+Pass 'PANCAKE=1' to `make` to build with all supported Pancake components
+(per-component flags are supported, see
+[pancake.mk](../tools/make/toolchain/pancake.mk)).
 Currently, the compiler shares the same binary as the CakeML compiler `cake`
 available [here](https://cakeml.org/download). In addition, the C toolchain
 should be accessible, because the linker and the preprocessor are still
