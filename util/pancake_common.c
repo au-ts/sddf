@@ -44,6 +44,7 @@ void cml_clear(void)
      */
     assert(false);
 }
+#endif
 
 void *cml_install(uint8_t *src, size_t len, uint8_t *dest)
 {
@@ -54,7 +55,6 @@ void *cml_install(uint8_t *src, size_t len, uint8_t *dest)
     assert(false);
     return NULL;
 }
-#endif
 
 /* This function checks that the constants hard-coded in Pancake programs for the size of
    a struct and the offset of a field within the struct are correct. */
