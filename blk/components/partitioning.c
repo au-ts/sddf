@@ -13,8 +13,8 @@
 
 /* Client specific info */
 typedef struct client {
-    uint32_t start_sector;
-    uint32_t sectors;
+    uint64_t start_sector;
+    uint64_t sectors;
 } client_t;
 static client_t clients[SDDF_BLK_MAX_CLIENTS];
 
@@ -362,7 +362,7 @@ static bool mbr_handle_response()
 
         uint32_t meta_mirror_blk_cnt = (GPT_SECTOR_SIZE * 1 + BLK_TRANSFER_SIZE - 1 + gpt_meta.table_size)
                                      / BLK_TRANSFER_SIZE;
-        uint32_t mirror_blk_start = (gpt_meta.header->lba_alt_header - gpt_meta.table_size / GPT_SECTOR_SIZE)
+        uint64_t mirror_blk_start = (gpt_meta.header->lba_alt_header - gpt_meta.table_size / GPT_SECTOR_SIZE)
                                   / (BLK_TRANSFER_SIZE / GPT_SECTOR_SIZE);
         gpt_state.mirror_req_addr = (uintptr_t)config.driver.data.region.vaddr + BLK_TRANSFER_SIZE * meta_blk_cnt;
         gpt_state.mirror_req_id = gpt_req_id;
@@ -386,8 +386,8 @@ blk_resp_status_t get_drv_block_number(uint64_t cli_block_number, uint16_t cli_c
     uint64_t block_number = cli_block_number
                           + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
 
-    unsigned long client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-    unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+    uint64_t client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+    uint64_t client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
     if (block_number < client_start_sector || block_number + cli_count > client_start_sector + client_sectors) {
         /* Requested block number out of bounds */
         LOG_BLK_VIRT_ERR("client %d request for block %lu is out of bounds\n", cli_id, cli_block_number);
