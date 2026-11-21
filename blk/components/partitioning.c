@@ -13,8 +13,8 @@
 
 /* Client specific info */
 typedef struct client {
-    uint32_t start_sector;
-    uint32_t sectors;
+    uint64_t start_sector;
+    uint64_t sectors;
 } client_t;
 static client_t clients[SDDF_BLK_MAX_CLIENTS];
 
@@ -339,7 +339,42 @@ static bool mbr_handle_response()
 
         /* Save the primary GPT header, and validate the header in gpt_validate_partitionsk() */
         gpt_meta.header = (struct gpt_partition_header *)(mbr_state.req_addr + GPT_SECTOR_SIZE);
+        if (gpt_meta.header->num_entries == 0 || gpt_meta.header->num_entries > GPT_MAX_PARTITIONS) {
+            LOG_BLK_VIRT_ERR("Unsupported GPT number of partition entries: %u (supported 1 to %d)\n",
+                             gpt_meta.header->num_entries, GPT_MAX_PARTITIONS);
+            return false;
+        }
+        if (gpt_meta.header->entry_size != sizeof(struct gpt_partition_entry)) {
+            LOG_BLK_VIRT_ERR("Unsupported GPT partition entry size: %u (supported %zu)\n", gpt_meta.header->entry_size,
+                             sizeof(struct gpt_partition_entry));
+            return false;
+        }
         gpt_meta.table_size = gpt_meta.header->num_entries * gpt_meta.header->entry_size;
+
+        /* Validate the primary and backup read ranges against the disk capacity, so a malformed
+         * GPT backup header LBA cannot underflow or send the driver an out-of-range request.
+         */
+        blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
+        if (gpt_meta.header->lba_alt_header < gpt_meta.table_size / GPT_SECTOR_SIZE) {
+            LOG_BLK_VIRT_ERR("Invalid GPT backup header LBA: %lu (must be at least %u)\n",
+                             gpt_meta.header->lba_alt_header, gpt_meta.table_size / GPT_SECTOR_SIZE);
+            return false;
+        }
+        uint32_t meta_blk_cnt = (GPT_SECTOR_SIZE * 2 + BLK_TRANSFER_SIZE - 1 + gpt_meta.table_size) / BLK_TRANSFER_SIZE;
+        if (meta_blk_cnt > driver_storage_info->capacity) {
+            LOG_BLK_VIRT_ERR("GPT primary table extends beyond end of disk: %u blocks needed, disk has %lu blocks\n",
+                             meta_blk_cnt, driver_storage_info->capacity);
+            return false;
+        }
+        uint32_t meta_mirror_blk_cnt = (GPT_SECTOR_SIZE * 1 + BLK_TRANSFER_SIZE - 1 + gpt_meta.table_size)
+                                     / BLK_TRANSFER_SIZE;
+        uint64_t mirror_blk_start = (gpt_meta.header->lba_alt_header - gpt_meta.table_size / GPT_SECTOR_SIZE)
+                                  / (BLK_TRANSFER_SIZE / GPT_SECTOR_SIZE);
+        if (meta_mirror_blk_cnt + mirror_blk_start > driver_storage_info->capacity) {
+            LOG_BLK_VIRT_ERR("GPT backup table extends beyond end of disk: ends at block %lu, disk has %lu blocks\n",
+                             meta_mirror_blk_cnt + mirror_blk_start, driver_storage_info->capacity);
+            return false;
+        }
 
         /* Copy the first two sectors of partition entries to the table */
         gpt_meta.table = (struct gpt_partition_entry *)(mbr_state.req_addr + GPT_SECTOR_SIZE * 2);
@@ -348,7 +383,6 @@ static bool mbr_handle_response()
         uint32_t gpt_req_id = 0;
         err = ialloc_alloc(&ialloc, &gpt_req_id);
         assert(!err);
-        uint32_t meta_blk_cnt = (GPT_SECTOR_SIZE * 2 + BLK_TRANSFER_SIZE - 1 + gpt_meta.table_size) / BLK_TRANSFER_SIZE;
         gpt_state.req_addr = (uintptr_t)config.driver.data.region.vaddr + BLK_TRANSFER_SIZE;
         gpt_state.req_id = gpt_req_id;
         gpt_state.req_cnt = meta_blk_cnt - 1;
@@ -359,11 +393,6 @@ static bool mbr_handle_response()
         /* Request for mirror of partition table and header */
         err = ialloc_alloc(&ialloc, &gpt_req_id);
         assert(!err);
-
-        uint32_t meta_mirror_blk_cnt = (GPT_SECTOR_SIZE * 1 + BLK_TRANSFER_SIZE - 1 + gpt_meta.table_size)
-                                     / BLK_TRANSFER_SIZE;
-        uint32_t mirror_blk_start = (gpt_meta.header->lba_alt_header - gpt_meta.table_size / GPT_SECTOR_SIZE)
-                                  / (BLK_TRANSFER_SIZE / GPT_SECTOR_SIZE);
         gpt_state.mirror_req_addr = (uintptr_t)config.driver.data.region.vaddr + BLK_TRANSFER_SIZE * meta_blk_cnt;
         gpt_state.mirror_req_id = gpt_req_id;
         gpt_state.mirror_req_cnt = meta_mirror_blk_cnt;
@@ -386,8 +415,8 @@ blk_resp_status_t get_drv_block_number(uint64_t cli_block_number, uint16_t cli_c
     uint64_t block_number = cli_block_number
                           + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
 
-    unsigned long client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-    unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+    uint64_t client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+    uint64_t client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
     if (block_number < client_start_sector || block_number + cli_count > client_start_sector + client_sectors) {
         /* Requested block number out of bounds */
         LOG_BLK_VIRT_ERR("client %d request for block %lu is out of bounds\n", cli_id, cli_block_number);
