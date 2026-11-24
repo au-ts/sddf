@@ -53,13 +53,18 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 static uint64_t get_ticks(void)
 {
     uint64_t overflow = overflow_count;
-    uint32_t sr1 = gpt[SR];
-    uint32_t cnt = gpt[CNT];
-    uint32_t sr2 = gpt[SR];
-    if ((sr2 & (1 << 5)) && (!(sr1 & (1 << 5)))) {
-        /* rolled-over during - 64-bit time must be the overflow */
-        cnt = gpt[CNT];
+    uint32_t sr = gpt[SR];
+    if (sr & (1 << 5)) {
         overflow++;
+    }
+    uint32_t cnt = gpt[CNT];
+    if (!(sr & (1 << 5))) {
+        sr = gpt[SR];
+        if (sr & (1 << 5)) {
+            /* rolled-over during - 64-bit time must be the overflow */
+            cnt = gpt[CNT];
+            overflow++;
+        }
     }
     return (overflow << 32) | cnt;
 }
