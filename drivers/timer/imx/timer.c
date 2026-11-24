@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2022, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
@@ -38,6 +39,7 @@
 #define ICR1 7
 #define ICR2 8
 #define CNT 9
+#define ROV (1 << 5)
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
@@ -53,18 +55,14 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 static uint64_t get_ticks(void)
 {
     uint64_t overflow = overflow_count;
-    uint32_t sr = gpt[SR];
-    if (sr & (1 << 5)) {
-        overflow++;
-    }
     uint32_t cnt = gpt[CNT];
-    if (!(sr & (1 << 5))) {
-        sr = gpt[SR];
-        if (sr & (1 << 5)) {
-            /* rolled-over during - 64-bit time must be the overflow */
-            cnt = gpt[CNT];
-            overflow++;
-        }
+    // Check for counter overflow rollover. This can happen after us reading cnt above
+    // or earlier in protected(). In the former case, cnt is now invalid.
+    // If we roll over, notified() will run shortly afterwards and update the global overflow
+    // count. We temporarily increment it here to get the correct value.
+    if (gpt[SR] & ROV) {
+        cnt = gpt[CNT];
+        overflow++;
     }
     return (overflow << 32) | cnt;
 }
@@ -103,7 +101,7 @@ void notified(sddf_channel ch)
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;
 
-    if (sr & (1 << 5)) {
+    if (sr & ROV) {
         overflow_count++;
     }
 
