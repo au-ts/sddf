@@ -39,7 +39,8 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_h1 = (uint64_t)timer_regs->time_high;
     uint64_t value_l = (uint64_t)timer_regs->time_low;
 
-    /* detects and handles counter underflows between reading the lower and upper halves */
+    /* Re-read high half. If it has changed since we read the lo half,
+     * we have underflowed and must read again. */
     uint64_t value_h2 = (uint64_t)timer_regs->time_high;
     if (value_h2 != value_h1) {
         value_l = (uint64_t)timer_regs->time_low;
