@@ -53,7 +53,8 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_h1 = timestamp_timer->current_value1;
     uint64_t value_l = timestamp_timer->current_value0;
 
-    /* detects and handles counter overflows between reading the lower and upper halves */
+    /* Re-read high half. If it has changed since we read the lo half,
+     * we have underflowed and must read again. */
     uint64_t value_h2 = timestamp_timer->current_value1;
     if (value_h2 != value_h1) {
         value_l = timestamp_timer->current_value0;

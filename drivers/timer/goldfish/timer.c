@@ -36,8 +36,16 @@ static volatile goldfish_timer_regs_t *timer_regs;
 
 static inline uint64_t get_ticks_in_ns(void)
 {
-    uint64_t time = (uint64_t)timer_regs->time_low;
-    time |= ((uint64_t)timer_regs->time_high) << 32;
+    uint64_t value_h1 = (uint64_t)timer_regs->time_high;
+    uint64_t value_l = (uint64_t)timer_regs->time_low;
+
+    /* Re-read high half. If it has changed since we read the lo half,
+     * we have underflowed and must read again. */
+    uint64_t value_h2 = (uint64_t)timer_regs->time_high;
+    if (value_h2 != value_h1) {
+        value_l = (uint64_t)timer_regs->time_low;
+    }
+    uint64_t time = (value_h2 << 32) | value_l;
     return time;
 }
 

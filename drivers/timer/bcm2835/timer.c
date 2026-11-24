@@ -60,9 +60,16 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 static inline uint64_t get_ticks_in_ns(void)
 {
     /* convert current value of free-running counter from microseconds to nanoseconds */
-    uint64_t value_h = (uint64_t)timer_regs->chi;
+    uint64_t value_h1 = (uint64_t)timer_regs->chi;
     uint64_t value_l = (uint64_t)timer_regs->clo;
-    uint64_t value_us = (value_h << 32) | value_l;
+
+    /* Re-read high half. If it has changed since we read the lo half,
+     * we have underflowed and must read again. */
+    uint64_t value_h2 = (uint64_t)timer_regs->chi;
+    if (value_h2 != value_h1) {
+        value_l = (uint64_t)timer_regs->clo;
+    }
+    uint64_t value_us = (value_h2 << 32) | value_l;
     return ticks_to_ns(value_us, BCM2835_CLK_FREQ);
 }
 
