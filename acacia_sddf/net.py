@@ -54,7 +54,7 @@ class sDDFMAC:
 
     def _parse_mac_addr(self, mac_str: str) -> List[int]:
         try:
-            return [int(p, 16) for p in parts]
+            return [int(p, 16) for p in mac_str]
         except ValueError:
             raise RuntimeError(f"Invalid MAC address: {mac_str}")
 
